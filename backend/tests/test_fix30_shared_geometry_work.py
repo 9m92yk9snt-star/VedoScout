@@ -46,7 +46,7 @@ def test_one_image_read_supplies_goal_and_field_geometry_through_to_physical_out
         return vision.parse_goal_scene_response(json.dumps(scene_payload(times)), times)
     monkeypatch.setattr(vision, "_read_frames", frames)
     monkeypatch.setattr(vision, "read_goal_scene_evidence", reader)
-    monkeypatch.setattr(direction, "_read_frames", lambda *_: pytest.fail("duplicate geometry decode"))
+    assert not hasattr(direction, "_read_frames")  # duplicate decoder/reader is retired
     bundle = vision.build_shadow_providers("key", "session", "video.mp4")
     provider = direction.GoalDirectionProvider(bundle.goal_geometry_provider, "key", "session", "video.mp4")
     strike = {"media_ms": 1000, "scene_id": "scene"}

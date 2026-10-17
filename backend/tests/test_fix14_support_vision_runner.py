@@ -98,12 +98,11 @@ READER_FUNCTIONS = {
     "read_action_pixel_evidence": vp.read_action_pixel_evidence,
     "read_visible_player_role": vp.read_visible_player_role,
     "read_goal_scene_evidence": vp.read_goal_scene_evidence,
-    "read_field_side_evidence": gd.read_field_side_evidence,
     "read_visible_jersey_number": iv.read_visible_jersey_number,
 }
 
 
-def test_exactly_the_eight_production_readers_are_registered_for_isolation():
+def test_exactly_the_seven_production_readers_are_registered_for_isolation():
     import video_model_input
     functions = {**READER_FUNCTIONS, "read_action_video_evidence": vp.read_action_video_evidence,
         "read_video": video_model_input.read_video, "read_text": video_model_input.read_text}
@@ -125,7 +124,7 @@ def test_exactly_the_eight_production_readers_are_registered_for_isolation():
                 "read_goal_scene_evidence",
             ],
         ),
-        ("fix10a_goal_direction.py", ["read_field_side_evidence"]),
+        ("fix10a_goal_direction.py", []),
     ],
 )
 def test_call_sites_pass_registered_readers_inside_fail_closed_try(module, expected):
@@ -593,7 +592,6 @@ def _reader_call(kind, images, key):
         "action": (vp.read_action_pixel_evidence, ((key, "fix14-action", [a, b], [1000, 1040]), {"body_candidates": []})),
         "role": (vp.read_visible_player_role, ((key, "fix14-role", a, b), {})),
         "goal": (vp.read_goal_scene_evidence, ((key, "fix14-goal", [a, b, c], [1000, 1040, 1080]), {})),
-        "field_side": (gd.read_field_side_evidence, ((key, "fix14-field", [a, b], [1000, 1040]), {})),
         "number": (iv.read_visible_jersey_number, ((key, "fix14-number", a), {})),
     }[kind]
 
@@ -604,14 +602,12 @@ PARSED = {
     ),
     "role": lambda r: r["role"] == "OUTFIELD" and "model_review_audit" in r,
     "goal": lambda r: r["reason"] == "fake offline server" and r["proof_ready"] is False and "model_review_audit" in r,
-    "field_side": lambda r: r["status"] == "VERIFIED" and len(r["rows"]) == 2 and "model_review_audit" in r,
     "number": lambda r: r["readable"] is True and r["number"] == "88" and "model_review_audit" in r,
 }
 READER_FAIL_CLOSED = {
     "action": lambda r: (r["status"], r["reason"], r["frames"]) == ("ERROR", "action_pixel_reader_error", []),
     "role": lambda r: (r["role"], r["reason"]) == ("UNKNOWN", "role_reader_error"),
     "goal": lambda r: r["reason"] == "goal_scene_reader_error" and r["proof_ready"] is False,
-    "field_side": lambda r: (r["status"], r["reason"]) == ("UNRESOLVED", "field_side_reader_error"),
     "number": lambda r: r["readable"] is False and r["reason"] == "reader_error",
 }
 KINDS = sorted(PARSED)
@@ -807,7 +803,7 @@ def test_action_and_role_call_sites_fail_closed_with_diagnostic(monkeypatch):
     assert [ref[1] for ref in seen] == ["read_action_video_evidence", "read_visible_player_role"]
 
 
-def test_goal_and_field_side_call_sites_fail_closed_with_diagnostic(monkeypatch):
+def test_goal_failure_stays_diagnostic_without_opening_a_second_field_side_call(monkeypatch):
     seen = []
     monkeypatch.setattr(svr, "run_support_vision", _raise_fail_closed(seen))
     monkeypatch.setattr(vp, "_read_frames", _zero_frames)
@@ -816,9 +812,6 @@ def test_goal_and_field_side_call_sites_fail_closed_with_diagnostic(monkeypatch)
     )
     assert goal["status"] == "UNRESOLVED" and goal["visual_crossing_audit"]["proof_ready"] is False
     assert goal["support_vision_fail_closed"]["proof_eligible"] is False
-    monkeypatch.setattr(
-        gd, "_read_frames", lambda _v, requested: [(int(ms), np.zeros((80, 120, 3), np.uint8)) for ms in requested]
-    )
     lines = [{"media_ms": ms, "line": {"p1": {"x": 0.9, "y": 0.3}, "p2": {"x": 0.9, "y": 0.7}}} for ms in (1000, 1100)]
     base = lambda _w, _s: {"status": "VERIFIED", "source": "INDEPENDENT_MULTI_FRAME_GOAL_REVIEW", "line_by_ms": lines}  # noqa: E731
     out = gd.GoalDirectionProvider(base, "key", "fix14", "unused.mp4", max_reviews=2)(
@@ -827,7 +820,6 @@ def test_goal_and_field_side_call_sites_fail_closed_with_diagnostic(monkeypatch)
     assert (out["field_side_status"], out["field_side_by_ms"], out["field_side_reason"]) == (
         "UNRESOLVED",
         [],
-        "field_side_reader_error",
+        "FIELD_SIDE_NOT_OBSERVED_BY_GOAL_SCENE_READER",
     )
-    assert out["field_side_fail_closed"]["lifecycle"]["lifecycle"] == "ABORTED"
-    assert [ref[1] for ref in seen] == ["read_goal_scene_evidence", "read_field_side_evidence"]
+    assert [ref[1] for ref in seen] == ["read_goal_scene_evidence"]

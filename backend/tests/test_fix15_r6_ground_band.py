@@ -50,6 +50,17 @@ def portrait():
     return np.zeros((1280, 640, 3), np.uint8)
 
 
+def test_person_refinement_keeps_person_outputs_while_ball_only_detail_discards_unused_people():
+    raw = prediction(PERSON, DETAIL)
+    person_detector, ball_detector = Detector(raw), Detector(raw)
+    people, balls = dense._detect_dense_people_and_ball(person_detector, portrait(), _detail_pass=True)
+    unused, same_balls = dense._detect_dense_people_and_ball(ball_detector, portrait(),
+        _detail_pass=True, _ball_only=True)
+    assert len(people) == 1 and unused == []
+    assert same_balls == balls and len(balls) == 1
+    assert person_detector.net.calls == ball_detector.net.calls == 1
+
+
 def test_other_whole_frame_ball_does_not_skip_detail_search():
     detector = Detector(prediction(PERSON, SPARE), prediction(DETAIL))
     people, balls = dense._detect_dense_people_and_ball(detector, portrait())

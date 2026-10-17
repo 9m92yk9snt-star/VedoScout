@@ -409,7 +409,7 @@ class NativeDetectionSession:
                 "scope": "RUN_LOCAL_NATIVE_PIXEL_PROPOSALS_ONLY"}
 
 
-def _detect_dense_people_and_ball(detector, frame_bgr, include_a7_support=False, *, _detail_pass=False):
+def _detect_dense_people_and_ball(detector, frame_bgr, include_a7_support=False, *, _detail_pass=False, _ball_only=False):
     """FIX10A dense detector with isolated A7 support proposals.
 
     Person detection keeps the production threshold.  A3 receives only sports-
@@ -492,8 +492,11 @@ def _detect_dense_people_and_ball(detector, frame_bgr, include_a7_support=False,
             rows.append(result)
         return sorted(rows, key=lambda r: float(r.get("confidence") or 0.0), reverse=True)
 
-    people = collect(0, float(cv_detect.CONF_T))
-    fsg._annotate_kit_chroma(frame_bgr, people)
+    # The ground-band forward contributes ball proposals only. Its person
+    # boxes and kit crops are discarded by the caller; do not compute them.
+    people = [] if _ball_only else collect(0, float(cv_detect.CONF_T))
+    if not _ball_only:
+        fsg._annotate_kit_chroma(frame_bgr, people)
     balls = collect(32, float(DENSE_BALL_CONF_T))
     # Portrait padding shrinks the pitch into ~360 detector columns. A ball
     # elsewhere (including a reserve ball) cannot establish that the active
@@ -510,7 +513,7 @@ def _detect_dense_people_and_ball(detector, frame_bgr, include_a7_support=False,
         y1 = min(H, int((max(feet) + .08) * H))
         if 0 < y1 - y0 <= .45 * H:
             _people, detailed = _detect_dense_people_and_ball(
-                detector, frame_bgr[y0:y1, :], _detail_pass=True)
+                detector, frame_bgr[y0:y1, :], _detail_pass=True, _ball_only=True)
             for candidate in detailed:
                 box = candidate["box"]
                 box["y"] = (y0 + box["y"] * (y1 - y0)) / H

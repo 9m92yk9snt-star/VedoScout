@@ -4,7 +4,6 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-import numpy as np
 import pytest
 
 BACKEND = Path(__file__).resolve().parents[1]
@@ -112,36 +111,23 @@ def test_gd05_review_budget_is_bounded_per_report():
     assert second["reason"] == "GOAL_REVIEW_BUDGET_EXHAUSTED"
 
 
-@pytest.mark.usefixtures("inline_support_vision")
-def test_gd06_wrapper_merges_multi_frame_field_side(monkeypatch):
-    frame = np.zeros((80, 120, 3), dtype=np.uint8)
-
-    def fake_frames(_video, requested):
-        return [(int(ms), frame.copy()) for ms in requested]
-
-    async def fake_read(_key, _session, _paths, media_ms):
-        return {
-            "status": "VERIFIED",
-            "rows": [
-                {"media_ms": int(ms), "point": {"x": .70, "y": .50}, "confidence": "high"}
-                for ms in media_ms
-            ],
-            "reason": "MULTI_FRAME_FIELD_SIDE_VISIBLE",
-        }
-
+@pytest.mark.parametrize("observed", [False, True])
+def test_gd06_wrapper_never_opens_a_second_field_side_reader(monkeypatch, observed):
+    import cv2
+    import support_vision_runner
+    calls = []
+    def forbidden(*_a, **_k):
+        pytest.fail("second field-side decode/model reader is retired")
+    monkeypatch.setattr(cv2, "VideoCapture", forbidden)
+    monkeypatch.setattr(support_vision_runner, "run_support_vision", forbidden)
     def base(_window, _strike):
-        return {
-            "status": "VERIFIED", "source": "INDEPENDENT_MULTI_FRAME_GOAL_REVIEW",
-            "line_by_ms": [
-                {"media_ms": 1000, "line": {"p1": {"x": .9, "y": .3}, "p2": {"x": .9, "y": .7}}},
-                {"media_ms": 1100, "line": {"p1": {"x": .9, "y": .3}, "p2": {"x": .9, "y": .7}}},
-            ],
-        }
-
-    monkeypatch.setattr(fgd, "_read_frames", fake_frames)
-    monkeypatch.setattr(fgd, "read_field_side_evidence", fake_read)
+        calls.append(1)
+        result = _geometry(field=observed)
+        if observed:
+            result["field_side_source"] = "SHARED_GOAL_SCENE_PLAYABLE_PITCH"
+        return result
     provider = fgd.GoalDirectionProvider(base, "key", "session", "video.mp4", max_reviews=2)
     out = provider({"dense_window_id": "w1"}, {"media_ms": 1000})
-    assert out["field_side_status"] == "VERIFIED"
-    assert len(out["field_side_by_ms"]) == 2
-    assert out["field_side_source"] == "INDEPENDENT_PLAYABLE_PITCH_REVIEW"
+    assert calls == [1] and provider.field_side_calls == 0
+    assert out["field_side_status"] == ("VERIFIED" if observed else "UNRESOLVED")
+    assert bool(out["field_side_by_ms"]) == observed

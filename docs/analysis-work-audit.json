@@ -1,0 +1,223 @@
+{
+  "scope": "RECORDED_MODEL_AUDIT_AND_FRESH_NATIVE_PROFILE_NOT_NEW_MODEL_INFERENCE",
+  "source_video_sha256": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+  "source_trace_sha256": {
+    "traces/000.json": "da1f0bbeaa66146627ee7c9074438d7409fc43c1207616794b378ef44f51ef19",
+    "traces/001.json": "92c27bad3f2957ceff961601313517714e649ad3da17206c0082658687b691d9",
+    "traces/002.json": "40ae09cded5e4db215a3dcd50d3c8b0b21537704cfb0b870f686a7995eb31a14",
+    "traces/003.json": "bd21bcee98a27fda0acac3912612f24cc4e7773e84ea89af553b9391af8334f9",
+    "traces/004.json": "78b310f94cb391db0c01bfdcd43b56a113045054c97e8ace9fa9ab2d8cb92162",
+    "traces/005.json": "6d9c501b62b955acef8969d3e28e06f04eaf9c5664fdb851d7dbfef718d4551b",
+    "traces/006.json": "c932f05215dd6eb15df1f1701dc624159f8d5f2bbf82bfedbf0dae76183313b1",
+    "traces/007.json": "022c689dd3c7b38108197ed0d78d5fe30306e6c1bd1881599f1c27b18fce62fc",
+    "traces/008.json": "303501a6f6d19b898e8e01d86ef95160d5987c72b1efd1dd1686764f223836e7",
+    "traces/009.json": "5ec6c537190a49c428dda63c9074eb771ca8164c0bebff74f697bcef2456f2ca",
+    "traces/010.json": "54fb005e6e4b903dab9836cc70412e04148ec09e38d4535d607d9dbc03ae6c8c",
+    "traces/011.json": "ab60b4ed74e00bcdca2960c86c103a66c629302d9c12c39fc7e36c64fdf5ccd2",
+    "traces/012.json": "cf17c432e84fef04b3ab14bf7d06772c72edcdff9436c785713e13dc2b606a06",
+    "traces/013.json": "9bfa1e39676d7573b58b5b7e8f2613ec3668120176faabe4b1712146b997f082",
+    "traces/014.json": "295dc011ef359e858a303f7b0f98564fbde3e374fc67b2247902bbfb1c5f5c2e"
+  },
+  "recorded_provider_diagnostics": {
+    "row_count": {
+      "action_pixels": 24,
+      "jersey": 23,
+      "intervention_role": 23,
+      "goal_geometry": 312
+    },
+    "elapsed_seconds": {
+      "action_pixels": 465.304,
+      "jersey": 260.426,
+      "intervention_role": 237.804,
+      "goal_geometry": 1379.742
+    },
+    "row_count_is_not_paid_model_call_count": true
+  },
+  "recorded_number_consensus_statuses": {
+    "UNKNOWN": 132,
+    "SUPPORTING": 30,
+    "VERIFIED": 7,
+    "UNRESOLVED": 10
+  },
+  "recorded_role_statuses": {
+    "UNRESOLVED:None": 8,
+    "VERIFIED:OUTFIELD": 43,
+    "VERIFIED:GOALKEEPER": 2
+  },
+  "recorded_goal_crossing_statuses": {
+    "UNRESOLVED": 192
+  },
+  "recorded_native_path_sources": {
+    "REJECTED_RELEASE_ANCHOR": 96,
+    "VERIFIED_RELEASE_ANCHOR": 96
+  },
+  "recorded_physical_proposals": 0,
+  "recorded_identity_recovered_actions": 1,
+  "fresh_native_profile": {
+    "mode": "FRESH_NATIVE_DECODE_DETECTION_ONLY_NOT_MODEL_RECOGNITION",
+    "source_sha256": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+    "window": {
+      "dense_window_id": "dense_e29df0078338b31c",
+      "end_ms": 25466,
+      "reasons": [
+        "ACTION_CONTACT",
+        "ACTION_OUTCOME",
+        "FIX09B_REFINEMENT",
+        "TARGET_UNRESOLVED",
+        "CAUSAL_CHAIN"
+      ],
+      "recall_window": false,
+      "scene_id": "scene_003",
+      "source_action_ids": [
+        "381c44303eb4_01",
+        "381c44303eb4_02"
+      ],
+      "source_refinement_ids": [
+        "ref_9ea31f92ecb3",
+        "ref_cc83169a37f7"
+      ],
+      "source_sequence_ids": [
+        "seq_381c44303eb4"
+      ],
+      "start_ms": 19466,
+      "trigger_ms": []
+    },
+    "elapsed_seconds": 67.202,
+    "frame_count": 361,
+    "detector": {
+      "hits": 0,
+      "misses": 361,
+      "evictions": 0,
+      "entries": 361,
+      "payload_bytes": 647185,
+      "max_entries": 768,
+      "max_payload_bytes": 16777216,
+      "scope": "RUN_LOCAL_NATIVE_PIXEL_PROPOSALS_ONLY"
+    },
+    "model_calls": 0,
+    "network_connections": 0,
+    "threads": 4,
+    "profiled_dnn_forward_calls": 672,
+    "profiled_dnn_forward_seconds": 54.044
+  },
+  "native_postprocessing_comparison": {
+    "mode": "REAL_SOURCE_NATIVE_PROPOSAL_COMPARISON_NOT_MODEL_RECOGNITION",
+    "baseline_published_commit": "e1d892c9f1107cb14a6da94651e8afdc181d5ee3",
+    "candidate_native_source_sha256": "c6b4c47e48c39a783fbd1845beb9085a202521fd05b9fd059a2a3aa47cce36b2",
+    "source_sha256": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+    "model_sha256": "013a98f3bc0264a3d793ef29ccbd178ceb0bbb86bc12ff3510273ce85b1c4526",
+    "source_frames": 13,
+    "model_calls": 0,
+    "network_connections": 0,
+    "all_native_proposals_identical": true,
+    "kit_annotate_calls": {
+      "warmup": 3,
+      "before": 24,
+      "after": 13
+    },
+    "elapsed_seconds": {
+      "before": 2.0629292279991205,
+      "after": 1.957145132986625
+    },
+    "timing_note": "Small paired sample, no inference about total-analysis speed.",
+    "frames": [
+      {
+        "media_ms": 19466,
+        "people": 9,
+        "balls": 1,
+        "support": 2,
+        "proposals_sha256": "89c39cc1914d7f2e4bec127081d015c0ca5aa59764fa1cfc481c1b4e48c4f6ae"
+      },
+      {
+        "media_ms": 19966,
+        "people": 9,
+        "balls": 1,
+        "support": 1,
+        "proposals_sha256": "420df2fe818d6eb7f96e8b7ae19272f74747083fde40b11256adaaacb75006e7"
+      },
+      {
+        "media_ms": 20466,
+        "people": 7,
+        "balls": 0,
+        "support": 3,
+        "proposals_sha256": "787bb7d1836ce31fa5d1b6cfe2c8f823b01b1e4c45a2e17f9b376b97925c2521"
+      },
+      {
+        "media_ms": 20966,
+        "people": 5,
+        "balls": 2,
+        "support": 2,
+        "proposals_sha256": "fbf367358ae4cc7b00a0e3c4962dc59b0aed6997b78293c40073539fb37a3dff"
+      },
+      {
+        "media_ms": 21466,
+        "people": 8,
+        "balls": 1,
+        "support": 2,
+        "proposals_sha256": "207b3784edd2bdd443101ce696b62c1abbde617c157c67ee33067b83f5594d40"
+      },
+      {
+        "media_ms": 21966,
+        "people": 9,
+        "balls": 3,
+        "support": 4,
+        "proposals_sha256": "b5edbdd689b433c38f24c111e653c3eedc544b98e2cb4662116939eb661ff9cf"
+      },
+      {
+        "media_ms": 22466,
+        "people": 7,
+        "balls": 5,
+        "support": 2,
+        "proposals_sha256": "a0ec99706f6883f359884b0e24934ada88f7f4f04ef2d979b92421ff67a5e67b"
+      },
+      {
+        "media_ms": 22966,
+        "people": 5,
+        "balls": 4,
+        "support": 5,
+        "proposals_sha256": "8814cc2f5c9b1508b7f0830809c30353d95c7563439bb71c4661ca515b6b1885"
+      },
+      {
+        "media_ms": 23466,
+        "people": 4,
+        "balls": 2,
+        "support": 6,
+        "proposals_sha256": "ab1787530f7eb9811529153a9d2d143cc1679cdfe14e49f4af7b02a19a851dc3"
+      },
+      {
+        "media_ms": 23966,
+        "people": 1,
+        "balls": 0,
+        "support": 2,
+        "proposals_sha256": "d960457051da3aec1d3f9390994cb52496daf9b01368d6e283ca20da2face845"
+      },
+      {
+        "media_ms": 24466,
+        "people": 2,
+        "balls": 0,
+        "support": 1,
+        "proposals_sha256": "b432a0715701202f320939cdb4fb140db70f5fdd5a2667eb33c32e169420b599"
+      },
+      {
+        "media_ms": 24966,
+        "people": 0,
+        "balls": 0,
+        "support": 1,
+        "proposals_sha256": "04d03a266b41f14c9463b0ded2e666993038d1cf771bc3faf518215e730a8c25"
+      },
+      {
+        "media_ms": 25466,
+        "people": 0,
+        "balls": 0,
+        "support": 1,
+        "proposals_sha256": "233a8449f9082819d077590a92572cfd899386b588e24c11d9b1871028e938c7"
+      }
+    ]
+  },
+  "limits": [
+    "Recorded VERIFIED statuses are model/consensus outputs, not independent ground-truth accuracy.",
+    "No fresh video-model inference, complete-video benchmark or before/after full-analysis measurement is included.",
+    "The deleted standalone field-side reader was already bypassed by valid combined goal-scene responses; no historical 39-minute saving is attributed to its deletion.",
+    "The 30-60 minute chat estimate was not measured or derived from a calibrated runtime model and is withdrawn as a reliable prediction."
+  ]
+}

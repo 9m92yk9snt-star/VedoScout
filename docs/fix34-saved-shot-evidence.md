@@ -95,6 +95,60 @@ every recorded decision instead of relabelling all 25 claims as approved.
 
 ## Existing-video evidence
 
+### Expensive-work audit and removals
+
+[`analysis-work-audit.json`](analysis-work-audit.json) records the original
+provider diagnostic totals, source-trace hashes, a fresh native profile and a
+paired comparison on original video frames. The historical provider rows total
+2,343.276 s (39.05 minutes), but include cache reuse and unavailable results;
+382 rows are not 382 paid model calls. Physical reconciliation proposed zero
+new scoring events and recovered one other action through identity feedback.
+The number reader produced seven VERIFIED consensus statuses and role readers
+produced two VERIFIED goalkeeper statuses. These are recorded model outputs,
+not independent proof that every classification was correct. One failed run
+does not show that an entire detector or reader has never worked.
+
+Removed or bypassed work:
+
+- Delete the standalone playable-field-side decoder/model reader and its worker
+  registration. The goal-scene reader already observes goal geometry and field
+  side together. Custom readers retain their literal orientation evidence; a
+  missing orientation stays missing rather than opening a second model call.
+  This path was already bypassed by valid combined production responses, so its
+  deletion is not credited with saving the historical 39 minutes.
+- Merge identical jersey/role crop requests within a pending batch. Previously
+  the cache was only filled after the batch returned, allowing the same source
+  instant/body crop under different local labels to open duplicate model calls.
+  Preserve each recipient/request ID and actual timestamp. Copies of one frame
+  remain one independent observation. Cache keys include source path and exact
+  body coordinates rather than rounded coordinates.
+- Reuse current-run physical results when feedback adds no physical input and
+  requests no new jersey crop. The source hash, measured frames, shared jersey
+  reference and explicit role evidence must be unchanged. Keep the fresh video
+  response for the common resolver. New native pixels, identity information,
+  jersey crops or changed shared evidence still re-enter the physical path;
+  exported replays without the current run's work record still reconstruct.
+- Remove person-box/kit-colour postprocessing from the native ground-band pass:
+  its caller only consumes ball candidates. Keep the entire detector forward,
+  ball thresholds, full-scene person pass and all original source views.
+
+The fresh local profile decoded/refined all 361 frames of the six-second saved
+shot window with four OpenCV threads. It took 67.202 s, with 672 detector forwards
+accounting for 54.044 s. This is a native-stage profile, not model recognition or
+full-analysis latency. That detector work produces source proposals and cannot
+be deleted merely because later canonical scoring was unresolved.
+
+On 13 uniformly selected frames from the same source window, the old and revised
+native functions returned exactly identical person, ball and support proposals.
+Discarded kit computations fell from 24 to 13; the final paired local times were
+2.063 s and 1.957 s. Native person-refinement crops retain their person outputs;
+only the ball-only ground-band pass drops them. This small sample does not
+establish a full-analysis speedup.
+
+The 30–60 minute chat estimate was not derived from a calibrated measurement
+and is withdrawn as a reliable runtime prediction. None of these measurements
+establishes a five-action model PASS or a complete-video speedup.
+
 The inspected export is for source SHA-256
 `b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999`,
 window `dense_e29df0078338b31c`, source interval 19.466–25.466 seconds.
@@ -220,6 +274,13 @@ pipeline to run this way before dense detection still requires real perception
 validation; no end-to-end performance or quality claim follows from this audit.
 
 ## Validation and limits
+
+The final code after removing redundant work passed 2,456 tests with one skip
+across the same 122 offline backend files in 27.41 s. Another focused selection
+passed 12 process-wiring/reuse checks, overlapping this sweep. The separate full
+process-hygiene module remains a GitHub CI check. Retiring its field-side cases
+and registry entry does not change deadlines, isolation, cancellation or cleanup
+for the remaining seven registered readers.
 
 After the broader action audit, the reviewed final code passed 2,447 tests with
 one skip across the same 122 backend files in 26.15 s. All Python socket

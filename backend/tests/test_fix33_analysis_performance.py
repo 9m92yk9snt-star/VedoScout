@@ -17,6 +17,97 @@ import evidence_feedback
 from test_fix31_temporal_video import motion_trace
 
 
+@pytest.mark.usefixtures("inline_support_vision")
+@pytest.mark.parametrize("reader", ["jersey", "role"])
+@pytest.mark.parametrize("times", [[1000], [1000, 1300]])
+def test_identical_crops_in_one_batch_are_read_once_without_inventing_independent_frames(monkeypatch, reader, times):
+    import fix10a_vision_providers as vision
+    import jersey_consensus
+    image = np.zeros((240, 160, 3), np.uint8)
+    box = {"x": .2, "y": .2, "w": .2, "h": .5}
+    requests = [{"media_ms": ms, "track_id": track, "box": deepcopy(box), "request_id": f"{track}-{ms}"}
+                for ms in times for track in ("first-label", "second-label")]
+    monkeypatch.setattr(vision, "_read_frames", lambda _v, wanted: {ms: (ms, image) for ms in wanted})
+    monkeypatch.setattr(vision, "_write_jpg", lambda *_: True)
+    calls = []
+    async def read(*_args):
+        calls.append(1)
+        return {"readable": True, "number": "7", "role": "GOALKEEPER", "confidence": "high"}
+    owner = vision.ShadowVisionProviders("test-only", "dedupe")
+    if reader == "jersey":
+        monkeypatch.setattr(vision.identity_verify, "read_visible_jersey_number", read)
+        result = owner.jersey_vote_provider("source.mp4", requests)
+        assert {v["request_id"] for votes in result.values() for v in votes} == {r["request_id"] for r in requests}
+        statuses = [jersey_consensus.aggregate_jersey_votes(votes)["status"] for votes in result.values()]
+    else:
+        monkeypatch.setattr(vision, "_role_review_requests", lambda *_: deepcopy(requests))
+        monkeypatch.setattr(vision, "read_visible_player_role", read)
+        result = owner.role_evidence_provider("source.mp4", {}, [], {}, [], [])
+        statuses = [row["status"] for row in result.values()]
+    assert len(calls) == len(times)
+    assert set(result) == {"first-label", "second-label"}
+    assert all((status == "VERIFIED") == (len(times) == 2) for status in statuses)
+
+
+@pytest.mark.parametrize("status", ["COMPLETED", "ERROR"])
+def test_feedback_without_new_inputs_does_not_repeat_physical_or_support_work(monkeypatch, status):
+    import test_fix10a_physical_reconstruction as fixture
+    frames = [fixture._frame(ms) for ms in range(900, 3301, 50)]
+    fixture._patch_window(monkeypatch, frames=frames, contact=fixture._contact_result())
+    window = {**fixture.WINDOW, "end_ms": 3300}
+    monkeypatch.setattr(physical.dense_replay, "select_critical_windows", lambda *_: [deepcopy(window)])
+    monkeypatch.setattr(physical.shot_outcome_engine, "find_strike_releases", lambda *_: [])
+    monkeypatch.setattr(physical.shot_outcome_engine, "find_scoring_control_contacts", lambda *_: [])
+    counts = {"contacts": 0, "jersey": 0, "role": 0}
+    def resolve(*_):
+        counts["contacts"] += 1
+        return fixture._contact_result()
+    monkeypatch.setattr(physical.ball_contact_engine, "resolve_contacts", resolve)
+    phases = []
+    def inspect(_video, job, rows):
+        phases.append(job.get("phase", "INITIAL"))
+        return {"status": status if job.get("phase") == "FEEDBACK" else "COMPLETED", "frames": [],
+                "requested_media_ms": [f["media_ms"] for f in rows]}
+    def jersey(*_):
+        counts["jersey"] += 1
+        return {}
+    def role(*_):
+        counts["role"] += 1
+        return {}
+    plan, analysis, graph, authority = fixture._base_inputs()
+    result = physical.reconstruct_physical_match("source.mp4", plan, analysis, graph, authority,
+        action_evidence_provider=inspect, jersey_vote_provider=jersey, role_evidence_provider=role,
+        source_video={"sha256": "same-source"})
+    assert result["status"] == "ok" and phases == ["INITIAL", "FEEDBACK"]
+    assert counts == {"contacts": 1, "jersey": 1, "role": 1}
+    retained, = result["traces"]
+    assert retained["physical_evidence_reused"] is True
+    assert retained["contacts"] == retained["first_pass_evidence"]["contacts"]
+    assert len(retained["action_inspections"]) == 2
+
+
+def test_reusing_physical_evidence_still_publishes_the_fresh_video_observation(monkeypatch):
+    import fix10b_runtime
+    trace = motion_trace("SHOT", "SAVED")
+    observation = trace["action_inspections"].pop()
+    trace["window"]["dense_window_id"] = trace["trace_id"]
+    trace.update(contacts={"accepted": [], "unresolved": [], "rejected": []},
+                 strike_evidence=[], outcome_evidence=[], role_evidence={}, jersey_consensus={}, unresolved_reasons=[])
+    # This isolates physical-work reuse; selected-person evidence is already
+    # present in the shared source graph, as in the other motion fixtures.
+    monkeypatch.setattr(physical.dense_identity_continuity, "apply", lambda rows, *_: {"frames": deepcopy(rows)})
+    monkeypatch.setattr(physical.ball_trajectory, "reconstruct_ball_trajectory", lambda *_: pytest.fail("unchanged native pass reran"))
+    result = physical.reconstruct_physical_match("source.mp4", {}, {}, {}, {},
+        action_evidence_provider=lambda *_: deepcopy(observation), source_video={"sha256": "source"},
+        _feedback_context={"traces": {trace["trace_id"]: trace}, "jobs": [{**trace["window"],
+            "inspection_id": "fresh-video", "selected": True, "phase": "FEEDBACK"}],
+            "window_rows": {trace["trace_id"]: {"dense_window_id": trace["trace_id"], "status": "ok"}}})
+    assert result["traces"][0]["physical_evidence_reused"] is True
+    final = fix10b_runtime.reconcile_unified_result({}, result)
+    event, = final["canonical_events"]["events"]
+    assert event["canonical_outcome"] == "SAVED" and event["causal_verified"] is True
+
+
 def test_source_cache_preserves_actual_pts_and_isolates_mutable_images(tmp_path):
     video = tmp_path / "source.mp4"
     video.write_bytes(b"source fingerprint")

@@ -58,7 +58,6 @@ ISOLATED_READERS = frozenset({
     ("fix10a_vision_providers", "read_action_video_evidence"),
     ("fix10a_vision_providers", "read_visible_player_role"),
     ("fix10a_vision_providers", "read_goal_scene_evidence"),
-    ("fix10a_goal_direction", "read_field_side_evidence"),
     ("identity_verify", "read_visible_jersey_number"),
 })
 

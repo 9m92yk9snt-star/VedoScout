@@ -488,7 +488,7 @@ def run_feedback_round(traces, video_path, sequence_plan, sequence_analysis, sce
                        identity_authority, *, action_evidence_provider=None,
                        jersey_vote_provider=None, goal_geometry_provider=None,
                        role_evidence_provider=None, role_evidence=None, source_video=None, review_jobs=None,
-                       feedback_trace_ids=None):
+                       feedback_trace_ids=None, window_rows=None):
     """Re-enter the original physical gates once using preserved measured frames."""
     feedback = evidence_feedback.build_plan([t for t in traces if feedback_trace_ids is None
         or t["trace_id"] in feedback_trace_ids], analysis=sequence_analysis)
@@ -503,6 +503,7 @@ def run_feedback_round(traces, video_path, sequence_plan, sequence_analysis, sce
     _apply_cross_window_review_context([], traces, shared_packets=shared_packets)
     context = {"traces": {tid: by_id[tid] for tid in wanted},
                "jobs": [{**j, "shared_sequence_context": shared_packets.get(j["dense_window_id"])} for j in selected],
+               "window_rows": {r["dense_window_id"]: r for r in window_rows or [] if r.get("status") == "ok"},
                "support_traces": [t for t in traces if t["trace_id"] not in wanted]}
     rerun = reconstruct_physical_match(
         video_path, sequence_plan, sequence_analysis, scene_graph, identity_authority,
@@ -668,6 +669,29 @@ def reconstruct_physical_match(
                 inspection_rows.append({**job, **observation, "added_ball_candidates": applied["added_ball_candidates"],
                                         "binding_rejections": applied["binding_rejections"],
                                         "independent_jersey_crops": len(applied["jersey_requests"])})
+
+            prior_row = (_feedback_context or {}).get("window_rows", {}).get(window["dense_window_id"])
+            if (previous is not None and prior_row is not None and not inspection_requests
+                    and source.get("sha256") and (previous.get("source_video") or {}).get("sha256") == source["sha256"]
+                    and dense_frames == previous.get("decoded_frames")
+                    and previous.get("automatic_jersey_reference") == authority.get("automatic_jersey_reference")
+                    and (not isinstance(role_evidence, dict) or all(
+                        (previous.get("role_evidence") or {}).get(k) == v for k, v in role_evidence.items()))):
+                # Same-run feedback supplied no new physical input. Keep its
+                # fresh video observations, but do not rerun identical contact,
+                # jersey, role, ball-path and goal work. An exported replay
+                # without the current run's window row still reconstructs.
+                retained = deepcopy(previous)
+                retained.update(action_inspections=inspection_rows, provider_diagnostics=provider_diagnostics,
+                    jersey_model_audits={}, provider_adapter_errors=_adapter_diagnostics(inspection_rows),
+                    physical_evidence_reused=True, goal_review_phase="complete", stage_seconds=clock.finish())
+                retained.pop("motion_observation_summary", None)
+                traces.append(retained)
+                summaries.append(event_trace.compact_trace_summary(retained))
+                window_rows.append({**deepcopy(prior_row), "action_inspections": len(inspection_rows),
+                    "stage_timings": stage_timings, "stage_seconds": retained["stage_seconds"],
+                    "provider_diagnostics": provider_diagnostics, "physical_evidence_reused": True})
+                continue
 
             stage = clock.enter("ball_trajectory")
             trajectory = ball_trajectory.reconstruct_ball_trajectory(dense_frames)
@@ -1082,7 +1106,7 @@ def reconstruct_physical_match(
             traces, str(video_path), plan, analysis, graph, authority,
             action_evidence_provider=action_evidence_provider, jersey_vote_provider=jersey_vote_provider,
             goal_geometry_provider=goal_geometry_provider, role_evidence_provider=role_evidence_provider,
-            role_evidence=role_evidence, source_video=source, review_jobs=review_jobs)
+            role_evidence=role_evidence, source_video=source, review_jobs=review_jobs, window_rows=window_rows)
         feedback_by_id = {r["dense_window_id"]: r for r in feedback_rows if r.get("status") == "ok"}
         combined_rows = []
         for row in window_rows:

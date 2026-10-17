@@ -10,7 +10,6 @@ from pathlib import Path
 
 import pytest
 
-import fix10a_goal_direction as gd
 import fix10a_vision_providers as vp
 import identity_verify as iv
 
@@ -54,18 +53,16 @@ def _readers(tmp_path):
         "action": lambda: vp.read_action_pixel_evidence("k", "s", [a, b], [1000, 1040], body_candidates=[]),
         "role": lambda: vp.read_visible_player_role("k", "s", a, b),
         "goal": lambda: vp.read_goal_scene_evidence("k", "s", [a, b, c], [1000, 1040, 1080]),
-        "field_side": lambda: gd.read_field_side_evidence("k", "s", [a, b], [1000, 1040]),
         "number": lambda: iv.read_visible_jersey_number("k", "s", a),
     }
 
 
-@pytest.mark.parametrize("reader_name", ["action", "role", "goal", "field_side", "number"])
+@pytest.mark.parametrize("reader_name", ["action", "role", "goal", "number"])
 def test_reader_request_deadline_and_no_hang(reader_name, tmp_path, monkeypatch):
     captured = []
     monkeypatch.setattr(litellm, "acompletion", _make_fake_acompletion(captured))
     # Keep the deadline short so the regression is fast; still < every wait_for.
     monkeypatch.setattr(vp, "VERIFY_REQUEST_TIMEOUT_S", PATCHED_DEADLINE)
-    monkeypatch.setattr(gd, "VERIFY_REQUEST_TIMEOUT_S", PATCHED_DEADLINE)
     monkeypatch.setattr(iv, "VERIFY_REQUEST_TIMEOUT_S", PATCHED_DEADLINE)
 
     coro = _readers(tmp_path)[reader_name]()
@@ -96,8 +93,6 @@ def test_reader_request_deadline_and_no_hang(reader_name, tmp_path, monkeypatch)
         assert result["status"] == "ERROR" and result.get("frames") == []
     elif reader_name == "role":
         assert result.get("role") == "UNKNOWN"
-    elif reader_name == "field_side":
-        assert result.get("status") == "UNRESOLVED" and result.get("rows") == []
     elif reader_name == "number":
         assert result.get("readable") is False and result.get("number") is None
     elif reader_name == "goal":
@@ -113,8 +108,7 @@ def test_default_request_timeout_is_float():
     """The shipped deadline must be a float for the OpenAI handler's
     float|httpx.Timeout validation (no int->float coercion dependency)."""
     assert isinstance(vp.VERIFY_REQUEST_TIMEOUT_S, float)
-    assert isinstance(gd.VERIFY_REQUEST_TIMEOUT_S, float)
     assert isinstance(iv.VERIFY_REQUEST_TIMEOUT_S, float)
     # shorter than the smallest existing wait_for (60s)
-    for v in (vp.VERIFY_REQUEST_TIMEOUT_S, gd.VERIFY_REQUEST_TIMEOUT_S, iv.VERIFY_REQUEST_TIMEOUT_S):
+    for v in (vp.VERIFY_REQUEST_TIMEOUT_S, iv.VERIFY_REQUEST_TIMEOUT_S):
         assert 0 < v < 60

@@ -1916,7 +1916,7 @@ class ShadowVisionProviders:
         votes_by_track = {}
         with tempfile.TemporaryDirectory(prefix="fix10a_jersey_") as temp:
             jobs = []
-            job_meta = []
+            job_meta = {}
             root = Path(temp)
             for index, row in enumerate(rows):
                 track = row.get("track_id")
@@ -1928,18 +1928,22 @@ class ShadowVisionProviders:
                 if not got:
                     continue
                 actual_ms, frame = got
-                cache_key = (int(actual_ms), tuple(round(float(box[k]), 5) for k in ("x", "y", "w", "h")))
+                cache_key = (str(video_path), int(actual_ms), tuple(float(box[k]) for k in ("x", "y", "w", "h")))
                 if cache_key in self._jersey_cache:
                     vote = deepcopy(self._jersey_cache[cache_key])
                     vote.update(media_ms=int(actual_ms), request_id=row.get("request_id"), reused=True)
                     votes_by_track.setdefault(track, []).append(vote)
+                    continue
+                meta = (track, int(actual_ms), row.get("request_id"))
+                if cache_key in job_meta:
+                    job_meta[cache_key].append(meta)
                     continue
                 crop = jersey_pixels.native_torso_crop(frame, box)
                 path = root / f"jersey_{index:03d}.jpg"
                 if crop is None or not _write_jpg(path, crop):
                     continue
                 jobs.append(((self.api_key, f"{self.session_prefix}-jersey-{index}", str(path)), {}))
-                job_meta.append((track, actual_ms, row.get("request_id"), cache_key))
+                job_meta[cache_key] = [meta]
             if not jobs:
                 return votes_by_track
             self.jersey_calls += len(jobs)
@@ -1951,14 +1955,15 @@ class ShadowVisionProviders:
             except Exception as exc:
                 results = [{"readable": False, "number": None, "confidence": "low", "reason": "reader_error",
                             **support_vision_runner.fail_closed_diagnostic(exc, index)} for index in range(len(job_meta))]
-            for (track, actual_ms, request_id, cache_key), result in zip(job_meta, results):
+            for (cache_key, recipients), result in zip(job_meta.items(), results):
                 vote = dict(result) if isinstance(result, dict) else {
                     "readable": False, "number": None, "confidence": "low", "reason": "reader_unavailable"
                 }
-                vote.update({"media_ms": int(actual_ms), "request_id": request_id})
+                vote["media_ms"] = recipients[0][1]
                 self._jersey_cache[cache_key] = deepcopy(vote)
                 # Expected jersey number is deliberately never passed to the reader.
-                votes_by_track.setdefault(track, []).append(vote)
+                for track, _actual_ms, request_id in recipients:
+                    votes_by_track.setdefault(track, []).append({**deepcopy(vote), "request_id": request_id})
         return votes_by_track
 
     def role_evidence_provider(self, video_path: str, window: dict, strikes,
@@ -1978,15 +1983,18 @@ class ShadowVisionProviders:
         raw_votes = {}
         with tempfile.TemporaryDirectory(prefix="fix10a_role_") as temp:
             root = Path(temp)
-            jobs, job_meta = [], []
+            jobs, job_meta = [], {}
             for index, row in enumerate(requests):
                 got = frames.get(int(row["media_ms"]))
                 if not got:
                     continue
                 actual_ms, frame = got
-                cache_key = (str(video_path), int(actual_ms), tuple(round(float(row["box"][k]), 5) for k in ("x", "y", "w", "h")))
+                cache_key = (str(video_path), int(actual_ms), tuple(float(row["box"][k]) for k in ("x", "y", "w", "h")))
                 if cache_key in self._role_cache:
                     raw_votes.setdefault(row["track_id"], []).append(deepcopy(self._role_cache[cache_key]))
+                    continue
+                if cache_key in job_meta:
+                    job_meta[cache_key].append(row["track_id"])
                     continue
                 crop = _crop(frame, row["box"], pad_x=0.18, pad_y=0.10)
                 tight = root / f"role_tight_{index:03d}.jpg"
@@ -1994,7 +2002,7 @@ class ShadowVisionProviders:
                 if crop is None or not _write_jpg(tight, crop) or not _write_jpg(context, frame):
                     continue
                 jobs.append(((self.api_key, f"{self.session_prefix}-role-{index}", str(tight), str(context)), {}))
-                job_meta.append((row["track_id"], int(actual_ms), cache_key))
+                job_meta[cache_key] = [row["track_id"]]
             if not jobs:
                 return {track: aggregate_role_votes(votes) for track, votes in raw_votes.items()}
             self.role_calls += len(jobs)
@@ -2006,13 +2014,14 @@ class ShadowVisionProviders:
             except Exception as exc:
                 results = [{"role": "UNKNOWN", "confidence": "low", "reason": "role_reader_error",
                             **support_vision_runner.fail_closed_diagnostic(exc, index)} for index in range(len(job_meta))]
-            for (track, actual_ms, cache_key), result in zip(job_meta, results):
+            for (cache_key, tracks), result in zip(job_meta.items(), results):
                 vote = dict(result) if isinstance(result, dict) else {
                     "role": "UNKNOWN", "confidence": "low", "reason": "reader_unavailable"
                 }
-                vote["media_ms"] = int(actual_ms)
+                vote["media_ms"] = cache_key[1]
                 self._role_cache[cache_key] = deepcopy(vote)
-                raw_votes.setdefault(track, []).append(vote)
+                for track in tracks:
+                    raw_votes.setdefault(track, []).append(deepcopy(vote))
         return {track: aggregate_role_votes(votes) for track, votes in raw_votes.items()}
 
     def goal_geometry_provider(self, window: dict, strike: dict):
