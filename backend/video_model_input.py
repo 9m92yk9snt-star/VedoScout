@@ -127,7 +127,10 @@ async def read_video(api_key, session_id, prompt, video_path, reference_paths=()
             cap.release()
         fps = PLAYBACK_FPS
         audit.update(requested_fps=fps, sampling_strategy="SOURCE_INDEXED_1FPS_PLAYBACK",
-            source_sampling_fps=VIDEO_FPS, playback_fps=rate, frame_count=count,
+            source_sampling_fps=round((len(source_clock)-1)*1000/(source_clock[-1]-source_clock[0]), 4),
+            max_source_gap_ms=max(b-a for a, b in zip(source_clock, source_clock[1:])),
+            min_source_gap_ms=min(b-a for a, b in zip(source_clock, source_clock[1:])),
+            playback_fps=rate, frame_count=count,
             frame_source_ms=list(source_clock), sampling_prepared_for_provider=True)
     for package in ("emergentintegrations", "litellm"):
         try:
@@ -199,7 +202,7 @@ class IsolatedTextChat:
         return response_text(result[0])
 
 
-def write_motion_clip(paths, source_ms, destination):
+def write_motion_clip(paths, source_ms, destination, *, max_dimension=1280):
     """Encode chronological source views; indices carry the original VFR clock.
 
     Playback time is not source time. Every frame is labelled with its exact
@@ -212,7 +215,9 @@ def write_motion_clip(paths, source_ms, destination):
     if first is None:
         raise ValueError("MOTION_CLIP_FRAME_UNAVAILABLE")
     h, w = first.shape[:2]
-    scale = min(1., 1280/max(h, w))
+    if max_dimension not in (1280, 1920):
+        raise ValueError("INVALID_MOTION_CLIP_DIMENSION")
+    scale = min(1., max_dimension/max(h, w))
     size = (max(2, int(w*scale)//2*2), max(2, int(h*scale)//2*2))
     writer = cv2.VideoWriter(str(destination), cv2.VideoWriter_fourcc(*"mp4v"), PLAYBACK_FPS, size)
     if not writer.isOpened():
@@ -231,8 +236,9 @@ def write_motion_clip(paths, source_ms, destination):
     finally:
         writer.release()
     return {"protocol": "SOURCE_INDEXED_MOTION_CLIP_V1", "playback_fps": PLAYBACK_FPS,
-            "source_sampling_fps": VIDEO_FPS,
+            "source_sampling_fps": round((len(source_ms)-1)*1000/(source_ms[-1]-source_ms[0]), 4),
             "frame_source_ms": list(source_ms), "frame_count": len(source_ms),
             "source_start_ms": source_ms[0], "source_end_ms": source_ms[-1],
             "max_source_gap_ms": max(b-a for a, b in zip(source_ms, source_ms[1:])),
+            "min_source_gap_ms": min(b-a for a, b in zip(source_ms, source_ms[1:])),
             "clip_sha256": sha256(destination)}

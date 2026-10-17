@@ -82,6 +82,7 @@ def build_plan(traces, budget=None, analysis=None):
         sha = (trace.get("source_video") or {}).get("sha256")
         centers = sequence_observation_context.requested_centers(trace, frames,
             shared_requests.get((sha, window["scene_id"]), []) if sha else attack_sequence_search.questions(trace))
+        motion_requests = [r for r in requests[id(trace)] if r.get("search_protocol") == "SOURCE_INDEXED_MOTION_CLIP_V1"]
         for job in trace.get("action_inspections") or []:
             if job.get("selected") and job.get("status") == "PARTIAL_RESPONSE":
                 centers.extend((1, ms, "PIXEL_RESPONSE_COVERAGE_GAP")
@@ -120,6 +121,11 @@ def build_plan(traces, budget=None, analysis=None):
                     centers.append((0 if release else 3, ms, "TARGET_RELEASE_OR_BALL_GAP"))
         if before["identity_frames"] or not (trace.get("contacts") or {}).get("accepted"):
             for job in trace.get("action_inspections") or []:
+                summary = trace.get("motion_observation_summary") or {}
+                if (job.get("observation_protocol") == "SOURCE_INDEXED_MOTION_CLIP_V1"
+                        and job.get("clip_review_complete") is True and summary.get("counts")
+                        and not summary.get("unresolved") and not summary.get("rejected")):
+                    continue  # a resolved full play needs no generic identity re-read
                 if job.get("selected") and job.get("status") not in {"ERROR", "UNAVAILABLE", "NOT_CONFIGURED", "DEFERRED"}:
                     centers.append((3, job.get("center_ms"), "IDENTITY_OR_CONTACT_GAP"))
         # Retry the most specific physical gap per window. No action kind or
@@ -139,11 +145,21 @@ def build_plan(traces, budget=None, analysis=None):
             index = min(range(len(frames)), key=lambda i: abs(frames[i]["media_ms"] - center))
             if not valid(frames[index]) or abs(frames[index]["media_ms"] - center) > 80:
                 continue
+            specific = next((r for r in motion_requests
+                if reason == "MODEL_SEQUENCE_"+r["question"] and abs(center-r["media_ms"]-
+                    (250 if r.get("direction") == "AFTER" else 0)) <= 80), None)
+            # A receiver/outcome search keeps the original passer and later
+            # finish in context. The previous fixed +700 ms crop often ended
+            # before the teammate's shot. Reuse the already decoded scene.
+            chain_search = specific and specific["question"] in {"RECEIVER", "SHOT", "OUTCOME"}
+            anchor = specific.get("anchor_media_ms", center) if specific else center
+            desired_start = min(anchor-400, center-350) if chain_search else center-350
+            desired_end = min(frames[-1]["media_ms"], desired_start+8000) if chain_search else center+700
             left = right = index
-            while left and frames[left - 1]["media_ms"] >= center - 350 and valid(frames[left - 1]) \
+            while left and frames[left - 1]["media_ms"] >= desired_start and valid(frames[left - 1]) \
                     and frames[left]["media_ms"] - frames[left - 1]["media_ms"] <= 80:
                 left -= 1
-            while right + 1 < len(frames) and frames[right + 1]["media_ms"] <= center + 700 and valid(frames[right + 1]) \
+            while right + 1 < len(frames) and frames[right + 1]["media_ms"] <= desired_end and valid(frames[right + 1]) \
                     and frames[right + 1]["media_ms"] - frames[right]["media_ms"] <= 80:
                 right += 1
             start, end = frames[left]["media_ms"], frames[right]["media_ms"]
@@ -153,8 +169,15 @@ def build_plan(traces, budget=None, analysis=None):
                    "start_ms": int(start), "end_ms": int(end), "center_ms": int(center),
                    "has_contact_time": True, "source_action_ids": [], "phase": "FEEDBACK",
                    "reason": reason, "priority": priority, "before": before}
-            requested = inspection.frame_times(job, frames)
-            if any(requested == old.get("requested_media_ms") for old in trace.get("action_inspections") or []):
+            if specific:
+                job.update(missing_link_question=specific["question"], anchor_media_ms=anchor,
+                    focus_track_id=specific.get("focus_track_id"),
+                    search_centers_ms=[specific["media_ms"], anchor])
+            requested = inspection.motion_frame_times(job, frames) if specific else inspection.frame_times(job, frames)
+            if any(requested == old.get("requested_media_ms") and (not specific or
+                    old.get("missing_link_question") == specific["question"]
+                    and old.get("anchor_media_ms") == anchor and old.get("focus_track_id") == specific.get("focus_track_id"))
+                    for old in trace.get("action_inspections") or []):
                 rejected.append({"trace_id": trace["trace_id"], "reason": "NO_NEW_REVIEW_INPUT", "center_ms": center})
                 continue
             job["inspection_id"] = "feedback_" + hashlib.sha256(json.dumps(
@@ -162,7 +185,7 @@ def build_plan(traces, budget=None, analysis=None):
             job["requested_media_ms"] = requested
             candidates.append(job)
             selected_searches.append(center)
-            if priority >= 0 or len(selected_searches) >= 2:
+            if specific or priority >= 0 or len(selected_searches) >= 2:
                 break
     # Overlapping dense/recall windows can request the identical source pixels.
     # Keep the most specific search once, rather than spending two reader calls.

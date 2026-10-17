@@ -16,7 +16,9 @@ import sequence_observation_context
 
 MAX_ACTION_REVIEWS = max(0, int(os.environ.get("FIX13_MAX_ACTION_REVIEWS", "16")))
 MAX_ACTION_FRAMES = 12
-MAX_ACTION_VIDEO_FRAMES = 65  # one complete existing 8-second physical window
+MAX_CONTEXT_VIDEO_FRAMES = 65  # retain the complete eight-second overview
+MAX_DETAIL_VIDEO_FRAMES = 32
+MAX_ACTION_VIDEO_FRAMES = MAX_CONTEXT_VIDEO_FRAMES + MAX_DETAIL_VIDEO_FRAMES
 MAX_SEARCH_CONTEXT_MS = 8000
 MAX_FRAME_ALIGNMENT_MS = 20
 NATIVE_NEIGHBOR_RADIUS_MS = 120
@@ -124,16 +126,68 @@ def frame_times(job, frames):
     return sequence_observation_context.sampling_plan(job, frames, MAX_ACTION_FRAMES)["media_ms"]
 
 
-def motion_frame_times(job, frames):
-    """Uniform temporal coverage, bound to actual source frames, not a guessed contact."""
+def motion_sampling_plan(job, frames):
+    """Keep the overview and spend a bounded supplement on contact details.
+
+    Search hints choose pixels only. All selected times belong to decoded source
+    frames; a higher requested cadence never invents missing frames or contacts.
+    """
     available = sorted({f["media_ms"] for f in frames
                         if sequence_observation_context.actual(f, job.get("scene_id"))
                         and job["start_ms"] <= f["media_ms"] <= job["end_ms"]})
     if len(available) < 2:
-        return available
-    count = min(MAX_ACTION_VIDEO_FRAMES, max(2, math.ceil((available[-1]-available[0])/125)+1))
-    return sorted({min(available, key=lambda ms: (abs(ms-(available[0]+(available[-1]-available[0])*i/(count-1))), ms))
-                   for i in range(count)})
+        return {"media_ms": available, "focuses": [], "detail_frames": 0, "canonical_authority": False}
+    nearest = lambda t: min(available, key=lambda ms: (abs(ms-t), ms))
+    count = min(MAX_CONTEXT_VIDEO_FRAMES, max(2, math.ceil((available[-1]-available[0])/125)+1))
+    selected = {nearest(available[0]+(available[-1]-available[0])*i/(count-1)) for i in range(count)}
+    baseline = len(selected)
+    packet = job.get("sequence_context") or {}
+    contacts = [r for r in packet.get("verified_contacts") or [] if isinstance(r, dict)]
+    hints = list(job.get("search_centers_ms") or [])
+    if job.get("has_contact_time"):
+        hints.append(job.get("center_ms"))
+    native = sequence_observation_context.native_focuses(job,
+        [f for f in frames if _num(f.get("media_ms")) and available[0] <= f["media_ms"] <= available[-1]], limit=12)
+    focuses = []
+    for value in hints:
+        if (_num(value) and available[0] <= value <= available[-1]
+                and all(abs(value-old) >= 300 for old in focuses)):
+            focuses.append(nearest(value))
+        if len(focuses) == 4:
+            break
+    # Saved graphs can contain many early contacts (including irrelevant balls).
+    # Do not let chronological list order consume all four detail neighborhoods.
+    pool = [(r.get("media_ms"), 2*int(r.get("global_target_id") == "GLOBAL_TARGET")
+             +int(isinstance(r.get("contact_role"), dict) and r["contact_role"].get("role") == "RELEASE")) for r in contacts]
+    pool.extend((r["media_ms"], 1) for r in native)
+    while len(focuses) < 4:
+        eligible = [(nearest(ms), priority) for ms, priority in pool if _num(ms)
+            and available[0] <= ms <= available[-1] and all(abs(ms-old) >= 300 for old in focuses)]
+        if not eligible:
+            break
+        span = max(1, available[-1]-available[0])
+        def utility(row):
+            ms, priority = row
+            coverage = min(abs(ms-old) for old in focuses)/span if focuses else \
+                .5-abs(ms-(available[0]+available[-1])/2)/span
+            return coverage+.15*priority, -ms
+        focuses.append(max(eligible, key=utility)[0])
+    # Round-robin details around each focus: do not spend all frames on the
+    # first target touch and starve a receiver or a later finishing contact.
+    for offset in (0, -40, 40, -80, 80, -120, 120, -160, 160, -200, 200, -240, 240):
+        for center in focuses:
+            if len(selected) >= min(MAX_ACTION_VIDEO_FRAMES, baseline+MAX_DETAIL_VIDEO_FRAMES):
+                break
+            desired = center+offset
+            if available[0] <= desired <= available[-1]:
+                selected.add(nearest(desired))
+    return {"media_ms": sorted(selected), "focuses": focuses,
+            "detail_frames": len(selected)-baseline, "context_target_fps": 8,
+            "detail_target_fps": 25, "canonical_authority": False}
+
+
+def motion_frame_times(job, frames):
+    return motion_sampling_plan(job, frames)["media_ms"]
 
 
 def neighbor_times(seed_ms, frames, scene_id):

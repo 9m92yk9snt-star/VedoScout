@@ -146,7 +146,46 @@ def motion_reader_context(packet):
             for r in source.get("body_observations") or [] if r.get("target_observed") is True],
         "verified_contacts": deepcopy(source.get("verified_contacts") or []),
         "roles": deepcopy(source.get("roles") or {}),
+        "requested_search": deepcopy(source.get("requested_search")),
         "related_sequence": deepcopy(source.get("related_sequence"))}
+
+
+def motion_review_requests(parsed, times, manifest):
+    """Ask for one observed missing link, without supplying an expected result."""
+    by_ms = {r["media_ms"]: {b["body_id"]: b.get("local_track_id") for b in r.get("source_bodies") or []}
+             for r in manifest}
+    def at(idx):
+        return times[idx-1] if type(idx) is int and 1 <= idx <= len(times) else None
+    requests = []
+    for action in _rows((parsed or {}).get("actions")):
+        if not isinstance(action, dict):
+            continue
+        contact = at(action.get("contact_idx"))
+        if contact is None:
+            continue
+        receiver, shot, outcome = (at(action.get(k)) for k in ("receiver_idx", "shot_idx", "outcome_idx"))
+        if action.get("receiver_body_id") not in by_ms.get(receiver, {}):
+            receiver = None
+        if action.get("finisher_body_id") not in by_ms.get(shot, {}):
+            shot = None
+        unknown = action.get("outcome") in {None, "UNKNOWN", "TEAMMATE_SHOT", "TEAMMATE_GOAL"}
+        question, pivot, body = None, contact, action.get("actor_body_id")
+        if not action.get("actor_evidence_indices"):
+            question = "IDENTITY"
+        elif action.get("kind") in {"PASS", "CROSS"} and receiver is None:
+            question = "RECEIVER"
+        elif action.get("kind") in {"PASS", "CROSS"} and shot is None and unknown:
+            question, pivot, body = "SHOT", receiver, action.get("receiver_body_id")
+        elif action.get("kind") in {"PASS", "CROSS", "SHOT"} and (outcome is None or action.get("outcome_visible") is not True
+                or not action.get("outcome_evidence_indices")) and unknown:
+            question, pivot, body = "OUTCOME", shot or contact, action.get("finisher_body_id") or body
+        if question:
+            requests.append({"question": question, "media_ms": pivot, "anchor_media_ms": contact,
+                "focus_track_id": by_ms.get(pivot, {}).get(body),
+                "search_protocol": "SOURCE_INDEXED_MOTION_CLIP_V1",
+                "source": "MODEL_SEQUENCE_SEARCH", "direction": "AROUND" if question == "IDENTITY" else "AFTER",
+                "canonical_authority": False})
+    return requests[:4]
 
 
 def _rows(value):
@@ -157,11 +196,13 @@ def _choice(value, choices):
     return value if isinstance(value, str) and value in choices else None
 
 
-def native_focuses(job, frames):
+def native_focuses(job, frames, limit=1):
     """Repeated near-foot native proposals choose pixels, never a contact."""
     import dense_track_refinement
     import ball_contact_engine
     import frame_geometry
+    if limit <= 0:
+        return []
     groups = {}
     for f in frames:
         scale = frame_geometry.horizontal_scale(f)
@@ -198,8 +239,14 @@ def native_focuses(job, frames):
             pivot = min(cluster, key=lambda r: (r[1], abs(r[0]-middle), r[0]))
             variation = max(r[1] for r in cluster)-min(r[1] for r in cluster)
             candidates.append((not any(r[2] for r in cluster), -variation, -len(cluster), pivot[0], track))
-    return [{"media_ms": r[3], "local_track_id": r[4], "reason": "NATIVE_LOWER_BODY_SEARCH",
-             "canonical_authority": False} for r in sorted(candidates)[:1]]
+    selected = []
+    for r in sorted(candidates):
+        if all(abs(r[3]-old["media_ms"]) >= 300 for old in selected):
+            selected.append({"media_ms": r[3], "local_track_id": r[4], "reason": "NATIVE_LOWER_BODY_SEARCH",
+                             "canonical_authority": False})
+        if len(selected) >= limit:
+            break
+    return selected
 
 
 def sampling_plan(job, frames, budget=12):
@@ -272,6 +319,8 @@ def build(window, frames, *, trace=None, times=None, source_video=None):
         "source_video_sha256": (source_video or trace.get("source_video") or {}).get("sha256"),
         "bounds_ms": [window.get("start_ms"), window.get("end_ms")],
         "requested_question": window.get("reason"),
+        "requested_search": {k: deepcopy(window.get(k)) for k in
+            ("missing_link_question", "center_ms", "anchor_media_ms", "focus_track_id") if window.get(k) is not None},
         "source_trace_ids": trace.get("source_trace_ids") or ([trace["trace_id"]] if trace.get("trace_id") else []),
         "body_observations": bodies, "verified_contacts": contacts[:32],
         "roles": {track: {"role": role.get("role"), "status": role.get("status"),
@@ -408,7 +457,8 @@ def requested_centers(trace, frames, extra=()):
                 or any(b["media_ms"]-a["media_ms"] > 80 for a, b in zip(path, path[1:]))):
             continue
         measured = request.get("source") == "MEASURED_CHAIN_SEARCH"
-        rank = -2 if measured and request.get("utility", 0) >= 5 else -1
+        rank = (-3 if request.get("search_protocol") == "SOURCE_INDEXED_MOTION_CLIP_V1" else
+                -2 if measured and request.get("utility", 0) >= 5 else -1)
         result.append((rank, min((f["media_ms"] for f in path), key=lambda t: abs(t-pivot)),
                        ("CHAIN_SEARCH_" if measured else "MODEL_SEQUENCE_")+request["question"]))
     return result

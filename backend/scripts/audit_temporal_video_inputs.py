@@ -31,25 +31,28 @@ def audit(export_dir, video_path, output_dir, trace_ids=()):
         if (trace.get("source_video") or {}).get("sha256") != digest:
             raise ValueError("SOURCE_VIDEO_DOES_NOT_MATCH_TRACE")
         frames, window = trace["decoded_frames"], trace["window"]
-        times = inspection.motion_frame_times(window, frames)
+        packet = context.build(window, frames, trace=trace, source_video=trace["source_video"])
+        sampling = inspection.motion_sampling_plan({**window, "sequence_context": packet}, frames)
+        times = sampling["media_ms"]
         by_ms = {f["media_ms"]: f for f in frames}
         labels = context.labels(frames)
-        search_frame = {"players": [p for f in frames for p in f.get("players") or []]}
         decoded = vision._read_frames(str(video_path), times)
-        clock, paths, bodies = [], [], []
+        clock, paths, bodies, views = [], [], [], []
         with tempfile.TemporaryDirectory(prefix="motion_input_audit_") as directory:
             for index, ms in enumerate(times):
                 actual_ms, image = decoded[ms]
                 if actual_ms != ms:
                     raise ValueError("DECODED_SOURCE_CLOCK_MISMATCH")
                 candidates = inspection.motion_body_candidates(by_ms[ms], body_labels=labels)
-                view, _roi, displayed = vision._action_search_view(image, search_frame, candidates)
+                view, roi, displayed = vision.motion_search_view(image, by_ms[ms], candidates)
                 image_path = Path(directory)/f"{index}.jpg"
                 if not vision._write_jpg(image_path, view):
                     raise ValueError("AUDIT_IMAGE_ENCODING_FAILED")
-                paths.append(image_path); clock.append(ms); bodies.append(len(displayed))
+                paths.append(image_path); clock.append(ms); bodies.append(len(displayed)); views.append(roi)
             clip_path = output/f"{trace['trace_id']}.mp4"
-            manifest = video.write_motion_clip(paths, clock, clip_path)
+            manifest = video.write_motion_clip(paths, clock, clip_path,
+                max_dimension=1920 if any(r.get("views") for r in views) else 1280)
+            manifest["sampling_plan"] = {k: v for k,v in sampling.items() if k != "media_ms"}
         cap = cv2.VideoCapture(str(clip_path))
         try:
             encoded = {"frame_count": int(cap.get(cv2.CAP_PROP_FRAME_COUNT)), "playback_fps": cap.get(cv2.CAP_PROP_FPS)}
@@ -59,6 +62,8 @@ def audit(export_dir, video_path, output_dir, trace_ids=()):
             raise ValueError("ENCODED_SOURCE_CLOCK_MISMATCH")
         results.append({"trace_id": trace["trace_id"], "scene_id": window["scene_id"],
             "motion_clip": manifest, "encoded": encoded, "labelled_body_frames": sum(n > 0 for n in bodies),
+            "full_scene_frames": sum(any(v.get("view_id") == "OVERVIEW" for v in r.get("views") or []) for r in views),
+            "detail_frames": sum(any(v.get("view_id") == "DETAIL" for v in r.get("views") or []) for r in views),
             "all_times_are_actual_source_pts": all(context.actual(by_ms[ms], window["scene_id"]) for ms in clock)})
     if wanted - {r["trace_id"] for r in results}:
         raise ValueError("REQUESTED_TRACE_NOT_FOUND")

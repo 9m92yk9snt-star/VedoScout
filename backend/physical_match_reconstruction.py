@@ -729,7 +729,8 @@ def reconstruct_physical_match(
             stage = "strike_detection"
             motion_input = {"source_video": source, "window": window,
                 "decoded_frames": dense_with_jersey, "ball_trajectory": trajectory,
-                "touch_graph": touch_with_jersey, "action_inspections": inspection_rows}
+                "touch_graph": touch_with_jersey,
+                "action_inspections": deepcopy((previous or {}).get("action_inspections") or [])+inspection_rows}
             motion_resolution = dense_event_reconciliation.resolve_motion_observations(motion_input)
             motion_events = motion_resolution.get("events") or []
             motion_review = {"complete": bool(source.get("sha256")) and any(
