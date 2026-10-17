@@ -219,5 +219,196 @@
     "No fresh video-model inference, complete-video benchmark or before/after full-analysis measurement is included.",
     "The deleted standalone field-side reader was already bypassed by valid combined goal-scene responses; no historical 39-minute saving is attributed to its deletion.",
     "The 30-60 minute chat estimate was not measured or derived from a calibrated runtime model and is withdrawn as a reliable prediction."
-  ]
+  ],
+  "shared_detector_benchmark": {
+    "scope": "BOUNDED_NATIVE_READER_PATTERN_NOT_FULL_ANALYSIS_OR_LLM_RECOGNITION",
+    "source_video_sha256": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+    "model_sha256": "013a98f3bc0264a3d793ef29ccbd178ceb0bbb86bc12ff3510273ce85b1c4526",
+    "source_span_ms": [
+      19466,
+      25466
+    ],
+    "source_frames": 361,
+    "reader_input_frames": 451,
+    "opencv_threads": 8,
+    "backend_source_sha256": {
+      "cv_detect": "57af24a00c07b1807de8a13608060592e33f64922eebc4ec2e23de4e74b06a63",
+      "dense_track_refinement": "0fa5fbc6c65c86f3d8c9c13990a2d823a12c3a3f9338d26ff91488d44d49256f",
+      "football_scene_graph": "4202db5e657027753c399efa84ad5793babb3d3635f4b59408de64d297701bdc"
+    },
+    "baseline_source_sha256": {
+      "cv_detect": "dd476e38ec72ce3f764e35beedfa6d24bd16b0ec5664a6c73db20e4da3fe3ec3",
+      "dense_track_refinement": "c6b4c47e48c39a783fbd1845beb9085a202521fd05b9fd059a2a3aa47cce36b2",
+      "football_scene_graph": "d8a4aaf22f944d789e7887eb2de0fd0ff977a7d6b7a4143adab0319027613a34"
+    },
+    "script_sha256": "d683b3f47e83eac0aba51ba1d9a9ed9b7ab5cfc8fc76bb4d1f20b4f501d51554",
+    "runs": [
+      {
+        "cache_enabled": false,
+        "seconds": 44.496892,
+        "forwards": 773,
+        "stages": [
+          {
+            "stage": "identity_reader",
+            "input_frames": 31,
+            "forwards": 31,
+            "seconds": 1.644291
+          },
+          {
+            "stage": "scene_reader",
+            "input_frames": 46,
+            "forwards": 46,
+            "seconds": 2.444516
+          },
+          {
+            "stage": "dense_reader",
+            "input_frames": 361,
+            "forwards": 672,
+            "seconds": 39.262309
+          },
+          {
+            "stage": "native_revisit",
+            "input_frames": 13,
+            "forwards": 24,
+            "seconds": 1.145397
+          }
+        ],
+        "evidence_sha256": "bac481b478abe231715c888ca4876419734b5cadebbe2620d0944b470d273d54",
+        "cache": null
+      },
+      {
+        "cache_enabled": true,
+        "seconds": 40.919901,
+        "forwards": 672,
+        "stages": [
+          {
+            "stage": "identity_reader",
+            "input_frames": 31,
+            "forwards": 31,
+            "seconds": 1.620851
+          },
+          {
+            "stage": "scene_reader",
+            "input_frames": 46,
+            "forwards": 30,
+            "seconds": 1.871578
+          },
+          {
+            "stage": "dense_reader",
+            "input_frames": 361,
+            "forwards": 611,
+            "seconds": 37.367072
+          },
+          {
+            "stage": "native_revisit",
+            "input_frames": 13,
+            "forwards": 0,
+            "seconds": 0.058116
+          }
+        ],
+        "evidence_sha256": "bac481b478abe231715c888ca4876419734b5cadebbe2620d0944b470d273d54",
+        "cache": {
+          "hits": 101,
+          "misses": 672,
+          "detector_forwards": 672,
+          "forward_seconds": 38.863,
+          "evictions": 0,
+          "entries": 672,
+          "payload_bytes": 1382624,
+          "max_payload_bytes": 67108864,
+          "max_entries": 8192,
+          "scope": "RUN_LOCAL_EXACT_NATIVE_PREDICTIONS_NO_DECISIONS"
+        }
+      }
+    ],
+    "evidence_identical": true,
+    "new_llm_calls": 0,
+    "network_attempts": 0,
+    "expected_event_labels_used": false,
+    "baseline_published_head": "f534902cb65d7cd382f0622537b9516cfe8b2498",
+    "baseline_published_tree": "b3d5db38cc7ab9899a9716cf6f55e707bd61cfd6",
+    "reader_pattern_is_not_recorded_llm_schedule": true,
+    "decode_and_model_loading_outside_timed_reader_loops": true,
+    "single_pair_not_calibrated_full_analysis_prediction": true
+  },
+  "detector_thread_experiment": {
+    "scope": "NATIVE_THREAD_EXPERIMENT_NOT_FULL_ANALYSIS",
+    "frames": 13,
+    "source_video_sha256": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+    "model_sha256": "013a98f3bc0264a3d793ef29ccbd178ceb0bbb86bc12ff3510273ce85b1c4526",
+    "runs": [
+      {
+        "repeat": 0,
+        "threads": 8,
+        "seconds": 1.314512,
+        "identical_proposals": true,
+        "sha256": "ffb49205c004ff2a616bda4d00725191b5296995625c535ce0c3f7ed674ad45a"
+      },
+      {
+        "repeat": 1,
+        "threads": 4,
+        "seconds": 1.828053,
+        "identical_proposals": true,
+        "sha256": "ffb49205c004ff2a616bda4d00725191b5296995625c535ce0c3f7ed674ad45a"
+      },
+      {
+        "repeat": 2,
+        "threads": 2,
+        "seconds": 2.476284,
+        "identical_proposals": true,
+        "sha256": "ffb49205c004ff2a616bda4d00725191b5296995625c535ce0c3f7ed674ad45a"
+      },
+      {
+        "repeat": 3,
+        "threads": 1,
+        "seconds": 4.318026,
+        "identical_proposals": true,
+        "sha256": "ffb49205c004ff2a616bda4d00725191b5296995625c535ce0c3f7ed674ad45a"
+      },
+      {
+        "repeat": 4,
+        "threads": 1,
+        "seconds": 4.176713,
+        "identical_proposals": true,
+        "sha256": "ffb49205c004ff2a616bda4d00725191b5296995625c535ce0c3f7ed674ad45a"
+      },
+      {
+        "repeat": 5,
+        "threads": 2,
+        "seconds": 2.838874,
+        "identical_proposals": true,
+        "sha256": "ffb49205c004ff2a616bda4d00725191b5296995625c535ce0c3f7ed674ad45a"
+      },
+      {
+        "repeat": 6,
+        "threads": 4,
+        "seconds": 2.198584,
+        "identical_proposals": true,
+        "sha256": "ffb49205c004ff2a616bda4d00725191b5296995625c535ce0c3f7ed674ad45a"
+      },
+      {
+        "repeat": 7,
+        "threads": 8,
+        "seconds": 1.89601,
+        "identical_proposals": true,
+        "sha256": "ffb49205c004ff2a616bda4d00725191b5296995625c535ce0c3f7ed674ad45a"
+      }
+    ],
+    "new_model_calls": 0,
+    "source_times_ms": [
+      19466,
+      19966,
+      20466,
+      20966,
+      21466,
+      21966,
+      22466,
+      22966,
+      23466,
+      23966,
+      24466,
+      24966,
+      25466
+    ]
+  }
 }

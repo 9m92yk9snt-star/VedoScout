@@ -273,7 +273,77 @@ missing link before further fallback work is justified. Changing the full
 pipeline to run this way before dense detection still requires real perception
 validation; no end-to-end performance or quality claim follows from this audit.
 
+## Shared detector work and the two-pass design
+
+The current production path does not run two independent whole-video reports
+in parallel. `generate_full_report_task` runs optical tracking and audio
+extraction in parallel, then prepares the identity/scene evidence and makes
+the whole-video sequence read. Report prose consumes canonical facts. The
+legacy full-video writer and `_cross_verify_full_report` remain a fallback
+when the unified path cannot run. Removing that fallback verifier alone would
+not accelerate successful unified analyses.
+
+The source-indexed motion reader has a different job: inspecting the player,
+contact, active ball and outcome in a bounded original-source sequence.
+Existing motion reconciliation already skips contact-bound native paths,
+interventions and goal reviews for an outcome resolved from that source clip.
+Unresolved contacts can still receive a goal review; missing observations are
+not treated as resolved merely to save work. No second outcome approval was
+added by this change.
+
+Native identity, scene, dense and ROI readers did repeat the same network
+inference for identical pixels. They now use one preprocessing/head reader in
+`cv_detect`, with a report-local cache. Its key binds the model SHA, network
+type, input size, candidate thresholds and exact image shape/dtype/pixels.
+It retains exact coordinates, winning class/confidence and class-32 scores,
+including support candidates whose winning class is different. It changes no
+precision, confidence/NMS threshold, source sample or crop coverage.
+
+The readers retain their separate NMS, kit measurements, tracking, player
+binding, ball association and event decisions. Returned arrays are isolated
+from caller mutations. Identical concurrent requests share one forward;
+failed/unknown-model requests cannot populate the cache. LRU storage is bounded
+to 64 MiB of array payload and 8,192 entries per report. Context restoration
+runs on success, early return and cancellation. `unified_detector_cache`
+records actual hits, forwards and payload use without becoming a proof gate.
+Ball-only review ROIs also stop computing discarded person/kit output.
+
+A fresh, offline native comparison used all 361 actual-PTS source frames from
+the existing six-second diagnostic window. The measured pattern exercised
+31 identity-reader inputs, 46 scene-reader inputs, all 361 dense inputs and
+13 sparse native revisits. The baseline loaded the three reader functions
+from the preceding published head `f534902c` (tree `b3d5db38`):
+
+| Native reader pattern | Before | Shared inference |
+| --- | ---: | ---: |
+| Network forwards | 773 | 672 |
+| Elapsed seconds | 44.496892 | 40.919901 |
+| Source/reader input frames | 361 / 451 | 361 / 451 |
+| Cached payload bytes | 0 | 1,382,624 |
+
+All returned person/ball/support proposals were exactly identical (canonical
+JSON SHA-256 `bac481b478abe231715c888ca4876419734b5cadebbe2620d0944b470d273d54`).
+This pair saved 101 forwards (13.07%) and 8.04% elapsed time in that reader
+pattern. It is not the historical LLM call schedule, full tracking or complete
+physical reconstruction. Decode/model loading were outside the timed reader
+loops. One pair does not calibrate a full-report speed prediction or prove
+ground-truth detection accuracy. Zero LLM calls and network connections ran.
+The reproducible driver is `backend/scripts/benchmark_shared_detector.py`;
+checksums, per-stage counts and receipts are in `docs/analysis-work-audit.json`.
+
+A separate 13-frame experiment compared 8/4/2/1 CPU threads twice. Eight
+threads were fastest here; all proposal outputs matched. No production thread
+cap or ONNX-runtime change was introduced based on an assumed benefit.
+
 ## Validation and limits
+
+The final shared-detector code passed 2,468 tests with one skip across 123
+offline backend files in 25.92 s; all Python socket connections were blocked.
+The new regressions cover reader threshold independence, class-32 support,
+pixel/model/config changes, caller mutations, failures, bounded storage,
+concurrent reuse, separate reports and task-context restoration. These are
+code fixtures. The native video measurement above is separate from them and
+does not automatically recognise or approve the real saved shot with an LLM.
 
 The final code after removing redundant work passed 2,456 tests with one skip
 across the same 122 offline backend files in 27.41 s. Another focused selection

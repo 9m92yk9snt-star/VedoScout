@@ -9052,6 +9052,9 @@ async def generate_full_report_task(report_id: str) -> None:
     `/reports/{id}/status` to know when generation is done. Status values:
     `generating` | `verifying` | `finalizing` | `ready` | `failed`.
     """
+    import cv_detect
+    detector_cache = cv_detect.PredictionCache()
+    detector_token = cv_detect.CURRENT_PREDICTIONS.set(detector_cache)
     try:
         doc = await db.reports.find_one({"id": report_id})
         if not doc:
@@ -9142,8 +9145,7 @@ async def generate_full_report_task(report_id: str) -> None:
         # ── Ground-truth tracking (deterministic, seeded by the user's taps) ──
         # Session 143 — PARALLEL PIPELINE:
         #   Phase A: optical tracking (automatic identity review) ∥ audio extraction
-        #   Phase B: movement/pace metrics (GPT-vision) ∥ Gemini full analysis
-        # Saves 1-2 min of wall-clock vs the old strictly-sequential flow.
+        #   Phase B: deterministic movement/pace metrics ∥ facts-only prose
         valid_anchors = [
             a for a in anchor_payload_list
             if isinstance(a, dict) and isinstance(a.get("t"), (int, float)) and isinstance(a.get("box"), dict)
@@ -9770,6 +9772,14 @@ async def generate_full_report_task(report_id: str) -> None:
             )
         except Exception:
             pass
+    finally:
+        cv_detect.CURRENT_PREDICTIONS.reset(detector_token)
+        try:
+            if detector_cache.forwards:
+                await db.reports.update_one({"id": report_id},
+                    {"$set": {"unified_detector_cache": detector_cache.metrics()}})
+        except Exception:
+            logger.warning("[detector] %s: cache metrics could not be persisted", report_id)
 
 
 # ============== AGENT REVIEW (user side) ==============

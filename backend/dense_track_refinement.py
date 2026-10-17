@@ -422,37 +422,12 @@ def _detect_dense_people_and_ball(detector, frame_bgr, include_a7_support=False,
         return [], []
     H, W = frame_bgr.shape[:2]
     scale = cv_detect.INPUT / max(H, W)
-    nw, nh = int(W * scale), int(H * scale)
-    img = np.zeros((cv_detect.INPUT, cv_detect.INPUT, 3), np.uint8)
-    img[:nh, :nw] = cv2.resize(frame_bgr, (nw, nh))
-    blob = cv2.dnn.blobFromImage(
-        img, 1 / 255.0, (cv_detect.INPUT, cv_detect.INPUT), swapRB=True
-    )
-    detector.net.setInput(blob)
-    raw = np.asarray(detector.net.forward())
-    # OpenCV can return an empty prediction tensor on a valid decoded frame.
-    # Treat that as no detections; never let a detector shape abort the whole
-    # physical-recall window with an opaque IndexError.
-    if raw.size == 0:
-        return ([], [], []) if include_a7_support else ([], [])
-    if raw.ndim == 3 and raw.shape[0] == 1:
-        raw = raw[0]
-    if raw.ndim != 2:
-        raise ValueError(f"DENSE_DETECTOR_OUTPUT_SHAPE:{raw.shape}")
-    # YOLO exports use either (channels, predictions) or its transpose.
-    if (raw.shape[0] >= 5 and raw.shape[0] < raw.shape[1]) or raw.shape[1] < 5:
-        raw = raw.T
-    if raw.shape[1] < 5:
-        raise ValueError(f"DENSE_DETECTOR_OUTPUT_SHAPE:{raw.shape}")
-    out = raw
-    cls = out[:, 4:].argmax(1)
-    conf = out[:, 4:].max(1)
+    out, cls, conf, ball_scores = cv_detect.predict(detector, frame_bgr,
+        ball_floor=min(DENSE_BALL_CONF_T, A7_BALL_SUPPORT_CONF_T, .001))
     def collect(cid, threshold, *, require_top_class=True):
-        class_col = 4 + int(cid)
-        if class_col >= out.shape[1]:
+        if cid == 32 and ball_scores is None:
             return []
-        class_conf = out[:, class_col]
-        scores_all = conf if require_top_class else class_conf
+        scores_all = conf if require_top_class else ball_scores
         keep = scores_all > float(threshold)
         if require_top_class:
             keep &= cls == cid

@@ -1429,7 +1429,7 @@ def _native_ball_roi(detector, image, proposal):
     if x1 - x0 < 16 or y1 - y0 < 16:
         return [], None
     _people, balls = dense_track_refinement._detect_dense_people_and_ball(
-        detector, image[y0:y1, x0:x1], _detail_pass=True)
+        detector, image[y0:y1, x0:x1], _detail_pass=True, _ball_only=True)
     accepted = []
     for ball in balls:
         box = ball["box"]
