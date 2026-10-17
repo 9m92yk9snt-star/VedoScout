@@ -146,12 +146,18 @@ def _player_by_id(frame, track_id):
     return None
 
 
-def _receiver_team_resolution(scene_frames, chain, actor_local_track_id) -> dict:
+def _source_video_observation(video) -> bool:
+    return bool(isinstance(video, dict) and video.get("authority") == "TEMPORAL_VIDEO_OBSERVATION"
+        and all(video.get(k) for k in ("input_sha256", "response_sha256", "source_video_sha256", "clip_sha256")))
+
+
+def _receiver_team_resolution(scene_frames, chain, actor_local_track_id, video=None) -> dict:
     """Verify that an assist receiver is a distinct, observed teammate.
 
     Receiver identity comes from the scene-local track in the visible causal
-    chain. Team relation comes only from the target-relative kit authority in
-    B.1. Model text such as ``TEAMMATE_GOAL`` is never team evidence.
+    chain. A source-indexed video observes the transfer and teammate roles once;
+    the independent ball/kit reconstruction is not a second approval of it.
+    Older sparse action labels still need the native team/possession evidence.
     """
     receiver = chain.get("receiver_local_track_id")
     receiver_ms = chain.get("receiver_ms")
@@ -172,6 +178,26 @@ def _receiver_team_resolution(scene_frames, chain, actor_local_track_id) -> dict
     pivot = _near_frame(scene_frames, receiver_ms)
     if pivot is None or _player_by_id(pivot, receiver) is None:
         return {**base, "reason": "RECEIVER_NOT_OBSERVED_AT_RECEIPT"}
+
+    if _source_video_observation(video) and chain.get("continuous_visible_sequence") is True:
+        roles = video.get("assist_roles") or {}
+        finisher = chain.get("finisher_local_track_id")
+        shot_frame = _near_frame(scene_frames, chain.get("teammate_shot_ms"))
+        if (_verified_target_id(pivot) == receiver
+                or (finisher and _verified_target_id(shot_frame) == finisher)):
+            return {**base, "status": "REJECTED", "reason": "SOURCE_VIDEO_ASSIST_ROLE_IS_TARGET"}
+        if roles.get("receiver_team") in {"OPPONENT", "OTHER"}:
+            return {**base, "status": "REJECTED", "reason": "SOURCE_VIDEO_RECEIVER_NOT_TEAMMATE"}
+        if roles.get("receiver_team") == "UNKNOWN":
+            return {**base, "reason": "SOURCE_VIDEO_RECEIVER_TEAM_UNRESOLVED"}
+        if roles.get("receiver_finisher_same_player") is False:
+            return {**base, "status": "REJECTED", "reason": "SOURCE_VIDEO_DIFFERENT_FINISHER"}
+        return {**base, "status": "VERIFIED", "reason": "SOURCE_VIDEO_TEAMMATE_TRANSFER",
+            "source": "TEMPORAL_VIDEO_OBSERVATION", "physical_certificate_required": False,
+            "finisher_local_track_id": chain.get("finisher_local_track_id"),
+            "evidence": [{"media_ms": chain.get("target_contact_ms"), "role": "TARGET_PASSER"},
+                         {"media_ms": receiver_ms, "role": "TEAMMATE_RECEIVER"},
+                         {"media_ms": chain.get("teammate_shot_ms"), "role": "TEAMMATE_FINISHER"}]}
 
     def possession_support(track_id, media_ms):
         if not isinstance(track_id, str) or not _num(media_ms):
@@ -409,8 +435,7 @@ def _resolve_actor(action, scene_frames, unified_authority) -> dict:
         and isinstance(s.get("mapped_local_track_id"), str)
     }
     video = action.get("video_observation") or {}
-    motion_actor = (video.get("authority") == "TEMPORAL_VIDEO_OBSERVATION"
-        and all(video.get(k) for k in ("input_sha256", "response_sha256", "source_video_sha256", "clip_sha256"))
+    motion_actor = (_source_video_observation(video)
         and (action.get("causal_chain") or {}).get("continuous_visible_sequence") is True)
     if motion_actor and exact_support and not contradictions:
         # The video reader follows one person across the play. One direct
@@ -606,7 +631,7 @@ def _causal_resolution(action, scene_frames) -> dict:
                               and receiver != actor)
         visible_chain = (action.get("outcome_visible") is True
                          and chain.get("continuous_visible_sequence") is True)
-        team_resolution = _receiver_team_resolution(scene_frames, chain, actor)
+        team_resolution = _receiver_team_resolution(scene_frames, chain, actor, action.get("video_observation"))
         ok = (ordered and different_receiver and visible_chain
               and team_resolution["status"] == "VERIFIED")
         if ok:
@@ -732,8 +757,7 @@ def has_motion_proof(event) -> bool:
     video = proof.get("video_observation") or {}
     return bool(event.get("global_target_id") == GLOBAL_TARGET_ID
         and event.get("causal_verified") is True and proof.get("proof_eligible") is True
-        and video.get("authority") == "TEMPORAL_VIDEO_OBSERVATION"
-        and all(video.get(k) for k in ("input_sha256", "response_sha256", "source_video_sha256", "clip_sha256")))
+        and _source_video_observation(video))
 
 
 def _same_real_action(a, b) -> bool:
@@ -749,8 +773,30 @@ def _same_real_action(a, b) -> bool:
             and abs(int(a["end_ms"]) - int(b["end_ms"])) <= DUP_EDGE_MS)
 
 
+def motion_outcomes_conflict(a, b) -> bool:
+    """A missing result or later view of a completed pass is not a contradiction."""
+    outcomes = {a.get("canonical_outcome"), b.get("canonical_outcome")}
+    return bool(has_motion_proof(a) and has_motion_proof(b) and len(outcomes) > 1
+        and not outcomes.intersection({None, "UNKNOWN"})
+        and not outcomes <= {"COMPLETED", "TEAMMATE_SHOT", "TEAMMATE_GOAL"})
+
+
 def _merge_event(dst, src):
     """Merge overlapping-window observations without inventing stronger facts."""
+    # Retain the complete qualified observation, including its causal chain and
+    # input/response provenance. Keeping only its label loses video authority
+    # and makes a downstream bridge demand physical approval all over again.
+    pass_stages = {"COMPLETED": 0, "TEAMMATE_SHOT": 1, "TEAMMATE_GOAL": 2}
+    if ((has_motion_proof(src) and not has_motion_proof(dst))
+            or (src.get("causal_verified") and not dst.get("causal_verified"))
+            or (has_motion_proof(src) and has_motion_proof(dst)
+                and {src.get("canonical_outcome"), dst.get("canonical_outcome")}
+                    <= pass_stages.keys()
+                and pass_stages[src["canonical_outcome"]] > pass_stages[dst["canonical_outcome"]])):
+        previous = deepcopy(dst)
+        dst.clear()
+        dst.update(deepcopy(src))
+        src = previous
     dst["source_action_ids"] = sorted(set(dst.get("source_action_ids") or []) | set(src.get("source_action_ids") or []))
     dst["source_sequence_ids"] = sorted(set(dst.get("source_sequence_ids") or []) | set(src.get("source_sequence_ids") or []))
     dst["details"] = list(dict.fromkeys((dst.get("details") or []) + (src.get("details") or [])))[:30]
@@ -762,13 +808,6 @@ def _merge_event(dst, src):
         if key not in seen:
             dproof.setdefault("actor_keyframes", []).append(r); seen.add(key)
     dproof["actor_keyframes"] = sorted(dproof.get("actor_keyframes") or [], key=lambda r: r.get("media_ms", 0))[:20]
-    # Never upgrade a weaker duplicate into GOAL/ASSIST unless that duplicate
-    # itself has verified causal evidence. Prefer the causally stronger row.
-    if src.get("causal_verified") and not dst.get("causal_verified"):
-        for k in ("canonical_event_type", "canonical_outcome", "causal_verified",
-                  "resolution_reason", "receiver_team_resolution"):
-            dst[k] = src.get(k)
-        dproof["causal_verified"] = True
     dst["proof"] = dproof
     return dst
 
@@ -851,11 +890,18 @@ def resolve_canonical_events(sequence_analysis: dict | None, scene_graph: dict |
     # Overlapping broad windows intentionally see the same real action. Merge
     # duplicates AFTER actor/causal verification so recall does not create
     # duplicate stats.
-    deduped = []
+    deduped, video_conflicts = [], []
     for e in sorted(accepted, key=lambda x: (x["scene_id"], x["canonical_ms"], x["canonical_action_type"])):
+        if any(_same_real_action(old, e) for c in video_conflicts for old in c["observed_events"]):
+            continue
         match = next((d for d in deduped if _same_real_action(d, e)), None)
         if match is None:
             deduped.append(e)
+        elif motion_outcomes_conflict(match, e):
+            video_conflicts.append({"reason": "CONFLICTING_VIDEO_OUTCOMES", "scene_id": e.get("scene_id"),
+                "contact_ms": e.get("contact_ms"), "kind": e.get("canonical_action_type"),
+                "observed_events": [deepcopy(match), deepcopy(e)]})
+            deduped.remove(match)
         else:
             _merge_event(match, e)
             rejected.append({
@@ -864,6 +910,7 @@ def resolve_canonical_events(sequence_analysis: dict | None, scene_graph: dict |
                 "kind": e.get("canonical_action_type"), "reason": "OVERLAPPING_WINDOW_DUPLICATE",
                 "duplicate_event_id": match.get("event_id"),
             })
+    unresolved.extend(video_conflicts)
 
     counts = {}
     for e in deduped:

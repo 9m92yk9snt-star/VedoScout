@@ -191,7 +191,7 @@ def test_five_complete_sequences_publish_one_goal_three_assists_one_saved_shot_w
 
 
 @pytest.mark.parametrize("failure", ["wrong_actor", "source_mismatch", "no_native_metadata", "wrong_clip", "invented_index",
-    "cut", "missing_outcome_evidence", "different_finisher", "opponent_receiver", "no_ball_transfer"])
+    "cut", "missing_outcome_evidence", "different_finisher", "opponent_receiver"])
 def test_video_chain_cannot_approve_a_wrong_player_or_missing_causal_link(failure):
     import dense_event_reconciliation as dense
     trace = motion_trace()
@@ -204,11 +204,8 @@ def test_video_chain_cannot_approve_a_wrong_player_or_missing_causal_link(failur
     elif failure == "invented_index": action["contact_idx"] = 999
     elif failure == "cut": trace["decoded_frames"][40]["cut_barrier"] = True
     elif failure == "missing_outcome_evidence": action.update(outcome_evidence_indices=[], outcome_idx=None)
-    elif failure == "different_finisher": action["finisher_body_id"] = "body_2"
-    elif failure == "opponent_receiver":
-        for f in trace["decoded_frames"]: f["players"][2]["team"] = "opponent"
-    elif failure == "no_ball_transfer":
-        for f in trace["decoded_frames"]: f.pop("possession", None)
+    elif failure == "different_finisher": action.update(finisher_body_id="body_2", receiver_finisher_same_player=False)
+    elif failure == "opponent_receiver": action["receiver_team"] = "OPPONENT"
     events = dense.resolve_motion_observations(trace)["events"]
     assert not any(e["canonical_event_type"] == "ASSIST" for e in events)
 
@@ -373,7 +370,9 @@ def test_video_active_ball_uses_native_pixels_even_when_global_tracking_follows_
     assert trace == before  # the global physical path is not rewritten
     for row in obs["frames"]:
         row["ball_candidates"][0]["pixel_corroborated"] = False
-    assert not any(e["canonical_event_type"] == "ASSIST" for e in dense.resolve_motion_observations(trace)["events"])
+    # Native pixels remain separate: losing their corroboration cannot erase
+    # the already observed source-video transfer.
+    assert any(e["canonical_event_type"] == "ASSIST" for e in dense.resolve_motion_observations(trace)["events"])
 
 
 @pytest.mark.parametrize("field,value", [("video_actions", None),("video_actions", {}),("video_actions", [None]),
@@ -566,7 +565,7 @@ def test_motion_body_identity_does_not_require_jersey_isolation_during_a_duel():
 
 
 @pytest.mark.parametrize("failure", [None,"missing_controls","wrong_body","invisible","low_confidence","wrong_source"])
-def test_complete_visual_transfer_does_not_require_a_duplicate_physical_ball_certificate(failure):
+def test_auxiliary_ball_controls_do_not_reapprove_the_complete_video_transfer(failure):
     import dense_event_reconciliation as dense
     import fix10b_runtime as runtime
     trace = motion_trace()
@@ -583,12 +582,9 @@ def test_complete_visual_transfer_does_not_require_a_duplicate_physical_ball_cer
     trace["action_inspections"][0]["video_control_observations"] = controls
     unified = runtime.reconcile_unified_result({}, {"traces": [trace]})
     assists = [e for e in unified["canonical_events"]["events"] if e["canonical_event_type"] == "ASSIST"]
-    if failure:
-        assert not assists
-    else:
-        assert len(assists) == 1
-        assert "fix10b_physical" not in assists[0]["proof"]
-        assert assists[0]["receiver_team_resolution"]["actor_ball_relation"]["evidence"][0]["source"] == "SOURCE_VIDEO_VISIBLE_BALL_CONTROL"
+    assert len(assists) == 1
+    assert "fix10b_physical" not in assists[0]["proof"]
+    assert assists[0]["receiver_team_resolution"]["source"] == "TEMPORAL_VIDEO_OBSERVATION"
 
 
 def test_short_feedback_clip_cannot_claim_coverage_of_the_entire_window():
@@ -601,3 +597,138 @@ def test_short_feedback_clip_cannot_claim_coverage_of_the_entire_window():
     observation["video_actions"] = []
     assert context.video_observations(observation, trace["decoded_frames"], trace["window"])["sequences"]
     assert not context.motion_window_complete(observation, trace["decoded_frames"], trace["window"])
+
+
+@pytest.mark.parametrize("kind", ["PASS", "CROSS", "KEY_PASS"])
+@pytest.mark.parametrize("native_gap", ["missing_ball", "unknown_team", "opposing_kit_label", "split_receiver"])
+def test_observed_assist_survives_secondary_native_gaps_through_stats(kind, native_gap):
+    import fix10b_runtime as runtime
+    import verified_stats
+    trace = motion_trace()
+    raw = trace["action_inspections"][0]["video_actions"][0]
+    raw["kind"] = kind
+    for f in trace["decoded_frames"]:
+        f.pop("possession", None)
+        if native_gap in {"unknown_team", "opposing_kit_label"}:
+            f["players"][2].update(team="opponent" if native_gap == "opposing_kit_label" else "unknown")
+    if native_gap == "split_receiver":
+        raw.update(finisher_body_id="body_2", receiver_finisher_same_player=True)
+    result = runtime.reconcile_unified_result({}, {"traces": [trace]})
+    event, = result["canonical_events"]["events"]
+    assert event["canonical_event_type"] == "ASSIST"
+    assert event["receiver_team_resolution"]["reason"] == "SOURCE_VIDEO_TEAMMATE_TRANSFER"
+    assert len(result["action_timeline"]) == len(result["event_ledger"]["events"]) == 1
+    assert verified_stats.build_verified_stats(result, result["scoring_scan"])["observed_counts"]["assists"] == 1
+
+
+@pytest.mark.parametrize("roles", [{"receiver_team": "UNKNOWN"}, {"receiver_team": "OPPONENT"},
+                                  {"receiver_finisher_same_player": False},
+                                  {"receiver_body_id": "body_1"}, {"finisher_body_id": "body_1"}])
+def test_explicit_source_role_contradictions_are_not_erased_by_removing_native_reapproval(roles):
+    import dense_event_reconciliation as dense
+    trace = motion_trace()
+    trace["action_inspections"][0]["video_actions"][0].update(roles)
+    assert not any(e["canonical_event_type"] == "ASSIST" for e in dense.resolve_motion_observations(trace)["events"])
+
+
+@pytest.mark.parametrize("reverse", [False, True])
+def test_merging_a_stronger_video_keeps_its_full_proof_and_chain(reverse):
+    import canonical_event_resolver as resolver
+    import sequence_observation_context as context
+    import fix10b_reconciliation as bridge
+    trace = motion_trace("SHOT", "GOAL")
+    packet = context.video_observations(trace["action_inspections"][0], trace["decoded_frames"], trace["window"])
+    strong = packet["sequences"][0]["actions"][0]
+    weak = deepcopy(strong)
+    weak.update(action_id="weak", outcome="UNKNOWN", outcome_visible=False, causal_chain={})
+    weak.pop("video_observation")
+    packet["sequences"][0]["actions"] = [strong, weak] if reverse else [weak, strong]
+    result = resolver.resolve_canonical_events(packet, {"frames": trace["decoded_frames"]}, {})
+    event, = result["events"]
+    assert resolver.has_motion_proof(event)
+    assert event["causal_chain"]["goal_outcome_ms"] is not None
+    assert "weak" in event["source_action_ids"]
+    assert bridge.reconcile_canonical_events(result, {})["counts"] == {"GOAL": 1}
+
+
+def test_a_later_view_of_the_same_completed_pass_can_supply_the_goal_without_a_conflict():
+    import dense_event_reconciliation as dense
+    first = motion_trace(outcome="COMPLETED")
+    later = motion_trace()
+    later["action_inspections"][0]["input_sha256"] = "later-source-view"
+    once = dense.merge_motion_observations({}, {"traces": [first]})
+    result = dense.merge_motion_observations(once, {"traces": [later]})
+    assert result["counts"] == {"ASSIST": 1}
+    assert not result["unresolved"]
+    assert dense.merge_motion_observations(result, {"traces": [later]}) == result
+
+
+@pytest.mark.parametrize("previously_merged", [False, True])
+def test_conflicting_video_outcomes_in_one_trace_cannot_be_silently_deduped_or_revived(previously_merged):
+    import dense_event_reconciliation as dense
+    trace = motion_trace("SHOT", "GOAL")
+    disagree = deepcopy(trace["action_inspections"][0])
+    disagree["input_sha256"] = "different-view"
+    disagree["video_actions"][0]["outcome"] = "SAVED"
+    trace["action_inspections"].append(disagree)
+    previous = dense.merge_motion_observations({}, {"traces": [motion_trace("SHOT", "GOAL")]}) if previously_merged else {}
+    result = dense.merge_motion_observations(previous, {"traces": [trace, motion_trace("SHOT", "GOAL")]})
+    assert not result["events"]
+    assert result["unresolved"][0]["reason"] == "CONFLICTING_VIDEO_OUTCOMES"
+    assert dense.merge_motion_observations(result, {"traces": [trace]}) == result
+
+
+def test_older_physical_boolean_cannot_discard_a_new_source_bound_saved_shot():
+    import dense_event_reconciliation as dense
+    trace = motion_trace("SHOT", "SAVED")
+    old = deepcopy(dense.resolve_motion_observations(trace)["events"][0])
+    old.update(canonical_event_type="GOAL", canonical_outcome="GOAL", event_id="previous-physical")
+    old["proof"].pop("video_observation")
+    old["proof"]["fix10b_physical"] = {"proof_eligible": True, "proposal_id": "secondary"}
+    result = dense.merge_motion_observations({"events": [old]}, {"traces": [trace]})
+    event, = result["events"]
+    assert event["canonical_outcome"] == "SAVED"
+    assert event["proof"]["previous_physical_observation"]["canonical_outcome"] == "GOAL"
+    assert "fix10b_physical" not in event["proof"]
+
+
+@pytest.mark.parametrize("kind,outcome", [("SHOT", "SAVED"), ("PASS", "TEAMMATE_GOAL")])
+def test_real_physical_bridge_retains_video_result_and_audits_secondary_disagreement(kind, outcome):
+    import dense_event_reconciliation as dense
+    import fix10b_reconciliation as bridge
+    import test_fix10b_reconciliation as physical
+    event, = dense.resolve_motion_observations(motion_trace(kind, outcome, scene="scene_007"))["events"]
+    strike = physical.strike(event["contact_ms"], "p001", target=True)
+    trace = physical.trace([physical.touch(event["contact_ms"], "p001", target=True)], [strike], [physical.outcome(strike)])
+    trace["window"].update(start_ms=900, end_ms=3900)
+    result = bridge.reconcile_canonical_events({"events": [event]}, physical.physical([trace]))
+    retained, = result["events"]
+    assert retained["canonical_outcome"] == outcome
+    evidence, = retained["proof"]["secondary_physical_observations"]
+    assert evidence["relation"] == "DISAGREES" and evidence["canonical_outcome"] == "GOAL"
+    assert result["reconciliation"]["proposals_retained_as_secondary"] == 1
+    assert result["reconciliation"]["proposals_applied"] == 0
+    assert bridge.reconcile_canonical_events(result, physical.physical([trace]))["events"] == result["events"]
+
+
+def test_nearby_physical_release_cannot_relabel_a_separate_observed_receive():
+    import dense_event_reconciliation as dense
+    import fix10b_reconciliation as bridge
+    event, = dense.resolve_motion_observations(motion_trace("RECEIVE", "COMPLETED"))["events"]
+    proposal = {"scene_id": event["scene_id"], "kind": "GOAL", "target_contact_ms": event["contact_ms"]+700}
+    assert bridge._event_match([event], proposal) is None
+
+
+@pytest.mark.parametrize("outcome", ["SAVED", "GOAL"])
+def test_verified_outcome_timestamp_still_supports_report_after_the_shooters_action_ends(outcome):
+    import dense_event_reconciliation as dense
+    import canonical_output_authority as output
+    import verified_stats
+    event, = dense.resolve_motion_observations(motion_trace("SHOT", outcome))["events"]
+    full = {"analysis_authority": {"output": "FIX09C"}, "action_timeline": output.project_timeline({"events": [event]}),
+        "technical": {"shooting": {"score": 7, "evidence": [{"timestamp": "00:03", "what": "Shot saved" if outcome == "SAVED" else "Goal scored"}]}},
+        "video_comments": []}
+    result = verified_stats.apply_verified_stats_authority(full)
+    evidence, = result["technical"]["shooting"]["evidence"]
+    assert evidence["event_id"] == event["event_id"]
+    assert result["technical"]["shooting"]["score"] == 7

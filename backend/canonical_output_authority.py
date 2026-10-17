@@ -123,6 +123,7 @@ def project_event(event: dict) -> dict:
         "football_event_type": football_event,
         "football_action_type": football_action,
         "football_outcome": event.get("canonical_outcome"),
+        "causal_verified": event.get("causal_verified") is True,
         "football_details": deepcopy(event.get("details") or []),
         "foot": event.get("foot") or "UNKNOWN",
         "pressure": deepcopy(event.get("pressure") or {}),

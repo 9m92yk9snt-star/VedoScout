@@ -55,6 +55,44 @@ The resulting visual observations remain distinct from native physical evidence.
 The shared resolver and projections publish one shot/on-target outcome only
 after the original player's identity and continuous source sequence qualify.
 
+## Audit of repeated approvals across actions
+
+The complete observation-to-report path was reviewed, including assists and
+ordinary involvements. The changes use existing modules and the existing video
+read; they add no model pass or runtime approval module.
+
+| Repeated decision | Previous effect | Current behavior |
+| --- | --- | --- |
+| Assist team and possession | An observed continuous pass/receive/finish still needed two native kit samples and native ball possession at both ends. | The source-bound video observes the transfer and teammate roles once. Missing detections or contradictory coarse kit labels do not veto that observation. |
+| Receiver/finisher track stitching | A changed native label required verified native touches within 150 ms and another physical same-person proof. | The video follows the receiver through the finish. Explicit evidence of a different finisher, opponent or target receiving/finishing remains a role contradiction. |
+| Overlap merge | A stronger event could contribute its label while losing its video provenance and causal chain, triggering physical approval again. | Keep the complete stronger observation and merge supporting source IDs/evidence. A later goal view can extend a completed pass to an assist. |
+| Physical reconciliation | A physical boolean could discard a fresh video observation; a later proposal could overwrite a resolved video outcome. | Retain the qualified video result. Keep secondary physical corroboration/disagreement in the audit, without attaching a contradictory physical certificate. A nearby separate release does not relabel a receive or dribble. |
+| Report timestamp binding | A save/goal after the player's action ended could fall outside the report's action-only matching interval. | Bind the report to the already verified causal outcome as well as the player's action. Preserve causal verification through timeline/stat projections. |
+
+An actually contradictory pair of complete source-video outcomes remains visible
+as `CONFLICTING_VIDEO_OUTCOMES`, including within one trace; deduplication cannot
+silently choose the first or revive it from an overlapping trace. UNKNOWN is
+missing knowledge, not contrary evidence. COMPLETED, TEAMMATE_SHOT and
+TEAMMATE_GOAL are compatible stages of the same observed pass.
+
+This policy intentionally gives the complete source-video interpretation priority
+over the independent native reconstruction. It is not proof of unchanged model
+accuracy or improved full-report latency.
+
+The immutable real-response audit is
+[`observation-approval-audit.json`](observation-approval-audit.json). It checks the
+stored response hash and maps every one of its 25 action claims to its recorded
+canonical decision: seven accepted, 18 unresolved, all 18 with
+`INSUFFICIENT_PHYSICAL_IDENTITY_EVIDENCE`. All 25 raw claims said target VERIFIED;
+that assertion was not the missing selected-reference pixel comparison. The old
+export contains no source-indexed temporal action inspections. This is a record
+of the actual older model run, not a fabricated new acceptance result.
+
+The raw run includes SHOT/SAVED and a completed pass around the first reference
+assist, but does not contain three complete direct-assist chains. Removing later
+vetoes cannot repair those original role/chain omissions. The audit retains
+every recorded decision instead of relabelling all 25 claims as approved.
+
 ## Existing-video evidence
 
 The inspected export is for source SHA-256
@@ -183,6 +221,18 @@ validation; no end-to-end performance or quality claim follows from this audit.
 
 ## Validation and limits
 
+After the broader action audit, the reviewed final code passed 2,447 tests with
+one skip across the same 122 backend files in 26.15 s. All Python socket
+connections were explicitly blocked for this run. An earlier unrestricted
+invocation was stopped by automatic approval review over an outbound fetch;
+the offline run completed without needing that fetch. The separate process
+runner module remains covered by GitHub CI rather than counted as locally green.
+The new regressions exercise complete production projections, native detection
+gaps, kit disagreement, receiver label changes, full-proof overlap merges,
+compatible pass outcomes, physical disagreements, source-role contradictions,
+idempotence and late report timestamps. They are code fixtures, not new model
+inference of the reference video.
+
 Regression coverage now explicitly admits source-video identity across local
 labels with one selected-reference comparison, optional save detail boxes,
 untracked keepers, held balls without another keeper box, either outcome-index
@@ -192,12 +242,12 @@ balls, contradictory controls and actual cuts remain separate controls. The
 production adapter/driver tests use explicit test doubles, not new perception.
 Source timestamps can be shifted without changing classification logic.
 
-The focused identity/video/save group passed 198 tests after the simplification.
+The earlier focused identity/video/save group passed 198 tests after the saved-shot simplification.
 This deliberately gives source-video observations more authority instead of
 recertifying them through native geometry. Unchanged perception accuracy or
 full-report latency cannot be claimed without a fresh real model run.
 
-After the simplification, 122 backend regression files passed 2,420 cases with
+Before the broader action audit, 122 backend regression files passed 2,420 cases with
 one skip in 28.99 s (the process-runner module is checked separately in CI).
 All 379 backend Python files parse and diff whitespace checks pass. The focused
 198-case group overlaps this sweep; the counts must not be added together.

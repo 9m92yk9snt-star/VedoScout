@@ -1,0 +1,569 @@
+{
+  "audit_kind": "RECORDED_REAL_MODEL_AND_CANONICAL_DECISIONS",
+  "fresh_inference": false,
+  "source_video_sha256": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+  "model": "gemini-2.5-pro",
+  "response_sha256": "9e7dc403ad4dbe8e11aa7c93fc3f3ebcb8e9688accab4c9a3160682eca522860",
+  "canonical_export_sha256": "f10a5900233b48bf3f4d1b6c253c15151f6753919ae189f6cf1ce2de5a8df0fe",
+  "counts": {
+    "model_observations": 25,
+    "events": 7,
+    "unresolved": 18
+  },
+  "nonaccepted_reasons": {
+    "INSUFFICIENT_PHYSICAL_IDENTITY_EVIDENCE": 18
+  },
+  "interpretation": "These are the unchanged original model claims and recorded decisions, not newly accepted actions. The source-indexed temporal protocol is absent from this export. Removing duplicate approvals does not create missing selected-reference comparisons or repair old action-role classifications.",
+  "actions": [
+    {
+      "action_id": "c39d96948dd7_01",
+      "sequence_id": "seq_c39d96948dd7",
+      "model_observation": {
+        "kind": "CARRY",
+        "start_ms": 1800,
+        "contact_ms": null,
+        "end_ms": 3900,
+        "target_status": "VERIFIED",
+        "outcome": "UNKNOWN",
+        "outcome_visible": false
+      },
+      "recorded_decisions": [
+        {
+          "lane": "events",
+          "reason": "TARGET_ACTION_VERIFIED",
+          "event_id": "evt_c4161461b36266b1",
+          "canonical_event_type": "CARRY",
+          "canonical_outcome": "UNKNOWN"
+        }
+      ]
+    },
+    {
+      "action_id": "c39d96948dd7_02",
+      "sequence_id": "seq_c39d96948dd7",
+      "model_observation": {
+        "kind": "DUEL",
+        "start_ms": 3900,
+        "contact_ms": 4200,
+        "end_ms": 4500,
+        "target_status": "VERIFIED",
+        "outcome": "LOST",
+        "outcome_visible": true
+      },
+      "recorded_decisions": [
+        {
+          "lane": "events",
+          "reason": "TARGET_ACTION_VERIFIED",
+          "event_id": "evt_8199029a992df480",
+          "canonical_event_type": "DUEL",
+          "canonical_outcome": "LOST"
+        }
+      ]
+    },
+    {
+      "action_id": "07c81afbeff2_01",
+      "sequence_id": "seq_07c81afbeff2",
+      "model_observation": {
+        "kind": "DRIBBLE",
+        "start_ms": 9800,
+        "contact_ms": null,
+        "end_ms": 10800,
+        "target_status": "VERIFIED",
+        "outcome": "TURNOVER",
+        "outcome_visible": true
+      },
+      "recorded_decisions": [
+        {
+          "lane": "unresolved",
+          "reason": "INSUFFICIENT_PHYSICAL_IDENTITY_EVIDENCE",
+          "event_id": null,
+          "canonical_event_type": null,
+          "canonical_outcome": null
+        }
+      ]
+    },
+    {
+      "action_id": "07c81afbeff2_02",
+      "sequence_id": "seq_07c81afbeff2",
+      "model_observation": {
+        "kind": "DUEL",
+        "start_ms": 10800,
+        "contact_ms": 11200,
+        "end_ms": 12000,
+        "target_status": "VERIFIED",
+        "outcome": "LOST",
+        "outcome_visible": true
+      },
+      "recorded_decisions": [
+        {
+          "lane": "events",
+          "reason": "TARGET_ACTION_VERIFIED",
+          "event_id": "evt_5f083340bedfa285",
+          "canonical_event_type": "DUEL",
+          "canonical_outcome": "LOST"
+        }
+      ]
+    },
+    {
+      "action_id": "9516be954359_01",
+      "sequence_id": "seq_9516be954359",
+      "model_observation": {
+        "kind": "PRESS",
+        "start_ms": 14500,
+        "contact_ms": null,
+        "end_ms": 16800,
+        "target_status": "VERIFIED",
+        "outcome": "UNKNOWN",
+        "outcome_visible": false
+      },
+      "recorded_decisions": [
+        {
+          "lane": "unresolved",
+          "reason": "INSUFFICIENT_PHYSICAL_IDENTITY_EVIDENCE",
+          "event_id": null,
+          "canonical_event_type": null,
+          "canonical_outcome": null
+        }
+      ]
+    },
+    {
+      "action_id": "381c44303eb4_01",
+      "sequence_id": "seq_381c44303eb4",
+      "model_observation": {
+        "kind": "RECEIVE",
+        "start_ms": 19500,
+        "contact_ms": 19800,
+        "end_ms": 20000,
+        "target_status": "VERIFIED",
+        "outcome": "COMPLETED",
+        "outcome_visible": true
+      },
+      "recorded_decisions": [
+        {
+          "lane": "unresolved",
+          "reason": "INSUFFICIENT_PHYSICAL_IDENTITY_EVIDENCE",
+          "event_id": null,
+          "canonical_event_type": null,
+          "canonical_outcome": null
+        }
+      ]
+    },
+    {
+      "action_id": "381c44303eb4_02",
+      "sequence_id": "seq_381c44303eb4",
+      "model_observation": {
+        "kind": "SHOT",
+        "start_ms": 20300,
+        "contact_ms": 20600,
+        "end_ms": 21000,
+        "target_status": "VERIFIED",
+        "outcome": "SAVED",
+        "outcome_visible": true
+      },
+      "recorded_decisions": [
+        {
+          "lane": "unresolved",
+          "reason": "INSUFFICIENT_PHYSICAL_IDENTITY_EVIDENCE",
+          "event_id": null,
+          "canonical_event_type": null,
+          "canonical_outcome": null
+        }
+      ]
+    },
+    {
+      "action_id": "1ba2f96f5d10_01",
+      "sequence_id": "seq_1ba2f96f5d10",
+      "model_observation": {
+        "kind": "RECEIVE",
+        "start_ms": 26500,
+        "contact_ms": 26800,
+        "end_ms": 27000,
+        "target_status": "VERIFIED",
+        "outcome": "COMPLETED",
+        "outcome_visible": true
+      },
+      "recorded_decisions": [
+        {
+          "lane": "events",
+          "reason": "TARGET_ACTION_VERIFIED",
+          "event_id": "evt_8ec71e36f8b38f46",
+          "canonical_event_type": "RECEIVE",
+          "canonical_outcome": "COMPLETED"
+        }
+      ]
+    },
+    {
+      "action_id": "1ba2f96f5d10_02",
+      "sequence_id": "seq_1ba2f96f5d10",
+      "model_observation": {
+        "kind": "TAKE_ON",
+        "start_ms": 27000,
+        "contact_ms": null,
+        "end_ms": 29500,
+        "target_status": "VERIFIED",
+        "outcome": "WON",
+        "outcome_visible": true
+      },
+      "recorded_decisions": [
+        {
+          "lane": "unresolved",
+          "reason": "INSUFFICIENT_PHYSICAL_IDENTITY_EVIDENCE",
+          "event_id": null,
+          "canonical_event_type": null,
+          "canonical_outcome": null
+        }
+      ]
+    },
+    {
+      "action_id": "1ba2f96f5d10_03",
+      "sequence_id": "seq_1ba2f96f5d10",
+      "model_observation": {
+        "kind": "SHOT",
+        "start_ms": 29500,
+        "contact_ms": 29800,
+        "end_ms": 30200,
+        "target_status": "VERIFIED",
+        "outcome": "GOAL",
+        "outcome_visible": true
+      },
+      "recorded_decisions": [
+        {
+          "lane": "unresolved",
+          "reason": "INSUFFICIENT_PHYSICAL_IDENTITY_EVIDENCE",
+          "event_id": null,
+          "canonical_event_type": null,
+          "canonical_outcome": null
+        }
+      ]
+    },
+    {
+      "action_id": "ac1191a3e0b2_01",
+      "sequence_id": "seq_ac1191a3e0b2",
+      "model_observation": {
+        "kind": "RECEIVE",
+        "start_ms": 34200,
+        "contact_ms": 34400,
+        "end_ms": 34600,
+        "target_status": "VERIFIED",
+        "outcome": "COMPLETED",
+        "outcome_visible": true
+      },
+      "recorded_decisions": [
+        {
+          "lane": "events",
+          "reason": "TARGET_ACTION_VERIFIED",
+          "event_id": "evt_ca9ff63c86166cd8",
+          "canonical_event_type": "RECEIVE",
+          "canonical_outcome": "COMPLETED"
+        }
+      ]
+    },
+    {
+      "action_id": "ac1191a3e0b2_02",
+      "sequence_id": "seq_ac1191a3e0b2",
+      "model_observation": {
+        "kind": "DRIBBLE",
+        "start_ms": 34600,
+        "contact_ms": null,
+        "end_ms": 36500,
+        "target_status": "VERIFIED",
+        "outcome": "UNKNOWN",
+        "outcome_visible": false
+      },
+      "recorded_decisions": [
+        {
+          "lane": "unresolved",
+          "reason": "INSUFFICIENT_PHYSICAL_IDENTITY_EVIDENCE",
+          "event_id": null,
+          "canonical_event_type": null,
+          "canonical_outcome": null
+        }
+      ]
+    },
+    {
+      "action_id": "ac1191a3e0b2_03",
+      "sequence_id": "seq_ac1191a3e0b2",
+      "model_observation": {
+        "kind": "SHOT",
+        "start_ms": 36500,
+        "contact_ms": 36800,
+        "end_ms": 37200,
+        "target_status": "VERIFIED",
+        "outcome": "OFF_TARGET",
+        "outcome_visible": true
+      },
+      "recorded_decisions": [
+        {
+          "lane": "unresolved",
+          "reason": "INSUFFICIENT_PHYSICAL_IDENTITY_EVIDENCE",
+          "event_id": null,
+          "canonical_event_type": null,
+          "canonical_outcome": null
+        }
+      ]
+    },
+    {
+      "action_id": "1620356bd3d0_01",
+      "sequence_id": "seq_1620356bd3d0",
+      "model_observation": {
+        "kind": "DUEL",
+        "start_ms": 38500,
+        "contact_ms": 39000,
+        "end_ms": 39500,
+        "target_status": "VERIFIED",
+        "outcome": "WON",
+        "outcome_visible": true
+      },
+      "recorded_decisions": [
+        {
+          "lane": "unresolved",
+          "reason": "INSUFFICIENT_PHYSICAL_IDENTITY_EVIDENCE",
+          "event_id": null,
+          "canonical_event_type": null,
+          "canonical_outcome": null
+        }
+      ]
+    },
+    {
+      "action_id": "1620356bd3d0_02",
+      "sequence_id": "seq_1620356bd3d0",
+      "model_observation": {
+        "kind": "SHOT",
+        "start_ms": 39500,
+        "contact_ms": 39700,
+        "end_ms": 40000,
+        "target_status": "VERIFIED",
+        "outcome": "BLOCKED",
+        "outcome_visible": true
+      },
+      "recorded_decisions": [
+        {
+          "lane": "unresolved",
+          "reason": "INSUFFICIENT_PHYSICAL_IDENTITY_EVIDENCE",
+          "event_id": null,
+          "canonical_event_type": null,
+          "canonical_outcome": null
+        }
+      ]
+    },
+    {
+      "action_id": "582e5f472fa6_01",
+      "sequence_id": "seq_582e5f472fa6",
+      "model_observation": {
+        "kind": "DUEL",
+        "start_ms": 41800,
+        "contact_ms": 42500,
+        "end_ms": 42800,
+        "target_status": "VERIFIED",
+        "outcome": "WON",
+        "outcome_visible": true
+      },
+      "recorded_decisions": [
+        {
+          "lane": "unresolved",
+          "reason": "INSUFFICIENT_PHYSICAL_IDENTITY_EVIDENCE",
+          "event_id": null,
+          "canonical_event_type": null,
+          "canonical_outcome": null
+        }
+      ]
+    },
+    {
+      "action_id": "582e5f472fa6_02",
+      "sequence_id": "seq_582e5f472fa6",
+      "model_observation": {
+        "kind": "PASS",
+        "start_ms": 42800,
+        "contact_ms": 43000,
+        "end_ms": 43300,
+        "target_status": "VERIFIED",
+        "outcome": "COMPLETED",
+        "outcome_visible": true
+      },
+      "recorded_decisions": [
+        {
+          "lane": "unresolved",
+          "reason": "INSUFFICIENT_PHYSICAL_IDENTITY_EVIDENCE",
+          "event_id": null,
+          "canonical_event_type": null,
+          "canonical_outcome": null
+        }
+      ]
+    },
+    {
+      "action_id": "dd2c43be6979_01",
+      "sequence_id": "seq_dd2c43be6979",
+      "model_observation": {
+        "kind": "TACKLE",
+        "start_ms": 47500,
+        "contact_ms": 48200,
+        "end_ms": 48500,
+        "target_status": "VERIFIED",
+        "outcome": "WON",
+        "outcome_visible": true
+      },
+      "recorded_decisions": [
+        {
+          "lane": "unresolved",
+          "reason": "INSUFFICIENT_PHYSICAL_IDENTITY_EVIDENCE",
+          "event_id": null,
+          "canonical_event_type": null,
+          "canonical_outcome": null
+        }
+      ]
+    },
+    {
+      "action_id": "dd2c43be6979_02",
+      "sequence_id": "seq_dd2c43be6979",
+      "model_observation": {
+        "kind": "SHOT",
+        "start_ms": 49000,
+        "contact_ms": 49300,
+        "end_ms": 49800,
+        "target_status": "VERIFIED",
+        "outcome": "GOAL",
+        "outcome_visible": true
+      },
+      "recorded_decisions": [
+        {
+          "lane": "unresolved",
+          "reason": "INSUFFICIENT_PHYSICAL_IDENTITY_EVIDENCE",
+          "event_id": null,
+          "canonical_event_type": null,
+          "canonical_outcome": null
+        }
+      ]
+    },
+    {
+      "action_id": "a08790452f20_01",
+      "sequence_id": "seq_a08790452f20",
+      "model_observation": {
+        "kind": "RECEIVE",
+        "start_ms": 56500,
+        "contact_ms": 56800,
+        "end_ms": 57000,
+        "target_status": "VERIFIED",
+        "outcome": "COMPLETED",
+        "outcome_visible": true
+      },
+      "recorded_decisions": [
+        {
+          "lane": "unresolved",
+          "reason": "INSUFFICIENT_PHYSICAL_IDENTITY_EVIDENCE",
+          "event_id": null,
+          "canonical_event_type": null,
+          "canonical_outcome": null
+        }
+      ]
+    },
+    {
+      "action_id": "a08790452f20_02",
+      "sequence_id": "seq_a08790452f20",
+      "model_observation": {
+        "kind": "SHOT",
+        "start_ms": 57000,
+        "contact_ms": 57200,
+        "end_ms": 57600,
+        "target_status": "VERIFIED",
+        "outcome": "OFF_TARGET",
+        "outcome_visible": true
+      },
+      "recorded_decisions": [
+        {
+          "lane": "events",
+          "reason": "VISIBLE_SHOT_OUTCOME",
+          "event_id": "evt_154e6e1c9a086d19",
+          "canonical_event_type": "SHOT",
+          "canonical_outcome": "OFF_TARGET"
+        }
+      ]
+    },
+    {
+      "action_id": "a9a13c44af83_01",
+      "sequence_id": "seq_a9a13c44af83",
+      "model_observation": {
+        "kind": "DUEL",
+        "start_ms": 59500,
+        "contact_ms": 60000,
+        "end_ms": 60500,
+        "target_status": "VERIFIED",
+        "outcome": "WON",
+        "outcome_visible": true
+      },
+      "recorded_decisions": [
+        {
+          "lane": "unresolved",
+          "reason": "INSUFFICIENT_PHYSICAL_IDENTITY_EVIDENCE",
+          "event_id": null,
+          "canonical_event_type": null,
+          "canonical_outcome": null
+        }
+      ]
+    },
+    {
+      "action_id": "fcd6846db0f1_01",
+      "sequence_id": "seq_fcd6846db0f1",
+      "model_observation": {
+        "kind": "DUEL",
+        "start_ms": 62800,
+        "contact_ms": 63500,
+        "end_ms": 64000,
+        "target_status": "VERIFIED",
+        "outcome": "LOST",
+        "outcome_visible": true
+      },
+      "recorded_decisions": [
+        {
+          "lane": "unresolved",
+          "reason": "INSUFFICIENT_PHYSICAL_IDENTITY_EVIDENCE",
+          "event_id": null,
+          "canonical_event_type": null,
+          "canonical_outcome": null
+        }
+      ]
+    },
+    {
+      "action_id": "d37d2f9fdada_01",
+      "sequence_id": "seq_d37d2f9fdada",
+      "model_observation": {
+        "kind": "OFF_BALL_RUN",
+        "start_ms": 68900,
+        "contact_ms": null,
+        "end_ms": 71000,
+        "target_status": "VERIFIED",
+        "outcome": "UNKNOWN",
+        "outcome_visible": true
+      },
+      "recorded_decisions": [
+        {
+          "lane": "events",
+          "reason": "TARGET_ACTION_VERIFIED",
+          "event_id": "evt_3901564aaa124828",
+          "canonical_event_type": "OFF_BALL_RUN",
+          "canonical_outcome": "UNKNOWN"
+        }
+      ]
+    },
+    {
+      "action_id": "97a27b1674b1_01",
+      "sequence_id": "seq_97a27b1674b1",
+      "model_observation": {
+        "kind": "DUEL",
+        "start_ms": 74200,
+        "contact_ms": 74600,
+        "end_ms": 75000,
+        "target_status": "VERIFIED",
+        "outcome": "LOST",
+        "outcome_visible": true
+      },
+      "recorded_decisions": [
+        {
+          "lane": "unresolved",
+          "reason": "INSUFFICIENT_PHYSICAL_IDENTITY_EVIDENCE",
+          "event_id": null,
+          "canonical_event_type": null,
+          "canonical_outcome": null
+        }
+      ]
+    }
+  ]
+}

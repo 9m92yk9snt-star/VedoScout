@@ -95,6 +95,16 @@ def _matching(events, row):
     for e in events:
         start = e.get("start_ms", e.get("canonical_ms"))
         end = e.get("end_ms", e.get("canonical_ms"))
+        # A pass ends before the receiver finishes; the goalkeeper intervenes
+        # after the shooter's action. Those already resolved outcome times
+        # belong to this event, rather than requiring another matching action.
+        if e.get("causal_verified") is True:
+            chain = e.get("causal_chain") or {}
+            times = [chain.get(k) for k in ("target_contact_ms", "receiver_ms", "teammate_shot_ms", "goal_outcome_ms")]
+            times.extend([start, end, (e.get("proof") or {}).get("outcome_ms")])
+            times = [t for t in times if isinstance(t, (int, float)) and not isinstance(t, bool) and math.isfinite(t)]
+            if times:
+                start, end = min(times), max(times)
         if (isinstance(start, (int, float)) and isinstance(end, (int, float))
                 and math.isfinite(start) and math.isfinite(end)
                 and start - 1000 <= ms <= end + 1000):

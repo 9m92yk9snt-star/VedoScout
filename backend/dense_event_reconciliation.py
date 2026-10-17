@@ -97,23 +97,7 @@ def resolve_motion_observations(trace):
         if not source or observation.get("source_video_sha256") != source:
             continue
         packet = sequence_observation_context.video_observations(observation, rows, trace.get("window") or {})
-        for seq in packet.get("sequences") or []:
-            for action in seq.get("actions") or []:
-                chain = action.get("causal_chain") or {}
-                receiver, scorer = chain.get("receiver_local_track_id"), chain.get("finisher_local_track_id")
-                if action.get("outcome") == "TEAMMATE_GOAL" and receiver != scorer:
-                    def touch(track, pivot):
-                        candidates = [t for t in (trace.get("touch_graph") or {}).get("touches") or []
-                            if t.get("status") == "VERIFIED" and t.get("proof_eligible") is True
-                            and t.get("player_track_id") == track and isinstance(pivot, int)
-                            and abs(t.get("representative_ms", t.get("media_ms", -1000000))-pivot) <= 150]
-                        return min(candidates, key=lambda t: abs(t.get("representative_ms", t.get("media_ms"))-pivot), default={})
-                    linked, evidence = physical_resolution._same_actor_after_track_split(trace,
-                        touch(receiver, chain.get("receiver_ms")), touch(scorer, chain.get("teammate_shot_ms")))
-                    action["video_observation"]["receiver_finisher_link"] = evidence
-                    if not linked:
-                        action["outcome_visible"] = False
-            sequences.append(seq)
+        sequences.extend(packet.get("sequences") or [])
     result = (resolver.resolve_canonical_events({"sequences": sequences}, {"frames": rows}, {})
               if sequences else {"events": [], "unresolved": [], "rejected": []})
     actions = {a["action_id"]: a for s in sequences for a in s.get("actions") or []}
@@ -137,6 +121,10 @@ def merge_motion_observations(canonical, physical):
                 if diagnostic not in bundle.setdefault(lane, []):
                     bundle[lane].append(deepcopy(diagnostic))
                     diagnostics_added += 1
+                    if diagnostic.get("reason") == "CONFLICTING_VIDEO_OUTCOMES":
+                        blocked.append(diagnostic)
+                        events[:] = [e for e in events if not any(
+                            resolver._same_real_action(e, old) for old in diagnostic["observed_events"])]
         for event in resolved.get("events") or []:
             old = next((e for e in events if resolver._same_real_action(e, event)), None)
             if any(resolver._same_real_action(e, event) for c in [*blocked, *conflicts] for e in c["observed_events"]):
@@ -146,19 +134,26 @@ def merge_motion_observations(canonical, physical):
             if (old and old.get("event_id") == event.get("event_id") and old_video
                     and all(old_video.get(k) == new_video.get(k) for k in ("input_sha256", "response_sha256"))):
                 continue
-            if old and ((old.get("proof") or {}).get("fix10b_physical") or {}).get("proof_eligible") is True:
+            if old and resolver.motion_outcomes_conflict(old, event):
+                conflicts.append({"reason": "CONFLICTING_VIDEO_OUTCOMES", "scene_id": event.get("scene_id"),
+                    "contact_ms": event.get("contact_ms"), "kind": event.get("canonical_action_type"),
+                    "observed_events": [deepcopy(old), deepcopy(event)]})
+                events.remove(old)
                 continue
-            if old and old.get("causal_verified") and event.get("causal_verified") and old.get("canonical_outcome") != event.get("canonical_outcome"):
-                if (old.get("proof") or {}).get("video_observation"):
-                    conflicts.append({"reason": "CONFLICTING_VIDEO_OUTCOMES", "scene_id": event.get("scene_id"),
-                        "contact_ms": event.get("contact_ms"), "kind": event.get("canonical_action_type"),
-                        "observed_events": [deepcopy(old), deepcopy(event)]})
-                    events.remove(old)
-                    continue
             if old:
                 if old.get("causal_verified") and not event.get("causal_verified"):
                     continue
+                if resolver.has_motion_proof(old):
+                    before = deepcopy(old)
+                    resolver._merge_event(old, event)
+                    observed += old != before
+                    continue
                 event.setdefault("proof", {})["superseded_semantic_event_ids"] = [old.get("event_id")]
+                if (old.get("proof") or {}).get("fix10b_physical"):
+                    event["proof"]["previous_physical_observation"] = {
+                        "canonical_event_type": old.get("canonical_event_type"),
+                        "canonical_outcome": old.get("canonical_outcome"),
+                        "proof": deepcopy(old["proof"]["fix10b_physical"])}
                 events.remove(old)
             events.append(event)
             observed += 1

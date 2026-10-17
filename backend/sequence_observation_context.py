@@ -49,8 +49,9 @@ def _motion_actor_observations(action):
 def video_observations(observation, frames, window):
     """Translate clip indices to measured bodies/source PTS for the existing resolver.
 
-    This creates observations, not events. Player identity, team/ball transfer
-    and causal ownership are still resolved against the shared native graph.
+    This creates observations, not events. Source bodies and selected-player
+    identity are bound once; video role/transfer observations do not require a
+    duplicate native ball/kit approval.
     """
     import football_sequence_intelligence as sequence
     obs = observation or {}
@@ -141,6 +142,9 @@ def video_observations(observation, frames, window):
             "source_sampling_fps": transport.get("source_sampling_fps"), "playback_fps": transport.get("playback_fps")}
         if isinstance(raw.get("save_sequence_evidence"), dict):
             action["video_observation"]["save_sequence"] = deepcopy(raw["save_sequence_evidence"])
+        if raw.get("outcome") == "TEAMMATE_GOAL":
+            action["video_observation"]["assist_roles"] = {
+                k: raw[k] for k in ("receiver_team", "receiver_finisher_same_player") if k in raw}
         actions.append(action)
     return {"sequences": [{"sequence_id": sid, "scene_id": window.get("scene_id"),
         "start_ms": times[0], "end_ms": times[-1], "actions": actions}]}
