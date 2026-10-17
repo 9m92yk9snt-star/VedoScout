@@ -1183,15 +1183,30 @@ async def read_action_video_evidence(api_key, session_id, clip_path, media_ms, b
         "coordinates, inside one of the supplied canvas_roi panels. Never connect the duplicate ball views as two balls. "
         "Use only the supplied integer frame indices in your answer. Body labels follow measured tracks; "
         "they are not shirt numbers. Some body labels disappear during overlaps; use labels from clear frames to track the person "
-        "through the play, and cite the actual labelled evidence frames. A local track label can switch people: compare the pixels, not just the label. "
+        "through the play, and cite the actual labelled evidence frames. In actor_observations give the label actually visible "
+        "at EACH cited index; one person's label can change. A local track label can also switch people: compare the pixels, not just the label. "
         "Compare the selected player's reference crops using hair, build, "
         "socks, boots and sleeves even when the shirt number is hidden. Kit colour alone cannot identify a teammate. "
         "Keep passer, receiver and finisher separate. Follow each active-ball sequence forward from the pass "
         "and backward from the outcome. A player leaving the picture after his pass does not erase that pass. "
+        "For SHOT, contact_idx is the final strike that sends the ball toward goal, not an earlier running or dribbling touch. "
+        "Cite the shooter in clear views just before/at that strike. The camera may then pan quickly to the ball and goalkeeper; "
+        "the shooter need not remain visible for his shot's outcome to be observed. A camera pan is not itself a scene cut. "
         "A briefly hidden ball can reappear; describe the visible before/after evidence rather than inventing its hidden path. "
         "continuous_visible_sequence means the same uninterrupted play, not that the ball must be visible in every frame. "
         "For a goal identify the active ball inside the goal after the strike, excluding stationary spare balls; "
-        "keeper gaze or celebration alone is not enough. For a save identify the keeper intervention and subsequent ball movement. "
+        "keeper gaze or celebration alone is not enough. For a save follow the incoming active ball, keeper intervention, "
+        "and the same ball's changed direction or movement away afterward; cite these source indices in outcome_evidence_indices "
+        "and describe what each shows in details. A separate ball resting in the net before/after the intervention is a spare, "
+        "not evidence that the shot scored. Its screen position can move during a camera pan: compare it to the goal and ground. "
+        "Give each distinguishable ball a response-local ball_id and keep the active ball's ID through the play. "
+        "For a visibly saved shot also supply save_sequence: the incoming ball, visible goalkeeper intervention, "
+        "and the same ball deflected away or held afterward. Each cited stage must have a visible ball box in its frames row. "
+        "At contact_idx show that ball's visible control_body_id matching the shooter in actor_observations at that index. "
+        "At keeper_idx give keeper_box including the keeper's body and reaching hands/feet. If no measured body label "
+        "is visible on the keeper, use keeper_body_id=null and locate him with keeper_box in the full overview; "
+        "never invent a body label. For HELD give aftermath_keeper_box at aftermath_idx with the ball visibly held there. "
+        "Use null for save_sequence if any connection is unseen; a diving keeper alone is not a save. "
         "Report visible actions and their outcome; don't replace an observed pass by the receiver's shot. "
         "No expected event count, event times, shirt number or result is provided. "
         "For every input frame return a frames row; empty ball proposals are fine. Ball boxes use the displayed video coordinates. "
@@ -1199,14 +1214,18 @@ async def read_action_video_evidence(api_key, session_id, clip_path, media_ms, b
         "For visible ball-foot/body contact or clear ball control, also supply control_body_id and control_visible=true. "
         "This needs a visible ball at that body, not gaze, proximity alone or the action label. Otherwise use null/false. "
         "Select only visibly exposed jersey bodies for separate digit reading; do not guess digits. "
-        "Return JSON: {\"reviewed_entire_clip\":true,\"frames\":[{\"idx\":1,\"balls\":[{\"box\":{\"x\":0,\"y\":0,\"w\":0.01,\"h\":0.01},\"confidence\":\"high\",\"active_ball\":true,\"control_body_id\":null,\"control_visible\":false}],\"selected_body_ids\":[]}],"
+        "Return JSON: {\"reviewed_entire_clip\":true,\"frames\":[{\"idx\":1,\"balls\":[{\"ball_id\":\"ball_a\",\"box\":{\"x\":0,\"y\":0,\"w\":0.01,\"h\":0.01},\"confidence\":\"high\",\"active_ball\":true,\"stationary_spare\":false,\"control_body_id\":null,\"control_visible\":false}],\"selected_body_ids\":[]}],"
         "\"target_observations\":[{\"idx\":1,\"body_id\":\"body_1\",\"confidence\":\"high\",\"features\":[\"hair\",\"boots\"]}],"
         "\"actions\":[{\"kind\":\"PASS|CROSS|SHOT|RECEIVE|CARRY|DRIBBLE|DUEL|RUN|OTHER\","
         "\"start_idx\":1,\"contact_idx\":2,\"end_idx\":3,\"actor_body_id\":\"body_1\",\"actor_evidence_indices\":[1,2],"
+        "\"actor_observations\":[{\"idx\":1,\"body_id\":\"body_1\"},{\"idx\":2,\"body_id\":\"body_1\"}],"
         "\"contact_visibility\":\"VISIBLE|PARTIAL|OCCLUDED|UNKNOWN\",\"foot\":\"LEFT|RIGHT|UNKNOWN\","
         "\"outcome\":\"GOAL|SAVED|BLOCKED|OFF_TARGET|COMPLETED|INCOMPLETE|TEAMMATE_SHOT|TEAMMATE_GOAL|UNKNOWN\","
         "\"outcome_visible\":true,\"outcome_idx\":null,\"receiver_body_id\":null,\"receiver_idx\":null,"
         "\"finisher_body_id\":null,\"shot_idx\":null,\"continuous_visible_sequence\":true,"
+        "\"save_sequence\":{\"ball_id\":\"ball_a\",\"incoming_idx\":4,\"keeper_idx\":5,\"keeper_body_id\":null,"
+        "\"keeper_box\":{\"x\":0,\"y\":0,\"w\":0.1,\"h\":0.1},\"aftermath_keeper_box\":null,"
+        "\"keeper_intervention_visible\":true,\"aftermath_idx\":6,\"aftermath\":\"DEFLECTED_AWAY|HELD\",\"same_active_ball\":true},"
         "\"outcome_evidence_indices\":[],\"details\":[\"visible evidence\"]}]}. "
         "Use null when a contact/role/outcome was not observed. For a teammate goal include receiver, finisher, shot and outcome indices. "
         "If the shared context specifies a requested_search, inspect that missing connection in the supplied play. "
@@ -1226,11 +1245,15 @@ async def read_action_video_evidence(api_key, session_id, clip_path, media_ms, b
                                                    timeout_s=video_model_input.VIDEO_TIMEOUT_S, source_clock=media_ms)
     raw = video_model_input.response_text(result)
     parsed = _extract_json(raw)
-    return {**_action_pixel_response(parsed, media_ms),
+    pixels = _action_pixel_response(parsed, media_ms)
+    import saved_shot_sequence
+    actions = saved_shot_sequence.connect((parsed or {}).get("actions"), pixels["frames"],
+        media_ms, body_candidates, _native_search_box)
+    return {**pixels,
             "clip_review_complete": (parsed or {}).get("reviewed_entire_clip") is True,
             "target_observations": _target_observations(parsed, media_ms, body_candidates) if refs else [],
-            "video_actions": (parsed or {}).get("actions") if isinstance((parsed or {}).get("actions"), list) else [],
-            "sequence_reasoning": {"review_requests": sequence_observation_context.motion_review_requests(parsed, media_ms, body_candidates),
+            "video_actions": actions,
+            "sequence_reasoning": {"review_requests": sequence_observation_context.motion_review_requests({"actions": actions}, media_ms, body_candidates),
                                    "canonical_authority": False},
             "observation_protocol": "SOURCE_INDEXED_MOTION_CLIP_V1",
             "provider": "gemini", "model": video_model_input.MODEL, "video_input": result["video_input"],
@@ -1779,6 +1802,7 @@ class ShadowVisionProviders:
                     native_box = _native_search_box(ball.get("box"), search_rois[media_ms])
                     if (review.get("observation_protocol") == "SOURCE_INDEXED_MOTION_CLIP_V1"
                             and ball.get("active_ball") is True and ball.get("control_visible") is True
+                            and ball.get("stationary_spare") is not True
                             and ball.get("confidence") == "high" and _valid_box(native_box)):
                         body = next((c for c in measured.get(media_ms, [])
                                      if c["body_id"] == ball.get("control_body_id")), None)
@@ -1787,7 +1811,8 @@ class ShadowVisionProviders:
                                 "ball_box": native_box, "confidence": "high", "control_visible": True,
                                 "source": "SOURCE_VIDEO_VISIBLE_BALL_CONTROL"})
                     measured_balls = corroborate_ball_pixels(detector, images[media_ms], native_box)
-                    if review.get("observation_protocol") == "SOURCE_INDEXED_MOTION_CLIP_V1" and ball.get("active_ball") is True:
+                    if (review.get("observation_protocol") == "SOURCE_INDEXED_MOTION_CLIP_V1"
+                            and ball.get("active_ball") is True and ball.get("stationary_spare") is not True):
                         measured_balls = [{**b, "video_active_ball": True} for b in measured_balls]
                     balls.extend(measured_balls)
             selected = row.get("selected_body_ids") if isinstance(row.get("selected_body_ids"), list) else []

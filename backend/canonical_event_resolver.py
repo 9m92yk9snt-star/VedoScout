@@ -399,9 +399,9 @@ def _resolve_actor(action, scene_frames, unified_authority) -> dict:
         if mid and vid and mid == vid:
             exact_support.setdefault(mid, []).append(s)
 
-    # Actor evidence describes one physical actor. If its visible boxes map to
-    # multiple bodies, one correct frame cannot bless the whole action.
-    # Preserve the observation for refinement instead of attributing a player.
+    # Local tracking labels are not person identities. If the shared graph
+    # already identifies the visible actor as GLOBAL_TARGET at every cited
+    # source instant, a label change does not contradict that identity.
     visible_mapped_ids = {
         s.get("mapped_local_track_id") for s in samples
         if s.get("geometry_proof_eligible") is True
@@ -409,6 +409,31 @@ def _resolve_actor(action, scene_frames, unified_authority) -> dict:
         and isinstance(s.get("mapped_local_track_id"), str)
     }
     if len(visible_mapped_ids) > 1:
+        visible = [s for s in samples if s.get("geometry_proof_eligible") is True]
+        source_frames = {int(f["media_ms"]): f for f in scene_frames}
+        path = [f for f in scene_frames if start <= int(f["media_ms"]) <= end]
+        aliases_verified = all(
+            s.get("mapped_local_track_id") == s.get("verified_target_id")
+            and s.get("mapped_local_track_id") in visible_mapped_ids
+            and not s.get("mapping_ambiguous") and s.get("graph_frame_ms") == s["media_ms"]
+            and source_frames.get(s["media_ms"], {}).get("time_authority") == "ACTUAL_MEDIA_PTS"
+            for s in visible)
+        uninterrupted = bool(path) and all(
+            f.get("time_authority") == "ACTUAL_MEDIA_PTS"
+            and not any(f.get(k) for k in ("cut", "cut_barrier", "used_fallback"))
+            and (_verified_target_id(f) is None or _verified_target_id(f) in visible_mapped_ids)
+            for f in path)
+        if aliases_verified and uninterrupted:
+            chosen = min(visible, key=lambda s: (abs(s["media_ms"]-pivot), s["media_ms"]))
+            return {
+                "status": "VERIFIED", "reason": "VISIBLE_GLOBAL_TARGET_ACROSS_LOCAL_TRACKS",
+                "actor_local_track_id": chosen["mapped_local_track_id"], "samples": samples,
+                "candidate_local_track_ids": sorted(visible_mapped_ids), "proof_eligible": True,
+                "actor_track_observations": sorted([
+                    {"media_ms": ms, "local_track_id": track}
+                    for ms, track in {(s["media_ms"], s["mapped_local_track_id"]) for s in visible}
+                ], key=lambda row: (row["media_ms"], row["local_track_id"])),
+            }
         return {
             "status": "UNRESOLVED", "reason": "INCONSISTENT_VISIBLE_ACTOR_TRACK",
             "actor_local_track_id": None, "samples": samples,
@@ -656,6 +681,8 @@ def _proof_payload(action, actor_resolution, causal) -> dict:
         "proof_eligible": bool(actor_resolution.get("proof_eligible")),
         "causal_verified": bool(causal.get("causal_verified")),
         "receiver_team_evidence": deepcopy(causal.get("receiver_team_resolution")),
+        **({"actor_track_observations": deepcopy(actor_resolution["actor_track_observations"])}
+           if actor_resolution.get("actor_track_observations") else {}),
         **({"video_observation": deepcopy(action["video_observation"])}
            if isinstance(action.get("video_observation"), dict) else {}),
     }
