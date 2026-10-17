@@ -89,6 +89,39 @@ def test_source_reference_comparison_does_not_require_a_native_body_detection():
     assert event["actor_local_track_id"] == "GLOBAL_TARGET" and event["causal_verified"]
 
 
+def test_a_native_frame_from_another_time_cannot_disprove_the_observed_actor():
+    ctx = prepared()
+    for f in ctx["scene_graph"]["frames"]:
+        f["media_ms"] += 60
+        f["global_target"].update(status="VERIFIED", proof_eligible=True, local_track_id="p002")
+    event, = finalise(ctx=ctx)["canonical_events"]["events"]
+    assert event["actor_local_track_id"] == "GLOBAL_TARGET" and event["canonical_outcome"] == "SAVED"
+    assert not event["proof"].get("actor_track_observations")
+
+
+def test_native_association_ambiguity_does_not_erase_a_direct_source_reference_comparison():
+    ctx = prepared()
+    for f in ctx["scene_graph"]["frames"]:
+        f["players"].append({**deepcopy(f["players"][0]), "local_track_id": "duplicate-native-body"})
+    event, = finalise(ctx=ctx)["canonical_events"]["events"]
+    assert event["actor_local_track_id"] == "GLOBAL_TARGET" and resolver.has_motion_proof(event)
+
+
+@pytest.mark.parametrize("role_state", ["observed_teammate", "unknown_team", "opponent", "different_finisher"])
+def test_visible_assist_roles_use_video_person_handles_without_a_second_native_detection(role_state):
+    raw = response("PASS", "TEAMMATE_GOAL")
+    chain = raw["sequences"][0]["actions"][0]["causal_chain"]
+    chain.update(receiver_local_track_id="video_body_1", finisher_local_track_id="video_body_1")
+    if role_state == "unknown_team": chain["receiver_team"] = "UNKNOWN"
+    elif role_state == "opponent": chain["receiver_team"] = "OPPONENT"
+    elif role_state == "different_finisher": chain["receiver_finisher_same_player"] = False
+    event, = finalise(raw, ctx=prepared(missing_bodies=True))["canonical_events"]["events"]
+    assert (event["canonical_event_type"] == "ASSIST") == (role_state == "observed_teammate")
+    if role_state == "observed_teammate":
+        assert event["receiver_team_resolution"]["source"] == "WHOLE_VIDEO_SEQUENCE_OBSERVATION"
+        assert event["receiver_team_resolution"]["physical_certificate_required"] is False
+
+
 @pytest.mark.parametrize("failure", ["no_runtime_receipt", "model_attests_own_input", "edited_action", "wrong_scene",
     "no_reference_image", "no_visible_reference", "low_reference_confidence", "no_actor_continuity"])
 def test_labels_and_unbound_or_incomplete_identity_claims_do_not_gain_authority(failure):
@@ -114,12 +147,14 @@ def test_labels_and_unbound_or_incomplete_identity_claims_do_not_gain_authority(
     assert not result["canonical_events"]["events"]
 
 
-@pytest.mark.parametrize("contradiction", ["visible_other_body", "direct_selected_geometry", "reference_is_other_player"])
+@pytest.mark.parametrize("contradiction", ["visible_other_body", "ambiguous_actor_other_selected_body", "direct_selected_geometry", "reference_is_other_player"])
 def test_actual_identity_contradictions_still_reopen_or_reject_the_observation(contradiction):
     raw, ctx = response(), prepared()
-    if contradiction == "visible_other_body":
+    if contradiction in {"visible_other_body", "ambiguous_actor_other_selected_body"}:
         for f in ctx["scene_graph"]["frames"]:
             f["global_target"].update(status="VERIFIED", proof_eligible=True, local_track_id="p002")
+            if contradiction == "ambiguous_actor_other_selected_body":
+                f["players"].append({**deepcopy(f["players"][0]), "local_track_id": "duplicate-native-body"})
     elif contradiction == "direct_selected_geometry": ctx["authority"] = authority([(800, OB)])
     else: raw["sequences"][0]["actions"][0]["selected_reference_match"]["same_player"] = False
     result = finalise(raw, ctx=ctx)["canonical_events"]

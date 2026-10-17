@@ -178,15 +178,21 @@ def _receiver_team_resolution(scene_frames, chain, actor_local_track_id, video=N
         return {**base, "status": "REJECTED", "reason": "RECEIVER_IS_TARGET_ACTOR"}
 
     pivot = _near_frame(scene_frames, receiver_ms)
-    if pivot is None or _player_by_id(pivot, receiver) is None:
+    source_play = _source_video_observation(video) and chain.get("continuous_visible_sequence") is True
+    roles = (video.get("assist_roles") or {}) if source_play else {}
+    whole_video = source_play and video.get("authority") == "WHOLE_VIDEO_SEQUENCE_OBSERVATION"
+    visual_roles = (whole_video and roles.get("receiver_team") == "TEAMMATE"
+                    and roles.get("receiver_finisher_same_player") is True)
+    if (pivot is None or _player_by_id(pivot, receiver) is None) and not visual_roles:
         return {**base, "reason": "RECEIVER_NOT_OBSERVED_AT_RECEIPT"}
 
-    if _source_video_observation(video) and chain.get("continuous_visible_sequence") is True:
-        roles = video.get("assist_roles") or {}
+    if source_play:
         finisher = chain.get("finisher_local_track_id")
         shot_frame = _near_frame(scene_frames, chain.get("teammate_shot_ms"))
-        if (_verified_target_id(pivot) == receiver
-                or (finisher and _verified_target_id(shot_frame) == finisher)):
+        receiver_aligned = not whole_video or pivot and abs(pivot["media_ms"]-receiver_ms) <= 20
+        finisher_aligned = not whole_video or shot_frame and abs(shot_frame["media_ms"]-chain["teammate_shot_ms"]) <= 20
+        if (receiver_aligned and _verified_target_id(pivot) == receiver
+                or finisher_aligned and finisher and _verified_target_id(shot_frame) == finisher):
             return {**base, "status": "REJECTED", "reason": "SOURCE_VIDEO_ASSIST_ROLE_IS_TARGET"}
         if roles.get("receiver_team") in {"OPPONENT", "OTHER"}:
             return {**base, "status": "REJECTED", "reason": "SOURCE_VIDEO_RECEIVER_NOT_TEAMMATE"}
@@ -201,8 +207,9 @@ def _receiver_team_resolution(scene_frames, chain, actor_local_track_id, video=N
             # The first graph already measured these role bodies. Reuse their
             # geometry when the dense graph later assigns different IDs.
             for row, tid in zip(evidence[1:], (receiver, finisher)):
-                body = _player_by_id(_near_frame(scene_frames, row["media_ms"]), tid)
-                if body and _valid_box(body.get("box")):
+                measured = _near_frame(scene_frames, row["media_ms"])
+                body = _player_by_id(measured, tid)
+                if body and abs(measured["media_ms"]-row["media_ms"]) <= 20 and _valid_box(body.get("box")):
                     row.update(box=deepcopy(body["box"]), local_track_id=tid)
         return {**base, "status": "VERIFIED", "reason": "SOURCE_VIDEO_TEAMMATE_TRANSFER",
             "source": video["authority"], "physical_certificate_required": False,
@@ -421,17 +428,27 @@ def _resolve_actor(action, scene_frames, unified_authority) -> dict:
     pivot = int(action.get("contact_ms") if _num(action.get("contact_ms")) else (start + end) // 2)
     samples = _action_evidence_samples(action, scene_frames)
     candidates = _actor_candidates(action, samples)
+    video = action.get("video_observation") or {}
+    whole_video = _source_video_observation(video) and video.get("authority") == "WHOLE_VIDEO_SEQUENCE_OBSERVATION"
+
+    def same_source_time(sample):
+        return not whole_video or (_num(sample.get("graph_frame_ms"))
+            and abs(sample["graph_frame_ms"]-sample["media_ms"]) <= 20)
 
     # Strong contradiction: visible actor maps to a body while canonical graph
     # simultaneously verifies GLOBAL_TARGET as a different body.
     contradictions = []
     exact_support = {}
     for s in samples:
-        if s.get("geometry_proof_eligible") is not True:
+        if s.get("geometry_proof_eligible") is not True or not same_source_time(s):
             continue
         mid, vid = s.get("mapped_local_track_id"), s.get("verified_target_id")
         if mid and vid and mid != vid:
             contradictions.append((s["media_ms"], mid, vid))
+        if whole_video and not mid and vid:
+            selected = _player_by_id(_near_frame(scene_frames, s["media_ms"], max_ms=20), vid)
+            if selected and _valid_box(selected.get("box")) and not _boxes_match(selected["box"], s["box"]):
+                contradictions.append((s["media_ms"], None, vid))
         if mid and vid and mid == vid:
             exact_support.setdefault(mid, []).append(s)
 
@@ -444,10 +461,9 @@ def _resolve_actor(action, scene_frames, unified_authority) -> dict:
         and not s.get("mapping_ambiguous")
         and isinstance(s.get("mapped_local_track_id"), str)
     }
-    video = action.get("video_observation") or {}
     reference = video.get("selected_reference_match") or {}
     reference_samples = [s for s in samples if s.get("geometry_proof_eligible") is True
-                         and not s.get("mapping_ambiguous")
+                         and (whole_video or not s.get("mapping_ambiguous"))
                          and s["media_ms"] in (reference.get("evidence_ms") or [])]
     if (_source_video_observation(video) and reference_samples
             and reference.get("confidence") == "high"):
@@ -475,7 +491,7 @@ def _resolve_actor(action, scene_frames, unified_authority) -> dict:
             # second approval of that same person's identity.
             visible = [s for s in samples if s.get("geometry_proof_eligible") is True
                        and not s.get("mapping_ambiguous")]
-            mapped = [s for s in visible if s.get("mapped_local_track_id")]
+            mapped = [s for s in visible if s.get("mapped_local_track_id") and same_source_time(s)]
             chosen = min(mapped, key=lambda s: (abs(s["media_ms"]-pivot), s["media_ms"])) if mapped else None
             return {"status": "VERIFIED", "reason": "SOURCE_VIDEO_SELECTED_PLAYER",
                 "actor_local_track_id": chosen["mapped_local_track_id"] if chosen else GLOBAL_TARGET_ID,

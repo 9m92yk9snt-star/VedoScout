@@ -21,6 +21,13 @@ already documented it.
   different IDs are mapped through geometry once. Actual cuts, ambiguous body
   mappings, different verified targets and explicit source/user conflicts remain
   unresolved. No shirt number is required to repeat an established identity.
+- A native graph frame from another source instant is supporting context, not a
+  direct contradiction of current actor pixels. An ambiguous native association
+  may leave the canonical actor as GLOBAL_TARGET without erasing the source
+  comparison. A different selected body observed at the aligned instant remains
+  a contradiction. For an assist, explicit observed teammate/same-finisher roles
+  may use response-local person handles without requiring another native body
+  detection. No native track ID is fabricated for those handles.
 - An outcome timestamp or an outcome-evidence list is sufficient. Likewise the
   source contact can be supplied in either contact field. Normalization fills the
   equivalent representation; two different contact times remain a contradiction.
@@ -46,11 +53,18 @@ later work, not from reducing source-image coverage.
 
 ## Verification and limits
 
-Local verification: **2,537 passed** across 125 offline regression modules in
-29.82 seconds, including 52 new first-read/reuse controls. Socket connections were
-blocked for that run. The two owned-child support-vision process test modules are
-left to the existing GitHub verification environment. All 383 backend Python
-files parse and the patch passes whitespace validation.
+Initial revision `e846c66f3ecf73443e6b2b72791a2acaebd30bf2`: **2,537 passed**
+across 125 offline regression modules in 29.82 seconds, including 52 new
+first-read/reuse controls. All five GitHub checks also passed for that revision.
+
+The final source-time/role follow-up passed **216 relevant tests** in 4.09 seconds
+across the first-read, canonical-resolver, temporal-video and coherent-evidence
+modules. Plugin autoload and ONNX Runtime were excluded; Python socket connections
+were blocked. A broader follow-up's result was blocked by automatic approval
+review over a telemetry attempt and is not counted as passed. The safe focused
+run completed. These overlapping test totals must not be added. All 383 backend
+Python files parse and the patch passes whitespace validation. The existing
+GitHub backend contract includes the new first-read tests automatically.
 
 The new regression replies are explicitly synthetic test doubles. They exercise
 first-call provenance and JSON retry wiring, native-ID changes, direct assists,
