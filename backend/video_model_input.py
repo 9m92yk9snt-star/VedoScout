@@ -10,6 +10,7 @@ their source sampling even through that proxy. No parent globals are patched.
 from __future__ import annotations
 
 import asyncio
+import base64
 from contextlib import contextmanager
 import hashlib
 from importlib import metadata
@@ -23,6 +24,66 @@ VIDEO_FPS = 8.0
 PLAYBACK_FPS = 1.0
 VIDEO_TIMEOUT_S = 150.0
 MODEL = "gemini-2.5-pro"
+VISUAL_OBSERVATION_POLICY = (
+    "Use video pixels and the original selected-player references as football event evidence. "
+    "Ignore music, commentary, cheers and other audio when identifying, timing, confirming or rejecting events. "
+    "State clearly visible actions directly. Preserve uncertainty for unseen identity, contact or outcomes; "
+    "never raise certainty merely to complete the response. Return valid JSON only."
+)
+
+
+def _direct_gemini_video(api_key, prompt, video_path, refs, fps, system_message, timeout_s):
+    """One bounded native request for a focused review, without SDK/proxy state.
+
+    Keep the production model, source-indexed clip and reference order. The
+    request sets sampling on the actual video Part; the response cannot attest
+    which frames the provider internally inspected. No retry or file upload.
+    """
+    import urllib.error
+    import urllib.request
+    if not api_key:
+        raise ValueError("MODEL_KEY_NOT_CONFIGURED")
+    if sum(4*((Path(p).stat().st_size+2)//3) for p in [*refs, video_path]) > 20_000_000:
+        raise ValueError("FOCUSED_VIDEO_REQUEST_TOO_LARGE")
+    parts = [{"inlineData": {"mimeType": "image/jpeg",
+              "data": base64.b64encode(Path(p).read_bytes()).decode()}} for p in refs]
+    parts.extend([{"inlineData": {"mimeType": "video/mp4",
+                   "data": base64.b64encode(Path(video_path).read_bytes()).decode()},
+                   "videoMetadata": {"fps": fps}}, {"text": prompt}])
+    payload = json.dumps({"contents": [{"role": "user", "parts": parts}],
+        "systemInstruction": {"parts": [{"text": system_message}]},
+        "generationConfig": {"temperature": 0, "responseMimeType": "application/json",
+                             "maxOutputTokens": 32768}}, separators=(",", ":")).encode()
+    if len(payload) > 20_000_000:
+        raise ValueError("FOCUSED_VIDEO_REQUEST_TOO_LARGE")
+    request = urllib.request.Request(
+        "https://generativelanguage.googleapis.com/v1beta/models/"+MODEL+":generateContent",
+        data=payload, method="POST", headers={"Content-Type": "application/json", "x-goog-api-key": api_key})
+    try:
+        with urllib.request.urlopen(request, timeout=float(timeout_s)) as response:
+            reply = response.read(4_000_001)
+    except urllib.error.HTTPError as exc:
+        status = int(exc.code)
+        exc.close()
+        return {"error_code": "HTTP_"+str(status), "http_status": status}
+    except (urllib.error.URLError, TimeoutError, OSError) as exc:
+        return {"error_code": "TIMEOUT" if isinstance(exc, TimeoutError)
+                or isinstance(getattr(exc, "reason", None), TimeoutError) else "REQUEST_FAILED"}
+    try:
+        if len(reply) > 4_000_000:
+            raise ValueError("OVERSIZED_RESPONSE")
+        data = json.loads(reply)
+        candidates = data.get("candidates") or []
+        if len(candidates) != 1 or candidates[0].get("finishReason") != "STOP":
+            return {"error_code": "INCOMPLETE_RESPONSE"}
+        text = "".join(p["text"] for p in (candidates[0].get("content") or {}).get("parts") or []
+                       if isinstance(p, dict) and isinstance(p.get("text"), str) and not p.get("thought"))
+        if not text:
+            return {"error_code": "EMPTY_RESPONSE"}
+        return {"raw_response": text, "model_version": data.get("modelVersion"),
+                "response_id": data.get("responseId"), "usage_metadata": data.get("usageMetadata")}
+    except (ValueError, TypeError, AttributeError, KeyError):
+        return {"error_code": "INVALID_RESPONSE"}
 
 
 def sha256(path):
@@ -101,17 +162,20 @@ def native_sampling(config_class, fps, audit):
 
 async def read_video(api_key, session_id, prompt, video_path, reference_paths=(),
                      *, timeout_s=VIDEO_TIMEOUT_S, fps=VIDEO_FPS, source_clock=None,
-                     system_message="Observe football video. Return valid JSON only."):
+                     system_message="Observe football video. Return valid JSON only.", transport="sdk"):
     """Registered owned-child reader. Return the raw reply before parsing."""
-    from emergentintegrations.llm.chat import LlmChat, UserMessage, FileContentWithMimeType
-    import litellm
+    if transport not in {"sdk", "gemini-rest"}:
+        raise ValueError("UNKNOWN_VIDEO_TRANSPORT")
+    system_message = VISUAL_OBSERVATION_POLICY + "\n\n" + str(system_message or "")
     fps = _fps(fps)
     refs = [str(p) for p in reference_paths if p and Path(p).is_file()]
     audit = {"protocol": "TEMPORAL_VIDEO_INPUT_V1", "model": MODEL,
              "requested_fps": fps, "model_video_sha256": sha256(video_path),
              "reference_sha256": [sha256(p) for p in refs],
              "sampling_attached_to_provider_payload": False,
-             "provider_receipt_confirmed": False}
+             "provider_receipt_confirmed": False,
+             "event_evidence_policy": "VISUAL_OBSERVATION_ONLY",
+             "system_instruction_sha256": hashlib.sha256(system_message.encode()).hexdigest()}
     if source_clock is not None:
         # Inspect the actual encoded file, rather than trusting a prompt or an
         # SDK field which a proxy/converter may silently discard.
@@ -132,6 +196,18 @@ async def read_video(api_key, session_id, prompt, video_path, reference_paths=()
             min_source_gap_ms=min(b-a for a, b in zip(source_clock, source_clock[1:])),
             playback_fps=rate, frame_count=count,
             frame_source_ms=list(source_clock), sampling_prepared_for_provider=True)
+    if transport == "gemini-rest":
+        result = await asyncio.to_thread(_direct_gemini_video, api_key, prompt, video_path,
+                                        refs, fps, system_message, timeout_s)
+        audit.update(transport="GEMINI_REST", provider_conversion="DIRECT_NATIVE",
+                     native_video_metadata=[{"fps": fps}],
+                     sampling_attached_to_provider_payload=True)
+        for key in ("http_status", "model_version", "response_id", "usage_metadata"):
+            if key in result:
+                audit[key] = result.pop(key)
+        return {**result, "video_input": audit}
+    from emergentintegrations.llm.chat import LlmChat, UserMessage, FileContentWithMimeType
+    import litellm
     for package in ("emergentintegrations", "litellm"):
         try:
             audit[package + "_version"] = metadata.version(package)

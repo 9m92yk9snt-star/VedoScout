@@ -244,3 +244,81 @@ async def test_completed_window_is_stored_before_reconstruction_finishes(monkeyp
         release.set()
     result = await task
     assert uploads == ["first"] and result["fix10a_completed_windows"] == 1
+
+
+async def test_cancelled_runtime_stops_worker_before_next_provider(monkeypatch):
+    import analysis_jobs
+    import physical_match_reconstruction as reconstruction
+
+    monkeypatch.setattr(runtime, "support_vision_enabled", lambda: False)
+    entered, release, stopped = threading.Event(), threading.Event(), threading.Event()
+    calls = []
+
+    def reconstruct(*_args, **_kwargs):
+        try:
+            entered.set()
+            assert release.wait(3)
+            reconstruction._safe_provider(lambda: calls.append("paid reader"))
+        finally:
+            stopped.set()
+
+    monkeypatch.setattr(reconstruction, "reconstruct_physical_match", reconstruct)
+    task = asyncio.create_task(runtime.run(report_id="r", video_path="unused",
+                                           unified_result=partial_result(), db=None))
+    try:
+        assert await asyncio.to_thread(entered.wait, 1)
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+    finally:
+        release.set()
+    assert await asyncio.to_thread(stopped.wait, 1)
+    assert calls == []
+    assert analysis_jobs.CURRENT_STOP.get() is None
+
+
+def test_cancelled_frame_stream_closes_decoder_without_reading_next_frame():
+    import analysis_jobs
+
+    stop = threading.Event()
+    token = analysis_jobs.CURRENT_STOP.set(stop)
+    decoded, closed = [], []
+
+    def frames():
+        try:
+            for index in range(3):
+                decoded.append(index)
+                yield index
+        finally:
+            closed.append(True)
+
+    stream = analysis_jobs.cancellable_frames(frames())
+    try:
+        assert next(stream) == 0
+        stop.set()
+        with pytest.raises(asyncio.CancelledError):
+            next(stream)
+        assert decoded == [0] and closed == [True]
+    finally:
+        analysis_jobs.CURRENT_STOP.reset(token)
+
+
+def test_cancelled_provider_result_does_not_continue_to_next_reader():
+    import analysis_jobs
+    import physical_match_reconstruction as reconstruction
+
+    stop = threading.Event()
+    token = analysis_jobs.CURRENT_STOP.set(stop)
+    calls = []
+
+    def in_flight():
+        stop.set()  # Owner was cancelled while this bounded call was running.
+        return {"status": "COMPLETED"}
+
+    try:
+        with pytest.raises(asyncio.CancelledError):
+            reconstruction._safe_provider(in_flight)
+            reconstruction._safe_provider(lambda: calls.append("next reader"))
+        assert calls == []
+    finally:
+        analysis_jobs.CURRENT_STOP.reset(token)

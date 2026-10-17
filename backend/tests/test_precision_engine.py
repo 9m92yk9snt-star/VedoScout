@@ -4,7 +4,7 @@ Unit tests for the Precision Scout pipeline.
 Covers:
   • Visual fingerprint extraction from a synthesized marker frame
   • Audio event detection from a synthesized wav clip
-  • Hedging scrubber strips weasel language
+  • Model uncertainty and structured observations are preserved
   • Prompt builders assemble priors + base prompt correctly
 """
 
@@ -170,22 +170,22 @@ def test_audio_events_prompt_block_lists_timestamps():
     assert "+6.1 dB" in block
 
     empty_block = audio_events_to_prompt_block([])
-    assert "no significant audio peaks" in empty_block
+    assert "neither confirms nor rejects" in empty_block
+    assert "cannot confirm or reject" in block
 
 
-# ── Hedging scrubber ──────────────────────────────────────────────────
+# ── Observation wording ───────────────────────────────────────────────
 
 
-def test_scrub_strips_hedging_words():
+def test_legacy_scrubber_preserves_uncertainty_instead_of_creating_facts():
     inp = {
         "summary": "Almin appears to be a smart playmaker who seems to scan well.",
         "evidence_note": "Likely 3 touches were observed. Probably a good clip.",
         "nested": {"deep": "He might have scored possibly from the box."},
     }
     out = scrub_hedging(inp)
-    text = out["summary"] + " " + out["evidence_note"] + " " + out["nested"]["deep"]
-    for banned in ("appears to", "seems to", "likely", "probably", "possibly", "might have"):
-        assert banned not in text.lower(), f"hedge word survived: {banned} in {text}"
+    assert out == inp
+    assert out["nested"]["deep"] == "He might have scored possibly from the box."
 
 
 def test_scrub_preserves_normal_text():
@@ -196,10 +196,10 @@ def test_scrub_preserves_normal_text():
 def test_scrub_handles_lists_and_numbers():
     inp = ["He appears to be fast.", 7, None, {"foo": "Probably yes."}]
     out = scrub_hedging(inp)
-    assert "appears to" not in out[0].lower()
+    assert out[0] == "He appears to be fast."
     assert out[1] == 7
     assert out[2] is None
-    assert "probably" not in out[3]["foo"].lower()
+    assert out[3]["foo"] == "Probably yes."
 
 
 # ── Prompt assembly ───────────────────────────────────────────────────
@@ -223,8 +223,9 @@ def test_preview_prompt_includes_priors_and_voice_rules():
     )
     assert "LOCKED PLAYER FINGERPRINT" in prompt
     assert "navy blue" in prompt
-    assert "8.00s" in prompt
-    assert "CONFIDENT VOICE ONLY" in prompt
+    assert "8.00s" not in prompt
+    assert "VISUAL OBSERVATION RULES" in prompt
+    assert "Preserve uncertainty" in prompt
     assert "Almin" in prompt
     assert "full_match" in prompt
 

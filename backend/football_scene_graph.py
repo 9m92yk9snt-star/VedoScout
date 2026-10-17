@@ -853,14 +853,7 @@ def _detect_people_and_ball(detector, frame_bgr):
         return [], []
     H, W = frame_bgr.shape[:2]
     scale = cv_detect.INPUT / max(H, W)
-    nw, nh = int(W * scale), int(H * scale)
-    img = np.zeros((cv_detect.INPUT, cv_detect.INPUT, 3), np.uint8)
-    img[:nh, :nw] = cv2.resize(frame_bgr, (nw, nh))
-    blob = cv2.dnn.blobFromImage(img, 1 / 255.0, (cv_detect.INPUT, cv_detect.INPUT), swapRB=True)
-    detector.net.setInput(blob)
-    out = detector.net.forward()[0].T
-    cls = out[:, 4:].argmax(1)
-    conf = out[:, 4:].max(1)
+    out, cls, conf, _ball_scores = cv_detect.predict(detector, frame_bgr)
 
     results = {0: [], 32: []}
     thresholds = {0: float(cv_detect.CONF_T), 32: 0.10}

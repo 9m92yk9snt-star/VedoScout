@@ -16,6 +16,7 @@ import traceback
 import time
 
 import ball_contact_engine
+import analysis_jobs
 import ball_trajectory
 import contact_role_resolver
 import dense_replay
@@ -45,6 +46,25 @@ MAX_TRACEBACK_CHARS = 5000
 GLOBAL_TARGET_ID = "GLOBAL_TARGET"
 GOAL_REVIEW_CAUSAL_MAX_MS = 5200
 GOAL_REVIEW_TEAM_CONFIDENCE_MIN = 0.70
+
+
+class StageClock:
+    """Operational wall times only; never affects scheduling or evidence."""
+    def __init__(self):
+        self.seconds = {}
+        self.stage = None
+        self.started = time.monotonic()
+
+    def enter(self, name):
+        now = time.monotonic()
+        if self.stage is not None:
+            self.seconds[self.stage] = round(self.seconds.get(self.stage, 0) + now-self.started, 6)
+        self.stage, self.started = name, now
+        return name
+
+    def finish(self):
+        self.enter(None)
+        return dict(self.seconds)
 
 
 def _num(value) -> bool:
@@ -180,6 +200,7 @@ def _strike_ball_paths(strikes, touch_graph, dense_frames, window_trajectory):
     pieces = attack_sequence_search.segments({"window": {"scene_id": strikes[0].get("scene_id") if strikes else None},
                                              "decoded_frames": dense_frames})
     for strike in strikes:
+        analysis_jobs.check_cancelled()
         touch = _touch_for_strike(strike, touch_graph) or {}
         anchor = strike.get("active_ball_anchor")
         ms = strike.get("media_ms")
@@ -264,6 +285,7 @@ def _goal_clarification_eligibility(strike, strikes, touch_graph, window):
 
 
 def _safe_provider(provider, *args, default=None, diagnostics=None, name="provider"):
+    analysis_jobs.check_cancelled()
     started = time.monotonic()
     record = {"provider": name}
     if provider is None:
@@ -278,6 +300,7 @@ def _safe_provider(provider, *args, default=None, diagnostics=None, name="provid
             # Exception text may contain credentials/transport URLs. Preserve
             # operational error type without copying that text to the report.
             record.update(status="ERROR", reason="PROVIDER_EXCEPTION", error_type=type(exc).__name__)
+    analysis_jobs.check_cancelled()
     record["elapsed_seconds"] = round(max(0.0, time.monotonic() - started), 3)
     if diagnostics is not None:
         diagnostics.append(record)
@@ -401,9 +424,14 @@ def _motion_event_for_strike(strike, events):
         bindings = [(event.get("actor_local_track_id"), event.get("contact_ms"))]
         if event.get("canonical_event_type") == "ASSIST":
             bindings.append((chain.get("finisher_local_track_id"), chain.get("teammate_shot_ms")))
-        if any(track == strike.get("player_track_id") and _num(ms)
-               and abs(ms-strike.get("media_ms", -1000000)) <= 250 for track, ms in bindings):
-            return event
+        for track, ms in bindings:
+            same_selected_person = (track == event.get("actor_local_track_id")
+                                    and isinstance(track, str)
+                                    and event.get("global_target_id") == GLOBAL_TARGET_ID
+                                    and strike.get("global_target_id") == GLOBAL_TARGET_ID)
+            if ((track == strike.get("player_track_id") or same_selected_person) and _num(ms)
+                    and abs(ms-strike.get("media_ms", -1000000)) <= 250):
+                return event
     return None
 
 
@@ -460,7 +488,7 @@ def run_feedback_round(traces, video_path, sequence_plan, sequence_analysis, sce
                        identity_authority, *, action_evidence_provider=None,
                        jersey_vote_provider=None, goal_geometry_provider=None,
                        role_evidence_provider=None, role_evidence=None, source_video=None, review_jobs=None,
-                       feedback_trace_ids=None):
+                       feedback_trace_ids=None, window_rows=None):
     """Re-enter the original physical gates once using preserved measured frames."""
     feedback = evidence_feedback.build_plan([t for t in traces if feedback_trace_ids is None
         or t["trace_id"] in feedback_trace_ids], analysis=sequence_analysis)
@@ -475,6 +503,7 @@ def run_feedback_round(traces, video_path, sequence_plan, sequence_analysis, sce
     _apply_cross_window_review_context([], traces, shared_packets=shared_packets)
     context = {"traces": {tid: by_id[tid] for tid in wanted},
                "jobs": [{**j, "shared_sequence_context": shared_packets.get(j["dense_window_id"])} for j in selected],
+               "window_rows": {r["dense_window_id"]: r for r in window_rows or [] if r.get("status") == "ok"},
                "support_traces": [t for t in traces if t["trace_id"] not in wanted]}
     rerun = reconstruct_physical_match(
         video_path, sequence_plan, sequence_analysis, scene_graph, identity_authority,
@@ -545,6 +574,7 @@ def reconstruct_physical_match(
     _feedback_context=None,
 ) -> dict:
     """Build bounded physical evidence without changing canonical truth."""
+    work_started = time.monotonic()
     plan = deepcopy(sequence_plan) if isinstance(sequence_plan, dict) else {}
     analysis = deepcopy(sequence_analysis) if isinstance(sequence_analysis, dict) else {}
     graph = deepcopy(scene_graph) if isinstance(scene_graph, dict) else {}
@@ -570,12 +600,14 @@ def reconstruct_physical_match(
     native_session = dense_track_refinement.NativeDetectionSession() if detector_fn is None else None
 
     for window in windows:
-        stage = "window_setup"
+        analysis_jobs.check_cancelled()
+        clock = StageClock()
+        stage = clock.enter("window_setup")
         try:
             provider_diagnostics = []
             stage_timings = {}
             native_started = time.monotonic()
-            stage = "dense_replay"
+            stage = clock.enter("dense_replay")
             previous = (_feedback_context or {}).get("traces", {}).get(window["dense_window_id"])
             if previous is not None:
                 dense_iter = []
@@ -588,9 +620,9 @@ def reconstruct_physical_match(
                     str(video_path), int(window["start_ms"]), int(window["end_ms"])
                 )
 
-            stage = "dense_track_refinement"
+            stage = clock.enter("dense_track_refinement")
             refined = {"frames": deepcopy(previous["decoded_frames"])} if previous is not None else dense_track_refinement.refine_window(
-                dense_iter, graph, authority, str(window.get("scene_id") or ""),
+                analysis_jobs.cancellable_frames(dense_iter), graph, authority, str(window.get("scene_id") or ""),
                 detector_fn=detector_fn, camera_estimator=camera_estimator,
                 native_session=native_session,
             )
@@ -602,7 +634,7 @@ def reconstruct_physical_match(
             # proposals do not become contacts or target identity directly:
             # ball locations need a fresh native detector match, and jersey
             # crops still use the separate multi-frame number authority.
-            stage = "action_pixel_inspection"
+            stage = clock.enter("action_pixel_inspection")
             inspection_rows, inspection_requests = [], []
             for job in inspection_plan["jobs"]:
                 if job["dense_window_id"] != window["dense_window_id"]:
@@ -638,23 +670,46 @@ def reconstruct_physical_match(
                                         "binding_rejections": applied["binding_rejections"],
                                         "independent_jersey_crops": len(applied["jersey_requests"])})
 
-            stage = "ball_trajectory"
+            prior_row = (_feedback_context or {}).get("window_rows", {}).get(window["dense_window_id"])
+            if (previous is not None and prior_row is not None and not inspection_requests
+                    and source.get("sha256") and (previous.get("source_video") or {}).get("sha256") == source["sha256"]
+                    and dense_frames == previous.get("decoded_frames")
+                    and previous.get("automatic_jersey_reference") == authority.get("automatic_jersey_reference")
+                    and (not isinstance(role_evidence, dict) or all(
+                        (previous.get("role_evidence") or {}).get(k) == v for k, v in role_evidence.items()))):
+                # Same-run feedback supplied no new physical input. Keep its
+                # fresh video observations, but do not rerun identical contact,
+                # jersey, role, ball-path and goal work. An exported replay
+                # without the current run's window row still reconstructs.
+                retained = deepcopy(previous)
+                retained.update(action_inspections=inspection_rows, provider_diagnostics=provider_diagnostics,
+                    jersey_model_audits={}, provider_adapter_errors=_adapter_diagnostics(inspection_rows),
+                    physical_evidence_reused=True, goal_review_phase="complete", stage_seconds=clock.finish())
+                retained.pop("motion_observation_summary", None)
+                traces.append(retained)
+                summaries.append(event_trace.compact_trace_summary(retained))
+                window_rows.append({**deepcopy(prior_row), "action_inspections": len(inspection_rows),
+                    "stage_timings": stage_timings, "stage_seconds": retained["stage_seconds"],
+                    "provider_diagnostics": provider_diagnostics, "physical_evidence_reused": True})
+                continue
+
+            stage = clock.enter("ball_trajectory")
             trajectory = ball_trajectory.reconstruct_ball_trajectory(dense_frames)
 
-            stage = "ball_contact_candidates"
+            stage = clock.enter("ball_contact_candidates")
             candidates = ball_contact_engine.detect_contact_candidates(dense_frames, trajectory)
 
-            stage = "ball_contact_resolution"
+            stage = clock.enter("ball_contact_resolution")
             contact_result = ball_contact_engine.resolve_contacts(candidates)
 
-            stage = "short_occlusion_recovery"
+            stage = clock.enter("short_occlusion_recovery")
             occlusion_started = time.monotonic()
             step3_recovery = short_occlusion_contact_recovery.recover_short_occlusion_contacts(
                 dense_frames, trajectory, contact_result, video_path=str(video_path)
             )
             stage_timings["short_occlusion_search_seconds"] = round(time.monotonic()-occlusion_started, 3)
 
-            stage = "short_occlusion_apply"
+            stage = clock.enter("short_occlusion_apply")
             contact_result = short_occlusion_contact_recovery.apply_recovered_contacts(
                 contact_result, step3_recovery
             )
@@ -668,21 +723,21 @@ def reconstruct_physical_match(
                         contact_result.setdefault("accepted", []).append(deepcopy(c))
                         contact_result.setdefault("contacts", []).append(deepcopy(c))
 
-            stage = "touch_graph"
+            stage = clock.enter("touch_graph")
             touches = touch_graph.build_touch_graph(contact_result, authority, dense_frames)
 
-            stage = "contact_role_resolution"
+            stage = clock.enter("contact_role_resolution")
             touches = contact_role_resolver.apply_contact_roles(
                 touches, contact_result,
                 dense_frames=dense_frames, ball_trajectory=trajectory,
             )
 
-            stage = "jersey_request_selection"
+            stage = clock.enter("jersey_request_selection")
             requests = jersey_consensus.merge_jersey_review_requests(
                 inspection_requests, jersey_consensus.select_jersey_review_requests(dense_frames, touches), touches,
                 window_evidence=dense_frames)
 
-            stage = "jersey_provider"
+            stage = clock.enter("jersey_provider")
             votes_by_track = _safe_provider(
                 jersey_vote_provider, str(video_path), deepcopy(requests), default={},
                 diagnostics=provider_diagnostics, name="jersey",
@@ -694,12 +749,12 @@ def reconstruct_physical_match(
                     if isinstance(row, dict):
                         votes_by_track[track] = deepcopy(row.get("votes") or []) + votes_by_track.get(track, [])
 
-            stage = "jersey_consensus"
+            stage = clock.enter("jersey_consensus")
             jersey_result = jersey_consensus.apply_jersey_consensus(dense_frames, touches, votes_by_track)
             dense_with_jersey = jersey_result.get("window_evidence") or dense_frames
             touch_with_jersey = jersey_result.get("touch_graph") or touches
 
-            stage = "verified_jersey_identity_handoff"
+            stage = clock.enter("verified_jersey_identity_handoff")
             if not authority.get("automatic_jersey_reference"):
                 reference = unified_identity_authority.selected_jersey_reference(
                     dense_with_jersey, jersey_result.get("consensus_by_track") or {},
@@ -726,7 +781,7 @@ def reconstruct_physical_match(
                 touch_with_jersey.get("jersey_identity_handoff") or {}
             )
 
-            stage = "strike_detection"
+            stage = clock.enter("strike_detection")
             motion_input = {"source_video": source, "window": window,
                 "decoded_frames": dense_with_jersey, "ball_trajectory": trajectory,
                 "touch_graph": touch_with_jersey,
@@ -773,12 +828,14 @@ def reconstruct_physical_match(
             # gates. Falling back to the window-global path after a valid seed
             # would silently reattach this strike to a competing ball.
             native_strikes = [s for s in strikes if _motion_event_for_strike(s, motion_events) is None]
+            stage = clock.enter("contact_bound_ball_paths")
+            analysis_jobs.check_cancelled()
             native_paths = _strike_ball_paths(native_strikes, touch_with_jersey, dense_with_jersey, trajectory) if native_strikes else []
             paths_by_id = {s["strike_id"]: path for s, path in zip(native_strikes, native_paths)}
             shot_trajectories = [paths_by_id.get(s["strike_id"], {"rows": [], "seed_ms": None,
                 "source": "SOURCE_VIDEO_ALREADY_RESOLVED"}) for s in strikes]
 
-            stage = "intervention_detection"
+            stage = clock.enter("intervention_detection")
             a7_interventions = [
                 post_strike_intervention.detect_post_strike_intervention(
                     strike, dense_with_jersey, shot_track["rows"]
@@ -791,7 +848,7 @@ def reconstruct_physical_match(
                 for row in a7_interventions
             )
 
-            stage = "role_provider"
+            stage = clock.enter("role_provider")
             unresolved_role_strikes = native_strikes
             provider_roles = _safe_role_provider(
                 role_evidence_provider if unresolved_role_strikes or not motion_review["complete"] else None,
@@ -811,7 +868,8 @@ def reconstruct_physical_match(
             goal_clarifications_requested = 0
             motion_outcomes_reused = 0
             for strike, a7, shot_track in zip(strikes, a7_interventions, shot_trajectories):
-                stage = "goal_review_eligibility"
+                analysis_jobs.check_cancelled()
+                stage = clock.enter("goal_review_eligibility")
                 eligibility = _goal_review_eligibility(
                     strike, strikes, touch_with_jersey
                 )
@@ -823,7 +881,7 @@ def reconstruct_physical_match(
                     goal_reviews_skipped += 1
                     motion_outcomes_reused += 1
                 elif review.get("eligible") is True:
-                    stage = "goal_review_scheduling"
+                    stage = clock.enter("goal_review_scheduling")
                     request_strike = deepcopy(strike)
                     request_strike["_review_lane"] = review["lane"]
                     # All physical windows are inspected before the bounded
@@ -845,7 +903,7 @@ def reconstruct_physical_match(
                     goal_geometry = _skipped_goal_review(eligibility)
                     goal_reviews_skipped += 1
 
-                stage = "shot_outcome_reconstruction"
+                stage = clock.enter("shot_outcome_reconstruction")
                 outcome = shot_outcome_engine.reconstruct_post_strike_outcome(
                     strike, shot_track["rows"], touch_with_jersey,
                     goal_geometry=goal_geometry, role_evidence=window_roles,
@@ -864,29 +922,29 @@ def reconstruct_physical_match(
                     if isinstance(row, dict) and row.get("state") == "MEASURED"
                 ]
 
-                stage = "intervention_apply"
+                stage = clock.enter("intervention_apply")
                 outcome = post_strike_intervention.apply_intervention_evidence(
                     outcome, a7, window_roles
                 )
 
-                stage = "goal_direction_gate"
+                stage = clock.enter("goal_direction_gate")
                 outcome = fix10a_goal_direction.apply_direction_gate(
                     outcome, shot_track["rows"], goal_geometry
                 )
 
-                stage = "ball_proof_gate"
+                stage = clock.enter("ball_proof_gate")
                 outcome = fix10a_ball_proof_gate.apply_ball_proof_gate(
                     outcome, shot_track["rows"]
                 )
                 outcome["goal_review_eligibility"] = deepcopy(eligibility)
                 outcomes.append(outcome)
 
-            stage = "window_unresolved_summary"
+            stage = clock.enter("window_unresolved_summary")
             unresolved = _window_unresolved_reasons(contact_result, jersey_result, outcomes)
             unresolved_all.extend(unresolved)
             trace_id = str(window.get("dense_window_id") or "dense_unknown")
 
-            stage = "event_trace"
+            stage = clock.enter("event_trace")
             trace = event_trace.build_event_trace(
                 trace_id=trace_id, source_video=previous.get("source_video") if previous is not None else source, window=window,
                 dense_frames=dense_with_jersey, ball_trajectory=trajectory,
@@ -915,10 +973,11 @@ def reconstruct_physical_match(
             trace["attack_search_plan"] = attack_sequence_search.build(trace)
             trace["sequence_context"] = sequence_observation_context.build(window, dense_with_jersey, trace=trace)
 
-            stage = "trace_summary"
+            stage = clock.enter("trace_summary")
             summary = event_trace.compact_trace_summary(trace)
             traces.append(trace)
             summaries.append(summary)
+            trace["stage_seconds"] = clock.finish()
             if trace_callback is not None:
                 try:
                     trace_callback(trace)
@@ -958,6 +1017,7 @@ def reconstruct_physical_match(
                 "goal_clarifications_requested": goal_clarifications_requested,
                 "provider_diagnostics": provider_diagnostics,
                 "stage_timings": stage_timings,
+                "stage_seconds": clock.finish(),
                 "provider_adapter_errors": sorted(set(adapter_errors)),
                 "unresolved_reasons": unresolved,
             })
@@ -974,9 +1034,11 @@ def reconstruct_physical_match(
                 "recall_window": bool(window.get("recall_window")),
                 "window_reasons": list(window.get("reasons") or []),
                 "reason": reason,
+                "stage_seconds": clock.finish(),
                 **diagnostic,
             })
 
+    window_loop_finished = time.monotonic()
     traces_by_window = {t["trace_id"]: t for t in traces}
     review_jobs = [job for job in review_jobs
                    if job["window"].get("dense_window_id") in traces_by_window]
@@ -988,25 +1050,33 @@ def reconstruct_physical_match(
         outcome = traces_by_window[job["window"]["dense_window_id"]]["outcome_evidence"][job["outcome_index"]]
         outcome["goal_geometry_evidence"] = {"status": "UNRESOLVED", "reason": "SHARED_MOTION_CLIP_FALLBACK_REPRESENTATIVE"}
         outcome["goal_review_decision"]["deferred_reason"] = "SHARED_MOTION_CLIP_FALLBACK_REPRESENTATIVE"
-    for rank, job in enumerate(scheduled_jobs):
-        trace = traces_by_window[job["window"]["dense_window_id"]]
-        try:
-            geometry = _safe_provider(
-                goal_geometry_provider, deepcopy(job["window"]), goal_review_sampling.provider_strike(job),
-                default=None, diagnostics=trace["provider_diagnostics"], name="goal_geometry")
-            previous = trace["outcome_evidence"][job["outcome_index"]]
-            outcome = _review_outcome(job, geometry, previous)
-            outcome["goal_review_decision"]["report_priority_rank"] = rank
-            trace["outcome_evidence"][job["outcome_index"]] = outcome
-        except Exception as exc:
-            # One malformed review must not discard unrelated windows. Keep
-            # its pending, unresolved outcome and expose the exact audit gap.
-            trace["provider_diagnostics"].append({
-                "provider": "goal_geometry", "status": "ERROR",
-                "error_type": type(exc).__name__, "report_priority_rank": rank,
-                "media_ms": job["strike"].get("media_ms"),
-            })
-            trace["unresolved_reasons"].append("GOAL_REVIEW_EXECUTION_ERROR")
+    review_many = getattr(goal_geometry_provider, "review_many", None)
+    batch = iter(review_many([(deepcopy(job["window"]), goal_review_sampling.provider_strike(job))
+                              for job in scheduled_jobs])) if callable(review_many) else None
+    try:
+        for rank, job in enumerate(scheduled_jobs):
+            trace = traces_by_window[job["window"]["dense_window_id"]]
+            try:
+                geometry = _safe_provider(
+                    (lambda: next(batch)) if batch is not None else goal_geometry_provider,
+                    *(() if batch is not None else (deepcopy(job["window"]), goal_review_sampling.provider_strike(job))),
+                    default=None, diagnostics=trace["provider_diagnostics"], name="goal_geometry")
+                previous = trace["outcome_evidence"][job["outcome_index"]]
+                outcome = _review_outcome(job, geometry, previous)
+                outcome["goal_review_decision"]["report_priority_rank"] = rank
+                trace["outcome_evidence"][job["outcome_index"]] = outcome
+            except Exception as exc:
+                # One malformed review must not discard unrelated windows.
+                trace["provider_diagnostics"].append({
+                    "provider": "goal_geometry", "status": "ERROR",
+                    "error_type": type(exc).__name__, "report_priority_rank": rank,
+                    "media_ms": job["strike"].get("media_ms"),
+                })
+                trace["unresolved_reasons"].append("GOAL_REVIEW_EXECUTION_ERROR")
+    finally:
+        close_batch = getattr(batch, "close", None)
+        if callable(close_batch):
+            close_batch()
     # Replace pending diagnostics and publish the final version of each trace.
     # The runtime upserts by trace ID so the manifest has one authoritative row.
     for trace in traces:
@@ -1029,12 +1099,14 @@ def reconstruct_physical_match(
             except Exception as exc:
                 trace["incremental_storage_error_type"] = type(exc).__name__
     feedback_plan = {"rounds": 0, "executed_windows": 0}
+    goal_phase_finished = time.monotonic()
+    analysis_jobs.check_cancelled()
     if _feedback_context is None:
         traces, feedback_rows, feedback_plan = run_feedback_round(
             traces, str(video_path), plan, analysis, graph, authority,
             action_evidence_provider=action_evidence_provider, jersey_vote_provider=jersey_vote_provider,
             goal_geometry_provider=goal_geometry_provider, role_evidence_provider=role_evidence_provider,
-            role_evidence=role_evidence, source_video=source, review_jobs=review_jobs)
+            role_evidence=role_evidence, source_video=source, review_jobs=review_jobs, window_rows=window_rows)
         feedback_by_id = {r["dense_window_id"]: r for r in feedback_rows if r.get("status") == "ok"}
         combined_rows = []
         for row in window_rows:
@@ -1043,6 +1115,9 @@ def reconstruct_physical_match(
                 original_times, feedback_times = row.get("stage_timings") or {}, replacement.get("stage_timings") or {}
                 replacement["stage_timings"] = {k: round(original_times.get(k, 0)+feedback_times.get(k, 0), 3)
                                                 for k in original_times.keys() | feedback_times.keys()}
+                first_stages, second_stages = row.get("stage_seconds") or {}, replacement.get("stage_seconds") or {}
+                replacement["stage_seconds"] = {k: round(first_stages.get(k, 0)+second_stages.get(k, 0), 6)
+                                                for k in first_stages.keys() | second_stages.keys()}
             combined_rows.append(replacement if replacement is not None else row)
         window_rows = combined_rows
         traces_by_window = {t["trace_id"]: t for t in traces}
@@ -1099,6 +1174,11 @@ def reconstruct_physical_match(
         "evidence_feedback_plan": feedback_plan,
         "cross_window_evidence": cross_window_context,
         "native_detection_cache": native_session.metrics() if native_session is not None else None,
+        "phase_seconds": {
+            "initial_windows": round(window_loop_finished-work_started, 3),
+            "goal_reviews_and_context": round(goal_phase_finished-window_loop_finished, 3),
+            "feedback_and_summary": round(time.monotonic()-goal_phase_finished, 3),
+        },
         "goal_review_plan": {
             "requests": len(scheduled_jobs),
             "deferred_repeated_clip_clarifications": len(motion_deferred),

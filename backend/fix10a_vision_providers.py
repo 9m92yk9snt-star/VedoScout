@@ -38,6 +38,8 @@ import goal_reappearance
 import native_goal_review
 import goal_context_observations
 import video_model_input
+import source_frame_cache
+import ordered_vision_reviews
 try:  # Supporting vision is optional and always fails closed when unavailable.
     from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
 except ImportError:  # pragma: no cover - availability is deployment-specific
@@ -166,6 +168,12 @@ _DEFAULT_FRAME_READER = video_timebase.read_frame_at
 
 
 def _read_frames(video_path: str, requested_ms) -> dict[int, tuple[int, object]]:
+    cache = source_frame_cache.CURRENT.get()
+    return (cache.read(video_path, requested_ms, _read_frames_uncached) if cache is not None
+            else _read_frames_uncached(video_path, requested_ms))
+
+
+def _read_frames_uncached(video_path: str, requested_ms) -> dict[int, tuple[int, object]]:
     """Read exact/nearest frames by canonical media time; values are actual PTS."""
     wanted = sorted({max(0, int(round(float(ms)))) for ms in requested_ms if _num(ms)})
     if not wanted:
@@ -1157,7 +1165,7 @@ _DEFAULT_ACTION_PIXEL_READER = read_action_pixel_evidence
 
 
 async def read_action_video_evidence(api_key, session_id, clip_path, media_ms, body_candidates,
-                                     sequence_context=None, selected_reference=None):
+                                     sequence_context=None, selected_reference=None, video_transport="sdk"):
     """One motion read supplies identity, action roles and pixel search proposals."""
     timeline = [{"idx": i+1, "source_ms": ms,
                  "views": (row.get("source_roi") or {}).get("views"),
@@ -1175,30 +1183,54 @@ async def read_action_video_evidence(api_key, session_id, clip_path, media_ms, b
         "coordinates, inside one of the supplied canvas_roi panels. Never connect the duplicate ball views as two balls. "
         "Use only the supplied integer frame indices in your answer. Body labels follow measured tracks; "
         "they are not shirt numbers. Some body labels disappear during overlaps; use labels from clear frames to track the person "
-        "through the play, and cite the actual labelled evidence frames. A local track label can switch people: compare the pixels, not just the label. "
+        "through the play, and cite the actual labelled evidence frames. In actor_observations give the label actually visible "
+        "at EACH cited index; one person's label can change. A local track label can also switch people: compare the pixels, not just the label. "
         "Compare the selected player's reference crops using hair, build, "
         "socks, boots and sleeves even when the shirt number is hidden. Kit colour alone cannot identify a teammate. "
         "Keep passer, receiver and finisher separate. Follow each active-ball sequence forward from the pass "
         "and backward from the outcome. A player leaving the picture after his pass does not erase that pass. "
+        "TEAMMATE_GOAL on a pass means the observed direct assist: the teammate receives that pass and finishes, "
+        "even if that same person's body label changes. If a different player receives another pass before scoring, "
+        "report the target's earlier pass as COMPLETED or TEAMMATE_SHOT, not a direct assist. "
+        "Determine teammate relation and visible transfer from this play; separate native kit labels and ball detections "
+        "need not repeat your observation. Optional receiver_team or receiver_finisher_same_player fields may record "
+        "an explicit opponent or different-finisher contradiction; do not label such a chain TEAMMATE_GOAL. "
+        "For SHOT, contact_idx is the final strike that sends the ball toward goal, not an earlier running or dribbling touch. "
+        "Cite the shooter in clear views just before/at that strike. The camera may then pan quickly to the ball and goalkeeper; "
+        "the shooter need not remain visible for his shot's outcome to be observed. A camera pan is not itself a scene cut. "
         "A briefly hidden ball can reappear; describe the visible before/after evidence rather than inventing its hidden path. "
         "continuous_visible_sequence means the same uninterrupted play, not that the ball must be visible in every frame. "
         "For a goal identify the active ball inside the goal after the strike, excluding stationary spare balls; "
-        "keeper gaze or celebration alone is not enough. For a save identify the keeper intervention and subsequent ball movement. "
+        "keeper gaze or celebration alone is not enough. For a save follow the incoming active ball, keeper intervention, "
+        "and the same ball's changed direction or movement away afterward; cite these source indices in outcome_evidence_indices "
+        "and describe what each shows in details. A separate ball resting in the net before/after the intervention is a spare, "
+        "not evidence that the shot scored. Its screen position can move during a camera pan: compare it to the goal and ground. "
+        "Give each distinguishable ball a response-local ball_id and keep the active ball's ID through the play. "
+        "The save_sequence object, ball boxes and keeper boxes are optional detail evidence; "
+        "a visibly saved shot does not need four extra boxes or a measured keeper label. "
+        "Use null for unavailable details rather than inventing coordinates or body labels. "
+        "A diving keeper alone is not a save: follow the active ball and the observed outcome. "
         "Report visible actions and their outcome; don't replace an observed pass by the receiver's shot. "
         "No expected event count, event times, shirt number or result is provided. "
-        "For every input frame return a frames row; empty ball proposals are fine. Ball boxes use the displayed video coordinates. "
+        "Return frames rows only for useful visible ball/control or jersey observations; omit empty rows. "
+        "Cite an outcome using outcome_idx or outcome_evidence_indices; duplicating both is unnecessary. "
+        "Ball boxes use the displayed video coordinates. "
         "Mark active_ball=true only for the ball followed in the current play, not stationary spares. "
         "For visible ball-foot/body contact or clear ball control, also supply control_body_id and control_visible=true. "
         "This needs a visible ball at that body, not gaze, proximity alone or the action label. Otherwise use null/false. "
         "Select only visibly exposed jersey bodies for separate digit reading; do not guess digits. "
-        "Return JSON: {\"reviewed_entire_clip\":true,\"frames\":[{\"idx\":1,\"balls\":[{\"box\":{\"x\":0,\"y\":0,\"w\":0.01,\"h\":0.01},\"confidence\":\"high\",\"active_ball\":true,\"control_body_id\":null,\"control_visible\":false}],\"selected_body_ids\":[]}],"
+        "Return JSON: {\"reviewed_entire_clip\":true,\"frames\":[{\"idx\":1,\"balls\":[{\"ball_id\":\"ball_a\",\"box\":{\"x\":0,\"y\":0,\"w\":0.01,\"h\":0.01},\"confidence\":\"high\",\"active_ball\":true,\"stationary_spare\":false,\"control_body_id\":null,\"control_visible\":false}],\"selected_body_ids\":[]}],"
         "\"target_observations\":[{\"idx\":1,\"body_id\":\"body_1\",\"confidence\":\"high\",\"features\":[\"hair\",\"boots\"]}],"
         "\"actions\":[{\"kind\":\"PASS|CROSS|SHOT|RECEIVE|CARRY|DRIBBLE|DUEL|RUN|OTHER\","
         "\"start_idx\":1,\"contact_idx\":2,\"end_idx\":3,\"actor_body_id\":\"body_1\",\"actor_evidence_indices\":[1,2],"
+        "\"actor_observations\":[{\"idx\":1,\"body_id\":\"body_1\"},{\"idx\":2,\"body_id\":\"body_1\"}],"
         "\"contact_visibility\":\"VISIBLE|PARTIAL|OCCLUDED|UNKNOWN\",\"foot\":\"LEFT|RIGHT|UNKNOWN\","
         "\"outcome\":\"GOAL|SAVED|BLOCKED|OFF_TARGET|COMPLETED|INCOMPLETE|TEAMMATE_SHOT|TEAMMATE_GOAL|UNKNOWN\","
         "\"outcome_visible\":true,\"outcome_idx\":null,\"receiver_body_id\":null,\"receiver_idx\":null,"
         "\"finisher_body_id\":null,\"shot_idx\":null,\"continuous_visible_sequence\":true,"
+        "\"save_sequence\":{\"ball_id\":\"ball_a\",\"incoming_idx\":4,\"keeper_idx\":5,\"keeper_body_id\":null,"
+        "\"keeper_box\":{\"x\":0,\"y\":0,\"w\":0.1,\"h\":0.1},\"aftermath_keeper_box\":null,"
+        "\"keeper_intervention_visible\":true,\"aftermath_idx\":6,\"aftermath\":\"DEFLECTED_AWAY|HELD\",\"same_active_ball\":true},"
         "\"outcome_evidence_indices\":[],\"details\":[\"visible evidence\"]}]}. "
         "Use null when a contact/role/outcome was not observed. For a teammate goal include receiver, finisher, shot and outcome indices. "
         "If the shared context specifies a requested_search, inspect that missing connection in the supplied play. "
@@ -1214,15 +1246,35 @@ async def read_action_video_evidence(api_key, session_id, clip_path, media_ms, b
             path = Path(directory)/f"reference_{i}.jpg"
             path.write_bytes(base64.b64decode(data))
             refs.append(str(path))
+        transport = {"transport": video_transport} if video_transport != "sdk" else {}
         result = await video_model_input.read_video(api_key, session_id, prompt, clip_path, refs,
-                                                   timeout_s=video_model_input.VIDEO_TIMEOUT_S, source_clock=media_ms)
+            timeout_s=video_model_input.VIDEO_TIMEOUT_S, source_clock=media_ms, **transport)
+    if video_transport == "gemini-rest" and result.get("error_code"):
+        return {"status": "ERROR", "reason": "DIRECT_GEMINI_"+result["error_code"],
+                "frames": [], "video_input": result["video_input"],
+                "provider": "gemini", "model": video_model_input.MODEL}
     raw = video_model_input.response_text(result)
     parsed = _extract_json(raw)
-    return {**_action_pixel_response(parsed, media_ms),
+    pixels = _action_pixel_response(parsed, media_ms)
+    import saved_shot_sequence
+    parsed_actions = parsed.get("actions") if isinstance(parsed, dict) else None
+    detail_rows = parsed.get("frames") if isinstance(parsed, dict) else None
+    detail_rows = [r for r in detail_rows if isinstance(r, dict) and type(r.get("idx")) is int
+                   and 1 <= r["idx"] <= len(media_ms)] if isinstance(detail_rows, list) else []
+    actions = saved_shot_sequence.connect(parsed_actions, detail_rows,
+        media_ms, body_candidates, _native_search_box)
+    return {**pixels,
+            # Optional pixel/crop rows are not the temporal action protocol.
+            # A malformed extra row cannot erase an otherwise observed play.
+            "status": ("COMPLETED" if parsed.get("reviewed_entire_clip") is True else "PARTIAL_RESPONSE")
+                      if isinstance(parsed_actions, list) else pixels["status"],
+            "reason": "TEMPORAL_VIDEO_OBSERVATIONS" if isinstance(parsed_actions, list) else pixels["reason"],
+            "pixel_observation_status": pixels["status"],
+            "pixel_observation_reason": pixels["reason"],
             "clip_review_complete": (parsed or {}).get("reviewed_entire_clip") is True,
             "target_observations": _target_observations(parsed, media_ms, body_candidates) if refs else [],
-            "video_actions": (parsed or {}).get("actions") if isinstance((parsed or {}).get("actions"), list) else [],
-            "sequence_reasoning": {"review_requests": sequence_observation_context.motion_review_requests(parsed, media_ms, body_candidates),
+            "video_actions": actions,
+            "sequence_reasoning": {"review_requests": sequence_observation_context.motion_review_requests({"actions": actions}, media_ms, body_candidates),
                                    "canonical_authority": False},
             "observation_protocol": "SOURCE_INDEXED_MOTION_CLIP_V1",
             "provider": "gemini", "model": video_model_input.MODEL, "video_input": result["video_input"],
@@ -1377,7 +1429,7 @@ def _native_ball_roi(detector, image, proposal):
     if x1 - x0 < 16 or y1 - y0 < 16:
         return [], None
     _people, balls = dense_track_refinement._detect_dense_people_and_ball(
-        detector, image[y0:y1, x0:x1], _detail_pass=True)
+        detector, image[y0:y1, x0:x1], _detail_pass=True, _ball_only=True)
     accepted = []
     for ball in balls:
         box = ball["box"]
@@ -1429,8 +1481,11 @@ def _active_ball_link(review, reference):
 class ShadowVisionProviders:
     """Stateful/cached sync callbacks used inside the FIX10A worker thread."""
 
-    def __init__(self, api_key: str | None, session_prefix: str):
+    def __init__(self, api_key: str | None, session_prefix: str, *, motion_transport="sdk"):
+        if motion_transport not in {"sdk", "gemini-rest"}:
+            raise ValueError("UNKNOWN_VIDEO_TRANSPORT")
         self.api_key = str(api_key or "")
+        self.motion_transport = motion_transport
         self.session_prefix = str(session_prefix or "fix10a")
         self._goal_cache = {}
         self._jersey_cache = {}
@@ -1726,7 +1781,8 @@ class ShadowVisionProviders:
                     clip_manifest["sampling_plan"] = {k: v for k, v in sampling.items() if k != "media_ms"}
                     review = support_vision_runner.run_support_vision(read_action_video_evidence, [(
                         (self.api_key, f"{self.session_prefix}-motion-{job['inspection_id']}", str(clip_path), times, body_manifest),
-                        {"sequence_context": context, "selected_reference": reference})],
+                        {"sequence_context": context, "selected_reference": reference,
+                         **({"video_transport": self.motion_transport} if self.motion_transport != "sdk" else {})})],
                         deadline_s=video_model_input.VIDEO_TIMEOUT_S + 5 + support_vision_runner.DEADLINE_MARGIN_S,
                         label="action_video")[0]
                     review["motion_clip"] = clip_manifest
@@ -1771,6 +1827,7 @@ class ShadowVisionProviders:
                     native_box = _native_search_box(ball.get("box"), search_rois[media_ms])
                     if (review.get("observation_protocol") == "SOURCE_INDEXED_MOTION_CLIP_V1"
                             and ball.get("active_ball") is True and ball.get("control_visible") is True
+                            and ball.get("stationary_spare") is not True
                             and ball.get("confidence") == "high" and _valid_box(native_box)):
                         body = next((c for c in measured.get(media_ms, [])
                                      if c["body_id"] == ball.get("control_body_id")), None)
@@ -1779,7 +1836,8 @@ class ShadowVisionProviders:
                                 "ball_box": native_box, "confidence": "high", "control_visible": True,
                                 "source": "SOURCE_VIDEO_VISIBLE_BALL_CONTROL"})
                     measured_balls = corroborate_ball_pixels(detector, images[media_ms], native_box)
-                    if review.get("observation_protocol") == "SOURCE_INDEXED_MOTION_CLIP_V1" and ball.get("active_ball") is True:
+                    if (review.get("observation_protocol") == "SOURCE_INDEXED_MOTION_CLIP_V1"
+                            and ball.get("active_ball") is True and ball.get("stationary_spare") is not True):
                         measured_balls = [{**b, "video_active_ball": True} for b in measured_balls]
                     balls.extend(measured_balls)
             selected = row.get("selected_body_ids") if isinstance(row.get("selected_body_ids"), list) else []
@@ -1858,7 +1916,7 @@ class ShadowVisionProviders:
         votes_by_track = {}
         with tempfile.TemporaryDirectory(prefix="fix10a_jersey_") as temp:
             jobs = []
-            job_meta = []
+            job_meta = {}
             root = Path(temp)
             for index, row in enumerate(rows):
                 track = row.get("track_id")
@@ -1870,18 +1928,22 @@ class ShadowVisionProviders:
                 if not got:
                     continue
                 actual_ms, frame = got
-                cache_key = (int(actual_ms), tuple(round(float(box[k]), 5) for k in ("x", "y", "w", "h")))
+                cache_key = (str(video_path), int(actual_ms), tuple(float(box[k]) for k in ("x", "y", "w", "h")))
                 if cache_key in self._jersey_cache:
                     vote = deepcopy(self._jersey_cache[cache_key])
                     vote.update(media_ms=int(actual_ms), request_id=row.get("request_id"), reused=True)
                     votes_by_track.setdefault(track, []).append(vote)
+                    continue
+                meta = (track, int(actual_ms), row.get("request_id"))
+                if cache_key in job_meta:
+                    job_meta[cache_key].append(meta)
                     continue
                 crop = jersey_pixels.native_torso_crop(frame, box)
                 path = root / f"jersey_{index:03d}.jpg"
                 if crop is None or not _write_jpg(path, crop):
                     continue
                 jobs.append(((self.api_key, f"{self.session_prefix}-jersey-{index}", str(path)), {}))
-                job_meta.append((track, actual_ms, row.get("request_id"), cache_key))
+                job_meta[cache_key] = [meta]
             if not jobs:
                 return votes_by_track
             self.jersey_calls += len(jobs)
@@ -1893,14 +1955,15 @@ class ShadowVisionProviders:
             except Exception as exc:
                 results = [{"readable": False, "number": None, "confidence": "low", "reason": "reader_error",
                             **support_vision_runner.fail_closed_diagnostic(exc, index)} for index in range(len(job_meta))]
-            for (track, actual_ms, request_id, cache_key), result in zip(job_meta, results):
+            for (cache_key, recipients), result in zip(job_meta.items(), results):
                 vote = dict(result) if isinstance(result, dict) else {
                     "readable": False, "number": None, "confidence": "low", "reason": "reader_unavailable"
                 }
-                vote.update({"media_ms": int(actual_ms), "request_id": request_id})
+                vote["media_ms"] = recipients[0][1]
                 self._jersey_cache[cache_key] = deepcopy(vote)
                 # Expected jersey number is deliberately never passed to the reader.
-                votes_by_track.setdefault(track, []).append(vote)
+                for track, _actual_ms, request_id in recipients:
+                    votes_by_track.setdefault(track, []).append({**deepcopy(vote), "request_id": request_id})
         return votes_by_track
 
     def role_evidence_provider(self, video_path: str, window: dict, strikes,
@@ -1920,15 +1983,18 @@ class ShadowVisionProviders:
         raw_votes = {}
         with tempfile.TemporaryDirectory(prefix="fix10a_role_") as temp:
             root = Path(temp)
-            jobs, job_meta = [], []
+            jobs, job_meta = [], {}
             for index, row in enumerate(requests):
                 got = frames.get(int(row["media_ms"]))
                 if not got:
                     continue
                 actual_ms, frame = got
-                cache_key = (str(video_path), int(actual_ms), tuple(round(float(row["box"][k]), 5) for k in ("x", "y", "w", "h")))
+                cache_key = (str(video_path), int(actual_ms), tuple(float(row["box"][k]) for k in ("x", "y", "w", "h")))
                 if cache_key in self._role_cache:
                     raw_votes.setdefault(row["track_id"], []).append(deepcopy(self._role_cache[cache_key]))
+                    continue
+                if cache_key in job_meta:
+                    job_meta[cache_key].append(row["track_id"])
                     continue
                 crop = _crop(frame, row["box"], pad_x=0.18, pad_y=0.10)
                 tight = root / f"role_tight_{index:03d}.jpg"
@@ -1936,7 +2002,7 @@ class ShadowVisionProviders:
                 if crop is None or not _write_jpg(tight, crop) or not _write_jpg(context, frame):
                     continue
                 jobs.append(((self.api_key, f"{self.session_prefix}-role-{index}", str(tight), str(context)), {}))
-                job_meta.append((row["track_id"], int(actual_ms), cache_key))
+                job_meta[cache_key] = [row["track_id"]]
             if not jobs:
                 return {track: aggregate_role_votes(votes) for track, votes in raw_votes.items()}
             self.role_calls += len(jobs)
@@ -1948,16 +2014,20 @@ class ShadowVisionProviders:
             except Exception as exc:
                 results = [{"role": "UNKNOWN", "confidence": "low", "reason": "role_reader_error",
                             **support_vision_runner.fail_closed_diagnostic(exc, index)} for index in range(len(job_meta))]
-            for (track, actual_ms, cache_key), result in zip(job_meta, results):
+            for (cache_key, tracks), result in zip(job_meta.items(), results):
                 vote = dict(result) if isinstance(result, dict) else {
                     "role": "UNKNOWN", "confidence": "low", "reason": "reader_unavailable"
                 }
-                vote["media_ms"] = int(actual_ms)
+                vote["media_ms"] = cache_key[1]
                 self._role_cache[cache_key] = deepcopy(vote)
-                raw_votes.setdefault(track, []).append(vote)
+                for track in tracks:
+                    raw_votes.setdefault(track, []).append(deepcopy(vote))
         return {track: aggregate_role_votes(votes) for track, votes in raw_votes.items()}
 
     def goal_geometry_provider(self, window: dict, strike: dict):
+        return ordered_vision_reviews.single_reader(self.goal_review_steps(window, strike))
+
+    def goal_review_steps(self, window: dict, strike: dict):
         if not self.api_key or not isinstance(strike, dict) or not _num(strike.get("media_ms")):
             return None
         if not goal_review_sampling.has_contact_reference(strike, window):
@@ -2043,9 +2113,9 @@ class ShadowVisionProviders:
                 kwargs = {"ball_reference": reference} if "ball_reference" in inspect.signature(read_goal_scene_evidence).parameters else {}
                 if "sequence_context" in inspect.signature(read_goal_scene_evidence).parameters:
                     kwargs["sequence_context"] = strike.get("_sequence_context")
-                review = support_vision_runner.run_support_vision(read_goal_scene_evidence, [(
+                review = yield (read_goal_scene_evidence, [(
                     (self.api_key, f"{self.session_prefix}-goal-{strike_ms}-{self.goal_calls}", paths, actual_times), kwargs)],
-                    deadline_s=90 + support_vision_runner.DEADLINE_MARGIN_S, label="goal_scene")[0]
+                    90 + support_vision_runner.DEADLINE_MARGIN_S, "goal_scene")
             except Exception as exc:
                 review = support_vision_runner.fail_closed_diagnostic(exc)
             if isinstance(review,dict):
@@ -2206,8 +2276,9 @@ class ShadowVisionProviders:
         return self
 
 
-def build_shadow_providers(api_key: str | None, session_prefix: str, video_path: str | None = None) -> ShadowVisionProviders:
-    bundle = ShadowVisionProviders(api_key, session_prefix)
+def build_shadow_providers(api_key: str | None, session_prefix: str, video_path: str | None = None,
+                           *, motion_transport="sdk") -> ShadowVisionProviders:
+    bundle = ShadowVisionProviders(api_key, session_prefix, motion_transport=motion_transport)
     if video_path:
         bundle.bind_video_path(video_path)
     return bundle

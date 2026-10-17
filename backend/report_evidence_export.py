@@ -35,7 +35,8 @@ CONFIG_KEYS = ("IDENTITY_TIMELINE_ENABLED", "IDENTITY_TIMELINE_HZ",
                "FIX10A_SUPPORT_VISION_MODEL", "FIX10A_MAX_JERSEY_READS", "FIX10A_MAX_ROLE_TRACKS",
                "FIX10A_MAX_ROLE_FRAMES", "FIX10A_MAX_GOAL_FRAMES", "FIX15_MAX_DENSE_GOAL_FRAMES")
 SOURCE_MODULES = (
-    "sequence_observation_context.py", "attack_sequence_search.py",
+    "source_frame_cache.py", "analysis_jobs.py", "ordered_vision_reviews.py",
+    "sequence_observation_context.py", "saved_shot_sequence.py", "scripts/review_source_window.py", "attack_sequence_search.py",
     "ball_motion_evidence.py", "cv_shadow.py", "dense_track_refinement.py", "event_ledger.py",
     "fix10a_occluded_goal.py", "frame_geometry.py", "independent_ball_review.py", "jersey_consensus.py",
     "jersey_pixels.py", "media_binaries.py", "motion_compensation.py", "open_observation_compat.py",

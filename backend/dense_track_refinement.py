@@ -409,7 +409,7 @@ class NativeDetectionSession:
                 "scope": "RUN_LOCAL_NATIVE_PIXEL_PROPOSALS_ONLY"}
 
 
-def _detect_dense_people_and_ball(detector, frame_bgr, include_a7_support=False, *, _detail_pass=False):
+def _detect_dense_people_and_ball(detector, frame_bgr, include_a7_support=False, *, _detail_pass=False, _ball_only=False):
     """FIX10A dense detector with isolated A7 support proposals.
 
     Person detection keeps the production threshold.  A3 receives only sports-
@@ -422,37 +422,12 @@ def _detect_dense_people_and_ball(detector, frame_bgr, include_a7_support=False,
         return [], []
     H, W = frame_bgr.shape[:2]
     scale = cv_detect.INPUT / max(H, W)
-    nw, nh = int(W * scale), int(H * scale)
-    img = np.zeros((cv_detect.INPUT, cv_detect.INPUT, 3), np.uint8)
-    img[:nh, :nw] = cv2.resize(frame_bgr, (nw, nh))
-    blob = cv2.dnn.blobFromImage(
-        img, 1 / 255.0, (cv_detect.INPUT, cv_detect.INPUT), swapRB=True
-    )
-    detector.net.setInput(blob)
-    raw = np.asarray(detector.net.forward())
-    # OpenCV can return an empty prediction tensor on a valid decoded frame.
-    # Treat that as no detections; never let a detector shape abort the whole
-    # physical-recall window with an opaque IndexError.
-    if raw.size == 0:
-        return ([], [], []) if include_a7_support else ([], [])
-    if raw.ndim == 3 and raw.shape[0] == 1:
-        raw = raw[0]
-    if raw.ndim != 2:
-        raise ValueError(f"DENSE_DETECTOR_OUTPUT_SHAPE:{raw.shape}")
-    # YOLO exports use either (channels, predictions) or its transpose.
-    if (raw.shape[0] >= 5 and raw.shape[0] < raw.shape[1]) or raw.shape[1] < 5:
-        raw = raw.T
-    if raw.shape[1] < 5:
-        raise ValueError(f"DENSE_DETECTOR_OUTPUT_SHAPE:{raw.shape}")
-    out = raw
-    cls = out[:, 4:].argmax(1)
-    conf = out[:, 4:].max(1)
+    out, cls, conf, ball_scores = cv_detect.predict(detector, frame_bgr,
+        ball_floor=min(DENSE_BALL_CONF_T, A7_BALL_SUPPORT_CONF_T, .001))
     def collect(cid, threshold, *, require_top_class=True):
-        class_col = 4 + int(cid)
-        if class_col >= out.shape[1]:
+        if cid == 32 and ball_scores is None:
             return []
-        class_conf = out[:, class_col]
-        scores_all = conf if require_top_class else class_conf
+        scores_all = conf if require_top_class else ball_scores
         keep = scores_all > float(threshold)
         if require_top_class:
             keep &= cls == cid
@@ -492,8 +467,11 @@ def _detect_dense_people_and_ball(detector, frame_bgr, include_a7_support=False,
             rows.append(result)
         return sorted(rows, key=lambda r: float(r.get("confidence") or 0.0), reverse=True)
 
-    people = collect(0, float(cv_detect.CONF_T))
-    fsg._annotate_kit_chroma(frame_bgr, people)
+    # The ground-band forward contributes ball proposals only. Its person
+    # boxes and kit crops are discarded by the caller; do not compute them.
+    people = [] if _ball_only else collect(0, float(cv_detect.CONF_T))
+    if not _ball_only:
+        fsg._annotate_kit_chroma(frame_bgr, people)
     balls = collect(32, float(DENSE_BALL_CONF_T))
     # Portrait padding shrinks the pitch into ~360 detector columns. A ball
     # elsewhere (including a reserve ball) cannot establish that the active
@@ -510,7 +488,7 @@ def _detect_dense_people_and_ball(detector, frame_bgr, include_a7_support=False,
         y1 = min(H, int((max(feet) + .08) * H))
         if 0 < y1 - y0 <= .45 * H:
             _people, detailed = _detect_dense_people_and_ball(
-                detector, frame_bgr[y0:y1, :], _detail_pass=True)
+                detector, frame_bgr[y0:y1, :], _detail_pass=True, _ball_only=True)
             for candidate in detailed:
                 box = candidate["box"]
                 box["y"] = (y0 + box["y"] * (y1 - y0)) / H
@@ -654,7 +632,7 @@ def _is_team_reference_target(frame):
     appearance = target.get("appearance_evidence") or {}
     return _is_direct_tap_target(frame) or bool(
         target.get("status") == "VERIFIED" and target.get("proof_eligible") is True
-        and target.get("reason") == "MULTI_FRAME_SELECTED_APPEARANCE"
+        and target.get("reason") in {"MULTI_FRAME_SELECTED_APPEARANCE", "SOURCE_VIDEO_SELECTED_PERSON"}
         and appearance.get("source") == "USER_SELECTED_SOURCE_PIXELS"
         and appearance.get("source_video_sha256") and appearance.get("input_sha256"))
 

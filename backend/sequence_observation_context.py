@@ -38,18 +38,26 @@ def fingerprint(packet):
     return packet
 
 
+def _motion_actor_observations(action):
+    """One person can have different measured labels at different source frames."""
+    if isinstance(action.get("actor_observations"), list):
+        return [row for row in action["actor_observations"] if isinstance(row, dict)]
+    return [{"idx": i, "body_id": action.get("actor_body_id")}
+            for i in _rows(action.get("actor_evidence_indices"))]
+
+
 def video_observations(observation, frames, window):
     """Translate clip indices to measured bodies/source PTS for the existing resolver.
 
-    This creates observations, not events. Player identity, team/ball transfer
-    and causal ownership are still resolved against the shared native graph.
+    This creates observations, not events. Source bodies and selected-player
+    identity are bound once; video role/transfer observations do not require a
+    duplicate native ball/kit approval.
     """
     import football_sequence_intelligence as sequence
     obs = observation or {}
     clip, transport = obs.get("motion_clip") or {}, obs.get("video_input") or {}
     times = clip.get("frame_source_ms") or []
     if (obs.get("observation_protocol") != "SOURCE_INDEXED_MOTION_CLIP_V1"
-            or obs.get("clip_review_complete") is not True
             or obs.get("status") not in {"COMPLETED", "PARTIAL_RESPONSE"}
             or transport.get("sampling_prepared_for_provider") is not True
             or transport.get("sampling_strategy") != "SOURCE_INDEXED_1FPS_PLAYBACK"
@@ -84,22 +92,30 @@ def video_observations(observation, frames, window):
         start, contact, end = (at(raw.get(k)) for k in ("start_idx", "contact_idx", "end_idx"))
         if start is None or end is None or start > end or (contact is not None and not start <= contact <= end):
             continue
-        actor_evidence, actor_ids = [], set()
-        for i in _rows(raw.get("actor_evidence_indices")):
-            b, ms = body(i, raw.get("actor_body_id")), at(i)
+        actor_evidence, actor_ids, actor_samples = [], set(), []
+        for row in _motion_actor_observations(raw):
+            i = row.get("idx")
+            b, ms = body(i, row.get("body_id")), at(i)
             if b and start <= ms <= end:
                 actor_evidence.append({"media_ms": ms, "box": deepcopy(b["box"]), "visibility": "VISIBLE"})
                 actor_ids.add(b["local_track_id"])
-        if len(actor_ids) != 1 or not actor_evidence:
+                actor_samples.append((ms, b["local_track_id"], i))
+        if not actor_evidence:
             continue
-        actor = next(iter(actor_ids))
+        # This only translates observed bodies. Whether changed local labels
+        # belong to GLOBAL_TARGET is decided by the shared identity resolver.
+        pivot = contact if contact is not None else start
+        actor = min(actor_samples, key=lambda row: (abs(row[0]-pivot), row[0], row[1]))[1]
         receiver, finisher = body(raw.get("receiver_idx"), raw.get("receiver_body_id")), body(raw.get("shot_idx"), raw.get("finisher_body_id"))
         outcome_ms = at(raw.get("outcome_idx"))
         outcome_evidence = sorted({at(i) for i in _rows(raw.get("outcome_evidence_indices")) if at(i) is not None})
+        if outcome_ms is not None:
+            outcome_evidence = sorted({*outcome_evidence, outcome_ms})
+        elif outcome_evidence:
+            outcome_ms = outcome_evidence[-1]
         terminal = outcome_ms if outcome_ms is not None else end
         continuous = (raw.get("continuous_visible_sequence") is True
-            and not any(start <= f.get("media_ms", -1) <= terminal and not actual(f, window.get("scene_id")) for f in frames)
-            and not any(b-a > 250 for a, b in zip(times, times[1:]) if start <= a <= terminal))
+            and not any(start <= f.get("media_ms", -1) <= terminal and not actual(f, window.get("scene_id")) for f in frames))
         visible = (continuous and raw.get("outcome_visible") is True and bool(outcome_evidence)
                    and min(outcome_evidence) >= (contact if contact is not None else start)
                    and (outcome_ms is None or outcome_ms in outcome_evidence))
@@ -110,7 +126,7 @@ def video_observations(observation, frames, window):
             "goal_outcome_ms": outcome_ms, "continuous_visible_sequence": continuous}
         action = sequence._normalise_action({"action_id": f"{sid}_{index}", "kind": raw.get("kind"),
             "start_ms": start, "end_ms": end, "contact_ms": contact,
-            "actor_local_track_id": actor, "actor_candidate_local_track_ids": [actor],
+            "actor_local_track_id": actor, "actor_candidate_local_track_ids": sorted(actor_ids),
             "actor_evidence": actor_evidence, "evidence_ms": [e["media_ms"] for e in actor_evidence],
             "target_status": "UNRESOLVED", "outcome": raw.get("outcome"), "outcome_visible": visible,
             "contact_visibility": raw.get("contact_visibility"), "foot": raw.get("foot"),
@@ -121,9 +137,14 @@ def video_observations(observation, frames, window):
         action["video_observation"] = {"authority": "TEMPORAL_VIDEO_OBSERVATION", "input_sha256": obs["input_sha256"],
             "response_sha256": obs["response_sha256"], "clip_sha256": clip["clip_sha256"],
             "source_video_sha256": obs.get("source_video_sha256"), "model": obs.get("model"),
-            "outcome_evidence_ms": outcome_evidence, "source_frame_indices": list(_rows(raw.get("actor_evidence_indices"))),
+            "outcome_evidence_ms": outcome_evidence, "source_frame_indices": sorted({row[2] for row in actor_samples}),
             "source_bounds_ms": [times[0], times[-1]], "provider_requested_fps": transport.get("requested_fps"),
             "source_sampling_fps": transport.get("source_sampling_fps"), "playback_fps": transport.get("playback_fps")}
+        if isinstance(raw.get("save_sequence_evidence"), dict):
+            action["video_observation"]["save_sequence"] = deepcopy(raw["save_sequence_evidence"])
+        if raw.get("outcome") == "TEAMMATE_GOAL":
+            action["video_observation"]["assist_roles"] = {
+                k: raw[k] for k in ("receiver_team", "receiver_finisher_same_player") if k in raw}
         actions.append(action)
     return {"sequences": [{"sequence_id": sid, "scene_id": window.get("scene_id"),
         "start_ms": times[0], "end_ms": times[-1], "actions": actions}]}
@@ -134,7 +155,7 @@ def motion_window_complete(observation, frames, window):
     packet = video_observations(observation, frames, window)
     native = [f["media_ms"] for f in frames if actual(f, window.get("scene_id"))]
     times = (observation.get("motion_clip") or {}).get("frame_source_ms") or []
-    return bool(packet.get("sequences") and native and times
+    return bool(observation.get("clip_review_complete") is True and packet.get("sequences") and native and times
                 and times[0] <= min(native)+150 and times[-1] >= max(native)-150)
 
 
@@ -160,24 +181,50 @@ def motion_review_requests(parsed, times, manifest):
     for action in _rows((parsed or {}).get("actions")):
         if not isinstance(action, dict):
             continue
+        save = action.get("save_sequence_evidence") or {}
+        if "LATER_VISIBLE_CONTROL_BEFORE_KEEPER" in save.get("reasons", []):
+            pivot = at((action.get("save_sequence") or {}).get("keeper_idx"))
+            if pivot is not None:
+                requests.append({"question": "CONTACT", "media_ms": pivot,
+                    "anchor_media_ms": pivot, "focus_track_id": None,
+                    "search_protocol": "SOURCE_INDEXED_MOTION_CLIP_V1",
+                    "source": "MODEL_SEQUENCE_SEARCH", "direction": "BEFORE",
+                    "canonical_authority": False})
+                continue
         contact = at(action.get("contact_idx"))
         if contact is None:
+            # An observed outcome without a contact is a search lead, not an
+            # event to silently drop or an excuse to invent a release time.
+            outcome = at(action.get("outcome_idx"))
+            pivot = next((value for value in (outcome, at(action.get("shot_idx")),
+                                              at(action.get("start_idx"))) if value is not None), None)
+            if pivot is not None and action.get("kind") in {"SHOT", "PASS", "CROSS"}:
+                requests.append({"question": "CONTACT", "media_ms": pivot,
+                    "anchor_media_ms": pivot, "focus_track_id": None,
+                    "search_protocol": "SOURCE_INDEXED_MOTION_CLIP_V1",
+                    "source": "MODEL_SEQUENCE_SEARCH", "direction": "BEFORE",
+                    "canonical_authority": False})
             continue
         receiver, shot, outcome = (at(action.get(k)) for k in ("receiver_idx", "shot_idx", "outcome_idx"))
+        outcome_evidence = [at(i) for i in _rows(action.get("outcome_evidence_indices")) if at(i) is not None]
+        outcome = outcome if outcome is not None else max(outcome_evidence, default=None)
         if action.get("receiver_body_id") not in by_ms.get(receiver, {}):
             receiver = None
         if action.get("finisher_body_id") not in by_ms.get(shot, {}):
             shot = None
         unknown = action.get("outcome") in {None, "UNKNOWN", "TEAMMATE_SHOT", "TEAMMATE_GOAL"}
         question, pivot, body = None, contact, action.get("actor_body_id")
-        if not action.get("actor_evidence_indices"):
+        if not _motion_actor_observations(action):
             question = "IDENTITY"
         elif action.get("kind") in {"PASS", "CROSS"} and receiver is None:
             question = "RECEIVER"
         elif action.get("kind") in {"PASS", "CROSS"} and shot is None and unknown:
             question, pivot, body = "SHOT", receiver, action.get("receiver_body_id")
-        elif action.get("kind") in {"PASS", "CROSS", "SHOT"} and (outcome is None or action.get("outcome_visible") is not True
-                or not action.get("outcome_evidence_indices")) and unknown:
+        elif (action.get("kind") in {"PASS", "CROSS", "SHOT"}
+                and (outcome is None or action.get("outcome_visible") is not True)
+                and (unknown or action.get("kind") == "SHOT")):
+            # A known shot label is not complete outcome evidence. In
+            # particular SAVED must not suppress its own missing-link search.
             question, pivot, body = "OUTCOME", shot or contact, action.get("finisher_body_id") or body
         if question:
             requests.append({"question": question, "media_ms": pivot, "anchor_media_ms": contact,

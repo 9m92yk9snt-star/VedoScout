@@ -1190,6 +1190,10 @@ def _event_match(events, proposal):
         and e.get("scene_id") == scene
         and _num(e.get("canonical_ms"))
         and abs(int(e["canonical_ms"]) - target_ms) <= CANONICAL_MATCH_MS
+        # A qualified video action can only share a proposal for its own
+        # contact, not any nearby receive, dribble or subsequent release.
+        and (not canonical_event_resolver.has_motion_proof(e)
+             or (_num(e.get("contact_ms")) and abs(int(e["contact_ms"]) - target_ms) <= 220))
     ]
     if proposal.get("kind") in {"GOAL", "SHOT"}:
         preferred = [e for e in candidates if e.get("canonical_action_type") == "SHOT"]
@@ -1381,6 +1385,9 @@ def _dedupe_events(events):
         ), None)
         if duplicate is None:
             out.append(event)
+        elif (canonical_event_resolver.has_motion_proof(event)
+              and not canonical_event_resolver.has_motion_proof(duplicate)):
+            out[out.index(duplicate)] = event
     return out
 
 
@@ -1527,7 +1534,7 @@ def reconcile_canonical_events(canonical_bundle: dict | None,
                     and left["kind"] != right["kind"]):
                 contradictory.update({left["proposal_id"], right["proposal_id"]})
 
-    applied = []
+    applied, secondary = [], []
     resolved_unresolved_keys = set()
     linked_known_keys = set()
     for proposal in proposals:
@@ -1577,6 +1584,23 @@ def reconcile_canonical_events(canonical_bundle: dict | None,
                 continue  # never downgrade a proved save to UNKNOWN
         else:
             match = _event_match(events, proposal)
+        if match is not None and canonical_event_resolver.has_motion_proof(match):
+            # The video chain already resolved player, roles and result. A
+            # separate reconstruction may corroborate or disagree; it cannot
+            # overwrite that observation or demand another approval.
+            outcome = proposal.get("canonical_outcome") or (
+                "GOAL" if proposal["kind"] == "GOAL" else "TEAMMATE_GOAL" if proposal["kind"] == "ASSIST" else "UNKNOWN")
+            relation = ("NO_OUTCOME" if outcome == "UNKNOWN" else "CORROBORATES"
+                        if match.get("canonical_outcome") == outcome else "DISAGREES")
+            evidence = {"canonical_event_type": proposal["kind"], "canonical_outcome": outcome,
+                        "relation": relation, "proof": _physical_proof(proposal)}
+            records = match.setdefault("proof", {}).setdefault("secondary_physical_observations", [])
+            if evidence not in records:
+                records.append(evidence)
+            secondary.append(proposal["proposal_id"])
+            changes.append({"proposal_id": proposal["proposal_id"], "event_id": match.get("event_id"),
+                            "change": "RETAINED_SOURCE_VIDEO_EVENT", "secondary_relation": relation})
+            continue
         if match is None:
             new_event = _synth_event(proposal)
             events.append(new_event)
@@ -1641,6 +1665,7 @@ def reconcile_canonical_events(canonical_bundle: dict | None,
         "authority": "FIX10B_PHYSICAL_RECONCILIATION",
         "proposals_total": len(proposals),
         "proposals_applied": len(applied),
+        "proposals_retained_as_secondary": len(secondary),
         "proposals_contradictory": len(contradictory),
         "applied_proposal_ids": applied,
         "changes": changes,

@@ -74,7 +74,7 @@ from emergentintegrations.payments.stripe.checkout import (
     CheckoutSessionRequest,
 )
 
-# Precision Scout — multi-signal player tracking + confident-voice pipeline
+# Precision Scout — visual player references and source-bound observations
 from precision_engine import (
     extract_player_fingerprint,
     extract_audio_events,
@@ -6474,17 +6474,15 @@ async def analyze_preview_task(report_id: str):
                 jersey_number=(details or {}).get("jersey_number"),
             ))
 
-        # ============== PREVIEW CLIP + AUDIO PEAKS (cut from the raw file) ==============
+        # ============== PREVIEW CLIP (cut from the raw file) ==============
         preview_clip_path = await _await_with_heartbeat(
             report_id,
             asyncio.to_thread(make_preview_clip, raw_path, marker_seconds=marker_timestamp, window_seconds=15),
         )
         await _trace(report_id, "clip_done")
-        try:
-            audio_events_preview = await asyncio.to_thread(extract_audio_events, preview_clip_path, top_n=5)
-        except Exception as e:
-            logger.warning(f"Audio extraction failed (preview) for {report_id}: {e}")
-            audio_events_preview = []
+        # Unclassified volume peaks (including music) are not football
+        # evidence. Keep the legacy API field empty without extracting audio.
+        audio_events_preview = []
         await db.reports.update_one(
             {"id": report_id},
             {"$set": {
@@ -6498,7 +6496,6 @@ async def analyze_preview_task(report_id: str):
         # Re-load the doc so downstream code sees the freshly persisted state.
         doc = await db.reports.find_one({"id": report_id})
         anchors = doc.get("anchors") or []
-        audio_events_preview_raw = doc.get("audio_events_preview") or []
         fingerprint_payload = doc.get("fingerprint")
 
         # Rebuild the lightweight FingerPrint-like object the precision prompt needs
@@ -6517,13 +6514,6 @@ async def analyze_preview_task(report_id: str):
                 )
             except Exception:
                 fp_obj = None
-
-        # Convert the persisted audio event dicts back into the lightweight namedtuple-ish
-        # objects the precision prompt builder expects (only the attrs it reads).
-        audio_events_preview = [
-            SimpleNamespace(t=float(e.get("t", 0)), peak_db=float(e.get("peak_db", 0)), kind=str(e.get("kind", "")))
-            for e in audio_events_preview_raw
-        ]
 
         # ============== CONTENT GATE (Gemini call #1) ==============
         # Step 2 → 3: content gate verifying clip.
@@ -8914,10 +8904,8 @@ async def _corrective_only_recovery(report_id: str, doc: dict) -> None:
         gt_t_off = float(doc.get("anchor_time_offset") or (gt_track or {}).get("t_off") or 0.0)
     except Exception:
         gt_t_off = 0.0
-    audio_events_full = [
-        SimpleNamespace(t=float(e.get("t", 0)), peak_db=float(e.get("peak_db", 0)), kind=str(e.get("kind", "")))
-        for e in (doc.get("audio_events_full") or []) if isinstance(e, dict)
-    ]
+    # Recovery must not reintroduce historic music/volume cues into the prompt.
+    audio_events_full = []
     full_prompt = await _compose_full_prompt(
         doc, audio_events_full, anchor_payload_list, crop_path_str, gt_track, gt_t_off,
         event_ledger_obj=doc.get("event_ledger"), canonical_events=doc.get("canonical_events"))
@@ -9052,6 +9040,9 @@ async def generate_full_report_task(report_id: str) -> None:
     `/reports/{id}/status` to know when generation is done. Status values:
     `generating` | `verifying` | `finalizing` | `ready` | `failed`.
     """
+    import cv_detect
+    detector_cache = cv_detect.PredictionCache()
+    detector_token = cv_detect.CURRENT_PREDICTIONS.set(detector_cache)
     try:
         doc = await db.reports.find_one({"id": report_id})
         if not doc:
@@ -9140,10 +9131,8 @@ async def generate_full_report_task(report_id: str) -> None:
         anchor_crops_full, wide_crops_full = _collect_anchor_crop_paths(anchor_payload_list)
 
         # ── Ground-truth tracking (deterministic, seeded by the user's taps) ──
-        # Session 143 — PARALLEL PIPELINE:
-        #   Phase A: optical tracking (automatic identity review) ∥ audio extraction
-        #   Phase B: movement/pace metrics (GPT-vision) ∥ Gemini full analysis
-        # Saves 1-2 min of wall-clock vs the old strictly-sequential flow.
+        #   Phase A: optical tracking (automatic identity review)
+        #   Phase B: deterministic movement/pace metrics ∥ facts-only prose
         valid_anchors = [
             a for a in anchor_payload_list
             if isinstance(a, dict) and isinstance(a.get("t"), (int, float)) and isinstance(a.get("box"), dict)
@@ -9169,13 +9158,8 @@ async def generate_full_report_task(report_id: str) -> None:
                 track = None
             return track, t_off
 
-        async def _audio_core():
-            try:
-                return await asyncio.to_thread(extract_audio_events, file_path, top_n=10)
-            except Exception:
-                return []
-
-        (gt_track, gt_t_off), audio_events_full = await asyncio.gather(_tracking_core(), _audio_core())
+        gt_track, gt_t_off = await _tracking_core()
+        audio_events_full = []
         from player_selection import full_body_anchors
         tap_times = [float(a["t"]) + gt_t_off for a in full_body_anchors(valid_anchors)] if gt_track else []
         if gt_track:
@@ -9770,6 +9754,14 @@ async def generate_full_report_task(report_id: str) -> None:
             )
         except Exception:
             pass
+    finally:
+        cv_detect.CURRENT_PREDICTIONS.reset(detector_token)
+        try:
+            if detector_cache.forwards:
+                await db.reports.update_one({"id": report_id},
+                    {"$set": {"unified_detector_cache": detector_cache.metrics()}})
+        except Exception:
+            logger.warning("[detector] %s: cache metrics could not be persisted", report_id)
 
 
 # ============== AGENT REVIEW (user side) ==============

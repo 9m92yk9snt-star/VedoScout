@@ -1,18 +1,10 @@
 """
 ScoutMePlay — Precision Scout pipeline.
 
-A multi-signal video analysis engine. The goal is to make the AI find the
-marked player reliably and describe what they did with confident, evidence-
-backed language. No hedging, no confidence badges, no pre-pay verification.
-
-Three independent signals are extracted *before* Gemini is asked to reason:
-
-  1. Visual fingerprint   — jersey colour, shorts colour, body ratio, crop
-  2. Audio event timeline — RMS spike timestamps (likely goals / loud plays)
-  3. Player details        — typed by the user (already provided to upload)
-
-Gemini receives all three as priors, plus the full clip + the marker image.
-This dramatically reduces tracking loss and hallucinated events.
+Visual player references and source-video observations support the report.
+Unclassified volume peaks cannot establish a football event. Legacy audio
+diagnostic helpers remain available but are not used by report generation.
+Model uncertainty is preserved instead of rewritten as an observed fact.
 """
 
 from __future__ import annotations
@@ -382,9 +374,9 @@ def extract_audio_events(
 ) -> list[AudioEvent]:
     """Detect timestamps with sudden audio volume spikes.
 
-    Crowd cheers, whistle bursts and shouts all show up as RMS peaks. Goals
-    and big plays almost always coincide with one — so the AI gets to cross-
-    check its visual interpretation against this independent signal.
+    Legacy volume diagnostic only. This cannot distinguish music from crowd
+    noise, recognise a football event, or confirm/reject visual observations.
+    Production report generation does not call it.
 
     Returns at most `top_n` events, sorted by time.
     """
@@ -472,44 +464,43 @@ def extract_audio_events(
 def audio_events_to_prompt_block(events: list[AudioEvent]) -> str:
     if not events:
         return (
-            "AUDIO EVIDENCE: no significant audio peaks detected in the clip "
-            "(quiet recording or short clip)."
+            "AUDIO VOLUME DIAGNOSTIC: no peaks recorded. This neither confirms "
+            "nor rejects a visual football event."
         )
     rows = [f"  • {e.t:>5.2f}s — loud_event ({e.peak_db:+.1f} dB vs baseline)" for e in events]
     return (
-        "AUDIO EVIDENCE — independent timestamps where the crowd / shouts / "
-        "whistle spiked. A real goal or big play almost always lines up with one:\n"
+        "AUDIO VOLUME DIAGNOSTIC — unclassified peaks, possibly music. "
+        "These cannot confirm or reject a visual football event:\n"
         + "\n".join(rows)
     )
 
 
 # ── Prompt builders ───────────────────────────────────────────────────
 
-# Hard rules every Gemini call gets. Pure confident voice, no hedging.
+# Keep the exported legacy name; the policy now preserves observed uncertainty.
 CONFIDENT_VOICE_RULES = """
-LANGUAGE & VOICE RULES (absolute, no exceptions):
+VISUAL OBSERVATION RULES:
 
-1. CONFIDENT VOICE ONLY. Write like a professional scout. Never use the words
-   "appears to", "seems to", "likely", "possibly", "might have", "looks like".
-   Either you observed something and you state it as a fact, or you write
-   OFF-CAMERA for that moment.
+1. State clearly observed actions directly. Preserve uncertainty about any
+   unseen player, contact or outcome; do not turn an inference into a fact.
+   OFF-CAMERA means the player is not visible, not that a visible action's
+   outcome is unknown. Keep the schema's unresolved/null fields when needed.
 
-2. NEVER INVENT EVENTS. Goals, shots, dribbles past defender, key passes,
-   tackles, saves — only state them when you actually saw them happen on the
-   locked player. If the marked player scored, that overrides everything else.
+2. Follow the visible sequence from the selected player through contact,
+   the active ball, goalkeeper/receiver and aftermath. A later save or finish
+   belongs to that same observed action when the source sequence connects it.
+   Distinguish stationary spare balls and other players' separate actions.
 
-3. CROSS-CHECK AGAINST AUDIO. If the AUDIO EVIDENCE block lists a loud peak
-   near a moment you described, use that as confirmation. If you described a
-   goal and there is no audio peak nearby, double-check that the ball really
-   crossed the line — do not output a goal you are unsure of.
+3. Use visual evidence. Music, commentary, cheers and volume peaks cannot
+   confirm, reject or time a shot, save, goal or assist. Missing sound cannot
+   invalidate a visible event. Do not invent an action to match audio.
 
-4. LOCK ON THE FINGERPRINT. The "LOCKED PLAYER FINGERPRINT" block tells you
-   exactly what jersey + shorts + body to track. Ignore every other player.
+4. Use the original selected-player references to follow the same person.
+   Observe teammates and the goalkeeper when needed to resolve the action;
+   their actions do not become the selected player's actions.
 
-5. NO confidence ratings in your prose. Do not write "high confidence" or
-   "I am 80% sure" anywhere in the user-facing text. (You still output the
-   structured confidence fields the schema requires — those are for internal
-   use only.)
+5. Use clear coaching language. Structured confidence fields must describe
+   the actual observation; do not raise certainty to make the report complete.
 """
 
 
@@ -569,7 +560,6 @@ def build_preview_prompt(
     sections = [
         anchor_block,
         fingerprint.to_prompt_block(),
-        audio_events_to_prompt_block(audio_events),
         CONFIDENT_VOICE_RULES,
         primed,
     ]
@@ -602,53 +592,18 @@ def build_full_prompt(
     sections = [
         anchor_block,
         fingerprint.to_prompt_block(),
-        audio_events_to_prompt_block(audio_events),
         CONFIDENT_VOICE_RULES,
         primed,
     ]
     return "\n\n".join(s for s in sections if s)
 
 
-# ── Post-process confident voice scrubber ─────────────────────────────
-
-# In case Gemini occasionally slips and outputs hedging language anyway,
-# we strip it on the way out. Pure safety net.
-_HEDGE_REPLACEMENTS = [
-    (r"\bappears to be\b", "is"),
-    (r"\bappears to\b", ""),
-    (r"\bseems to be\b", "is"),
-    (r"\bseems to\b", ""),
-    (r"\blikely\b", ""),
-    (r"\bpossibly\b", ""),
-    (r"\bmight have\b", "did"),
-    (r"\blooks like\b", "is"),
-    (r"\bprobably\b", ""),
-    (r"\bperhaps\b", ""),
-]
-
-
-def _scrub_text(text: str) -> str:
-    import re
-    if not isinstance(text, str):
-        return text
-    out = text
-    for pat, repl in _HEDGE_REPLACEMENTS:
-        out = re.sub(pat, repl, out, flags=re.IGNORECASE)
-    # Collapse double spaces created by deletions.
-    out = re.sub(r" {2,}", " ", out).strip()
-    # Capitalise sentences that lost their first word.
-    out = re.sub(r"(^|\. )([a-z])", lambda m: m.group(1) + m.group(2).upper(), out)
-    return out
-
-
 def scrub_hedging(payload):
-    """Recursively walk a dict/list returned by Gemini and remove hedging language."""
-    if isinstance(payload, dict):
-        return {k: scrub_hedging(v) for k, v in payload.items()}
-    if isinstance(payload, list):
-        return [scrub_hedging(v) for v in payload]
-    if isinstance(payload, str):
-        return _scrub_text(payload)
+    """Compatibility entry point: preserve model wording and structured data.
+
+    Rewriting 'might have scored' as 'did scored' both corrupts meaning and
+    manufactures certainty. No text traversal or regex rewriting remains.
+    """
     return payload
 
 

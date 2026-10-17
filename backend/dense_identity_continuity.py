@@ -14,7 +14,7 @@ MAX_CONTINUITY_MS = 1200
 MAX_FRAME_GAP_MS = 80
 SEED_REASONS = {"OK_EXACT", "OK_NEAREST_TAP_FRAME",
                 "PROOF_TARGET_SINGLE_CANDIDATE_HYPOTHESIS_COLLAPSE",
-                "MULTI_FRAME_SELECTED_APPEARANCE"}
+                "MULTI_FRAME_SELECTED_APPEARANCE", "SOURCE_VIDEO_SELECTED_PERSON"}
 IDENTITY_BARRIERS = {"UNRESOLVED_IDENTITY", "SOURCE_CONFLICT",
                      "USER_EXCLUDED_OPPONENT", "USER_PARTIAL_VISIBLE_BODY",
                      "DENSE_TARGET_COMPETING_ASSOCIATION"}
@@ -70,9 +70,9 @@ def _native_unique_step(before, after, track):
 def apply_reference_matches(frames, observation):
     """Fuse the existing pixel reader's comparisons to actual selected crops.
 
-    The reader must locate a measured body on two separated source frames.
-    Kit colour, an expected shirt number, or an event story cannot do this.
-    Native continuity then carries the identity between visible observations.
+    A source-video comparison is direct identity evidence at its cited frame.
+    It need not repeat the comparison under each changing native track ID.
+    Static crop reads retain their independent multi-frame requirements.
     """
     rows = deepcopy(frames or [])
     reference = (observation or {}).get("selected_reference") or {}
@@ -94,44 +94,43 @@ def apply_reference_matches(frames, observation):
         track = match.get("local_track_id")
         features = set(v for v in match.get("features") or [] if isinstance(v, str)
                        and v in {"hair", "build", "socks", "boots", "sleeves"})
-        if (f is None or match.get("confidence") != "high" or len(features) < 2
+        if (f is None or match.get("confidence") != "high" or (not direct_motion and len(features) < 2)
                 or f.get("time_authority") != "ACTUAL_MEDIA_PTS"
                 or any(f.get(k) for k in ("cut", "cut_barrier", "used_fallback"))):
             continue
         body = _body(f, track)
         target = f.get("global_target") or {}
+        barrier = _hard_barrier(target) and (not direct_motion or target.get("reason") in {
+            "SOURCE_CONFLICT", "USER_EXCLUDED_OPPONENT", "USER_PARTIAL_VISIBLE_BODY"})
         if (body is None or (not direct_motion and not _native_unique_step(f, f, track))
-                or body.get("team") == "opponent" or _hard_barrier(target)
+                or (not direct_motion and body.get("team") == "opponent") or barrier
                 or target.get("proof_eligible") is True and target.get("local_track_id") != track):
             continue
         votes.setdefault((f.get("scene_id"), track), set()).add(f["media_ms"])
     for (scene, track), times in votes.items():
-        if len(times) < 2 or max(times)-min(times) < 150:
-            continue
-        path = [f for f in rows if min(times) <= f["media_ms"] <= max(times)]
-        if (any(f.get("scene_id") != scene or f.get("time_authority") != "ACTUAL_MEDIA_PTS"
+        if not direct_motion:
+            if len(times) < 2 or max(times)-min(times) < 150:
+                continue
+            path = [f for f in rows if min(times) <= f["media_ms"] <= max(times)]
+            if (any(f.get("scene_id") != scene or f.get("time_authority") != "ACTUAL_MEDIA_PTS"
                 or any(f.get(k) for k in ("cut", "cut_barrier", "used_fallback"))
                 or _hard_barrier(f.get("global_target") or {})
                 or ((f.get("global_target") or {}).get("proof_eligible") is True
                     and (f.get("global_target") or {}).get("local_track_id") != track)
-                or (not direct_motion and _body(f, track) is None) for f in path)
+                or _body(f, track) is None for f in path)
                 or any(b["media_ms"]-a["media_ms"] > MAX_FRAME_GAP_MS
-                       or (not direct_motion and not _native_unique_step(a, b, track)) for a, b in zip(path, path[1:]))):
-            continue
-        # Competing high-confidence matches in a frame/segment are uncertainty.
-        if any(other != track and other_scene == scene and other_times & times
-               for (other_scene, other), other_times in votes.items()):
-            continue
-        # A complete video supplies direct selected-person comparisons at these
-        # exact source frames. It need not satisfy a jersey-isolation test in
-        # every intervening frame. Only the directly observed frames become
-        # seeds; ordinary native propagation across gaps remains unchanged.
+                       or not _native_unique_step(a, b, track) for a, b in zip(path, path[1:]))):
+                continue
         for ms in times:
+            if any(other != track and other_scene == scene and ms in other_times
+                   for (other_scene, other), other_times in votes.items()):
+                continue
             f = by_ms[ms]
             if (f.get("global_target") or {}).get("proof_eligible") is True:
                 continue
             f["global_target"] = {"status": "VERIFIED", "proof_eligible": True,
-                "reason": "MULTI_FRAME_SELECTED_APPEARANCE", "local_track_id": track,
+                "reason": "SOURCE_VIDEO_SELECTED_PERSON" if direct_motion else "MULTI_FRAME_SELECTED_APPEARANCE",
+                "local_track_id": track,
                 "candidate_local_track_ids": [track], "body_box": deepcopy(_body(f, track)["box"]),
                 "appearance_evidence": {**deepcopy(reference), "evidence_ms": sorted(times),
                                         "number_required": False}}

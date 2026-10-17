@@ -1,17 +1,22 @@
-"""cv_detect.py — P3 scene awareness for the SHADOW identity engine.
+"""Shared local person/ball detector and supporting scene primitives.
 
 Lightweight person detection (YOLOv8n via OpenCV DNN, local, no API), a
 minimal camera-compensated multi-object tracker and kit-color team
 classification. Everything here is a SUPPORTING layer: it filters candidates
 and provides spatial context — it never decides target identity by itself
-and never touches the production pipeline.
+in the production pipeline.
 """
 from __future__ import annotations
 
 import logging
 import hashlib
 import os
+import threading
+import time
+from collections import OrderedDict
+from contextvars import ContextVar
 from pathlib import Path
+from typing import NamedTuple
 
 import cv2
 import numpy as np
@@ -23,6 +28,109 @@ MODEL_PATH = Path(__file__).resolve().parent / "models" / "yolov8n.onnx"
 CONF_T = float(os.environ.get("CV_SHADOW_DET_CONF", "0.25"))
 NMS_T = 0.45
 INPUT = 640
+CURRENT_PREDICTIONS = ContextVar("native_detector_predictions", default=None)
+
+
+class Predictions(NamedTuple):
+    xywh: np.ndarray
+    classes: np.ndarray
+    scores: np.ndarray
+    ball_scores: np.ndarray | None
+
+
+def _predict(detector, frame):
+    height, width = frame.shape[:2]
+    scale = INPUT / max(height, width)
+    nw, nh = int(width * scale), int(height * scale)
+    image = np.zeros((INPUT, INPUT, 3), np.uint8)
+    image[:nh, :nw] = cv2.resize(frame, (nw, nh))
+    blob = cv2.dnn.blobFromImage(image, 1 / 255.0, (INPUT, INPUT), swapRB=True)
+    detector.net.setInput(blob)
+    raw = np.asarray(detector.net.forward())
+    if raw.size == 0:
+        return Predictions(np.empty((0, 4)), np.empty(0, dtype=int), np.empty(0), None)
+    if raw.ndim == 3 and raw.shape[0] == 1:
+        raw = raw[0]
+    if raw.ndim != 2:
+        raise ValueError(f"DENSE_DETECTOR_OUTPUT_SHAPE:{raw.shape}")
+    if (raw.shape[0] >= 5 and raw.shape[0] < raw.shape[1]) or raw.shape[1] < 5:
+        raw = raw.T
+    if raw.shape[1] < 5:
+        raise ValueError(f"DENSE_DETECTOR_OUTPUT_SHAPE:{raw.shape}")
+    scores = raw[:, 4:]
+    # Retain exact network coordinates/scores, including ball scores when a
+    # different COCO class wins. No box rounding or NMS moves between callers.
+    return Predictions(raw[:, :4], scores.argmax(1), scores.max(1),
+                       scores[:, 32] if scores.shape[1] > 32 else None)
+
+
+def predict(detector, frame, *, ball_floor=.001):
+    """Stateless network candidates; callers retain their own NMS and rules."""
+    cache = CURRENT_PREDICTIONS.get()
+    return _predict(detector, frame) if cache is None else cache.predict(detector, frame, ball_floor)
+
+
+class PredictionCache:
+    """Bounded, exact-pixel reuse across one report's native detector readers.
+
+    Cache only the head values used by person/ball readers, with no precision
+    conversion. All other class scores have already contributed to argmax/max.
+    Source coverage, tracks, kit measurements and decisions remain caller-owned.
+    """
+    def __init__(self, max_bytes=64 * 1024 * 1024, max_entries=8192):
+        self.max_bytes, self.max_entries = max(0, int(max_bytes)), max(0, int(max_entries))
+        self._cache, self._bytes = OrderedDict(), 0
+        self._lock = threading.RLock()
+        self.hits = self.misses = self.evictions = self.forwards = 0
+        self.forward_seconds = 0.
+
+    def predict(self, detector, frame, ball_floor):
+        model_sha = getattr(detector, "model_sha256", None)
+        key = None
+        if (self.max_bytes and self.max_entries and isinstance(model_sha, str) and len(model_sha) == 64):
+            settings = (model_sha, type(detector.net).__module__, type(detector.net).__qualname__,
+                        INPUT, CONF_T, float(ball_floor), frame.shape, frame.dtype.str)
+            digest = hashlib.sha256(repr(settings).encode())
+            digest.update(frame.tobytes(order="C"))
+            key = digest.digest()
+        with self._lock:
+            if key in self._cache:
+                self.hits += 1
+                saved = self._cache[key]
+                self._cache.move_to_end(key)
+                return Predictions(*(a.copy() if a is not None else None for a in saved))
+            self.misses += 1
+            started = time.monotonic()
+            try:
+                result = _predict(detector, frame)
+            finally:
+                self.forwards += 1
+                self.forward_seconds += time.monotonic() - started
+            if key is not None and len(result.scores):
+                keep = (result.classes == 0) & (result.scores > CONF_T)
+                if result.ball_scores is not None:
+                    keep |= result.ball_scores > float(ball_floor)
+                saved = Predictions(*(a[keep].copy() if a is not None else None for a in result))
+                size = sum(a.nbytes for a in saved if a is not None)
+                if size <= self.max_bytes:
+                    while self._cache and (len(self._cache) >= self.max_entries or self._bytes + size > self.max_bytes):
+                        _, old = self._cache.popitem(last=False)
+                        self._bytes -= sum(a.nbytes for a in old if a is not None)
+                        self.evictions += 1
+                    for array in saved:
+                        if array is not None:
+                            array.flags.writeable = False
+                    self._cache[key] = saved
+                    self._bytes += size
+            return result
+
+    def metrics(self):
+        with self._lock:
+            return {"hits": self.hits, "misses": self.misses, "detector_forwards": self.forwards,
+                    "forward_seconds": round(self.forward_seconds, 3), "evictions": self.evictions,
+                    "entries": len(self._cache), "payload_bytes": self._bytes,
+                    "max_payload_bytes": self.max_bytes, "max_entries": self.max_entries,
+                    "scope": "RUN_LOCAL_EXACT_NATIVE_PREDICTIONS_NO_DECISIONS"}
 
 
 class PersonDetector:
@@ -54,14 +162,7 @@ class PersonDetector:
             return []
         H, W = frame_bgr.shape[:2]
         s = INPUT / max(H, W)
-        nw, nh = int(W * s), int(H * s)
-        img = np.zeros((INPUT, INPUT, 3), np.uint8)
-        img[:nh, :nw] = cv2.resize(frame_bgr, (nw, nh))
-        blob = cv2.dnn.blobFromImage(img, 1 / 255.0, (INPUT, INPUT), swapRB=True)
-        self.net.setInput(blob)
-        out = self.net.forward()[0].T  # (8400, 84)
-        cls = out[:, 4:].argmax(1)
-        conf = out[:, 4:].max(1)
+        out, cls, conf, _ball_scores = predict(self, frame_bgr)
         keep = (cls == 0) & (conf > CONF_T)
         boxes, scores = [], []
         for r, c in zip(out[keep], conf[keep]):

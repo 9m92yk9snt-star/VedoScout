@@ -791,6 +791,6 @@ def apply_verified_stats_authority(full: dict) -> dict:
              "end_ms": e.get("event_end_ms", ts_to_ms(e.get("timestamp"))),
              "canonical_event_type": e.get("football_event_type", e.get("canonical_event_type")),
              "canonical_outcome": e.get("football_outcome", e.get("canonical_result")),
-             "causal_verified": e.get("canonical_result") in {"SCORED", "TEAMMATE_SCORED"}}
+             "causal_verified": e.get("causal_verified", e.get("canonical_result") in {"SCORED", "TEAMMATE_SCORED"})}
             for e in full.get("action_timeline") or [] if isinstance(e, dict)]})
     return full
