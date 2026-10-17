@@ -275,10 +275,11 @@ validation; no end-to-end performance or quality claim follows from this audit.
 
 ## Shared detector work and the two-pass design
 
-The current production path does not run two independent whole-video reports
-in parallel. `generate_full_report_task` runs optical tracking and audio
-extraction in parallel, then prepares the identity/scene evidence and makes
-the whole-video sequence read. Report prose consumes canonical facts. The
+The production path does not run two independent whole-video reports
+in parallel. At `1bd23012`, `generate_full_report_task` ran optical tracking
+and audio extraction in parallel. The follow-up removes the unused audio
+extraction: tracking precedes the identity/scene preparation and whole-video
+sequence read. Report prose consumes canonical facts. The
 legacy full-video writer and `_cross_verify_full_report` remain a fallback
 when the unified path cannot run. Removing that fallback verifier alone would
 not accelerate successful unified analyses.
@@ -335,7 +336,64 @@ A separate 13-frame experiment compared 8/4/2/1 CPU threads twice. Eight
 threads were fastest here; all proposal outputs matched. No production thread
 cap or ONNX-runtime change was introduced based on an assumed benefit.
 
+## Music, observation certainty and one connected action
+
+The legacy audio helper computes volume/RMS peaks, not music, speech, football
+contact or goal recognition. On the original 76.76-second source it returned
+ten `loud_event` rows in 0.403 s. These are unclassified volume observations,
+not proof of any reference action. This small local time cannot explain the
+69-minute reconstruction or two-hour timeout, and the old full-report branch
+ran alongside tracking. No full-report wall-time gain is inferred from removing
+it. The measurement is recorded in `docs/analysis-work-audit.json`.
+
+The preview and full report no longer extract those peaks. Legacy API arrays
+remain empty, and corrective recovery does not reload old peaks. Both precision
+prompt builders ignore their compatibility `audio_events` argument, so saved
+music peaks cannot re-enter a prompt through an older caller. The unused volume
+diagnostic remains available as a legacy helper with an explicit non-evidence
+description. The unified sequence reader already did not consume the extracted
+peak list; this removes wasted work there and misleading cues in preview and
+legacy/corrective prompt paths.
+
+The previous voice rules instructed the model to confirm events with loud
+peaks, question goals with no nearby peak, ignore every other player, and never
+express uncertainty. The text scrubber then changed phrases such as `might
+have` to `did`. That could manufacture certainty without adding any observation;
+it is not established as the cause of the old saved-shot identity failure.
+
+The rules now ask for direct statements of clearly seen actions, preserve the
+unknown part of an action, and follow the selected player/contact/active ball
+through the goalkeeper or receiver and aftermath. Observing a teammate or
+keeper is necessary context, not a reason to transfer their actions to the
+target. A stationary spare remains a separate ball. The legacy scrubber entry
+point now returns the model's wording/data unchanged; regex rewriting and
+recursive traversal have been removed.
+
+The existing SDK and direct-REST video requests share one explicit visual
+observation policy. No extra model request, model change, decoding pass or
+source/frame sampling change is introduced. Source/reference bytes and their
+hashes are retained. The audit records the policy and actual system-instruction
+hash; that is evidence of the sent instruction, not a receipt proving model
+compliance. Original uploads can still contain a soundtrack. No music
+classifier or repeated audio/video transcoding was added.
+
+Existing motion reconciliation skips the physical path, keeper-role and goal
+review work that would re-establish an already resolved source-clip outcome.
+It can still investigate an unresolved contact. This is the useful role for
+the AI: one connected source observation, reuse of its documented result, and
+bounded follow-up for the actual missing evidence, without a second assistant
+model routinely repeating the full video.
+
 ## Validation and limits
+
+After the visual/audio policy change, 2,485 tests passed with one skip across
+125 offline backend files in 28.56 s (the prior sweep plus the new policy
+regressions and `test_precision_engine.py`). A focused reader/precision group
+also passed 174 tests, overlapping this sweep. Original source hashes, one
+request per invocation, sent policy and preserved uncertainty are code-tested
+with explicit transport doubles, not fresh LLM perception. The old
+`test_iter18_multianchor.py` integration module requires `/app/frontend/.env`
+and was not runnable here; no live service was substituted for it.
 
 The final shared-detector code passed 2,468 tests with one skip across 123
 offline backend files in 25.92 s; all Python socket connections were blocked.

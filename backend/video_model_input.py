@@ -24,6 +24,12 @@ VIDEO_FPS = 8.0
 PLAYBACK_FPS = 1.0
 VIDEO_TIMEOUT_S = 150.0
 MODEL = "gemini-2.5-pro"
+VISUAL_OBSERVATION_POLICY = (
+    "Use video pixels and the original selected-player references as football event evidence. "
+    "Ignore music, commentary, cheers and other audio when identifying, timing, confirming or rejecting events. "
+    "State clearly visible actions directly. Preserve uncertainty for unseen identity, contact or outcomes; "
+    "never raise certainty merely to complete the response. Return valid JSON only."
+)
 
 
 def _direct_gemini_video(api_key, prompt, video_path, refs, fps, system_message, timeout_s):
@@ -160,13 +166,16 @@ async def read_video(api_key, session_id, prompt, video_path, reference_paths=()
     """Registered owned-child reader. Return the raw reply before parsing."""
     if transport not in {"sdk", "gemini-rest"}:
         raise ValueError("UNKNOWN_VIDEO_TRANSPORT")
+    system_message = VISUAL_OBSERVATION_POLICY + "\n\n" + str(system_message or "")
     fps = _fps(fps)
     refs = [str(p) for p in reference_paths if p and Path(p).is_file()]
     audit = {"protocol": "TEMPORAL_VIDEO_INPUT_V1", "model": MODEL,
              "requested_fps": fps, "model_video_sha256": sha256(video_path),
              "reference_sha256": [sha256(p) for p in refs],
              "sampling_attached_to_provider_payload": False,
-             "provider_receipt_confirmed": False}
+             "provider_receipt_confirmed": False,
+             "event_evidence_policy": "VISUAL_OBSERVATION_ONLY",
+             "system_instruction_sha256": hashlib.sha256(system_message.encode()).hexdigest()}
     if source_clock is not None:
         # Inspect the actual encoded file, rather than trusting a prompt or an
         # SDK field which a proxy/converter may silently discard.

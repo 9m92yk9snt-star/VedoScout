@@ -410,5 +410,88 @@
       24966,
       25466
     ]
+  },
+  "legacy_audio_volume_audit": {
+    "scope": "LEGACY_AUDIO_VOLUME_MEASUREMENT_NOT_FOOTBALL_PERCEPTION",
+    "source_video_sha256": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+    "legacy_extraction_seconds": 0.403,
+    "events": [
+      {
+        "t": 2.5,
+        "peak_db": 5.5,
+        "kind": "loud_event"
+      },
+      {
+        "t": 13.25,
+        "peak_db": 5.8,
+        "kind": "loud_event"
+      },
+      {
+        "t": 18.5,
+        "peak_db": 5.8,
+        "kind": "loud_event"
+      },
+      {
+        "t": 29.25,
+        "peak_db": 5.4,
+        "kind": "loud_event"
+      },
+      {
+        "t": 45.25,
+        "peak_db": 5.3,
+        "kind": "loud_event"
+      },
+      {
+        "t": 50.5,
+        "peak_db": 5.4,
+        "kind": "loud_event"
+      },
+      {
+        "t": 55.75,
+        "peak_db": 5.4,
+        "kind": "loud_event"
+      },
+      {
+        "t": 61.25,
+        "peak_db": 5.9,
+        "kind": "loud_event"
+      },
+      {
+        "t": 66.5,
+        "peak_db": 5.8,
+        "kind": "loud_event"
+      },
+      {
+        "t": 71.75,
+        "peak_db": 5.4,
+        "kind": "loud_event"
+      }
+    ],
+    "legacy_extractor_classifies_music": false,
+    "legacy_extractor_classifies_goals_or_saves": false,
+    "new_llm_calls": 0,
+    "report_audio_extraction_calls_before": 2,
+    "report_audio_extraction_calls_after": 0,
+    "unified_sequence_reader_consumed_peak_list": false,
+    "full_report_wall_time_improvement_not_measured": true
+  },
+  "visual_observation_policy_change": {
+    "baseline_published_head": "1bd230121740c6628cba73d3f4a24d96e5468d54",
+    "baseline_published_tree": "deaf88835524cc0b604b9d6d5d2fd656afee803d",
+    "source_sha256_before": {
+      "backend/precision_engine.py": "0f882a09e5d346b554b60331f5a0fb9be37f6491a04949eec4dc97322ad14b35",
+      "backend/server.py": "ad16602a2a0fbf15f31369b3a2d43431ac09b788d002f5d89788a7d35f509126",
+      "backend/video_model_input.py": "6e6e69c4b7854a3a1408edc2d391dbfccca31daf32796519eb89524dd77fd009"
+    },
+    "source_sha256_after": {
+      "backend/precision_engine.py": "7f02ea7f2914ea3435ea76e3f9a79ed6e4bd169b277fefa91d838b47821fd615",
+      "backend/server.py": "e4f5d53220be6edaa88b33aab7fd6f1bc454264dddec4c14da25e42ec3afeef3",
+      "backend/video_model_input.py": "98e8ac9cf0af60261506c2f40c325fdc90fe1997d870d83ff145992ec8a1debd"
+    },
+    "extra_model_requests_added": 0,
+    "audio_volume_is_not_event_evidence": true,
+    "model_uncertainty_preserved": true,
+    "fresh_llm_compliance_or_recognition_verified": false,
+    "original_source_or_sampling_changed": false
   }
 }
