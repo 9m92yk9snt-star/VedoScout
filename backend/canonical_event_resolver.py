@@ -147,8 +147,10 @@ def _player_by_id(frame, track_id):
 
 
 def _source_video_observation(video) -> bool:
-    return bool(isinstance(video, dict) and video.get("authority") == "TEMPORAL_VIDEO_OBSERVATION"
-        and all(video.get(k) for k in ("input_sha256", "response_sha256", "source_video_sha256", "clip_sha256")))
+    return bool(isinstance(video, dict) and video.get("authority") in {
+            "TEMPORAL_VIDEO_OBSERVATION", "WHOLE_VIDEO_SEQUENCE_OBSERVATION"}
+        and all(video.get(k) for k in ("input_sha256", "response_sha256", "source_video_sha256", "clip_sha256"))
+        and (video.get("authority") != "WHOLE_VIDEO_SEQUENCE_OBSERVATION" or video.get("reference_sha256")))
 
 
 def _receiver_team_resolution(scene_frames, chain, actor_local_track_id, video=None) -> dict:
@@ -192,12 +194,20 @@ def _receiver_team_resolution(scene_frames, chain, actor_local_track_id, video=N
             return {**base, "reason": "SOURCE_VIDEO_RECEIVER_TEAM_UNRESOLVED"}
         if roles.get("receiver_finisher_same_player") is False:
             return {**base, "status": "REJECTED", "reason": "SOURCE_VIDEO_DIFFERENT_FINISHER"}
+        evidence = [{"media_ms": chain.get("target_contact_ms"), "role": "TARGET_PASSER"},
+                    {"media_ms": receiver_ms, "role": "TEAMMATE_RECEIVER"},
+                    {"media_ms": chain.get("teammate_shot_ms"), "role": "TEAMMATE_FINISHER"}]
+        if video.get("authority") == "WHOLE_VIDEO_SEQUENCE_OBSERVATION":
+            # The first graph already measured these role bodies. Reuse their
+            # geometry when the dense graph later assigns different IDs.
+            for row, tid in zip(evidence[1:], (receiver, finisher)):
+                body = _player_by_id(_near_frame(scene_frames, row["media_ms"]), tid)
+                if body and _valid_box(body.get("box")):
+                    row.update(box=deepcopy(body["box"]), local_track_id=tid)
         return {**base, "status": "VERIFIED", "reason": "SOURCE_VIDEO_TEAMMATE_TRANSFER",
-            "source": "TEMPORAL_VIDEO_OBSERVATION", "physical_certificate_required": False,
+            "source": video["authority"], "physical_certificate_required": False,
             "finisher_local_track_id": chain.get("finisher_local_track_id"),
-            "evidence": [{"media_ms": chain.get("target_contact_ms"), "role": "TARGET_PASSER"},
-                         {"media_ms": receiver_ms, "role": "TEAMMATE_RECEIVER"},
-                         {"media_ms": chain.get("teammate_shot_ms"), "role": "TEAMMATE_FINISHER"}]}
+            "evidence": evidence}
 
     def possession_support(track_id, media_ms):
         if not isinstance(track_id, str) or not _num(media_ms):
@@ -435,6 +445,44 @@ def _resolve_actor(action, scene_frames, unified_authority) -> dict:
         and isinstance(s.get("mapped_local_track_id"), str)
     }
     video = action.get("video_observation") or {}
+    reference = video.get("selected_reference_match") or {}
+    reference_samples = [s for s in samples if s.get("geometry_proof_eligible") is True
+                         and not s.get("mapping_ambiguous")
+                         and s["media_ms"] in (reference.get("evidence_ms") or [])]
+    if (_source_video_observation(video) and reference_samples
+            and reference.get("confidence") == "high"):
+        if any(f.get("cut") or f.get("cut_barrier")
+               or (f.get("global_target") or {}).get("reason") in {
+                   "SOURCE_CONFLICT", "USER_EXCLUDED_OPPONENT", "USER_PARTIAL_VISIBLE_BODY"}
+               for f in scene_frames if min(s["media_ms"] for s in reference_samples) <= int(f["media_ms"]) <= pivot):
+            return {"status": "UNRESOLVED", "reason": "SOURCE_VIDEO_ACTOR_CONTINUITY_INTERRUPTED",
+                "actor_local_track_id": None, "samples": samples,
+                "candidate_local_track_ids": candidates, "proof_eligible": False}
+        for sample in reference_samples:
+            target, why = uia.resolve_target_at(unified_authority or {}, sample["media_ms"],
+                proof_required=True, max_interp_ms=CONTACT_NEAR_MS)
+            if (target and why == "OK_EXACT" and target.get("proof_eligible") is True
+                    and _valid_box(target.get("box")) and not _boxes_match(target["box"], sample["box"])):
+                contradictions.append((sample["media_ms"], None, GLOBAL_TARGET_ID))
+        if reference.get("same_player") is False:
+            return {"status": "REJECTED", "reason": "SOURCE_VIDEO_OTHER_PLAYER",
+                "actor_local_track_id": None, "samples": samples,
+                "candidate_local_track_ids": candidates, "proof_eligible": False}
+        if (reference.get("same_player") is True and reference.get("continuous_visible_actor") is True
+                and not contradictions):
+            # One comparison to the original selected-player pixels identifies
+            # the visible actor. Native/OCR IDs are useful measurements, not a
+            # second approval of that same person's identity.
+            visible = [s for s in samples if s.get("geometry_proof_eligible") is True
+                       and not s.get("mapping_ambiguous")]
+            mapped = [s for s in visible if s.get("mapped_local_track_id")]
+            chosen = min(mapped, key=lambda s: (abs(s["media_ms"]-pivot), s["media_ms"])) if mapped else None
+            return {"status": "VERIFIED", "reason": "SOURCE_VIDEO_SELECTED_PLAYER",
+                "actor_local_track_id": chosen["mapped_local_track_id"] if chosen else GLOBAL_TARGET_ID,
+                "samples": samples, "candidate_local_track_ids": sorted(visible_mapped_ids),
+                "proof_eligible": True, "actor_track_observations": [
+                    {"media_ms": ms, "local_track_id": track} for ms, track in sorted({
+                        (s["media_ms"], s["mapped_local_track_id"]) for s in mapped})]}
     motion_actor = (_source_video_observation(video)
         and (action.get("causal_chain") or {}).get("continuous_visible_sequence") is True)
     if motion_actor and exact_support and not contradictions:
@@ -580,6 +628,14 @@ def _resolve_actor(action, scene_frames, unified_authority) -> dict:
 
 def _causal_resolution(action, scene_frames) -> dict:
     """Classify outcome only from the visible same-sequence causal chain."""
+    if (action.get("video_observation") or {}).get("authority") == "WHOLE_VIDEO_SEQUENCE_OBSERVATION":
+        terminal = (action.get("causal_chain") or {}).get("goal_outcome_ms")
+        terminal = terminal if _num(terminal) else action.get("end_ms", 0)
+        if any((f.get("cut") or f.get("cut_barrier"))
+               and action["start_ms"] <= int(f["media_ms"]) <= terminal for f in scene_frames):
+            action = deepcopy(action)
+            action["outcome_visible"] = False
+            action["causal_chain"]["continuous_visible_sequence"] = False
     kind = str(action.get("kind") or "OTHER")
     outcome = str(action.get("outcome") or "UNKNOWN")
     chain = action.get("causal_chain") if isinstance(action.get("causal_chain"), dict) else {}
@@ -698,6 +754,8 @@ def _proof_payload(action, actor_resolution, causal) -> dict:
     for k in ("target_contact_ms", "receiver_ms", "teammate_shot_ms", "goal_outcome_ms"):
         if _num(chain.get(k)):
             evidence.append(int(chain[k]))
+    evidence.extend(ms for ms in (action.get("video_observation") or {}).get("outcome_evidence_ms") or []
+                    if type(ms) is int)
     evidence = sorted(set(evidence))
     visible_actor = [
         {"media_ms": int(s["media_ms"]), "box": deepcopy(s["box"]),

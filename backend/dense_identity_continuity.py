@@ -75,6 +75,40 @@ def apply_reference_matches(frames, observation):
     Static crop reads retain their independent multi-frame requirements.
     """
     rows = deepcopy(frames or [])
+    direct_source_events = False
+    if (observation or {}).get("source_events"):
+        # Reuse the canonical first read's actor geometry at an actual native
+        # source frame. Never equate the first reader's and dense reader's IDs.
+        import canonical_event_resolver as resolver
+        import sequence_observation_context as context
+        source = observation.get("source_video_sha256")
+        events = [e for e in observation["source_events"] if resolver.has_motion_proof(e)
+                  and (e["proof"].get("video_observation") or {}).get("source_video_sha256") == source]
+        matches, receipts, references, event_ids = [], set(), set(), []
+        for event in events:
+            available = [f for f in rows if context.actual(f, event.get("scene_id"))]
+            for evidence in event["proof"].get("actor_keyframes") or []:
+                if evidence.get("visibility") not in {"VISIBLE", "PARTIAL"} or not available:
+                    continue
+                f = min(available, key=lambda f: abs(f["media_ms"]-evidence["media_ms"]))
+                if abs(f["media_ms"]-evidence["media_ms"]) > 20:
+                    continue
+                track, ambiguous = resolver._map_box_to_local(f, evidence.get("box"))
+                if track and not ambiguous:
+                    matches.append({"media_ms": f["media_ms"], "local_track_id": track, "confidence": "high"})
+            video = event["proof"]["video_observation"]
+            receipts.add(video["input_sha256"])
+            references.update(video.get("reference_sha256") or [])
+            event_ids.append(event["event_id"])
+        if not matches:
+            return rows
+        import hashlib
+        import json
+        observation = {"selected_reference": {"source": "USER_SELECTED_SOURCE_PIXELS",
+            "source_video_sha256": source, "reference_sha256": sorted(references),
+            "input_sha256": hashlib.sha256(json.dumps(sorted(receipts)).encode()).hexdigest(),
+            "canonical_event_ids": sorted(set(event_ids))}, "target_observations": matches}
+        direct_source_events = True
     reference = (observation or {}).get("selected_reference") or {}
     if (reference.get("source") != "USER_SELECTED_SOURCE_PIXELS"
             or not reference.get("source_video_sha256") or not reference.get("input_sha256")):
@@ -84,7 +118,7 @@ def apply_reference_matches(frames, observation):
     source_times = [f["media_ms"] for f in rows if sequence_observation_context.actual(f, scene)]
     if not source_times:
         return rows
-    direct_motion = (observation.get("source_video_sha256") == reference["source_video_sha256"]
+    direct_motion = direct_source_events or (observation.get("source_video_sha256") == reference["source_video_sha256"]
         and bool(sequence_observation_context.video_observations(observation, rows,
             {"scene_id": scene, "start_ms": min(source_times), "end_ms": max(source_times)}).get("sequences")))
     by_ms = {f["media_ms"]: f for f in rows}

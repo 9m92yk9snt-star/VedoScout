@@ -38,6 +38,7 @@ import action_evidence_review
 import sequence_observation_context
 import attack_sequence_search
 import dense_event_reconciliation
+import canonical_event_resolver
 
 VERSION = 1
 SOURCE_ROLE = "CANONICAL_WEB_VIDEO"
@@ -413,7 +414,7 @@ def _apply_cross_window_review_context(jobs, traces, *, shared_packets=None):
                                  for c in graph["contexts"] if c.get("source_trace_ids")]}
 
 
-def _motion_event_for_strike(strike, events):
+def _motion_event_for_strike(strike, events, dense_frames=None):
     """Reuse a resolved source-video outcome for the same measured actor/contact."""
     for event in events:
         if (event.get("scene_id") != strike.get("scene_id")
@@ -424,6 +425,13 @@ def _motion_event_for_strike(strike, events):
         bindings = [(event.get("actor_local_track_id"), event.get("contact_ms"))]
         if event.get("canonical_event_type") == "ASSIST":
             bindings.append((chain.get("finisher_local_track_id"), chain.get("teammate_shot_ms")))
+            for role in ((event.get("proof") or {}).get("receiver_team_evidence") or {}).get("evidence") or []:
+                if role.get("role") != "TEAMMATE_FINISHER" or not role.get("box"):
+                    continue
+                frame = canonical_event_resolver._near_frame(dense_frames, role.get("media_ms"), max_ms=20)
+                track, ambiguous = canonical_event_resolver._map_box_to_local(frame, role["box"])
+                if track and not ambiguous:
+                    bindings.append((track, role["media_ms"]))
         for track, ms in bindings:
             same_selected_person = (track == event.get("actor_local_track_id")
                                     and isinstance(track, str)
@@ -509,7 +517,8 @@ def run_feedback_round(traces, video_path, sequence_plan, sequence_analysis, sce
         video_path, sequence_plan, sequence_analysis, scene_graph, identity_authority,
         jersey_vote_provider=jersey_vote_provider, goal_geometry_provider=goal_geometry_provider,
         role_evidence_provider=role_evidence_provider, action_evidence_provider=action_evidence_provider,
-        role_evidence=role_evidence, source_video=source_video, _feedback_context=context)
+        role_evidence=role_evidence, source_video=source_video,
+        observed_events=[e for t in traces for e in t.get("reused_source_events") or []], _feedback_context=context)
     replacements = {}
     for new in rerun["traces"]:
         old = by_id[new["trace_id"]]
@@ -571,6 +580,7 @@ def reconstruct_physical_match(
     camera_estimator=None,
     dense_frame_provider=None,
     trace_callback=None,
+    observed_events=None,
     _feedback_context=None,
 ) -> dict:
     """Build bounded physical evidence without changing canonical truth."""
@@ -579,6 +589,10 @@ def reconstruct_physical_match(
     analysis = deepcopy(sequence_analysis) if isinstance(sequence_analysis, dict) else {}
     graph = deepcopy(scene_graph) if isinstance(scene_graph, dict) else {}
     authority = deepcopy(identity_authority) if isinstance(identity_authority, dict) else {}
+    source = _source_meta(source_video, video_path)
+    source_events = [deepcopy(e) for e in observed_events or []
+                     if canonical_event_resolver.has_motion_proof(e) and source.get("sha256")
+                     and (e.get("proof") or {}).get("video_observation", {}).get("source_video_sha256") == source["sha256"]]
     semantic_windows = dense_replay.select_critical_windows(plan, analysis)
     recall_plan = full_video_event_recall.build_physical_recall_windows(plan, graph)
     recall_windows = recall_plan.get("windows") or []
@@ -586,11 +600,11 @@ def reconstruct_physical_match(
         semantic_windows,
         recall_windows,
     )
-    inspection_plan = action_evidence_review.build_plan(windows, analysis)
+    inspection_plan = action_evidence_review.build_plan(windows, analysis,
+        observed_events=source_events, source_video_sha256=source.get("sha256"))
     if _feedback_context is not None:
         windows = [deepcopy(t["window"]) for t in _feedback_context["traces"].values()]
         inspection_plan = {"jobs": deepcopy(_feedback_context["jobs"])}
-    source = _source_meta(source_video, video_path)
     authority["_reid_source_video_sha256"] = source.get("sha256")
     traces = []
     summaries = []
@@ -604,6 +618,9 @@ def reconstruct_physical_match(
         clock = StageClock()
         stage = clock.enter("window_setup")
         try:
+            window_source_events = [e for e in source_events if e.get("scene_id") == window.get("scene_id")
+                and e["start_ms"] <= window["end_ms"]
+                and max(e["end_ms"], (e.get("proof") or {}).get("outcome_ms") or 0) >= window["start_ms"]]
             provider_diagnostics = []
             stage_timings = {}
             native_started = time.monotonic()
@@ -627,6 +644,15 @@ def reconstruct_physical_match(
                 native_session=native_session,
             )
             dense_frames = list(refined.get("frames") or []) if isinstance(refined, dict) else []
+            if window_source_events:
+                identified = dense_identity_continuity.apply_reference_matches(dense_frames,
+                    {"source_events": window_source_events, "source_video_sha256": source.get("sha256")})
+                new_identity = any((new.get("global_target") or {}).get("proof_eligible") is True
+                    and (old.get("global_target") or {}).get("proof_eligible") is not True
+                    for old, new in zip(dense_frames, identified))
+                dense_frames = identified
+                if new_identity:
+                    dense_track_refinement._apply_dense_team_labels(dense_frames)
             dense_frames = dense_identity_continuity.apply(dense_frames)["frames"]
             stage_timings["native_decode_detection_tracking_seconds"] = round(time.monotonic()-native_started, 3)
 
@@ -638,6 +664,9 @@ def reconstruct_physical_match(
             inspection_rows, inspection_requests = [], []
             for job in inspection_plan["jobs"]:
                 if job["dense_window_id"] != window["dense_window_id"]:
+                    continue
+                if job.get("reused_event_ids"):
+                    inspection_rows.append({**job, "status": "REUSED"})
                     continue
                 if not job["selected"]:
                     inspection_rows.append({**job, "status": "DEFERRED", "reason": "ACTION_INSPECTION_BUDGET_EXHAUSTED"})
@@ -787,8 +816,14 @@ def reconstruct_physical_match(
                 "touch_graph": touch_with_jersey,
                 "action_inspections": deepcopy((previous or {}).get("action_inspections") or [])+inspection_rows}
             motion_resolution = dense_event_reconciliation.resolve_motion_observations(motion_input)
-            motion_events = motion_resolution.get("events") or []
-            motion_review = {"complete": bool(source.get("sha256")) and any(
+            motion_events = [*(motion_resolution.get("events") or []), *window_source_events]
+            # A genuine contradictory source observation must reopen that
+            # action rather than borrowing either result for native work.
+            motion_events = [e for e in motion_events if not any(
+                canonical_event_resolver._same_real_action(e, other)
+                and canonical_event_resolver.motion_outcomes_conflict(e, other)
+                for other in motion_events)]
+            motion_review = {"complete": any(o.get("reused_event_ids") for o in inspection_rows) or bool(source.get("sha256")) and any(
                 o.get("source_video_sha256") == source.get("sha256")
                 and sequence_observation_context.motion_window_complete(o, dense_with_jersey, window)
                 for o in inspection_rows),
@@ -827,7 +862,8 @@ def reconstruct_physical_match(
             # same path through intervention, outcome, direction, and proof
             # gates. Falling back to the window-global path after a valid seed
             # would silently reattach this strike to a competing ball.
-            native_strikes = [s for s in strikes if _motion_event_for_strike(s, motion_events) is None]
+            source_for_strike = {s["strike_id"]: _motion_event_for_strike(s, motion_events, dense_with_jersey) for s in strikes}
+            native_strikes = [s for s in strikes if source_for_strike[s["strike_id"]] is None]
             stage = clock.enter("contact_bound_ball_paths")
             analysis_jobs.check_cancelled()
             native_paths = _strike_ball_paths(native_strikes, touch_with_jersey, dense_with_jersey, trajectory) if native_strikes else []
@@ -874,12 +910,27 @@ def reconstruct_physical_match(
                     strike, strikes, touch_with_jersey
                 )
                 review = _goal_clarification_eligibility(strike, strikes, touch_with_jersey, window)
-                resolved_video_event = _motion_event_for_strike(strike, motion_events)
+                resolved_video_event = source_for_strike[strike["strike_id"]]
                 if resolved_video_event is not None:
                     goal_geometry = {"status": "UNRESOLVED", "reason": "OUTCOME_ALREADY_RESOLVED_FROM_SOURCE_CLIP",
                                      "canonical_event_id": resolved_video_event["event_id"]}
                     goal_reviews_skipped += 1
                     motion_outcomes_reused += 1
+                    # Retain a link to the canonical source observation, not
+                    # an invented physical crossing/save certificate. The
+                    # already completed result needs none of the native
+                    # outcome/intervention/direction/ball-proof rechecks.
+                    outcomes.append({"version": VERSION, "status": "reused",
+                        "strike_id": strike.get("strike_id"), "touch_id": strike.get("touch_id"),
+                        "media_ms": strike["media_ms"], "scene_id": strike.get("scene_id"),
+                        "strike_actor_track_id": strike.get("player_track_id"),
+                        "physical_outcome": "NOT_RECONSTRUCTED_SOURCE_VIDEO",
+                        "goal_plane_crossing": {"status": "NOT_ASSESSED", "reason": goal_geometry["reason"]},
+                        "goal_geometry_evidence": goal_geometry,
+                        "goal_review_decision": review, "goal_review_eligibility": deepcopy(eligibility),
+                        "ball_trajectory_source": shot_track["source"], "ball_trajectory_points": [],
+                        "canonical_event_type": None})
+                    continue
                 elif review.get("eligible") is True:
                     stage = clock.enter("goal_review_scheduling")
                     request_strike = deepcopy(strike)
@@ -957,6 +1008,7 @@ def reconstruct_physical_match(
                                                   [o.get("goal_geometry_evidence") for o in outcomes]])
             trace["provider_diagnostics"] = provider_diagnostics
             trace["action_inspections"] = inspection_rows
+            trace["reused_source_events"] = window_source_events
             trace["motion_observation_summary"] = {"counts": motion_resolution.get("counts") or {},
                 "outcomes_reused": motion_outcomes_reused, "canonical_authority": False,
                 "unresolved": [{k: row.get(k) for k in ("action_id", "kind", "contact_ms", "reason")}

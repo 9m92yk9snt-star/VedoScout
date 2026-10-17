@@ -121,6 +121,8 @@ def build_plan(traces, budget=None, analysis=None):
                     centers.append((0 if release else 3, ms, "TARGET_RELEASE_OR_BALL_GAP"))
         if before["identity_frames"] or not (trace.get("contacts") or {}).get("accepted"):
             for job in trace.get("action_inspections") or []:
+                if job.get("reason") == "SOURCE_SEQUENCE_ALREADY_RESOLVED":
+                    continue
                 summary = trace.get("motion_observation_summary") or {}
                 if (job.get("observation_protocol") == "SOURCE_INDEXED_MOTION_CLIP_V1"
                         and job.get("clip_review_complete") is True and summary.get("counts")

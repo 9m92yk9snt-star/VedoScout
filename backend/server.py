@@ -3447,6 +3447,8 @@ async def call_gemini_with_video(
     crop_path: Optional[str] = None,
     anchor_crops: Optional[list[str]] = None,
     timeout_s: float = 150.0,
+    observation_audit: Optional[dict] = None,
+    source_video_sha256: Optional[str] = None,
 ) -> dict:
     """Send a video file (+ optional marker image, subject crop, and multi-anchor crops)
     + prompt to Gemini and return parsed JSON.
@@ -3456,6 +3458,17 @@ async def call_gemini_with_video(
     being given the wide marker frame and full video.
     """
     import video_model_input
+    if observation_audit is not None:
+        observation_audit.clear()
+
+    def parse_observation(text, adapter, sent_prompt):
+        parsed = extract_json(text)
+        if observation_audit is not None:
+            import football_sequence_intelligence
+            observation_audit.update(football_sequence_intelligence.source_observation_receipt(
+                parsed, text, sent_prompt, adapter.video_input_audit, source_video_sha256))
+        return parsed
+
     system_message = (
             "You are an experienced football scout. ALWAYS respond with valid JSON only. "
             "State visible actions precisely. Preserve uncertainty when identity, ball "
@@ -3527,7 +3540,7 @@ async def call_gemini_with_video(
     # blocks, smart quotes, trailing commas, nested braces, and preamble prose.
     first_err: Optional[Exception] = None
     try:
-        return extract_json(response_text)
+        return parse_observation(response_text, chat, prompt)
     except ValueError as e:
         first_err = e
         logger.warning(
@@ -3633,7 +3646,7 @@ async def call_gemini_with_video(
         except Exception:
             pass
     try:
-        parsed = extract_json(retry_text)
+        parsed = parse_observation(retry_text, retry_chat, strict_prompt)
         logger.info(f"Gemini response parsed on RETRY (session={session_id})")
         return parsed
     except ValueError as retry_err:
@@ -9241,6 +9254,7 @@ async def generate_full_report_task(report_id: str) -> None:
                 # review ONLY omitted/malformed original windows; it cannot add
                 # windows, move times across cuts, or promote partial coverage.
                 _sequence_attempts = []
+                _sequence_source_observations = []
                 _sequence_request = {
                     "sequence_plan": _unified_prepared.get("sequence_plan") or {},
                     "analysis_prompt": str(_unified_prepared.get("analysis_prompt") or ""),
@@ -9267,6 +9281,7 @@ async def generate_full_report_task(report_id: str) -> None:
                             sequence_prompt += _gtb
                     except Exception:
                         pass
+                    _sequence_observation_audit = {}
                     sequence_raw, _sequence_provider_error = await analysis_jobs.optional_observation(call_gemini_with_video(
                         session_id=(
                             f"sequence-{report_id}" if _attempt_no == 0
@@ -9278,13 +9293,18 @@ async def generate_full_report_task(report_id: str) -> None:
                         crop_path=crop_path_str,
                         anchor_crops=anchor_crops_full if anchor_crops_full else None,
                         timeout_s=420.0,
+                        observation_audit=_sequence_observation_audit,
+                        source_video_sha256=run_manifest.get("source_video_sha256"),
                     ))
                     _sequence_attempts.append(sequence_raw)
+                    if _sequence_observation_audit:
+                        _sequence_source_observations.append(_sequence_observation_audit)
                     await _trace(report_id, "sequence_model_error" if _sequence_provider_error else "sequence_model_complete")
                     _sequence_merged = unified_analysis_engine.merge_model_attempts(
                         _sequence_attempts)
                     _unified_candidate = unified_analysis_engine.finalise_analysis(
-                        _sequence_merged, _unified_prepared)
+                        _sequence_merged, _unified_prepared,
+                        source_observations=_sequence_source_observations)
                     if _sequence_provider_error:
                         # No repeated semantic spend after a provider failure.
                         # Safe prepared windows still enter the physical lane.
