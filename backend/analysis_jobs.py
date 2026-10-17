@@ -19,7 +19,35 @@ from pathlib import Path
 
 IN_FLIGHT = ("generating", "verifying", "finalizing", "awaiting_confirmation")
 CURRENT_RUN = ContextVar("full_analysis_run", default=None)
+CURRENT_STOP = ContextVar("physical_analysis_stop", default=None)
 logger = logging.getLogger("elite-scout")
+
+
+def check_cancelled():
+    """Threads inherit this signal through to_thread; cancelling a Future alone
+    cannot stop their CPU work or prevent subsequent paid provider calls.
+    CancelledError deliberately bypasses evidence-reader Exception fallbacks.
+    """
+    signal = CURRENT_STOP.get()
+    if signal is not None and signal.is_set():
+        raise asyncio.CancelledError("Physical analysis owner stopped")
+
+
+def cancellable_frames(frames):
+    iterator = iter(frames)
+    try:
+        while True:
+            check_cancelled()
+            try:
+                frame = next(iterator)
+            except StopIteration:
+                return
+            check_cancelled()
+            yield frame
+    finally:
+        close = getattr(iterator, "close", None)
+        if close is not None:
+            close()
 
 
 def audit_fields(fields):

@@ -162,6 +162,17 @@ def motion_review_requests(parsed, times, manifest):
             continue
         contact = at(action.get("contact_idx"))
         if contact is None:
+            # An observed outcome without a contact is a search lead, not an
+            # event to silently drop or an excuse to invent a release time.
+            outcome = at(action.get("outcome_idx"))
+            pivot = next((value for value in (outcome, at(action.get("shot_idx")),
+                                              at(action.get("start_idx"))) if value is not None), None)
+            if pivot is not None and action.get("kind") in {"SHOT", "PASS", "CROSS"}:
+                requests.append({"question": "CONTACT", "media_ms": pivot,
+                    "anchor_media_ms": pivot, "focus_track_id": None,
+                    "search_protocol": "SOURCE_INDEXED_MOTION_CLIP_V1",
+                    "source": "MODEL_SEQUENCE_SEARCH", "direction": "BEFORE",
+                    "canonical_authority": False})
             continue
         receiver, shot, outcome = (at(action.get(k)) for k in ("receiver_idx", "shot_idx", "outcome_idx"))
         if action.get("receiver_body_id") not in by_ms.get(receiver, {}):

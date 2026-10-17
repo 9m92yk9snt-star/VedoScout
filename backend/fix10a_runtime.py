@@ -18,6 +18,8 @@ from copy import deepcopy
 from pathlib import Path
 
 import event_trace
+import analysis_jobs
+import source_frame_cache
 import fix10a_goal_direction
 import fix10a_vision_providers
 import fix10b_runtime
@@ -75,6 +77,8 @@ def _compact_physical_result(result: dict | None) -> dict:
         "goal_review_plan": row.get("goal_review_plan") or {},
         "cross_window_evidence": row.get("cross_window_evidence") or {},
         "native_detection_cache": row.get("native_detection_cache") or {},
+        "source_frame_cache": row.get("source_frame_cache") or {},
+        "phase_seconds": row.get("phase_seconds") or {},
         "metrics": row.get("metrics") or {},
         "audit_storage_complete": row.get("audit_storage_complete"),
         "dense_traces_persisted_in_mongo": False,
@@ -180,6 +184,8 @@ async def run(*, report_id: str, video_path: str, unified_result: dict,
     })
     logger.info("[fix10a] %s: production START", report_id)
 
+    frame_cache = source_frame_cache.SourceFrameCache()
+    frame_cache_token = source_frame_cache.CURRENT.set(frame_cache)
     try:
         support_mode = {
             "enabled": False,
@@ -283,6 +289,8 @@ async def run(*, report_id: str, video_path: str, unified_result: dict,
             # executor: otherwise concurrent runs could exhaust its threads.
             pending.append(asyncio.run_coroutine_threadsafe(publish_trace(deepcopy(trace)), loop))
 
+        stop = threading.Event()
+        stop_token = analysis_jobs.CURRENT_STOP.set(stop)
         try:
             physical = await asyncio.to_thread(
                 physical_match_reconstruction.reconstruct_physical_match,
@@ -300,11 +308,14 @@ async def run(*, report_id: str, video_path: str, unified_result: dict,
                 if isinstance(trace, dict) and trace.get("trace_id") not in emitted:
                     await publish_trace(trace)
         finally:
+            stop.set()
+            analysis_jobs.CURRENT_STOP.reset(stop_token)
             accepting.clear()
             for future in pending:
                 if not future.done():
                     future.cancel()
 
+        physical["source_frame_cache"] = frame_cache.metrics()
         unpersisted = [m for m in manifests if m.get("storage") == "unpersisted"]
         storage_errors.extend({"trace_id": m.get("trace_id"), "error_type": "StorageUnavailable"}
                               for m in unpersisted)
@@ -385,3 +396,5 @@ async def run(*, report_id: str, video_path: str, unified_result: dict,
         }
         await _persist_fix10a_fields(db, report_id, update)
         return {**update, "status": "error", "mode": "production"}
+    finally:
+        source_frame_cache.CURRENT.reset(frame_cache_token)

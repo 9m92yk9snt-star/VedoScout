@@ -147,14 +147,18 @@ def build_plan(traces, budget=None, analysis=None):
                 continue
             specific = next((r for r in motion_requests
                 if reason == "MODEL_SEQUENCE_"+r["question"] and abs(center-r["media_ms"]-
-                    (250 if r.get("direction") == "AFTER" else 0)) <= 80), None)
+                    (250 if r.get("direction") == "AFTER" else -150 if r.get("direction") == "BEFORE" else 0)) <= 80), None)
             # A receiver/outcome search keeps the original passer and later
             # finish in context. The previous fixed +700 ms crop often ended
             # before the teammate's shot. Reuse the already decoded scene.
-            chain_search = specific and specific["question"] in {"RECEIVER", "SHOT", "OUTCOME"}
+            chain_search = specific and specific["question"] in {"CONTACT", "RECEIVER", "SHOT", "OUTCOME"}
             anchor = specific.get("anchor_media_ms", center) if specific else center
-            desired_start = min(anchor-400, center-350) if chain_search else center-350
-            desired_end = min(frames[-1]["media_ms"], desired_start+8000) if chain_search else center+700
+            if specific and specific["question"] == "CONTACT":
+                desired_end = min(frames[-1]["media_ms"], anchor+350)
+                desired_start = max(frames[0]["media_ms"], desired_end-8000)
+            else:
+                desired_start = min(anchor-400, center-350) if chain_search else center-350
+                desired_end = min(frames[-1]["media_ms"], desired_start+8000) if chain_search else center+700
             left = right = index
             while left and frames[left - 1]["media_ms"] >= desired_start and valid(frames[left - 1]) \
                     and frames[left]["media_ms"] - frames[left - 1]["media_ms"] <= 80:
@@ -167,7 +171,8 @@ def build_plan(traces, budget=None, analysis=None):
                 continue
             job = {"dense_window_id": trace["trace_id"], "scene_id": window["scene_id"],
                    "start_ms": int(start), "end_ms": int(end), "center_ms": int(center),
-                   "has_contact_time": True, "source_action_ids": [], "phase": "FEEDBACK",
+                   "has_contact_time": not (specific and specific["question"] == "CONTACT"),
+                   "source_action_ids": [], "phase": "FEEDBACK",
                    "reason": reason, "priority": priority, "before": before}
             if specific:
                 job.update(missing_link_question=specific["question"], anchor_media_ms=anchor,

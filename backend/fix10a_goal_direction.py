@@ -203,7 +203,47 @@ class GoalDirectionProvider:
                                   if max_reviews is None else self.max_reviews)
         self._cache = {}
 
+    def _cached_review(self, key, start, end):
+        for saved_start, saved_end, saved in self._cache.get(key, []):
+            if saved_start <= start and saved_end >= end:
+                result = deepcopy(saved)
+                if isinstance(result, dict):
+                    result["review_delivery"] = {"status": "REUSED", "start_ms": saved_start, "end_ms": saved_end}
+                return True, result
+        return False, None
+
+    def review_many(self, jobs):
+        import ordered_vision_reviews
+        owner = getattr(self.base_provider, "__self__", None)
+        if not callable(getattr(owner, "goal_review_steps", None)):
+            for window, strike in jobs:
+                yield self(window, strike)
+            return
+        yield from ordered_vision_reviews.ordered(self, owner, jobs)
+
     def __call__(self, window: dict, strike: dict):
+        import ordered_vision_reviews as ordered
+        steps = self._review_steps(window, strike)
+        try:
+            done, request = ordered.advance(steps, first=True)
+            if done:
+                return request
+            kind, payload = request
+            if kind != "BASE":
+                raise RuntimeError("Unexpected concurrent call outside ordered review")
+            try:
+                base = self.base_provider(*payload)
+            except Exception as exc:
+                done, result = ordered.advance(steps, error=exc)
+            else:
+                done, result = ordered.advance(steps, base)
+            if not done:
+                raise RuntimeError("Unexpected second goal provider request")
+            return result
+        finally:
+            steps.close()
+
+    def _review_steps(self, window: dict, strike: dict):
         if self.base_provider is None:
             return None
         strike_ms = int(strike.get("media_ms")) if isinstance(strike, dict) and _num(strike.get("media_ms")) else None
@@ -240,6 +280,13 @@ class GoalDirectionProvider:
                                                  "end_ms": saved_end}
                 return result
 
+        pending = getattr(self, "_pending_reviews", None)
+        if pending is not None:
+            for saved_start, saved_end in pending.get(cache_key, []):
+                if saved_start <= start_ms and saved_end >= end_ms:
+                    result = yield ("REUSE", (cache_key, start_ms, end_ms))
+                    return result
+
         def remember(value):
             if isinstance(value, dict):
                 value["review_delivery"] = {"status": "EXECUTED", "start_ms": start_ms, "end_ms": end_ms}
@@ -268,8 +315,10 @@ class GoalDirectionProvider:
             self.clarification_calls += 1
         else:
             self.calls += 1
+        if pending is not None:
+            pending.setdefault(cache_key, []).append((start_ms, end_ms))
         try:
-            base = self.base_provider(window, strike)
+            base = yield ("BASE", (window, strike))
         except Exception:
             base = {"status": "UNRESOLVED", "source": "INDEPENDENT_MULTI_FRAME_GOAL_REVIEW",
                     "reason": "goal_geometry_reader_error", "line_by_ms": []}

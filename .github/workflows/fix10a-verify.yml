@@ -97,6 +97,9 @@ jobs:
             backend/action_evidence_review.py \
             backend/report_fact_authority.py \
             backend/video_model_input.py \
+            backend/scripts/detector_runtime_probe.py \
+            backend/source_frame_cache.py \
+            backend/ordered_vision_reviews.py \
             backend/dense_event_reconciliation.py \
             backend/sequence_observation_context.py \
             backend/cross_window_evidence.py \
@@ -122,7 +125,7 @@ jobs:
         working-directory: backend
         env:
           PYTHONPATH: /tmp/ci_stubs:.
-        run: pytest --asyncio-mode=auto -q tests/test_fix09b2_sequence_intelligence.py tests/test_fix10a*.py tests/test_fix10b*.py tests/test_fix13*.py tests/test_fix14_orman10_recovery.py tests/test_fix15_native_goal_reappearance.py tests/test_fix15_native_goal_review.py tests/test_fix15_temporal_goal_context.py tests/test_fix15_contact_role_seed_handoff.py tests/test_fix15_independent_ball_review.py tests/test_fix15_dense_reader_coverage.py tests/test_fix15_direct_goal_transport.py tests/test_fix15_r6_multiball_search.py tests/test_fix31_temporal_video.py tests/test_fix32_edited_portrait_video.py
+        run: pytest --asyncio-mode=auto -q tests/test_fix09b2_sequence_intelligence.py tests/test_fix10a*.py tests/test_fix10b*.py tests/test_fix13*.py tests/test_fix14_orman10_recovery.py tests/test_fix15_native_goal_reappearance.py tests/test_fix15_native_goal_review.py tests/test_fix15_temporal_goal_context.py tests/test_fix15_contact_role_seed_handoff.py tests/test_fix15_independent_ball_review.py tests/test_fix15_dense_reader_coverage.py tests/test_fix15_direct_goal_transport.py tests/test_fix15_r6_multiball_search.py tests/test_fix31_temporal_video.py tests/test_fix32_edited_portrait_video.py tests/test_fix33_analysis_performance.py
 
   backend_regression:
     runs-on: ubuntu-latest

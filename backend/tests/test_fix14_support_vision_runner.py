@@ -133,14 +133,37 @@ def test_call_sites_pass_registered_readers_inside_fail_closed_try(module, expec
     parents = {child: node for node in ast.walk(tree) for child in ast.iter_child_nodes(node)}
     calls = [n for n in ast.walk(tree) if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)]
     assert not [n for n in calls if n.func.attr == "run" and getattr(n.func.value, "id", None) == "asyncio"]
-    sites = sorted((n for n in calls if n.func.attr == "run_support_vision"), key=lambda n: n.lineno)
-    assert [getattr(s.args[0], "id", None) or s.args[0].attr for s in sites] == expected
-    for site in sites:
-        assert any(k.arg == "deadline_s" for k in site.keywords)
+    # Ordered geometry yields its registered reader request inside the same
+    # exception boundary; the dispatcher executes only the owned-child runner
+    # and throws failures back into that generator before evidence is parsed.
+    sites = [(n, n.args[0]) for n in calls if n.func.attr == "run_support_vision"]
+    sites.extend((n, n.value.elts[0]) for n in ast.walk(tree)
+                 if isinstance(n, ast.Yield) and isinstance(n.value, ast.Tuple)
+                 and len(n.value.elts) == 4)
+    sites.sort(key=lambda pair: pair[0].lineno)
+    assert [getattr(reader, "id", None) or reader.attr for _site, reader in sites] == expected
+    for site, _reader in sites:
+        if isinstance(site, ast.Call):
+            assert any(k.arg == "deadline_s" for k in site.keywords)
+        else:
+            assert "DEADLINE_MARGIN_S" in ast.unparse(site.value.elts[2])
         node = site
         while not (isinstance(parents.get(node), ast.Try) and node in parents[node].body):
             node = parents[node]
         assert any(getattr(h.type, "id", None) == "Exception" for h in parents[node].handlers)
+
+
+def test_ordered_dispatch_still_uses_owned_runner_and_forwards_deadline():
+    tree = ast.parse((BACKEND / "ordered_vision_reviews.py").read_text())
+    read = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "read")
+    calls = [n for n in ast.walk(read) if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)
+             and n.func.attr == "run_support_vision"]
+    assert len(calls) == 1
+    assert any(k.arg == "deadline_s" and isinstance(k.value, ast.Name) and k.value.id == "deadline"
+               for k in calls[0].keywords)
+    assert not any(isinstance(n, (ast.Import, ast.ImportFrom)) and
+                   (getattr(n, "module", "") or "").startswith(("litellm", "emergentintegrations"))
+                   for n in ast.walk(tree))
 
 
 def test_parent_side_never_touches_sdk_globals_and_runner_is_fingerprinted():

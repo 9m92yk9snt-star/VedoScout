@@ -38,6 +38,8 @@ import goal_reappearance
 import native_goal_review
 import goal_context_observations
 import video_model_input
+import source_frame_cache
+import ordered_vision_reviews
 try:  # Supporting vision is optional and always fails closed when unavailable.
     from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
 except ImportError:  # pragma: no cover - availability is deployment-specific
@@ -166,6 +168,12 @@ _DEFAULT_FRAME_READER = video_timebase.read_frame_at
 
 
 def _read_frames(video_path: str, requested_ms) -> dict[int, tuple[int, object]]:
+    cache = source_frame_cache.CURRENT.get()
+    return (cache.read(video_path, requested_ms, _read_frames_uncached) if cache is not None
+            else _read_frames_uncached(video_path, requested_ms))
+
+
+def _read_frames_uncached(video_path: str, requested_ms) -> dict[int, tuple[int, object]]:
     """Read exact/nearest frames by canonical media time; values are actual PTS."""
     wanted = sorted({max(0, int(round(float(ms)))) for ms in requested_ms if _num(ms)})
     if not wanted:
@@ -1958,6 +1966,9 @@ class ShadowVisionProviders:
         return {track: aggregate_role_votes(votes) for track, votes in raw_votes.items()}
 
     def goal_geometry_provider(self, window: dict, strike: dict):
+        return ordered_vision_reviews.single_reader(self.goal_review_steps(window, strike))
+
+    def goal_review_steps(self, window: dict, strike: dict):
         if not self.api_key or not isinstance(strike, dict) or not _num(strike.get("media_ms")):
             return None
         if not goal_review_sampling.has_contact_reference(strike, window):
@@ -2043,9 +2054,9 @@ class ShadowVisionProviders:
                 kwargs = {"ball_reference": reference} if "ball_reference" in inspect.signature(read_goal_scene_evidence).parameters else {}
                 if "sequence_context" in inspect.signature(read_goal_scene_evidence).parameters:
                     kwargs["sequence_context"] = strike.get("_sequence_context")
-                review = support_vision_runner.run_support_vision(read_goal_scene_evidence, [(
+                review = yield (read_goal_scene_evidence, [(
                     (self.api_key, f"{self.session_prefix}-goal-{strike_ms}-{self.goal_calls}", paths, actual_times), kwargs)],
-                    deadline_s=90 + support_vision_runner.DEADLINE_MARGIN_S, label="goal_scene")[0]
+                    90 + support_vision_runner.DEADLINE_MARGIN_S, "goal_scene")
             except Exception as exc:
                 review = support_vision_runner.fail_closed_diagnostic(exc)
             if isinstance(review,dict):
