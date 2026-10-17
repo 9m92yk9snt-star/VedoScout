@@ -5,22 +5,23 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Check, X, EyeOff, RotateCcw, ZoomIn, ZoomOut, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
+import { Check, X, RotateCcw, ZoomIn, ZoomOut, ChevronRight, Loader2, ScanLine, SlidersHorizontal, HelpCircle, ArrowRight, CheckCircle2 } from "lucide-react";
 import MarkedCropCanvas from "../MarkedCropCanvas";
 import { detectSceneCuts, selectTapHints } from "./sceneDetect";
 import videoFrameAuthority from "./videoFrameAuthority.cjs";
 import policy from "./scoutTapPolicy.cjs";
 import selection from "./selectionHints.cjs";
+import "./ScoutMode.css";
 
-const { TARGET_TAPS, MIN_TAPS, screenToVideo, tapBox, markingProgress, nearbyTime, buildPayload } = policy;
+const { TARGET_TAPS, MIN_TAPS, screenToVideo, tapBox, markingProgress, nearbyTime, nearbyMoments, resizeBox, buildPayload } = policy;
 const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
 const insideBox = (point, box) => !!point && !!box && point.x >= box.x && point.x <= box.x + box.w && point.y >= box.y && point.y <= box.y + box.h;
 const fmt = t => {
   const s = Math.floor(Math.max(0, t || 0));
   return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
 };
-const button = "min-h-[44px] rounded-xl border border-white/25 px-3 text-sm font-bold disabled:opacity-35 transition-colors hover:border-[#CCFF00]";
-const primary = "min-h-[48px] rounded-xl bg-[#CCFF00] text-ink px-4 font-black disabled:opacity-35 flex items-center justify-center gap-2";
+const button = "min-h-[44px] rounded-xl border border-white/15 bg-white/[.035] px-3 text-sm font-semibold disabled:opacity-35 transition-colors hover:border-[#CCFF00]/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#CCFF00]";
+const primary = "min-h-[52px] rounded-2xl bg-[#CCFF00] text-[#10150a] px-4 font-bold disabled:opacity-35 flex items-center justify-center gap-2 transition-colors hover:bg-[#dcff60] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#CCFF00]";
 
 function waitForMetadata(video, signal) {
   return new Promise((resolve, reject) => {
@@ -91,6 +92,9 @@ export default function ScoutMode({ open, videoUrl, onCancel, onConfirm, request
   const [partial, setPartial] = useState(false);
   const [tapIntent, setTapIntent] = useState("target");
   const [refine, setRefine] = useState(false);
+  const [advanced, setAdvanced] = useState(false);
+  const [dragging, setDragging] = useState(false);
+  const [nearby, setNearby] = useState(null);
   const [link, setLink] = useState(null);
   const [maskBusy, setMaskBusy] = useState(false);
   const [preview, setPreview] = useState(null);
@@ -112,7 +116,7 @@ export default function ScoutMode({ open, videoUrl, onCancel, onConfirm, request
     setError(""); setNotice(""); setFrames([]); setQueue([]); setPosition(0);
     setMarks({}); setLoadedImage(null); setDraft(null);
     setFrameBusy(false); setSubmitting(false); setHiddenHelp(false); setPartial(false); setTapIntent("target"); setLink(null); setPreview(null);
-    setZoom(1); setPan({ x: 0, y: 0 });
+    setZoom(1); setPan({ x: 0, y: 0 }); setRefine(false); setAdvanced(false); setNearby(null); setDragging(false);
     const video = videoRef.current;
     (async () => {
       try {
@@ -180,12 +184,12 @@ export default function ScoutMode({ open, videoUrl, onCancel, onConfirm, request
   const fullCount = Object.values(marks).filter(m => policy.validBox(m.box) && m.visibility !== "partial").length;
   const canTap = !!activeFrame && loadedImage === activeFrame.jpegDataUrl && !frameBusy && !submitting && !preview &&
     phase === "MARKING";
-  const hasDraft = canTap && draft?.frame === activeFrame;
+  const hasDraft = !!draft && draft.frame === activeFrame;
   const hasVisibleTarget = insideBox(draft?.target_point, draft?.box);
   const maskDataUrl = useMemo(() => selection.maskImage(draft?.visible_mask), [draft?.visible_mask]);
   const maskKey = draft ? JSON.stringify([draft.box, draft.target_point, draft.exclude_points, draft.include_points, draft.player_behind, draft.visibility, draft.manualBox]) : "";
   useEffect(() => {
-    if (!requestMask || !draft?.maskRequested || !hasVisibleTarget || !canTap || draft.visible_mask || draft.maskDeclined === maskKey) { setMaskBusy(false); return undefined; }
+    if (!requestMask || !draft?.maskRequested || !hasVisibleTarget || !canTap || dragging || draft.visible_mask || draft.maskDeclined === maskKey) { setMaskBusy(false); return undefined; }
     const controller = new AbortController();
     const captured = draft;
     setMaskBusy(true);
@@ -204,26 +208,26 @@ export default function ScoutMode({ open, videoUrl, onCancel, onConfirm, request
         if (!controller.signal.aborted) {
           setDraft(prev => prev?.frame === captured.frame && JSON.stringify([prev.box, prev.target_point, prev.exclude_points, prev.include_points, prev.player_behind, prev.visibility, prev.manualBox]) === maskKey
             ? { ...prev, maskRequested: false } : prev);
-          setNotice("Player outline unavailable. Your selected point and box are kept. Retry or choose a clearer moment.");
+          setNotice("Your selection is kept. Adjust the box or choose a clearer moment.");
         }
       } finally { if (!controller.signal.aborted) setMaskBusy(false); }
     }, 250);
     return () => { clearTimeout(timer); controller.abort(); };
     // Keyed only to the frame and human inputs, never to the returned mask.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [requestMask, maskKey, activeFrame, canTap, draft?.maskRequested, hasVisibleTarget]);
+  }, [requestMask, maskKey, activeFrame, canTap, draft?.maskRequested, hasVisibleTarget, dragging]);
   const outlinePending = !!requestMask && !!draft?.maskRequested && hasVisibleTarget && !draft?.visible_mask && draft?.maskDeclined !== maskKey;
   const outlineBusy = maskBusy || outlinePending;
   const resetView = useCallback(() => { setZoom(1); setPan({ x: 0, y: 0 }); }, []);
 
   useEffect(() => {
     actionLock.current = false;
-    setDraft(null); setHiddenHelp(false); setPartial(false); setTapIntent("target"); setRefine(false); setLink(null); setPreview(null); resetView();
+    setDraft(null); setHiddenHelp(false); setPartial(false); setTapIntent("target"); setRefine(false); setAdvanced(false); setNearby(null); setLink(null); setPreview(null); resetView();
   }, [phase, current, resetView]);
 
   const handleTap = useCallback(e => {
     if (suppressClick.current) { suppressClick.current = false; return; }
-    if (!canTap || hiddenHelp || e.target.closest("button, input, [data-marker-handle]")) return;
+    if (!canTap || hiddenHelp || nearby || e.target.closest("button, input, [data-marker-handle]")) return;
     const r = stageRef.current.getBoundingClientRect();
     const point = screenToVideo({ x: e.clientX, y: e.clientY }, r, activeFrame, zoom, pan);
     if (!point) return;
@@ -246,14 +250,15 @@ export default function ScoutMode({ open, videoUrl, onCancel, onConfirm, request
         ...(inside ? { visibility: "partial", player_behind: true, continuity: undefined } : {}) }));
       if (inside) setPartial(true);
       setTapIntent("target"); setNotice("Opponent marked in red. Check that the cutout keeps only your player.");
-    } else {
+    } else if (!hasDraft) {
       setDraft({ box: tapBox(point), frame: activeFrame, target_point: point, maskRequested: true,
         ...(partial && !link ? { visibility: "partial", player_behind: true, manualBox: true } : {}) });
     }
-  }, [canTap, hiddenHelp, activeFrame, zoom, pan, tapIntent, hasDraft, hasVisibleTarget, partial, link, draft, requestMask]);
+  }, [canTap, hiddenHelp, nearby, activeFrame, zoom, pan, tapIntent, hasDraft, hasVisibleTarget, partial, link, draft, requestMask]);
 
   const handlePointerDown = useCallback((e, mode = "stage") => {
-    if (!canTap || hiddenHelp || (["include", "exclude"].includes(tapIntent)) || (e.button != null && e.button !== 0)) return;
+    if (!canTap || hiddenHelp || nearby || (["include", "exclude"].includes(tapIntent)) || (e.button != null && e.button !== 0)) return;
+    if (mode !== "stage" && !refine) return;
     if (e.target.closest("button, input")) return;
     if (mode !== "stage") e.stopPropagation();
     try { stageRef.current.setPointerCapture(e.pointerId); } catch { /* older devices */ }
@@ -261,6 +266,7 @@ export default function ScoutMode({ open, videoUrl, onCancel, onConfirm, request
     const values = [...pointers.current.values()];
     if (values.length === 1) {
       suppressClick.current = mode !== "stage";
+      if (mode !== "stage") setDragging(true);
       gesture.current = { mode, origin: values[0], pan: { ...pan }, zoom, box: draft?.box && { ...draft.box } };
     } else if (values.length === 2) {
       suppressClick.current = true;
@@ -270,7 +276,7 @@ export default function ScoutMode({ open, videoUrl, onCancel, onConfirm, request
         pan: { ...pan }, zoom,
       };
     }
-  }, [canTap, hiddenHelp, pan, zoom, draft, tapIntent]);
+  }, [canTap, hiddenHelp, nearby, pan, zoom, draft, tapIntent, refine]);
 
   const handlePointerMove = useCallback(e => {
     if (!pointers.current.has(e.pointerId) || !gesture.current) return;
@@ -292,29 +298,83 @@ export default function ScoutMode({ open, videoUrl, onCancel, onConfirm, request
     const dx = e.clientX - g.origin.x, dy = e.clientY - g.origin.y;
     if (Math.hypot(dx, dy) > 6) suppressClick.current = true;
     if (g.mode === "stage") {
-      if (zoom > 1) setPan({
+      if (zoom > 1 && !draft) setPan({
         x: clamp(g.pan.x + dx, -r.width * (zoom - 1) / 2, r.width * (zoom - 1) / 2),
         y: clamp(g.pan.y + dy, -r.height * (zoom - 1) / 2, r.height * (zoom - 1) / 2),
       });
     } else if (g.box) {
       const scale = Math.min(r.width / activeFrame.width, r.height / activeFrame.height);
       const fx = dx / (activeFrame.width * scale * zoom), fy = dy / (activeFrame.height * scale * zoom);
-      const b = { ...g.box };
+      let b = { ...g.box };
       if (g.mode === "move") { b.x = clamp(b.x + fx, 0, 1 - b.w); b.y = clamp(b.y + fy, 0, 1 - b.h); }
-      else { b.w = clamp(b.w + fx, 0.02, 1 - b.x); b.h = clamp(b.h + fy, 0.04, 1 - b.y); }
+      else b = resizeBox(g.box, g.mode.replace("resize-", ""), fx, fy);
       setDraft(prev => ({ ...prev, box: b, manualBox: true, frame: activeFrame, visible_mask: undefined, maskRequested: true, maskDeclined: undefined, continuity: undefined, tracking_check: undefined }));
     }
-  }, [activeFrame, zoom]);
+  }, [activeFrame, zoom, draft]);
 
   const handlePointerUp = useCallback(e => {
     pointers.current.delete(e.pointerId);
-    if (!pointers.current.size) gesture.current = null;
+    if (!pointers.current.size) { gesture.current = null; setDragging(false); }
     try { stageRef.current.releasePointerCapture(e.pointerId); } catch { /* already released */ }
   }, []);
 
+  const editSelection = () => {
+    if (!hasDraft) return;
+    setRefine(v => !v); setTapIntent("target"); setHiddenHelp(false); setAdvanced(false);
+    if (!refine && rect.w && rect.h) {
+      const scale = Math.min(rect.w / activeFrame.width, rect.h / activeFrame.height);
+      const z = clamp(Math.min(rect.w * .6 / (draft.box.w * activeFrame.width * scale), rect.h * .65 / (draft.box.h * activeFrame.height * scale)), 1, 5);
+      setZoom(z);
+      setPan({ x: clamp((.5 - draft.box.x - draft.box.w / 2) * activeFrame.width * scale * z, -rect.w * (z - 1) / 2, rect.w * (z - 1) / 2),
+        y: clamp((.5 - draft.box.y - draft.box.h / 2) * activeFrame.height * scale * z, -rect.h * (z - 1) / 2, rect.h * (z - 1) / 2) });
+    }
+  };
+  const choosePartial = () => {
+    setPartial(true); setHiddenHelp(false); setRefine(true); setAdvanced(true);
+    setTapIntent(hasDraft ? "behind" : "target");
+    if (hasDraft) setDraft(prev => ({ ...prev, player_behind: true, visibility: "partial", manualBox: true,
+      target_point: undefined, include_points: [], visible_mask: undefined, maskRequested: true, maskDeclined: undefined, continuity: undefined, tracking_check: undefined }));
+    setNotice("Tap a visible part of YOUR player. Do not mark the player in front.");
+  };
+  const chooseVisible = () => {
+    setPartial(false); setHiddenHelp(false); setTapIntent("target");
+    if (draft?.player_behind) setDraft(prev => ({ ...prev, player_behind: undefined, visibility: undefined,
+      exclude_points: [], include_points: [], visible_mask: undefined, maskRequested: true, maskDeclined: undefined, continuity: undefined, tracking_check: undefined }));
+    setNotice("");
+  };
+  const openNearby = async () => {
+    if (frameBusy || submitting || !activeFrame || link || preview) return;
+    const base = activeFrame, session = sessionRef.current, index = current;
+    const request = {};
+    frameRequestRef.current = request;
+    setFrameBusy(true); setHiddenHelp(false);
+    try {
+      const candidates = [];
+      const segment = t => cuts.filter(c => t >= c).length;
+      for (const t of nearbyMoments(base.t, duration, cuts)) {
+        let f;
+        try { f = t === base.t ? base : await capturePresented(videoRef.current, t, session.signal); }
+        catch (e) { if (session.signal.aborted) throw e; else continue; }
+        if (session.signal.aborted || frameRequestRef.current !== request) return;
+        if (segment(f.t) === segment(base.t) && !candidates.some(c => Math.abs(c.t - f.t) < .02)) candidates.push(f);
+      }
+      setNearby({ index, frames: candidates, base });
+    } catch { if (!session.signal.aborted) setNotice("Could not open nearby moments. Your selection is kept."); }
+    finally { if (!session.signal.aborted && frameRequestRef.current === request) setFrameBusy(false); }
+  };
+  const chooseNearby = frame => {
+    if (!nearby || frameBusy || nearby.index !== current) return;
+    if (frame !== activeFrame) {
+      setFrames(prev => prev.map((f, i) => i === current ? frame : f));
+      setMarks(prev => { const updated = { ...prev }; delete updated[current]; return updated; });
+      setDraft(null); setPartial(false); setRefine(false); setAdvanced(false); setTapIntent("target"); resetView();
+    }
+    setNearby(null); setNotice("Tap your player in this moment.");
+  };
+
   const goNext = updated => {
     const progress = markingProgress(queue, current, updated);
-    setDraft(null); resetView(); setHiddenHelp(false); setPartial(false); setTapIntent("target");
+    setDraft(null); resetView(); setHiddenHelp(false); setPartial(false); setTapIntent("target"); setRefine(false); setAdvanced(false); setNearby(null);
     if (progress.ready) setPhase("READY");
     else {
       setPosition(queue.indexOf(progress.next));
@@ -322,7 +382,7 @@ export default function ScoutMode({ open, videoUrl, onCancel, onConfirm, request
     }
   };
   const confirmMark = () => {
-    if (!hasDraft || !hasVisibleTarget || actionLock.current || link || outlineBusy || (requestMask && draft.player_behind && !draft.visible_mask)) return;
+    if (!canTap || !hasDraft || !hasVisibleTarget || actionLock.current || link || outlineBusy || dragging || (requestMask && draft.player_behind && !draft.visible_mask)) return;
     actionLock.current = true;
     const updated = { ...marks, [current]: { t: activeFrame.t, box: { ...draft.box }, ...selection.hints(draft),
       ...(draft.continuity?.length ? { continuity: draft.continuity } : {}) } };
@@ -336,29 +396,6 @@ export default function ScoutMode({ open, videoUrl, onCancel, onConfirm, request
     setMarks(updated); setNotice("Not visible — this frame is not an identity anchor."); goNext(updated);
   };
 
-  const moveNearby = async direction => {
-    if (frameBusy || submitting) return;
-    const session = sessionRef.current;
-    const t = activeFrame?.t;
-    const next = nearbyTime(t, direction, duration, cuts);
-    if (next === null) { setNotice("This is the edge of this scene. Choose another moment."); return; }
-    const index = current;
-    const request = {};
-    frameRequestRef.current = request;
-    setFrameBusy(true); setDraft(null); setNotice("");
-    try {
-      const frame = await capturePresented(videoRef.current, next, session.signal);
-      if (session.signal.aborted || frameRequestRef.current !== request) return;
-      setFrames(prev => prev.map((f, i) => i === index ? frame : f));
-      setMarks(prev => { const updated = { ...prev }; delete updated[index]; return updated; });
-      resetView();
-      setNotice("Check this nearby moment. Only confirm when your player is visible.");
-    } catch {
-      if (!session.signal.aborted) setNotice("Could not open that moment. Your other selections are kept — try the other direction.");
-    } finally {
-      if (!session.signal.aborted && frameRequestRef.current === request) setFrameBusy(false);
-    }
-  };
 
   const startLink = async direction => {
     if (!hasDraft || frameBusy || link || outlineBusy || phase !== "MARKING") return;
@@ -455,208 +492,147 @@ export default function ScoutMode({ open, videoUrl, onCancel, onConfirm, request
       onKeyDown={e => {
         if (e.key === 'Escape') { e.preventDefault(); onCancel(); }
         if (e.key !== 'Tab') return;
-        const controls = [...overlayRef.current.querySelectorAll('button:not(:disabled), input:not(:disabled)')];
+        const controls = [...overlayRef.current.querySelectorAll('button:not(:disabled), input:not(:disabled), [tabindex="0"]')];
         const first = controls[0], last = controls[controls.length - 1];
         if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last?.focus(); }
         if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first?.focus(); }
-      }}
-      className="fixed inset-0 z-[230] bg-ink text-white flex flex-col" style={{ height: "100dvh", paddingTop: "env(safe-area-inset-top, 0px)" }}>
-      <header className="flex-none h-12 flex items-center justify-between px-3 border-b border-white/10">
-        <button type="button" aria-label="Close player selection" data-testid="scout-close" onClick={onCancel} className="w-11 h-11 flex items-center justify-center"><X size={22} /></button>
-        <span className="text-sm font-black tracking-wide">Select your player</span>
-        <span className="text-xs text-white/60">3–10 taps</span>
+      }} className="scout-editor">
+      <header className="scout-header">
+        <button type="button" aria-label="Close player selection" data-testid="scout-close" onClick={onCancel} className="scout-icon"><X size={21} /></button>
+        <span className="scout-wordmark"><ScanLine size={17} /> PLAYER SELECT</span>
+        <span className="scout-step">SCOUTMEPLAY</span>
       </header>
-      {(phase === "MARKING" || phase === "READY") && (
-        <div className="flex-none px-4 py-2.5 flex justify-between gap-2 items-center bg-white/5">
-          <div>
-            <p className="text-sm font-bold">{done ? "Your selections are ready" : "Tap your player in the clear moments"}</p>
-            <p className="text-[11px] text-white/60">{done ? "Review your references. Add or adjust a selection if needed." : hasDraft ? "Drag or resize the box to fit your player." : partial ? "Tap only the visible part of your player." : "Pinch to zoom · drag to pan · tap to select"}</p>
-          </div>
-          <span data-testid="scout-progress-counter" className="text-[#CCFF00] text-xl font-black tabular-nums whitespace-nowrap">
-            {confirmedCount + "/" + queue.length}
-          </span>
+      {(phase === "MARKING" || done) && <div className="scout-instruction">
+        <div>
+          <span className="scout-eyebrow">{done ? "READY TO GO" : refine ? "FINE-TUNE" : hasDraft ? "YOUR PLAYER" : "ONE PLAYER. ONE TAP."}</span>
+          <h2>{done ? "Looking good." : refine ? "Make it a perfect fit." : hasDraft ? "Is this your player?" : "Select your player."}</h2>
+          <p>{done ? "Your references are ready for analysis." : refine ? "Drag the corners. Keep only your player." : hasDraft ? "Check the player below, then save this moment." : partial ? "Tap the visible part of your player." : "Tap their shirt. We’ll help you frame the rest."}</p>
         </div>
-      )}
-      <div ref={stageRef} data-testid="scout-stage" className="relative flex-1 min-h-0 overflow-hidden bg-black"
-        aria-busy={frameBusy || phase === "BOOTING" || (!!activeFrame && loadedImage !== activeFrame.jpegDataUrl)} onClick={handleTap} onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerCancel={handlePointerUp}
-        style={{ touchAction: "none" }}>
-        <video ref={videoRef} src={videoUrl} playsInline muted crossOrigin="anonymous" preload="auto" data-testid="scout-video"
-          className="absolute inset-0 w-full h-full object-contain" style={{ pointerEvents: "none" }} />
-        {activeFrame && (
-          <img key={activeFrame.jpegDataUrl} src={activeFrame.jpegDataUrl} alt="The exact video frame for this tap" draggable={false}
-            onLoad={() => setLoadedImage(activeFrame.jpegDataUrl)}
-            data-testid="scout-presented-frame" data-frame-time={activeFrame.t}
-            className="absolute inset-0 w-full h-full object-contain select-none"
-            style={{ transform, transformOrigin: "center center", pointerEvents: "none" }} />
-        )}
-        {activeFrame && !frameBusy && (
-          <span className="absolute top-2 left-3 bg-black/70 px-2 py-1 rounded-lg text-xs text-white/80 pointer-events-none">{fmt(activeFrame.t)}</span>
-        )}
-        {hasDraft && rect.w > 0 && <DraftMarker box={draft.box} frame={activeFrame} rect={rect} zoom={zoom} pan={pan} onPointerDown={handlePointerDown} maskDataUrl={maskDataUrl} excludeMode={["include", "exclude"].includes(tapIntent)} />}
-        {hasDraft && rect.w > 0 && <SelectionPoints points={draft.exclude_points || []} frame={activeFrame} rect={rect} zoom={zoom} pan={pan} />}
-        {preview && rect.w > 0 && policy.validBox(preview.results[previewIndex]?.box) && <div style={{ pointerEvents: "none" }}>
-          <DraftMarker box={preview.results[previewIndex].box} frame={activeFrame} rect={rect} zoom={zoom} pan={pan} onPointerDown={() => {}} excludeMode />
+        <div className="scout-count"><span data-testid="scout-progress-counter">{confirmedCount + "/" + queue.length}</span><small>saved</small></div>
+      </div>}
+      <div ref={stageRef} data-testid="scout-stage" className="scout-stage"
+        aria-busy={frameBusy || phase === "BOOTING" || (!!activeFrame && loadedImage !== activeFrame.jpegDataUrl)}
+        onClick={handleTap} onPointerDown={e => handlePointerDown(e)} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerCancel={handlePointerUp}>
+        <video ref={videoRef} src={videoUrl} playsInline muted crossOrigin="anonymous" preload="auto" data-testid="scout-video" className="scout-source-video" />
+        {activeFrame && <img key={activeFrame.jpegDataUrl} src={activeFrame.jpegDataUrl} alt="The exact video frame for this tap" draggable={false}
+          onLoad={() => setLoadedImage(activeFrame.jpegDataUrl)} data-testid="scout-presented-frame" data-frame-time={activeFrame.t}
+          className="scout-still" style={{ transform, transformOrigin: "center center" }} />}
+        {activeFrame && !frameBusy && <span className="scout-time">{fmt(activeFrame.t)} <span>· paused</span></span>}
+        {canTap && !hiddenHelp && <div className="scout-zoom">
+          <button type="button" aria-label="Zoom out" data-testid="scout-zoom-out" className="scout-icon" disabled={zoom <= 1} onClick={() => { setZoom(z => Math.max(1, z / 1.4)); setPan({ x: 0, y: 0 }); }}><ZoomOut size={17} /></button>
+          <button type="button" aria-label="Reset zoom" data-testid="scout-zoom-reset" className="scout-zoom-value" onClick={resetView}>{zoom.toFixed(1)}×</button>
+          <button type="button" aria-label="Zoom in" data-testid="scout-zoom-in" className="scout-icon" disabled={zoom >= 5} onClick={() => setZoom(z => Math.min(5, z * 1.4))}><ZoomIn size={17} /></button>
         </div>}
-        {preview && <span role="status" className="absolute bottom-2 left-3 bg-black/80 rounded-lg px-2 py-1 text-xs">{preview.results[previewIndex]?.box ? "Suggested tracking" : "Uncertain — no trusted box"}</span>}
-        {phase === "BOOTING" && (
-          <div className="absolute inset-0 bg-ink flex flex-col items-center justify-center gap-4 px-8 text-center">
-            <Loader2 className="animate-spin text-[#CCFF00]" size={42} />
-            <p className="text-lg font-bold" role="status">{boot.label}</p>
-            <div role="progressbar" aria-label="Preparing tap moments" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(boot.progress * 100)}
-              className="w-full max-w-xs h-2 rounded-full bg-white/15 overflow-hidden">
-              <div className="h-full bg-[#CCFF00]" style={{ width: Math.round(boot.progress * 100) + "%" }} />
-            </div>
-            <p className="text-xs text-white/60">Mark 3–10 clear moments across the clip. Identity checks then run automatically.</p>
-          </div>
-        )}
-        {phase === "ERROR" && (
-          <div className="absolute inset-0 bg-ink flex flex-col items-center justify-center gap-5 px-6 text-center">
-            <p role="alert">{error}</p>
-            <button type="button" data-testid="scout-retry" className={primary} onClick={() => setRetry(n => n + 1)}>Retry preparing video</button>
-          </div>
-        )}
-        {frameBusy && <div role="status" className="absolute inset-0 flex items-center justify-center bg-black/65 pointer-events-none"><Loader2 className="animate-spin text-[#CCFF00]" size={32} /></div>}
+        {hasDraft && rect.w > 0 && <DraftMarker box={draft.box} frame={activeFrame} rect={rect} zoom={zoom} pan={pan}
+          onPointerDown={handlePointerDown} maskDataUrl={maskDataUrl} editable={refine} targetPoint={draft.target_point}
+          excludeMode={["include", "exclude"].includes(tapIntent)} onAdjustBox={box => setDraft(prev => ({ ...prev, box, manualBox: true, visible_mask: undefined, maskRequested: true, maskDeclined: undefined, continuity: undefined, tracking_check: undefined }))} />}
+        {hasDraft && rect.w > 0 && <SelectionPoints points={draft.exclude_points || []} frame={activeFrame} rect={rect} zoom={zoom} pan={pan} />}
+        {preview && rect.w > 0 && policy.validBox(preview.results[previewIndex]?.box) &&
+          <DraftMarker box={preview.results[previewIndex].box} frame={activeFrame} rect={rect} zoom={zoom} pan={pan} onPointerDown={() => {}} excludeMode />}
+        {preview && <span role="status" className="scout-stage-tip">{preview.results[previewIndex]?.box ? "Suggested tracking · not a saved selection" : "Uncertain — no trusted box"}</span>}
+        {canTap && !hasDraft && !hiddenHelp && <span className="scout-stage-tip"><ScanLine size={14} /> Pinch to zoom · tap to select</span>}
+        {hasDraft && refine && !hasVisibleTarget && <span className="scout-stage-tip">Tap your player inside the box to set the selection point.</span>}
+        {phase === "BOOTING" && <div className="scout-loading">
+          <span className="scout-scan-orb"><ScanLine size={34} /></span>
+          <h2>Finding your best moments.</h2><p role="status">{boot.label}</p>
+          <div role="progressbar" aria-label="Preparing tap moments" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(boot.progress * 100)} className="scout-progress-track">
+            <div style={{ width: Math.round(boot.progress * 100) + "%" }} />
+          </div><small>You choose the player. We do the analysis.</small>
+        </div>}
+        {phase === "ERROR" && <div className="scout-loading"><p role="alert">{error}</p><button type="button" data-testid="scout-retry" className={primary} onClick={() => setRetry(n => n + 1)}>Retry preparing video</button></div>}
+        {frameBusy && <div role="status" className="scout-busy"><Loader2 className="animate-spin" size={28} /><span>Opening real video frames…</span></div>}
       </div>
 
-      {(phase === "MARKING" || done) && !link && !preview && (
-        <div data-testid="scout-frame-strip" className="flex-none flex gap-1.5 overflow-x-auto px-3 py-2 bg-ink" style={{ touchAction: "pan-x" }}>
-          {queue.map((i, pos) => (
-            <button key={i} type="button" disabled={frameBusy} data-testid={"scout-frame-strip-" + pos}
-              aria-label={"Moment " + (pos + 1) + (marks[i]?.box ? ", selected" : marks[i]?.skipped ? ", not visible" : ", pending")}
-              onClick={() => { setPosition(pos); setPhase("MARKING"); setDraft(null); setHiddenHelp(false); resetView(); }}
-              className={"relative flex-none w-12 h-12 border-2 rounded-lg overflow-hidden " + (pos === position ? "border-[#CCFF00]" : "border-white/25")}>
-              {marks[i]?.box ? <MarkedCropCanvas frameDataUrl={frames[i].jpegDataUrl} box={marks[i].box} className="w-full h-full" width={96} height={96} /> :
-                <img src={frames[i].jpegDataUrl} alt="" className={"w-full h-full object-cover " + (marks[i]?.skipped ? "opacity-40" : "")} />}
-              <span className="absolute bottom-0 left-0 right-0 bg-black/70 text-[9px]">{marks[i]?.box ? "✓ " : ""}{pos + 1}</span>
-            </button>
-          ))}
-        </div>
-      )}
-      {(phase === "MARKING" || phase === "READY") && (
-        <footer className="flex-none px-3 pt-2 bg-ink border-t border-white/10 space-y-2"
-          style={{ paddingBottom: "max(12px, env(safe-area-inset-bottom, 0px))", maxHeight: "55dvh", overflowY: "auto" }}>
-          {notice && <p role="status" data-testid="scout-notice" className="text-[12px] text-white/85">{notice}</p>}
-          {phase === "MARKING" && confirmedCount > fullCount && !hasDraft && !preview && !link && <p className="text-[11px] text-white/60">{fullCount} clear selections · {confirmedCount - fullCount} partial. Keep at least 3 clear selections for the identity reference.</p>}
-          {preview && <div data-testid="scout-tracking-preview" className="space-y-2">
-            <p className="text-sm font-bold">Does the box stay on your player?</p>
-            <div className="flex gap-2">
-              <button type="button" data-testid="scout-preview-approve" className={primary + " flex-1"}
-                disabled={preview.results.some(r => !policy.validBox(r.box))} onClick={() => finishPreview(true)}>Right player</button>
-              <button type="button" data-testid="scout-preview-close" className={button} onClick={() => finishPreview(false)}>Close</button>
-            </div>
-            {phase === "MARKING" && <div className="flex gap-1 flex-wrap">{preview.frames.slice(1).map((frame, i) =>
-              <button key={i} type="button" data-testid={"scout-preview-correct-" + (i + 1)} className={button} onClick={() => correctPreview(i + 1)}>Fix at +{(frame.t - preview.frames[0].t).toFixed(2)}s</button>)}</div>}
-          </div>}
-          {hasDraft && (
-            <div data-testid="scout-selection-preview" className="flex items-center gap-3">
-              <div className="w-16 h-20 flex-none rounded-xl border-2 border-[#CCFF00] overflow-hidden">
-                <MarkedCropCanvas frameDataUrl={activeFrame.jpegDataUrl} box={draft.box} mask={draft.visible_mask} width={128} height={160} className="w-full h-full" />
+      {(phase === "MARKING" || done) && !link && !preview && <nav data-testid="scout-frame-strip" className="scout-moments" aria-label="Player reference moments">
+        {queue.map((i, pos) => <button key={i} type="button" disabled={frameBusy} data-testid={"scout-frame-strip-" + pos}
+          ref={el => { if (pos === position) el?.scrollIntoView?.({ block: "nearest", inline: "nearest" }); }}
+          aria-label={"Moment " + (pos + 1) + (marks[i]?.box ? ", selected" : marks[i]?.skipped ? ", not visible" : ", pending")}
+          aria-current={pos === position ? "step" : undefined}
+          onClick={() => { setPosition(pos); setPhase("MARKING"); setDraft(null); setHiddenHelp(false); setNearby(null); setRefine(false); resetView(); }}
+          className={"scout-moment " + (pos === position ? "is-current " : "") + (marks[i]?.box ? "is-saved" : "")}>
+          {marks[i]?.box ? <MarkedCropCanvas frameDataUrl={frames[i].jpegDataUrl} box={marks[i].box} className="scout-moment-image" width={96} height={96} /> :
+            <img src={frames[i].jpegDataUrl} alt="" className={"scout-moment-image " + (marks[i]?.skipped ? "is-skipped" : "")} />}
+          <span>{marks[i]?.box ? <Check size={11} /> : pos + 1}</span>
+        </button>)}
+      </nav>}
+
+      {(phase === "MARKING" || done) && <footer className="scout-panel">
+        <div className="scout-panel-body">
+          {notice && <p role="status" data-testid="scout-notice" className="scout-notice">{notice}</p>}
+          {preview ? <div data-testid="scout-tracking-preview" className="scout-tool-panel">
+            <strong>Does the box stay on your player?</strong>
+            <div className="scout-button-row"><button type="button" data-testid="scout-preview-approve" className={primary + " flex-1"} disabled={preview.results.some(r => !policy.validBox(r.box))} onClick={() => finishPreview(true)}>Right player</button>
+              <button type="button" data-testid="scout-preview-close" className={button} onClick={() => finishPreview(false)}>Close</button></div>
+            <div className="scout-button-row">{preview.frames.slice(1).map((frame, i) => <button key={i} type="button" data-testid={"scout-preview-correct-" + (i + 1)} className={button} onClick={() => correctPreview(i + 1)}>Fix +{(frame.t - preview.frames[0].t).toFixed(2)}s</button>)}</div>
+          </div> : nearby ? <section className="scout-tool-panel" data-testid="scout-nearby-filmstrip">
+            <div className="scout-tool-heading"><div><strong>Find a clearer moment</strong><p>Swipe to look. Tap a frame to use it.</p></div><button type="button" aria-label="Close nearby moments" className="scout-icon" onClick={() => setNearby(null)}><X size={18} /></button></div>
+            <div className="scout-nearby-frames">{nearby.frames.map((frame, i) => <button type="button" key={frame.t} data-testid={"scout-nearby-frame-" + i} aria-label={"Use frame at " + frame.t.toFixed(2) + " seconds"} aria-pressed={frame === activeFrame}
+              className={"scout-nearby-frame " + (frame === activeFrame ? "is-current" : "")} onClick={() => chooseNearby(frame)}>
+              <img src={frame.jpegDataUrl} alt="" /><span>{frame.t.toFixed(2)}s</span></button>)}</div>
+            <small>Same scene only. Your selection stays until you choose a different frame.</small>
+          </section> : hiddenHelp ? <section data-testid="scout-hidden-help" className="scout-tool-panel">
+            <div className="scout-tool-heading"><div><strong>Can you see your player?</strong><p>Do not mark the player in front.</p></div><button type="button" className="scout-icon" aria-label="Close selection help" onClick={() => setHiddenHelp(false)}><X size={18} /></button></div>
+            <button type="button" data-testid="scout-partial-player" className={button + " w-full"} onClick={choosePartial}>Partly visible — select the visible part</button>
+            <button type="button" data-testid="scout-skip-frame" disabled={frameBusy} className={button + " w-full"} onClick={skipMark}>Not visible — use another moment</button>
+            {partial && <button type="button" data-testid="scout-player-visible" className="scout-text-button" onClick={chooseVisible}>Player is fully visible</button>}
+          </section> : <>
+            {hasDraft && <div data-testid="scout-selection-preview" className="scout-selection-card">
+              <div className="scout-player-crop"><MarkedCropCanvas frameDataUrl={activeFrame.jpegDataUrl} box={draft.box} mask={draft.visible_mask} width={192} height={240} className="w-full h-full" /></div>
+              <div className="scout-selection-copy"><span className="scout-eyebrow">{draft.player_behind ? "PARTLY VISIBLE" : "SELECTED PLAYER"}</span><strong>{outlineBusy ? "Framing your player…" : !hasVisibleTarget ? "Set the player’s point" : "Your player. Your call."}</strong>
+                <p>{!hasVisibleTarget ? "Tap their visible body inside the box." : draft.player_behind ? draft.visible_mask ? "Only the visible parts are selected." : "Use precise tools or a clearer moment." : draft.visible_mask ? "Check the head, shirt and feet." : "Check the box includes the full player."}</p>
+                {draft.visible_mask && <span className="scout-outline-status"><CheckCircle2 size={12} /> Player outline ready</span>}
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-bold text-sm text-[#CCFF00]">Your selected player</p>
-                <p className="text-[11px] text-white/60">{!hasVisibleTarget ? "Tap a visible part of YOUR player inside the marked area." : outlineBusy ? "Finding your player’s outline…" : draft.player_behind ? draft.visible_mask ? "Only visible parts of the player behind are selected." : "Mark the player in front or retry. Confirm becomes available when your player’s cutout is ready." : draft.visible_mask ? "Check the head, shirt, arms and legs before confirming." : "Fit the box from head to feet. You can retry the outline or keep this area."}</p>
-                <div className="flex gap-2 mt-2">
-                  <button type="button" data-testid="scout-retap" className={button} onClick={() => setDraft(null)}><RotateCcw size={15} className="inline mr-1" />Re-tap</button>
-                  <button type="button" data-testid="scout-confirm-mark" className={primary + " flex-1"}
-                    disabled={submitting || actionLock.current || !hasVisibleTarget || outlineBusy || (!!requestMask && draft.player_behind && !draft.visible_mask)} onClick={link ? () => finishLink(true) : confirmMark}><Check size={18} />{link ? "Same player" : "Confirm"}</button>
+            </div>}
+            {hasDraft && refine && <div className="scout-edit-tools" data-testid="scout-edit-tools">
+              <div className="scout-tool-heading"><span>Drag any corner · two fingers to move the view</span><button type="button" data-testid="scout-retap" className="scout-text-button" onClick={() => { setDraft(null); setRefine(false); setAdvanced(false); setNotice(""); resetView(); }}><RotateCcw size={13} /> Pick again</button></div>
+              <button type="button" className="scout-text-button" data-testid="scout-advanced" aria-expanded={advanced} onClick={() => setAdvanced(v => !v)}><SlidersHorizontal size={14} />Precise tools<ChevronRight size={13} /></button>
+              {advanced && <div className="scout-tool-panel">
+                <div className="scout-button-row">
+                  {requestMask && !draft.maskRequested && <button type="button" data-testid="scout-refine-cutout" className={button} onClick={() => setDraft(prev => ({ ...prev, maskRequested: true, maskDeclined: undefined }))}>Retry outline</button>}
+                  {requestMask && <button type="button" data-testid="scout-include-player" className={button} disabled={outlineBusy} aria-pressed={tapIntent === "include"} onClick={() => { setTapIntent(t => t === "include" ? "target" : "include"); setNotice("Tap a missing visible part of YOUR player."); }}>Add body part</button>}
+                  <button type="button" data-testid="scout-exclude-opponent" className={button} disabled={outlineBusy} aria-pressed={tapIntent === "exclude"} onClick={() => { setTapIntent(t => t === "exclude" ? "target" : "exclude"); setNotice("Tap the other player to exclude them."); }}>Remove other player</button>
+                  {!!draft.exclude_points?.length && <button type="button" className={button} onClick={() => { setDraft(prev => ({ ...prev, exclude_points: [], visible_mask: undefined, maskRequested: true, maskDeclined: undefined, tracking_check: undefined })); setTapIntent("target"); }}>Clear red points</button>}
+                  {!!draft.visible_mask && !draft.player_behind && <button type="button" className={button} onClick={() => { setMaskBusy(false); setDraft(prev => ({ ...prev, visible_mask: undefined, maskRequested: false, maskDeclined: maskKey, tracking_check: undefined })); }}>Use box instead</button>}
+                  {requestTracking && draft.visibility !== "partial" && !link && <button type="button" data-testid="scout-check-tracking" className={button} disabled={outlineBusy || frameBusy} onClick={startPreview}>Preview tracking</button>}
                 </div>
-              </div>
-            </div>
-          )}
-          {hasDraft && draft.visible_mask && <div data-testid="scout-cutout-context" className="flex items-center gap-3">
-            <div className="w-16 h-20 flex-none rounded-xl border border-white/25 overflow-hidden">
-              <MarkedCropCanvas frameDataUrl={activeFrame.jpegDataUrl} box={draft.box} width={128} height={160} className="w-full h-full" />
-            </div>
-            <p className="text-[11px] text-white/70">Full area for comparison. The outline highlights your player’s visible pixels.</p>
+                {draft.visible_mask && <div data-testid="scout-cutout-context" className="scout-context-crop"><MarkedCropCanvas frameDataUrl={activeFrame.jpegDataUrl} box={draft.box} width={96} height={120} /><small>Original area for comparison. The outline keeps only visible player pixels.</small></div>}
+                {draft.visibility === "partial" && !link && <div className="scout-button-row">
+                  <button type="button" data-testid="scout-link-before" className={button} disabled={outlineBusy || frameBusy} onClick={() => startLink(-1)}>Link earlier reference</button>
+                  <button type="button" data-testid="scout-link-after" className={button} disabled={outlineBusy || frameBusy} onClick={() => startLink(1)}>Link later reference</button>
+                </div>}
+                {!!draft.continuity?.length && <small>{draft.continuity.length} nearby identity check(s) saved</small>}
+              </div>}
+            </div>}
+            {!hasDraft && !done && <div className="scout-empty-hint"><ScanLine size={22} /><div><strong>{partial ? "Select only the visible part" : "Start with one clear tap"}</strong><p>{fullCount >= MIN_TAPS ? "You can finish now, or add more references." : "Choose the same player in at least 3 clear moments."}</p></div></div>}
+          </>}
+        </div>
+
+        {!preview && !nearby && !hiddenHelp && <div className="scout-actions">
+          {hasDraft && <div className="scout-button-row">
+            <button type="button" data-testid="scout-refine" className={button + " scout-edit-button"} aria-expanded={refine} onClick={editSelection}><SlidersHorizontal size={16} />{refine ? "Done editing" : "Adjust"}</button>
+            <button type="button" data-testid="scout-confirm-mark" className={primary + " flex-1"}
+              disabled={!canTap || submitting || actionLock.current || !hasVisibleTarget || outlineBusy || dragging || (!!requestMask && draft.player_behind && !draft.visible_mask)}
+              onClick={link ? () => finishLink(true) : confirmMark}>{outlineBusy ? <Loader2 size={17} className="animate-spin" /> : <Check size={18} />}{link ? "Same player" : "Save player"}{!outlineBusy && <ArrowRight size={16} />}</button>
           </div>}
-          {hasDraft && <div className="flex gap-2">
-            {!link && <button type="button" data-testid="scout-player-behind" className={button + " flex-1"} aria-pressed={draft.player_behind === true}
-              onClick={() => {
-                if (draft.player_behind) {
-                  setDraft(prev => ({ ...prev, player_behind: undefined, visibility: undefined, exclude_points: [], include_points: [], visible_mask: undefined, maskRequested: true, maskDeclined: undefined, continuity: undefined, tracking_check: undefined }));
-                  setPartial(false); setTapIntent("target");
-                  setNotice("Area kept. Check the visible player’s outline before confirming."); return;
-                }
-                setDraft(prev => ({ ...prev, player_behind: true, visibility: "partial", manualBox: true,
-                  target_point: undefined, include_points: [], visible_mask: undefined, maskRequested: true, maskDeclined: undefined, continuity: undefined, tracking_check: undefined }));
-                setPartial(true); setRefine(true); setTapIntent("behind");
-                setNotice("Area kept. Tap a visible part of your player behind. Mark the player in front with Not my player if needed.");
-              }}>{draft.player_behind ? "Player is visible" : "Player is behind"}</button>}
-          </div>}
-          {hasDraft && <div className="flex gap-2">
-            <button type="button" data-testid="scout-refine" className={button + " flex-1"} aria-expanded={refine} onClick={() => { setRefine(v => !v); setTapIntent("target"); }}>Adjust selection</button>
-            {requestTracking && draft.visibility !== "partial" && !link && <button type="button" data-testid="scout-check-tracking" className={button + " flex-1"}
-              disabled={outlineBusy || frameBusy} onClick={startPreview}>Check tracking</button>}
-          </div>}
-          {hasDraft && (refine || draft.visibility === "partial") && <div className="flex gap-2 flex-wrap">
-            {requestMask && !draft.maskRequested && <button type="button" data-testid="scout-refine-cutout" className={button}
-              onClick={() => setDraft(prev => ({ ...prev, maskRequested: true, maskDeclined: undefined }))}>Retry player outline</button>}
-            {requestMask && <button type="button" data-testid="scout-include-player" className={button} disabled={outlineBusy} aria-pressed={tapIntent === "include"}
-              onClick={() => { setTapIntent(t => t === "include" ? "target" : "include"); setNotice("Tap a visible part of YOUR player that is missing from the cutout."); }}>Add player part</button>}
-            <button type="button" data-testid="scout-exclude-opponent" className={button} disabled={outlineBusy} aria-pressed={tapIntent === "exclude"}
-              onClick={() => { setTapIntent(t => t === "exclude" ? "target" : "exclude"); setNotice("Tap the opponent — not your player. Red points exclude that person from this selection."); }}>Not my player</button>
-            {!!draft.exclude_points?.length && <button type="button" className={button} onClick={() => { setDraft(prev => ({ ...prev, exclude_points: [], visible_mask: undefined, maskRequested: true, maskDeclined: undefined, tracking_check: undefined })); setTapIntent("target"); }}>Clear red points</button>}
-            {!!draft.visible_mask && !draft.player_behind && <button type="button" className={button} onClick={() => { setMaskBusy(false); setDraft(prev => ({ ...prev, visible_mask: undefined, maskRequested: false, maskDeclined: maskKey, tracking_check: undefined })); }}>Use box instead</button>}
-          </div>}
-          {hasDraft && draft.visibility === "partial" && !link && <div className="rounded-xl border border-white/20 p-2 space-y-2">
-            <p className="text-[11px] text-white/75">Player behind. Only visible pixels are kept. You can add a nearby clear reference:</p>
-            <div className="flex gap-2">
-              <button type="button" data-testid="scout-link-before" className={button + " flex-1"} disabled={outlineBusy || frameBusy} onClick={() => startLink(-1)}>Before · −0.5s</button>
-              <button type="button" data-testid="scout-link-after" className={button + " flex-1"} disabled={outlineBusy || frameBusy} onClick={() => startLink(1)}>After · +0.5s</button>
-            </div>
-            {!!draft.continuity?.length && <p className="text-[11px] text-[#CCFF00]">{draft.continuity.length} nearby identity check(s) saved</p>}
-          </div>}
-          {link && <button type="button" data-testid="scout-cancel-link" className={button + " w-full"} disabled={outlineBusy || frameBusy} onClick={() => finishLink(false)}>Cancel nearby check</button>}
-          {!done && !link && !preview && (
-            <div className="flex justify-between items-center gap-2">
-              <button type="button" data-testid="scout-hidden-player" className={button + " flex items-center gap-1.5"} disabled={frameBusy}
-                aria-expanded={hiddenHelp} onClick={() => { setHiddenHelp(v => !v); setDraft(null); }}>
-                <EyeOff size={16} />Hidden / duel?
-              </button>
-              <div className="flex items-center gap-1">
-                <button type="button" aria-label="Zoom out" data-testid="scout-zoom-out" className={button} disabled={zoom <= 1} onClick={() => { setZoom(z => Math.max(1, z / 1.4)); setPan({ x: 0, y: 0 }); }}><ZoomOut size={18} /></button>
-                <button type="button" aria-label="Reset zoom" data-testid="scout-zoom-reset" className={button + " tabular-nums"} onClick={resetView}>{zoom.toFixed(1)}×</button>
-                <button type="button" aria-label="Zoom in" data-testid="scout-zoom-in" className={button} disabled={zoom >= 5} onClick={() => setZoom(z => Math.min(5, z * 1.4))}><ZoomIn size={18} /></button>
-              </div>
-            </div>
-          )}
-          {hiddenHelp && !done && (
-            <div data-testid="scout-hidden-help" className="rounded-xl bg-white/5 border border-white/15 p-3 space-y-2">
-              <p className="text-sm font-bold">Behind another player?</p>
-              <p className="text-[11px] text-white/70">Do not mark the player in front. If partly visible, tap only your player's visible body. If fully hidden, move to a clear frame or skip.</p>
-              {phase === "MARKING" && <button type="button" data-testid="scout-partial-player" className={primary + " w-full"} onClick={() => { setPartial(true); setHiddenHelp(false); setTapIntent("target"); setNotice("Tap the visible part of YOUR player. Adjust the box to include only visible body parts."); }}>Player is behind / partly visible</button>}
-              <div className="flex gap-2">
-                <button type="button" data-testid="scout-nearby-earlier" disabled={frameBusy} className={button + " flex-1"} onClick={() => moveNearby(-1)}><ChevronLeft size={14} className="inline" />0.5s earlier</button>
-                <button type="button" data-testid="scout-nearby-later" disabled={frameBusy} className={button + " flex-1"} onClick={() => moveNearby(1)}>0.5s later<ChevronRight size={14} className="inline" /></button>
-              </div>
-              {phase === "MARKING" && <button type="button" data-testid="scout-skip-frame" disabled={frameBusy} className={button + " w-full"} onClick={skipMark}>Not visible — skip this moment</button>}
-              <button type="button" className="w-full min-h-[44px] text-[#CCFF00] text-sm font-bold" onClick={() => { setHiddenHelp(false); setPartial(false); setTapIntent("target"); }}>Player visible — tap now</button>
-            </div>
-          )}
-          {phase === "MARKING" && !hasDraft && !hiddenHelp && !link && !preview && fullCount >= MIN_TAPS && (
-            <button type="button" data-testid="scout-finish-early" className={button + " w-full text-[#CCFF00]"} onClick={() => { setNotice(""); setPhase("READY"); }}>Review {confirmedCount} selections</button>
-          )}
-          {done && (
-            <>
-              <div className="flex gap-2 overflow-x-auto" data-testid="scout-selection-done">
-                {Object.entries(marks).filter(([, m]) => policy.validBox(m.box)).map(([i, m]) => <div key={i} className="flex-none w-14 h-16 border border-[#CCFF00] rounded-lg overflow-hidden"><MarkedCropCanvas frameDataUrl={frames[Number(i)].jpegDataUrl} box={m.box} mask={m.visible_mask} width={112} height={128} className="w-full h-full" /></div>)}
-              </div>
-              <p className="text-[11px] text-white/70">After saving, identity checks run automatically. No further player taps are required.</p>
-              <button type="button" data-testid="scout-submit" disabled={submitting} className={primary + " w-full"} onClick={submit}>
-                {submitting ? <Loader2 size={18} className="animate-spin" /> : <Check size={18} />}
-                {submitting ? "Saving your selections…" : "Use " + confirmedCount + " player selections"}
-              </button>
-              <button type="button" className="w-full min-h-[44px] text-xs text-white/60" disabled={submitting} onClick={() => setPhase("MARKING")}>Add or adjust a selection</button>
-            </>
-          )}
-        </footer>
-      )}
+          {phase === "MARKING" && !hasDraft && !link && fullCount >= MIN_TAPS && <button type="button" data-testid="scout-finish-early" className={primary + " w-full"} onClick={() => { setNotice(""); setPhase("READY"); }}>Finish with {confirmedCount} selections<ArrowRight size={17} /></button>}
+          {done && <>
+            <div className="scout-review-crops" data-testid="scout-selection-done">{Object.entries(marks).filter(([, m]) => policy.validBox(m.box)).map(([i, m]) => <div key={i}><MarkedCropCanvas frameDataUrl={frames[Number(i)].jpegDataUrl} box={m.box} mask={m.visible_mask} width={112} height={128} className="w-full h-full" /></div>)}</div>
+            <p className="scout-review-note">Identity checks run automatically. No extra player taps.</p>
+            <button type="button" data-testid="scout-submit" disabled={submitting} className={primary + " w-full"} onClick={submit}>{submitting ? <Loader2 size={18} className="animate-spin" /> : <Check size={18} />}{submitting ? "Saving your selections…" : "Use " + confirmedCount + " player selections"}</button>
+            <button type="button" className="scout-text-button w-full" disabled={submitting} onClick={() => setPhase("MARKING")}>Add or adjust a selection</button>
+          </>}
+        </div>}
+        {phase === "MARKING" && !link && !preview && !nearby && <div className="scout-secondary">
+          <button type="button" data-testid="scout-hidden-player" className="scout-text-button" disabled={frameBusy} aria-expanded={hiddenHelp} onClick={() => { setHiddenHelp(v => !v); setNotice(""); }}><HelpCircle size={15} />Need a clearer view?</button>
+          <button type="button" data-testid="scout-open-nearby" className="scout-text-button" disabled={frameBusy} onClick={openNearby}>Find moment<ChevronRight size={14} /></button>
+        </div>}
+        {link && <button type="button" data-testid="scout-cancel-link" className={button + " w-full"} disabled={outlineBusy || frameBusy} onClick={() => finishLink(false)}>Cancel nearby check</button>}
+      </footer>}
     </div>, document.body,
   );
 }
 
-function DraftMarker({ box, frame, rect, zoom, pan, onPointerDown, maskDataUrl, excludeMode }) {
+function DraftMarker({ box, frame, rect, zoom, pan, onPointerDown, maskDataUrl, excludeMode, editable, targetPoint, onAdjustBox }) {
   const scale = Math.min(rect.w / frame.width, rect.h / frame.height);
   const rw = frame.width * scale, rh = frame.height * scale;
   const x = ((rect.w - rw) / 2 + box.x * rw - rect.w / 2) * zoom + rect.w / 2 + pan.x;
@@ -668,11 +644,19 @@ function DraftMarker({ box, frame, rect, zoom, pan, onPointerDown, maskDataUrl, 
         maskImage: `url(${maskDataUrl})`, WebkitMaskImage: `url(${maskDataUrl})`, maskSize: "100% 100%", WebkitMaskSize: "100% 100%", pointerEvents: "none", zIndex: 9 }} />}
       <div data-testid="scout-draft-marker" data-marker-handle="move" onPointerDown={e => onPointerDown(e, "move")}
         style={{ position: "absolute", left: x, top: y, width, height, border: "3px solid #CCFF00", borderRadius: 8,
-          boxShadow: "0 0 0 100vmax rgba(0,0,0,0.32), 0 0 18px rgba(204,255,0,0.7)", cursor: "move", zIndex: 10, touchAction: "none", pointerEvents: excludeMode ? "none" : "auto" }} />
-      <div role="presentation" data-testid="scout-draft-resize" data-marker-handle="resize" onPointerDown={e => onPointerDown(e, "resize")}
-        style={{ position: "absolute", left: x + width - 22, top: y + height - 22, width: 44, height: 44, zIndex: 11, cursor: "nwse-resize", touchAction: "none", display: "grid", placeItems: "center", pointerEvents: excludeMode ? "none" : "auto" }}>
-        <span style={{ width: 18, height: 18, borderRadius: 5, background: "#CCFF00", border: "2px solid #0A0F0D" }} />
-      </div>
+          boxShadow: "0 0 0 100vmax rgba(0,0,0,0.23)", cursor: editable ? "move" : "default", zIndex: 10, touchAction: "none", pointerEvents: excludeMode || !editable || !insideBox(targetPoint, box) ? "none" : "auto" }} />
+      {targetPoint && <span data-testid="scout-target-point" style={{ position: "absolute", left: x + (targetPoint.x - box.x) * rw * zoom - 4, top: y + (targetPoint.y - box.y) * rh * zoom - 4,
+        width: 8, height: 8, borderRadius: "50%", background: "#CCFF00", border: "2px solid #10170d", boxShadow: "0 0 0 2px white", pointerEvents: "none", zIndex: 12 }} />}
+      {editable && ["nw", "ne", "sw", "se"].map(corner => <div key={corner} role="button" tabIndex={excludeMode ? -1 : 0} aria-label={"Resize " + ({ nw: "top left", ne: "top right", sw: "bottom left", se: "bottom right" })[corner]}
+        data-testid={"scout-draft-resize-" + corner} data-marker-handle={"resize-" + corner} onPointerDown={e => onPointerDown(e, "resize-" + corner)}
+        onKeyDown={e => {
+          if (!onAdjustBox || !e.key.startsWith("Arrow") || excludeMode) return;
+          e.preventDefault(); e.stopPropagation();
+          const delta = e.shiftKey ? 10 : 1;
+          onAdjustBox(resizeBox(box, corner, (e.key === "ArrowLeft" ? -delta : e.key === "ArrowRight" ? delta : 0) / frame.width, (e.key === "ArrowUp" ? -delta : e.key === "ArrowDown" ? delta : 0) / frame.height));
+        }} className="scout-resize-handle"
+        style={{ left: x + (corner.includes("e") ? width : 0) - 22, top: y + (corner.includes("s") ? height : 0) - 22,
+          cursor: ["nw", "se"].includes(corner) ? "nwse-resize" : "nesw-resize", pointerEvents: excludeMode ? "none" : "auto" }}><span /></div>)}
     </>
   );
 }
