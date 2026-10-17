@@ -523,7 +523,8 @@ def test_resolved_source_clip_outcome_is_reused_by_physical_orchestration(monkey
     assert physical["windows"][0]["status"] == "ok", physical["windows"]
     trace = physical["traces"][0]
     assert trace["motion_observation_summary"]["outcomes_reused"] == 1
-    assert trace["outcome_evidence"][0]["goal_plane_crossing"]["status"] == "UNRESOLVED"
+    assert trace["outcome_evidence"][0]["goal_plane_crossing"]["status"] == "NOT_ASSESSED"
+    assert trace["outcome_evidence"][0]["physical_outcome"] == "NOT_RECONSTRUCTED_SOURCE_VIDEO"
     unified = runtime.reconcile_unified_result({}, physical)
     assert unified["canonical_events"]["counts"] == {"GOAL": 1}
 

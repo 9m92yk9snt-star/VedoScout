@@ -17,7 +17,9 @@ single contact frame deleted an otherwise observable football sequence.
 
 Contracts
 ---------
-* Input identity is only GLOBAL_TARGET from FIX09B.0/B.1.
+* GLOBAL_TARGET starts with the original user-selected reference pixels and
+  shared identity measurements. A source-bound video comparison is direct
+  identity evidence; an unbound model label is not.
 * All times are canonical media milliseconds.
 * Hard scene cuts are absolute causal boundaries.
 * Ambiguity is preserved; model output may never silently select one of several
@@ -538,6 +540,7 @@ IDENTITY RULES
 - The structured graph below is SUPPORTING context only. VERIFIED local-track mappings are strong identity evidence; HYPOTHESES means multiple bodies remain possible and you MUST inspect before/after frames rather than choose by behaviour.
 - If identity cannot be physically resolved from visible continuity, return target_status=UNRESOLVED for that action. Do not guess.
 - Do not use behavioural profiling such as 'the target usually dribbles this way' as identity evidence.
+- Compare the attached original selected-player references with the visible actor. Record that comparison once in selected_reference_match, citing clear actor_evidence times and distinguishing appearance (hair, build, socks, boots or sleeves). A local track ID is a measurement label, not the person's identity; follow the same visible person when that label changes.
 
 SEQUENCE RULES
 - Follow the sequence several seconds BEFORE and AFTER each possible target involvement.
@@ -547,6 +550,10 @@ SEQUENCE RULES
 - Distinguish target action from teammate/opponent action. Track possession transfer and who performs the next action.
 - For a pass/cross that might become an assist, inspect the continuous visible chain: TARGET contact → teammate receive/use → teammate shot → visible goal. A cut breaks the causal chain.
 - For a target goal, require target shot contact and a visible goal outcome in the same causal sequence.
+- contact_ms for a SHOT is the final strike toward goal, never an earlier dribbling touch. Follow the active ball through the camera pan, keeper intervention and aftermath. A pan is not a cut; the shooter may leave the picture after contact. Keep stationary spare balls separate by their position relative to the goal and ground.
+- Cite the actual later outcome using outcome_evidence_ms OR causal_chain.goal_outcome_ms (also for SAVED/BLOCKED/OFF_TARGET); duplicating the timestamp is unnecessary. Give the contact in contact_ms or causal_chain.target_contact_ms. Do not infer a save from a keeper dive alone. Brief ball occlusion does not break the play, but its hidden path must remain unspecified.
+- A direct assist follows the receiver through his finish, including changing track labels. Record receiver_team and receiver_finisher_same_player from the visible transfer; a further pass to a different finisher is not the target's direct assist.
+- Receiver/finisher IDs may use response-local video_body_1-style handles if the supporting graph missed that body. Keep those visible-person handles consistent; they are not native track measurements or jersey numbers.
 - start_ms/end_ms describe the target's own action. Later receiver/shot/goal timestamps belong in causal_chain and may occur after action end, but they MUST remain inside the same supplied no-cut sequence window.
 - The target does NOT need to remain on screen after his pass if the teammate's outcome remains continuously visible.
 - If contact is briefly occluded, use adjacent frames to describe what is visible, but mark contact_visibility=OCCLUDED rather than fabricating exact contact.
@@ -557,7 +564,7 @@ For every action, capture the useful visible detail: pressure, nearby defenders,
 
 PLAYER CONTEXT
 name={pd.get('player_name') or 'selected player'}; age={pd.get('age') or 'youth'}; position={pd.get('position') or 'unknown'}; jersey_hint={profile.get('jersey_number') or 'unknown'}.
-These hints NEVER override the video or identity graph.
+These descriptive hints do not establish identity; compare the source references with the visible actor.
 
 ANALYSIS PLAN (canonical media milliseconds; hard scene boundaries)
 {compact}
@@ -585,18 +592,23 @@ RETURN ONLY VALID JSON with this exact top-level shape:
           "actor_candidate_local_track_ids": [],
           "actor_box": null,
           "actor_evidence": [{{"media_ms":0,"box":{{"x":0,"y":0,"w":0,"h":0}},"visibility":"VISIBLE|PARTIAL|OCCLUDED"}}],
+          "selected_reference_match": {{"same_player":null,"confidence":"high|medium|low","evidence_ms":[],"features":[],"continuous_visible_actor":false}},
           "evidence_ms": [0],
           "foot": "LEFT|RIGHT|BOTH|UNKNOWN",
           "pressure": {{"level":"NONE|LOW|MEDIUM|HIGH|UNKNOWN","nearby_players":0}},
           "details": ["short visible micro-detail"],
           "outcome": "GOAL|SAVED|BLOCKED|OFF_TARGET|COMPLETED|INCOMPLETE|WON|LOST|TEAMMATE_SHOT|TEAMMATE_GOAL|TURNOVER|UNKNOWN",
           "outcome_visible": true,
+          "outcome_evidence_ms": [],
           "causal_chain": {{
              "target_contact_ms": null,
              "receiver_local_track_id": null,
              "receiver_ms": null,
              "teammate_shot_ms": null,
+             "finisher_local_track_id": null,
              "goal_outcome_ms": null,
+             "receiver_team": "TEAMMATE|OPPONENT|UNKNOWN",
+             "receiver_finisher_same_player": null,
              "continuous_visible_sequence": false
           }},
           "contact_visibility": "VISIBLE|PARTIAL|OCCLUDED|UNKNOWN",
@@ -733,9 +745,108 @@ def _normalise_action(a, window):
     return open_observation_compat.preserve_open_observation(a, normalised)
 
 
-def normalise_sequence_analysis(raw, plan: dict) -> dict:
+def _source_action_fingerprint(sequence_id, scene_id, action):
+    """Bind evidence to the actual response row, including its enclosing scene."""
+    return hashlib.sha256(json.dumps([sequence_id, scene_id, action], sort_keys=True,
+        separators=(",", ":"), ensure_ascii=False, allow_nan=False).encode()).hexdigest()
+
+
+def source_observation_receipt(raw, response_text, prompt, video_input, source_video_sha256):
+    """Record an existing model call out of band; model JSON cannot attest input.
+
+    The server supplies the run's canonical source hash and the adapter's actual
+    video/reference audit. No decode, model call, identity re-read or event
+    decision happens here. Fingerprints survive bounded window retries without
+    attaching an earlier call's proof to a changed action.
+    """
+    audit = video_input if isinstance(video_input, dict) else {}
+    hashes = [source_video_sha256, audit.get("model_video_sha256"),
+              *(audit.get("reference_sha256") or [])]
+    if (not isinstance(raw, dict) or not isinstance(response_text, str)
+            or audit.get("protocol") != "TEMPORAL_VIDEO_INPUT_V1"
+            or not audit.get("reference_sha256")
+            or any(not isinstance(h, str) or len(h) != 64
+                   or any(c not in "0123456789abcdef" for c in h) for h in hashes)):
+        return {}
+    fingerprints = []
+    for sequence in raw.get("sequences") or []:
+        if not isinstance(sequence, dict):
+            continue
+        for action in sequence.get("actions") or []:
+            if isinstance(action, dict):
+                try:
+                    fingerprints.append(_source_action_fingerprint(
+                        sequence.get("sequence_id"), sequence.get("scene_id"), action))
+                except (ValueError, TypeError):
+                    continue
+    return {
+        "authority": "WHOLE_VIDEO_SEQUENCE_OBSERVATION",
+        "source_video_sha256": source_video_sha256,
+        "clip_sha256": audit["model_video_sha256"],
+        "reference_sha256": list(audit["reference_sha256"]),
+        "input_sha256": hashlib.sha256(json.dumps([prompt, *hashes], separators=(",", ":")).encode()).hexdigest(),
+        "response_sha256": hashlib.sha256(response_text.encode()).hexdigest(),
+        "model": audit.get("model"), "provider_requested_fps": audit.get("requested_fps"),
+        "sampling_attached_to_provider_payload": audit.get("sampling_attached_to_provider_payload") is True,
+        "provider_receipt_confirmed": audit.get("provider_receipt_confirmed") is True,
+        "action_fingerprints": fingerprints,
+    }
+
+
+def _attach_source_observation(action, raw, receipt, window):
+    """Give the first video read the same source evidence path as a motion read."""
+    video = {k: deepcopy(v) for k, v in receipt.items() if k != "action_fingerprints"}
+    video["source_bounds_ms"] = [int(window["start_ms"]), int(window["end_ms"])]
+    match = raw.get("selected_reference_match")
+    if isinstance(match, dict):
+        visible = {r["media_ms"] for r in action["actor_evidence"]
+                   if r["visibility"] in {"VISIBLE", "PARTIAL"}}
+        match_times = match.get("evidence_ms") if isinstance(match.get("evidence_ms"), list) else []
+        features = match.get("features") if isinstance(match.get("features"), list) else []
+        video["selected_reference_match"] = {
+            "same_player": match.get("same_player"), "confidence": match.get("confidence"),
+            "continuous_visible_actor": match.get("continuous_visible_actor") is True,
+            "evidence_ms": sorted({ms for ms in match_times
+                                   if type(ms) is int and ms in visible}),
+            "features": [f for f in features if isinstance(f, str)
+                         and f in {"hair", "build", "socks", "boots", "sleeves"}],
+        }
+    chain = action["causal_chain"]
+    contact, chain_contact = action.get("contact_ms"), chain.get("target_contact_ms")
+    if contact is None and chain_contact is not None and action["start_ms"] <= chain_contact <= action["end_ms"]:
+        action["contact_ms"] = chain_contact
+    elif chain_contact is None:
+        chain["target_contact_ms"] = contact
+    pivot = action.get("contact_ms")
+    pivot = pivot if pivot is not None else action["start_ms"]
+    outcome_times = raw.get("outcome_evidence_ms") if isinstance(raw.get("outcome_evidence_ms"), list) else []
+    evidence = {ms for ms in outcome_times if type(ms) is int and pivot <= ms <= window["end_ms"]}
+    terminal = chain.get("goal_outcome_ms")
+    if terminal is None and evidence:
+        terminal = chain["goal_outcome_ms"] = max(evidence)
+    elif terminal is not None and pivot <= terminal <= window["end_ms"]:
+        evidence.add(terminal)
+    video["outcome_evidence_ms"] = sorted(evidence)
+    # Source binding establishes provenance, not the correctness of an outcome
+    # label. The same read must actually cite its later visible result.
+    action["outcome_visible"] = bool(action["outcome_visible"] and evidence
+        and terminal in evidence and action["causal_chain"]["continuous_visible_sequence"])
+    if action["kind"] in {"SHOT", "PASS", "CROSS", "KEY_PASS"}:
+        action["outcome_visible"] = bool(action["outcome_visible"] and action.get("contact_ms") is not None
+            and action["causal_chain"].get("target_contact_ms") == action["contact_ms"])
+    chain = raw.get("causal_chain") if isinstance(raw.get("causal_chain"), dict) else {}
+    if isinstance(chain.get("finisher_local_track_id"), str):
+        action["causal_chain"]["finisher_local_track_id"] = chain["finisher_local_track_id"]
+    video["assist_roles"] = {k: chain[k] for k in ("receiver_team", "receiver_finisher_same_player") if k in chain}
+    action["video_observation"] = video
+
+
+def normalise_sequence_analysis(raw, plan: dict, *, source_observations=()) -> dict:
     """Validate model output against supplied sequence windows and timebase."""
     obj = raw if isinstance(raw, dict) else {}
+    receipts = {key: receipt for receipt in source_observations or [] if isinstance(receipt, dict)
+                and receipt.get("authority") == "WHOLE_VIDEO_SEQUENCE_OBSERVATION"
+                for key in receipt.get("action_fingerprints") or []}
     windows = {
         w.get("sequence_id"): w for w in (plan or {}).get("analysis_windows") or []
         if isinstance(w, dict) and w.get("sequence_id")
@@ -764,6 +875,13 @@ def normalise_sequence_analysis(raw, plan: dict) -> dict:
             n = _normalise_action(a, w)
             if n is None:
                 continue
+            if receipts:
+                try:
+                    receipt = receipts.get(_source_action_fingerprint(sid, s.get("scene_id"), a))
+                except (ValueError, TypeError):
+                    receipt = None
+                if receipt:
+                    _attach_source_observation(n, a, receipt, w)
             aid = n.get("action_id") or _stable_id("act", w["sequence_id"], n["start_ms"], n["end_ms"])
             if aid in seen_action_ids:
                 # Duplicate ids cannot become two facts. Keep first occurrence;

@@ -29,7 +29,41 @@ def _num(value):
     return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
 
 
-def build_plan(windows, analysis, budget=None):
+def _resolved_source_job(job, analysis, events, source_video_sha256):
+    """Reuse a fully resolved review, retaining native recall for new evidence.
+
+    Empty, partial, conflicting or merely labelled model windows retain their
+    existing inspection. A complete event outside this job cannot suppress it.
+    """
+    import canonical_event_resolver as resolver
+    if not source_video_sha256:
+        return []
+    events = [e for e in events or [] if resolver.has_motion_proof(e)
+              and (e.get("proof") or {}).get("video_observation", {}).get("source_video_sha256") == source_video_sha256
+              and e.get("scene_id") == job["scene_id"]]
+    complete = {c.get("sequence_id") for c in (analysis or {}).get("coverage") or []
+                if c.get("contract_complete") is True}
+    sequences = [s for s in (analysis or {}).get("sequences") or [] if s.get("scene_id") == job["scene_id"]]
+    if not any(s.get("sequence_id") in complete and s.get("start_ms", float("inf")) <= job["start_ms"]
+               and s.get("end_ms", -1) >= job["end_ms"] for s in sequences):
+        return []
+    # An overlapping unresolved action still deserves a read, even when a
+    # different overlapping model window is already complete.
+    actions = [a for s in sequences for a in s.get("actions") or [] if not a.get("duplicate_of")
+               and a.get("start_ms", float("inf")) <= job["end_ms"]
+               and a.get("end_ms", -1) >= job["start_ms"]]
+    matched = []
+    for action in actions:
+        video = action.get("video_observation") or {}
+        event = next((e for e in events if action.get("action_id") in (e.get("source_action_ids") or [])), None)
+        if (event is None or video.get("authority") != "WHOLE_VIDEO_SEQUENCE_OBSERVATION"
+                or video.get("source_video_sha256") != source_video_sha256):
+            return []
+        matched.append(event["event_id"])
+    return sorted(set(matched))
+
+
+def build_plan(windows, analysis, budget=None, *, observed_events=None, source_video_sha256=None):
     """Reserve a report-wide allocation before windows spend any model calls."""
     limit = MAX_ACTION_REVIEWS if budget is None else max(0, int(budget))
     windows = [w for w in windows if _num(w.get("start_ms")) and _num(w.get("end_ms"))
@@ -100,7 +134,7 @@ def build_plan(windows, analysis, budget=None):
     for cells in scenes.values():
         for group in cells.values():
             group.sort(key=lambda j: (not j["has_contact_time"], j["center_ms"]))
-    visits, ordered = defaultdict(int), []
+    visits, ordered, selected_count = defaultdict(int), [], 0
     while scenes:
         minimum_visits = min(visits[(scene, cell)] for scene, cells in scenes.items() for cell in cells)
         eligible_scenes = [s for s in scenes if any(visits[(s, c)] == minimum_visits for c in scenes[s])]
@@ -111,7 +145,11 @@ def build_plan(windows, analysis, budget=None):
             job["inspection_id"] = hashlib.sha256(json.dumps(
                 [job["scene_id"], job["dense_window_id"], job["start_ms"], job["end_ms"], job["center_ms"]]).encode()).hexdigest()[:20]
             job["selection_rank"] = len(ordered)
-            job["selected"] = len(ordered) < limit
+            reused = _resolved_source_job(job, analysis, observed_events, source_video_sha256)
+            job["selected"] = not reused and selected_count < limit
+            selected_count += int(job["selected"])
+            if reused:
+                job.update(reason="SOURCE_SEQUENCE_ALREADY_RESOLVED", reused_event_ids=reused)
             ordered.append(job)
             visits[(scene, cell)] += 1
             if not cells[cell]:
@@ -119,7 +157,8 @@ def build_plan(windows, analysis, budget=None):
             if not cells:
                 del scenes[scene]
     return {"budget": limit, "selected": sum(j["selected"] for j in ordered),
-            "deferred": sum(not j["selected"] for j in ordered), "jobs": ordered}
+            "deferred": sum(not j["selected"] and not j.get("reused_event_ids") for j in ordered),
+            "reused": sum(bool(j.get("reused_event_ids")) for j in ordered), "jobs": ordered}
 
 
 def frame_times(job, frames):

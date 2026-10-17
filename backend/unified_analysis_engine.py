@@ -353,7 +353,7 @@ def _scoring_scan(canonical: dict, sequence_analysis: dict) -> dict:
     }
 
 
-def finalise_analysis(raw_model_result: dict | None, prepared: dict | None) -> dict:
+def finalise_analysis(raw_model_result: dict | None, prepared: dict | None, *, source_observations=None) -> dict:
     """Turn one B.2 observation response into canonical event/output truth."""
     ctx = prepared if isinstance(prepared, dict) else {}
     plan = ctx.get("sequence_plan") if isinstance(ctx.get("sequence_plan"), dict) else {}
@@ -361,7 +361,8 @@ def finalise_analysis(raw_model_result: dict | None, prepared: dict | None) -> d
     authority = ctx.get("authority") if isinstance(ctx.get("authority"), dict) else {}
 
     sequence_analysis = football_sequence_intelligence.normalise_sequence_analysis(
-        raw_model_result if isinstance(raw_model_result, dict) else {}, plan)
+        raw_model_result if isinstance(raw_model_result, dict) else {}, plan,
+        **({"source_observations": source_observations} if source_observations is not None else {}))
     canonical = canonical_event_resolver.resolve_canonical_events(
         sequence_analysis, scene_graph, authority)
     ledger = canonical_output_authority.build_ledger_compat(

@@ -54,6 +54,8 @@ def build(trace):
             continue
         start, end = piece[0]["media_ms"], piece[-1]["media_ms"]
         outcome = outcomes.get(strike.get("strike_id")) or {}
+        if (outcome.get("goal_geometry_evidence") or {}).get("reason") == "OUTCOME_ALREADY_RESOLVED_FROM_SOURCE_CLIP":
+            continue  # the same observed finish needs no second forward/backward search
         crossing = outcome.get("goal_plane_crossing") or {}
         terminal = crossing.get("crossing_ms") if crossing.get("status") == "VERIFIED" else None
         if observations.num(terminal) and ms <= terminal <= end:

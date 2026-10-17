@@ -299,6 +299,7 @@ async def run(*, report_id: str, video_path: str, unified_result: dict,
                 source_video=source_video or {}, goal_geometry_provider=goal_geometry_provider,
                 role_evidence=role_evidence or {}, role_evidence_provider=role_evidence_provider,
                 action_evidence_provider=action_evidence_provider,
+                observed_events=(result.get("canonical_events") or {}).get("events") or [],
                 trace_callback=completed_trace,
             )
             await asyncio.gather(*(asyncio.wrap_future(future) for future in pending))
