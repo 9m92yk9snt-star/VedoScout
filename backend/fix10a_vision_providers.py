@@ -1187,6 +1187,10 @@ async def read_action_video_evidence(api_key, session_id, clip_path, media_ms, b
         "at EACH cited index; one person's label can change. A local track label can also switch people: compare the pixels, not just the label. "
         "Compare the selected player's reference crops using hair, build, "
         "socks, boots and sleeves even when the shirt number is hidden. Kit colour alone cannot identify a teammate. "
+        "Also compare the shirt and shorts with the reference: a clearly incompatible kit is negative identity evidence; "
+        "matching hair alone cannot turn that opponent into the selected player. A detail-panel body or tracking label "
+        "does not establish identity. In selected_reference_match state whether the ACTOR is the selected person, "
+        "including false for an observed different player, and cite that actor's evidence_indices. "
         "Keep passer, receiver and finisher separate. Follow each active-ball sequence forward from the pass "
         "and backward from the outcome. A player leaving the picture after his pass does not erase that pass. "
         "TEAMMATE_GOAL on a pass means the observed direct assist: the teammate receives that pass and finishes, "
@@ -1220,7 +1224,7 @@ async def read_action_video_evidence(api_key, session_id, clip_path, media_ms, b
         "This needs a visible ball at that body, not gaze, proximity alone or the action label. Otherwise use null/false. "
         "Select only visibly exposed jersey bodies for separate digit reading; do not guess digits. "
         "Return JSON: {\"reviewed_entire_clip\":true,\"frames\":[{\"idx\":1,\"balls\":[{\"ball_id\":\"ball_a\",\"box\":{\"x\":0,\"y\":0,\"w\":0.01,\"h\":0.01},\"confidence\":\"high\",\"active_ball\":true,\"stationary_spare\":false,\"control_body_id\":null,\"control_visible\":false}],\"selected_body_ids\":[]}],"
-        "\"target_observations\":[{\"idx\":1,\"body_id\":\"body_1\",\"confidence\":\"high\",\"features\":[\"hair\",\"boots\"]}],"
+        "\"target_observations\":[{\"idx\":1,\"body_id\":\"body_1\",\"same_player\":true,\"kit_consistent\":true,\"confidence\":\"high\",\"features\":[\"hair\",\"boots\"]}],"
         "\"actions\":[{\"kind\":\"PASS|CROSS|SHOT|RECEIVE|CARRY|DRIBBLE|DUEL|RUN|OTHER\","
         "\"start_idx\":1,\"contact_idx\":2,\"end_idx\":3,\"actor_body_id\":\"body_1\",\"actor_evidence_indices\":[1,2],"
         "\"actor_observations\":[{\"idx\":1,\"body_id\":\"body_1\"},{\"idx\":2,\"body_id\":\"body_1\"}],"
@@ -1228,6 +1232,7 @@ async def read_action_video_evidence(api_key, session_id, clip_path, media_ms, b
         "\"outcome\":\"GOAL|SAVED|BLOCKED|OFF_TARGET|COMPLETED|INCOMPLETE|TEAMMATE_SHOT|TEAMMATE_GOAL|UNKNOWN\","
         "\"outcome_visible\":true,\"outcome_idx\":null,\"receiver_body_id\":null,\"receiver_idx\":null,"
         "\"finisher_body_id\":null,\"shot_idx\":null,\"continuous_visible_sequence\":true,"
+        "\"selected_reference_match\":{\"same_player\":null,\"confidence\":\"low\",\"evidence_indices\":[1,2],\"continuous_visible_actor\":true,\"features\":[]},"
         "\"save_sequence\":{\"ball_id\":\"ball_a\",\"incoming_idx\":4,\"keeper_idx\":5,\"keeper_body_id\":null,"
         "\"keeper_box\":{\"x\":0,\"y\":0,\"w\":0.1,\"h\":0.1},\"aftermath_keeper_box\":null,"
         "\"keeper_intervention_visible\":true,\"aftermath_idx\":6,\"aftermath\":\"DEFLECTED_AWAY|HELD\",\"same_active_ball\":true},"
@@ -1289,6 +1294,8 @@ def _target_observations(parsed, times, manifest):
     by_ms = {r["media_ms"]: {b["body_id"] for b in r.get("bodies") or []} for r in manifest or []}
     for row in rows if isinstance(rows, list) else []:
         if not isinstance(row, dict) or type(row.get("idx")) is not int or not 1 <= row["idx"] <= len(times):
+            continue
+        if row.get("same_player") is False or row.get("kit_consistent") is False:
             continue
         ms = times[row["idx"]-1]
         if not isinstance(row.get("body_id"), str) or row["body_id"] not in by_ms.get(ms, set()):

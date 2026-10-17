@@ -330,7 +330,8 @@ def _build_tap_references(cap, fps, anchors, t_off, sw, sh, scale, detector=None
                 if point_px is None:
                     return min(candidates, key=lambda c: abs(c[0] + c[2] / 2 - cx0)
                                + abs(c[1] + c[3] / 2 - cy0)) if candidates else None
-                indices = body_indices_at_point(candidates, point_px, excluded_px)
+                indices = body_indices_at_point(candidates, point_px, excluded_px,
+                                                selection_box=(bx, by, bw, bh), visible_mask=a.get("visible_mask"))
                 return candidates[indices[0]] if len(indices) == 1 else None
 
             def human_excluded(c):
