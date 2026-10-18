@@ -1,0 +1,1183 @@
+{
+  "experiment": "native-assist-automatic-approval",
+  "workflow_run": 39164556304,
+  "job_id": 117784665470,
+  "code_commit": "e3509ea07805f76194ef7474c7b7b55b1beec295",
+  "source_video_sha256": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+  "whole_source_preparation_seconds": 19.288,
+  "source_input_comparison": {
+    "prior_workflow_run": 39161654199,
+    "previous_payload_sha256": "b5ef39a235b2af744322c7355fc044d432c8ffd0ed49e1affb5cae490a3a67e1",
+    "current_payload_sha256": "23bd60aab3097ab898f4151f6f0c0c4262e49e6a376997cbd6de29779534b410",
+    "all_184_image_hashes_and_sizes_identical": true,
+    "model_and_reasoning_unchanged": true,
+    "changed_instruction": "typed contact-chain event mapping"
+  },
+  "packet_id": "continuous_pass_link",
+  "provider": "emergent",
+  "requested_model": "gpt-6-astra",
+  "origin": "LIVE_MODEL_REQUEST",
+  "status": "COMPLETED",
+  "requested_reasoning_effort": "medium",
+  "payload_sha256": "23bd60aab3097ab898f4151f6f0c0c4262e49e6a376997cbd6de29779534b410",
+  "payload_bytes": 19199413,
+  "explicit_image_count": 184,
+  "frame_sampling_in_provider_metadata": false,
+  "videos": [],
+  "requested_image_detail": "high",
+  "model_version": "gpt-6-astra",
+  "response_id": "chatcmpl-EaS1PLJIPgdYHvBkxL2Apo1kx7Uj2",
+  "usage": {
+    "completion_tokens": 3304,
+    "prompt_tokens": 129500,
+    "total_tokens": 132804,
+    "completion_tokens_details": {
+      "accepted_prediction_tokens": 0,
+      "audio_tokens": 0,
+      "reasoning_tokens": 694,
+      "rejected_prediction_tokens": 0
+    },
+    "prompt_tokens_details": {
+      "audio_tokens": 0,
+      "cached_tokens": 0
+    }
+  },
+  "raw_response": "{\n  \"players\": [\n    {\n      \"person_id\": \"p1\",\n      \"selected\": true,\n      \"appearance\": \"Short, light-brown-haired player in white, white socks and dark boots. Matches the selected person in r2 by appearance and continuous movement from the left-side reception through the later release.\",\n      \"reference_ids\": [\"r2\"],\n      \"evidence_frames\": [\"s000041632\", \"s000041915\", \"s000043965\", \"s000044115\", \"s000045265\"]\n    },\n    {\n      \"person_id\": \"p2\",\n      \"selected\": false,\n      \"appearance\": \"Dark-skinned white-team player with short dark hair. Initially carries the ball on the right; subsequently remains in the foreground while another white attacker receives farther ahead. Physically distinct from r2.\",\n      \"reference_ids\": [],\n      \"evidence_frames\": [\"s000038765\", \"s000040765\", \"s000043732\", \"s000045332\"]\n    },\n    {\n      \"person_id\": \"p3\",\n      \"selected\": false,\n      \"appearance\": \"White-team player with conspicuous longer pale-blond hair. Involved in the earlier central redirection, then runs to the right of the later receiving attacker. Not the short-haired selected player or the later finisher.\",\n      \"reference_ids\": [],\n      \"evidence_frames\": [\"s000041265\", \"s000041382\", \"s000044648\", \"s000045515\", \"s000046015\"]\n    },\n    {\n      \"person_id\": \"p4\",\n      \"selected\": false,\n      \"appearance\": \"Dark-haired white-team attacker farther upfield, initially partly concealed behind blue players during the later pass. Emerges centrally with the ball and makes the finishing movement. Distinct from the foreground dark-haired p2, the blond p3 and r2.\",\n      \"reference_ids\": [],\n      \"evidence_frames\": [\"s000044115\", \"s000045215\", \"s000045332\", \"s000045498\", \"s000045598\"]\n    },\n    {\n      \"person_id\": \"p5\",\n      \"selected\": false,\n      \"appearance\": \"Additional dark-haired white player briefly visible at the far left during p1's carry. Kept separate from the upfield attacker; the supplied views do not establish a later contact by this person. Does not match r2.\",\n      \"reference_ids\": [],\n      \"evidence_frames\": [\"s000042765\", \"s000042882\", \"s000043132\"]\n    },\n    {\n      \"person_id\": \"p6\",\n      \"selected\": false,\n      \"appearance\": \"Short dark-haired blue-shirted defender with white shorts and dark socks who stretches a leg into p1's outgoing ball path, bends forward, then turns to chase. Not a white-team identity match.\",\n      \"reference_ids\": [],\n      \"evidence_frames\": [\"s000044198\", \"s000044332\", \"s000044515\", \"s000045515\"]\n    },\n    {\n      \"person_id\": \"p7\",\n      \"selected\": false,\n      \"appearance\": \"Tall, short fair-haired blue defender who initially follows p2 and later retreats toward the goal alongside the rolling shot. Distinct from r2.\",\n      \"reference_ids\": [],\n      \"evidence_frames\": [\"s000039015\", \"s000040882\", \"s000045782\", \"s000045915\"]\n    },\n    {\n      \"person_id\": \"p8\",\n      \"selected\": false,\n      \"appearance\": \"Red-clad goalkeeper, initially standing in the goal and later diving low across the shot's path. Not an identity match.\",\n      \"reference_ids\": [],\n      \"evidence_frames\": [\"s000039015\", \"s000045515\", \"s000045815\", \"s000046015\"]\n    }\n  ],\n  \"contact_chain\": [\n    {\n      \"actor\": \"p2\",\n      \"kind\": \"Carries the active ball and changes direction under pressure\",\n      \"before_frame\": \"s000038765\",\n      \"after_frame\": \"s000040765\",\n      \"recipient\": null,\n      \"visible_evidence\": \"The ball stays near p2's advancing feet, then moves left as p2 bends and turns before moving back toward it. The nearby blue defender challenges, but no controlled defensive possession is established.\",\n      \"remaining_alternatives\": \"Individual foot-ball instants during the challenge are not all clear; no extra defensive possession or deliberate pass is inferred.\"\n    },\n    {\n      \"actor\": \"p2\",\n      \"kind\": \"Releases a low ball leftward\",\n      \"before_frame\": \"s000040765\",\n      \"after_frame\": \"s000041132\",\n      \"recipient\": \"p3\",\n      \"visible_evidence\": \"The ball is beside p2 before the leg extension, is travelling left across the defenders at s000040882, and reaches the approaching blond p3's area at s000041132.\",\n      \"remaining_alternatives\": \"A blue player stretches toward its route; the overview does not resolve every possible brush.\"\n    },\n    {\n      \"actor\": \"p3\",\n      \"kind\": \"Redirects the arriving ball farther left\",\n      \"before_frame\": \"s000041132\",\n      \"after_frame\": \"s000041382\",\n      \"recipient\": \"p1\",\n      \"visible_evidence\": \"P3 steps across the arriving ball and extends a leg at s000041265; afterward the ball separates leftward while p3 remains in the central group. P1 approaches from the left.\",\n      \"remaining_alternatives\": \"The crowded contact does not establish prolonged controlled possession by p3 or exclude a slight defensive contribution.\"\n    },\n    {\n      \"actor\": \"p1\",\n      \"kind\": \"Receives the leftward ball and carries it before turning inward\",\n      \"before_frame\": \"s000041515\",\n      \"after_frame\": \"s000043732\",\n      \"recipient\": null,\n      \"visible_evidence\": \"The ball rolls to p1, who steps to it at s000041632 and carries it left through the original selection instant. P1 then turns and advances rightward with the ball ahead of the feet. P3 and p2 remain separate players behind and to the right.\",\n      \"remaining_alternatives\": \"\"\n    },\n    {\n      \"actor\": \"p1\",\n      \"kind\": \"Passes the active ball forward through the defensive line\",\n      \"before_frame\": \"s000043948\",\n      \"after_frame\": \"s000044132\",\n      \"recipient\": \"p4\",\n      \"visible_evidence\": \"P1 brings the foot through the ball between s000043965 and s000044082. By s000044098–s000044132 the ball has separated and is travelling rightward, slightly above the turf. P1 is the uniquely supported releasing actor.\",\n      \"remaining_alternatives\": \"The subsequent defender's attempted interception is not itself an established touch.\"\n    },\n    {\n      \"actor\": \"p4\",\n      \"kind\": \"Receives the through ball ahead of the defenders\",\n      \"before_frame\": \"s000044598\",\n      \"after_frame\": \"s000045332\",\n      \"recipient\": null,\n      \"visible_evidence\": \"The ball emerges beyond p6 at s000044598, continues forward through the gap, and is visible farther along that route at s000044982. P4 emerges behind the defensive line with the ball immediately ahead of the feet at s000045298–s000045332. P2 stays in the foreground and p3 runs separately on the right.\",\n      \"remaining_alternatives\": \"The first receiving foot-ball pixel is partly concealed. The moving-ball route and p4's emergence support p4 as the recipient; they do not establish a separate intervening pass or a long spell of possession.\"\n    },\n    {\n      \"actor\": \"p4\",\n      \"kind\": \"Makes a low finishing strike toward goal\",\n      \"before_frame\": \"s000045448\",\n      \"after_frame\": \"s000045682\",\n      \"recipient\": null,\n      \"visible_evidence\": \"P4 has the ball immediately ahead, plants and swings through as a blue defender closes. The kicking leg follows through in s000045532–s000045598, and the ball emerges travelling rapidly rightward along the ground at s000045648–s000045682. This short body-and-ball sequence uniquely identifies p4 as the attacking finisher.\",\n      \"remaining_alternatives\": \"The exact foot-ball instant is obscured by the challenge. A slight defensive brush remains unresolved, but neither p2 nor p3 is an alternative attacking finisher.\"\n    }\n  ],\n  \"outcome\": {\n    \"kind\": \"GOAL\",\n    \"last_touch_actor\": null,\n    \"evidence\": [\"s000045698\", \"s000045915\", \"s000046015\", \"s000046131\"],\n    \"uncertainty\": \"The moving ball passes the diving goalkeeper and retreating defender and is established inside the goal. P4's finishing action is supported; the absolute last toucher remains unresolved because slight defensive contact cannot be resolved.\"\n  },\n  \"link_assessment\": {\n    \"releaser\": \"p1\",\n    \"receiver\": \"p4\",\n    \"finisher\": \"p4\",\n    \"same_ball_release_to_receiver\": {\n      \"status\": \"SUPPORTED\",\n      \"frames\": [\"s000044098\", \"s000044332\", \"s000044598\", \"s000044982\", \"s000045332\"],\n      \"observation\": \"The outgoing ball advances toward and beyond the stretching blue defender, emerges on his far side, and continues into the upfield white attacker's feet. The recipient is p4, not foreground p2 or the blond runner p3. Brief body occlusions do not supply evidence of a different ball or an intervening deliberate pass.\"\n    },\n    \"receiver_finishing_action\": {\n      \"status\": \"SUPPORTED\",\n      \"frames\": [\"s000045332\", \"s000045498\", \"s000045598\", \"s000045682\"],\n      \"observation\": \"The same upfield white attacker stays with the arriving ball, plants and swings through it, then follows through as the ball departs low toward goal. The attacking actor is unique despite the obscured contact pixel.\"\n    },\n    \"goal_from_that_finish\": {\n      \"status\": \"SUPPORTED\",\n      \"frames\": [\"s000045682\", \"s000045915\", \"s000046015\", \"s000046131\"],\n      \"observation\": \"The low outgoing ball continues past the diving goalkeeper, passes the retreating blue defender, crosses into the goal and travels farther across its interior. This is moving active-ball evidence, not a stationary background ball.\"\n    },\n    \"intervening_control\": {\n      \"status\": \"NOT_OBSERVED\",\n      \"frames\": [\"s000044265\", \"s000044515\", \"s000044598\", \"s000045332\"],\n      \"observation\": \"P6 stretches and bends as the ball travels past, then turns to pursue. No trap, sustained defensive carry or deliberate intervening pass is visible before p4 receives. The pass connection is supported separately by the ball's forward motion.\"\n    },\n    \"defensive_contact\": {\n      \"status\": \"UNCERTAIN\",\n      \"frames\": [\"s000044332\", \"s000044598\", \"s000045515\", \"s000045682\", \"s000045848\", \"s000045915\"],\n      \"observation\": \"The initial interception attempt brings a boot close to the ball without a clear contact or decisive redirection. The finishing challenge obscures the exact strike, and the ball later passes close to a retreating defender's foot. Slight brushes cannot be resolved; none establishes controlled possession or an interruption of the supported attacking sequence.\"\n    }\n  },\n  \"event_mapping\": {\n    \"pass_chain_index\": 4,\n    \"receive_chain_index\": 5,\n    \"finish_chain_index\": 6,\n    \"receiver_is_teammate\": true,\n    \"same_active_ball\": true,\n    \"continuous_play\": true,\n    \"pass_actor_unique\": true,\n    \"finishing_actor_unique\": true,\n    \"goal_frame\": \"s000046015\"\n  }\n}",
+  "response_sha256": "211a33fc775829734650d2e3e05397227f1e925e69e643387b8647fa7a9d092c",
+  "elapsed_seconds": 68.6,
+  "result": {
+    "status": "COMPLETED",
+    "source_video_sha256": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+    "source_start_ms": 38632,
+    "source_end_ms": 47264,
+    "identity_reference_ids": [
+      "r2"
+    ],
+    "source_crop_box": [
+      0,
+      861,
+      1080,
+      1510
+    ],
+    "comparison": {
+      "origin_run": 39155426908,
+      "baseline_payload_sha256": "56d7e3037ed62a00d74f6ecac8787327909e96b5b2ae86e1ca6bbb2f142af27b",
+      "messages_images_and_source_instants_unchanged": false,
+      "changed_settings": [
+        "added_continuous_bridge_images",
+        "explicit_neutral_link_observation_schema",
+        "typed_contact_chain_event_mapping"
+      ]
+    },
+    "retained_overview_instants": [
+      38632,
+      38765,
+      38882,
+      39015,
+      39132,
+      39265,
+      39382,
+      39515,
+      39632,
+      39765,
+      39882,
+      40015,
+      40132,
+      40265,
+      40382,
+      40515,
+      40632,
+      40765,
+      40882,
+      41015,
+      41132,
+      41265,
+      41382,
+      41515,
+      41632,
+      41765,
+      41882,
+      41915,
+      42015,
+      42132,
+      42265,
+      42382,
+      42515,
+      42632,
+      42765,
+      42882,
+      43015,
+      43132,
+      43265,
+      43382,
+      43515,
+      43632,
+      43765,
+      43882,
+      44015,
+      44132,
+      44265,
+      44382,
+      44515,
+      44632,
+      44765,
+      44882,
+      45015,
+      45132,
+      45265,
+      45382,
+      45515,
+      45632,
+      45765,
+      45881,
+      46015,
+      46131,
+      46265,
+      46381,
+      46515,
+      46631,
+      46765,
+      46881,
+      47015,
+      47131
+    ],
+    "retained_native_instants": [
+      43732,
+      43748,
+      43765,
+      43782,
+      43798,
+      43815,
+      43832,
+      43848,
+      43865,
+      43882,
+      43898,
+      43915,
+      43932,
+      43948,
+      43965,
+      43982,
+      43998,
+      44015,
+      44032,
+      44048,
+      44065,
+      44082,
+      44098,
+      44115,
+      44132,
+      44148,
+      44165,
+      44182,
+      44198,
+      44215,
+      44232,
+      44248,
+      44265,
+      44282,
+      44298,
+      44315,
+      44332,
+      44348,
+      44365,
+      44382,
+      45132,
+      45148,
+      45165,
+      45182,
+      45198,
+      45215,
+      45232,
+      45248,
+      45265,
+      45282,
+      45298,
+      45315,
+      45332,
+      45348,
+      45365,
+      45382,
+      45398,
+      45415,
+      45432,
+      45448,
+      45465,
+      45482,
+      45498,
+      45515,
+      45532,
+      45548,
+      45565,
+      45582,
+      45598,
+      45615,
+      45632,
+      45648,
+      45665,
+      45682,
+      45698,
+      45715,
+      45732,
+      45748,
+      45765,
+      45782,
+      45798,
+      45815,
+      45832,
+      45848,
+      45865,
+      45881,
+      45898,
+      45915,
+      45931,
+      45948,
+      45965,
+      45981,
+      45998,
+      46015
+    ],
+    "new_bridge_instants": [
+      44398,
+      44432,
+      44482,
+      44515,
+      44565,
+      44598,
+      44648,
+      44682,
+      44732,
+      44765,
+      44815,
+      44848,
+      44898,
+      44932,
+      44982,
+      45015,
+      45065,
+      45098
+    ],
+    "bridge_jpeg_quality": 80,
+    "max_detail_gap_ms": 50,
+    "original_image_hashes_retained": true,
+    "request_audit": {
+      "payload_sha256": "23bd60aab3097ab898f4151f6f0c0c4262e49e6a376997cbd6de29779534b410",
+      "payload_bytes": 19199413,
+      "explicit_image_count": 184,
+      "frame_sampling_in_provider_metadata": false,
+      "videos": [],
+      "requested_image_detail": "high"
+    },
+    "preparation_seconds": 3.394,
+    "production_pipeline_changed": false,
+    "expected_answers_used_as_input": false,
+    "independent_visual_correctness_verified": false,
+    "target_events": [
+      {
+        "event_id": "8a2678eb0a7c4143655e",
+        "source_packet_ids": [
+          "continuous_pass_link"
+        ],
+        "source_action_keys": [
+          "continuous_pass_link:0:pass"
+        ],
+        "source_video_sha256": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+        "kind": "PASS",
+        "event_type": "ASSIST",
+        "outcome": "TEAMMATE_GOAL",
+        "start_ms": 43948,
+        "end_ms": 46015,
+        "contact_ms": null,
+        "contact_interval_ms": [
+          43948,
+          44132
+        ],
+        "contact_basis": "BRACKETED_VISUAL_SEQUENCE",
+        "contact_evidence": [
+          {
+            "frame": "s000043948",
+            "fact": "P1 brings the foot through the ball between s000043965 and s000044082. By s000044098–s000044132 the ball has separated and is travelling rightward, slightly above the turf. P1 is the uniquely supported releasing actor."
+          },
+          {
+            "frame": "s000044132",
+            "fact": "P1 brings the foot through the ball between s000043965 and s000044082. By s000044098–s000044132 the ball has separated and is travelling rightward, slightly above the turf. P1 is the uniquely supported releasing actor."
+          }
+        ],
+        "outcome_ms": 46015,
+        "selected_player": true,
+        "actor": "p1",
+        "actor_scope": "continuous_pass_link:0",
+        "actor_evidence_frames": [
+          "s000043948",
+          "s000044132"
+        ],
+        "reference_ids": [
+          "r2"
+        ],
+        "outcome_evidence": [
+          {
+            "frame": "s000045682",
+            "fact": "The low outgoing ball continues past the diving goalkeeper, passes the retreating blue defender, crosses into the goal and travels farther across its interior. This is moving active-ball evidence, not a stationary background ball."
+          },
+          {
+            "frame": "s000045915",
+            "fact": "The low outgoing ball continues past the diving goalkeeper, passes the retreating blue defender, crosses into the goal and travels farther across its interior. This is moving active-ball evidence, not a stationary background ball."
+          },
+          {
+            "frame": "s000046015",
+            "fact": "The low outgoing ball continues past the diving goalkeeper, passes the retreating blue defender, crosses into the goal and travels farther across its interior. This is moving active-ball evidence, not a stationary background ball."
+          },
+          {
+            "frame": "s000046131",
+            "fact": "The low outgoing ball continues past the diving goalkeeper, passes the retreating blue defender, crosses into the goal and travels farther across its interior. This is moving active-ball evidence, not a stationary background ball."
+          }
+        ],
+        "receiver": "p4",
+        "finisher": "p4",
+        "reason": "VISIBLE_DIRECT_ASSIST",
+        "details": "P1 brings the foot through the ball between s000043965 and s000044082. By s000044098–s000044132 the ball has separated and is travelling rightward, slightly above the turf. P1 is the uniquely supported releasing actor. Remaining alternatives: The subsequent defender's attempted interception is not itself an established touch.",
+        "receipts": [
+          {
+            "packet_id": "continuous_pass_link",
+            "payload_sha256": "23bd60aab3097ab898f4151f6f0c0c4262e49e6a376997cbd6de29779534b410",
+            "response_sha256": "211a33fc775829734650d2e3e05397227f1e925e69e643387b8647fa7a9d092c",
+            "origin": "LIVE_MODEL_REQUEST"
+          }
+        ],
+        "review_phase": "INITIAL",
+        "proof_eligible": true,
+        "model_requested_clarification": false,
+        "answers_source_action_keys": [],
+        "approval_status": "APPROVED",
+        "receiver_interval_ms": [
+          44598,
+          45332
+        ],
+        "finishing_contact_interval_ms": [
+          45448,
+          45682
+        ],
+        "intervening_control": {
+          "status": "NOT_OBSERVED",
+          "frames": [
+            "s000044265",
+            "s000044515",
+            "s000044598",
+            "s000045332"
+          ],
+          "observation": "P6 stretches and bends as the ball travels past, then turns to pursue. No trap, sustained defensive carry or deliberate intervening pass is visible before p4 receives. The pass connection is supported separately by the ball's forward motion."
+        },
+        "defensive_contact": {
+          "status": "UNCERTAIN",
+          "frames": [
+            "s000044332",
+            "s000044598",
+            "s000045515",
+            "s000045682",
+            "s000045848",
+            "s000045915"
+          ],
+          "observation": "The initial interception attempt brings a boot close to the ball without a clear contact or decisive redirection. The finishing challenge obscures the exact strike, and the ball later passes close to a retreating defender's foot. Slight brushes cannot be resolved; none establishes controlled possession or an interruption of the supported attacking sequence."
+        },
+        "last_touch_actor": null
+      }
+    ],
+    "probe_seconds": 72.169,
+    "raw_observations": {
+      "players": [
+        {
+          "person_id": "p1",
+          "selected": true,
+          "appearance": "Short, light-brown-haired player in white, white socks and dark boots. Matches the selected person in r2 by appearance and continuous movement from the left-side reception through the later release.",
+          "reference_ids": [
+            "r2"
+          ],
+          "evidence_frames": [
+            "s000041632",
+            "s000041915",
+            "s000043965",
+            "s000044115",
+            "s000045265"
+          ]
+        },
+        {
+          "person_id": "p2",
+          "selected": false,
+          "appearance": "Dark-skinned white-team player with short dark hair. Initially carries the ball on the right; subsequently remains in the foreground while another white attacker receives farther ahead. Physically distinct from r2.",
+          "reference_ids": [],
+          "evidence_frames": [
+            "s000038765",
+            "s000040765",
+            "s000043732",
+            "s000045332"
+          ]
+        },
+        {
+          "person_id": "p3",
+          "selected": false,
+          "appearance": "White-team player with conspicuous longer pale-blond hair. Involved in the earlier central redirection, then runs to the right of the later receiving attacker. Not the short-haired selected player or the later finisher.",
+          "reference_ids": [],
+          "evidence_frames": [
+            "s000041265",
+            "s000041382",
+            "s000044648",
+            "s000045515",
+            "s000046015"
+          ]
+        },
+        {
+          "person_id": "p4",
+          "selected": false,
+          "appearance": "Dark-haired white-team attacker farther upfield, initially partly concealed behind blue players during the later pass. Emerges centrally with the ball and makes the finishing movement. Distinct from the foreground dark-haired p2, the blond p3 and r2.",
+          "reference_ids": [],
+          "evidence_frames": [
+            "s000044115",
+            "s000045215",
+            "s000045332",
+            "s000045498",
+            "s000045598"
+          ]
+        },
+        {
+          "person_id": "p5",
+          "selected": false,
+          "appearance": "Additional dark-haired white player briefly visible at the far left during p1's carry. Kept separate from the upfield attacker; the supplied views do not establish a later contact by this person. Does not match r2.",
+          "reference_ids": [],
+          "evidence_frames": [
+            "s000042765",
+            "s000042882",
+            "s000043132"
+          ]
+        },
+        {
+          "person_id": "p6",
+          "selected": false,
+          "appearance": "Short dark-haired blue-shirted defender with white shorts and dark socks who stretches a leg into p1's outgoing ball path, bends forward, then turns to chase. Not a white-team identity match.",
+          "reference_ids": [],
+          "evidence_frames": [
+            "s000044198",
+            "s000044332",
+            "s000044515",
+            "s000045515"
+          ]
+        },
+        {
+          "person_id": "p7",
+          "selected": false,
+          "appearance": "Tall, short fair-haired blue defender who initially follows p2 and later retreats toward the goal alongside the rolling shot. Distinct from r2.",
+          "reference_ids": [],
+          "evidence_frames": [
+            "s000039015",
+            "s000040882",
+            "s000045782",
+            "s000045915"
+          ]
+        },
+        {
+          "person_id": "p8",
+          "selected": false,
+          "appearance": "Red-clad goalkeeper, initially standing in the goal and later diving low across the shot's path. Not an identity match.",
+          "reference_ids": [],
+          "evidence_frames": [
+            "s000039015",
+            "s000045515",
+            "s000045815",
+            "s000046015"
+          ]
+        }
+      ],
+      "contact_chain": [
+        {
+          "actor": "p2",
+          "kind": "Carries the active ball and changes direction under pressure",
+          "before_frame": "s000038765",
+          "after_frame": "s000040765",
+          "recipient": null,
+          "visible_evidence": "The ball stays near p2's advancing feet, then moves left as p2 bends and turns before moving back toward it. The nearby blue defender challenges, but no controlled defensive possession is established.",
+          "remaining_alternatives": "Individual foot-ball instants during the challenge are not all clear; no extra defensive possession or deliberate pass is inferred."
+        },
+        {
+          "actor": "p2",
+          "kind": "Releases a low ball leftward",
+          "before_frame": "s000040765",
+          "after_frame": "s000041132",
+          "recipient": "p3",
+          "visible_evidence": "The ball is beside p2 before the leg extension, is travelling left across the defenders at s000040882, and reaches the approaching blond p3's area at s000041132.",
+          "remaining_alternatives": "A blue player stretches toward its route; the overview does not resolve every possible brush."
+        },
+        {
+          "actor": "p3",
+          "kind": "Redirects the arriving ball farther left",
+          "before_frame": "s000041132",
+          "after_frame": "s000041382",
+          "recipient": "p1",
+          "visible_evidence": "P3 steps across the arriving ball and extends a leg at s000041265; afterward the ball separates leftward while p3 remains in the central group. P1 approaches from the left.",
+          "remaining_alternatives": "The crowded contact does not establish prolonged controlled possession by p3 or exclude a slight defensive contribution."
+        },
+        {
+          "actor": "p1",
+          "kind": "Receives the leftward ball and carries it before turning inward",
+          "before_frame": "s000041515",
+          "after_frame": "s000043732",
+          "recipient": null,
+          "visible_evidence": "The ball rolls to p1, who steps to it at s000041632 and carries it left through the original selection instant. P1 then turns and advances rightward with the ball ahead of the feet. P3 and p2 remain separate players behind and to the right.",
+          "remaining_alternatives": ""
+        },
+        {
+          "actor": "p1",
+          "kind": "Passes the active ball forward through the defensive line",
+          "before_frame": "s000043948",
+          "after_frame": "s000044132",
+          "recipient": "p4",
+          "visible_evidence": "P1 brings the foot through the ball between s000043965 and s000044082. By s000044098–s000044132 the ball has separated and is travelling rightward, slightly above the turf. P1 is the uniquely supported releasing actor.",
+          "remaining_alternatives": "The subsequent defender's attempted interception is not itself an established touch."
+        },
+        {
+          "actor": "p4",
+          "kind": "Receives the through ball ahead of the defenders",
+          "before_frame": "s000044598",
+          "after_frame": "s000045332",
+          "recipient": null,
+          "visible_evidence": "The ball emerges beyond p6 at s000044598, continues forward through the gap, and is visible farther along that route at s000044982. P4 emerges behind the defensive line with the ball immediately ahead of the feet at s000045298–s000045332. P2 stays in the foreground and p3 runs separately on the right.",
+          "remaining_alternatives": "The first receiving foot-ball pixel is partly concealed. The moving-ball route and p4's emergence support p4 as the recipient; they do not establish a separate intervening pass or a long spell of possession."
+        },
+        {
+          "actor": "p4",
+          "kind": "Makes a low finishing strike toward goal",
+          "before_frame": "s000045448",
+          "after_frame": "s000045682",
+          "recipient": null,
+          "visible_evidence": "P4 has the ball immediately ahead, plants and swings through as a blue defender closes. The kicking leg follows through in s000045532–s000045598, and the ball emerges travelling rapidly rightward along the ground at s000045648–s000045682. This short body-and-ball sequence uniquely identifies p4 as the attacking finisher.",
+          "remaining_alternatives": "The exact foot-ball instant is obscured by the challenge. A slight defensive brush remains unresolved, but neither p2 nor p3 is an alternative attacking finisher."
+        }
+      ],
+      "outcome": {
+        "kind": "GOAL",
+        "last_touch_actor": null,
+        "evidence": [
+          "s000045698",
+          "s000045915",
+          "s000046015",
+          "s000046131"
+        ],
+        "uncertainty": "The moving ball passes the diving goalkeeper and retreating defender and is established inside the goal. P4's finishing action is supported; the absolute last toucher remains unresolved because slight defensive contact cannot be resolved."
+      },
+      "link_assessment": {
+        "releaser": "p1",
+        "receiver": "p4",
+        "finisher": "p4",
+        "same_ball_release_to_receiver": {
+          "status": "SUPPORTED",
+          "frames": [
+            "s000044098",
+            "s000044332",
+            "s000044598",
+            "s000044982",
+            "s000045332"
+          ],
+          "observation": "The outgoing ball advances toward and beyond the stretching blue defender, emerges on his far side, and continues into the upfield white attacker's feet. The recipient is p4, not foreground p2 or the blond runner p3. Brief body occlusions do not supply evidence of a different ball or an intervening deliberate pass."
+        },
+        "receiver_finishing_action": {
+          "status": "SUPPORTED",
+          "frames": [
+            "s000045332",
+            "s000045498",
+            "s000045598",
+            "s000045682"
+          ],
+          "observation": "The same upfield white attacker stays with the arriving ball, plants and swings through it, then follows through as the ball departs low toward goal. The attacking actor is unique despite the obscured contact pixel."
+        },
+        "goal_from_that_finish": {
+          "status": "SUPPORTED",
+          "frames": [
+            "s000045682",
+            "s000045915",
+            "s000046015",
+            "s000046131"
+          ],
+          "observation": "The low outgoing ball continues past the diving goalkeeper, passes the retreating blue defender, crosses into the goal and travels farther across its interior. This is moving active-ball evidence, not a stationary background ball."
+        },
+        "intervening_control": {
+          "status": "NOT_OBSERVED",
+          "frames": [
+            "s000044265",
+            "s000044515",
+            "s000044598",
+            "s000045332"
+          ],
+          "observation": "P6 stretches and bends as the ball travels past, then turns to pursue. No trap, sustained defensive carry or deliberate intervening pass is visible before p4 receives. The pass connection is supported separately by the ball's forward motion."
+        },
+        "defensive_contact": {
+          "status": "UNCERTAIN",
+          "frames": [
+            "s000044332",
+            "s000044598",
+            "s000045515",
+            "s000045682",
+            "s000045848",
+            "s000045915"
+          ],
+          "observation": "The initial interception attempt brings a boot close to the ball without a clear contact or decisive redirection. The finishing challenge obscures the exact strike, and the ball later passes close to a retreating defender's foot. Slight brushes cannot be resolved; none establishes controlled possession or an interruption of the supported attacking sequence."
+        }
+      },
+      "event_mapping": {
+        "pass_chain_index": 4,
+        "receive_chain_index": 5,
+        "finish_chain_index": 6,
+        "receiver_is_teammate": true,
+        "same_active_ball": true,
+        "continuous_play": true,
+        "pass_actor_unique": true,
+        "finishing_actor_unique": true,
+        "goal_frame": "s000046015"
+      }
+    },
+    "identity_review": {
+      "status": "STRUCTURALLY_CONSISTENT",
+      "reasons": [],
+      "conflicting_person_ids": [],
+      "independent_visual_correctness_verified": false,
+      "target_events": []
+    },
+    "experimental_link_decision": {
+      "status": "ASSIST_SUPPORTED_BY_MODEL_OBSERVATIONS",
+      "reasons": [],
+      "independent_visual_correctness_verified": false,
+      "target_events": [],
+      "releaser": "p1",
+      "finisher": "p4"
+    },
+    "automatic_approval": {
+      "status": "APPROVED",
+      "reasons": [],
+      "target_events": [
+        {
+          "event_id": "8a2678eb0a7c4143655e",
+          "source_packet_ids": [
+            "continuous_pass_link"
+          ],
+          "source_action_keys": [
+            "continuous_pass_link:0:pass"
+          ],
+          "source_video_sha256": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+          "kind": "PASS",
+          "event_type": "ASSIST",
+          "outcome": "TEAMMATE_GOAL",
+          "start_ms": 43948,
+          "end_ms": 46015,
+          "contact_ms": null,
+          "contact_interval_ms": [
+            43948,
+            44132
+          ],
+          "contact_basis": "BRACKETED_VISUAL_SEQUENCE",
+          "contact_evidence": [
+            {
+              "frame": "s000043948",
+              "fact": "P1 brings the foot through the ball between s000043965 and s000044082. By s000044098–s000044132 the ball has separated and is travelling rightward, slightly above the turf. P1 is the uniquely supported releasing actor."
+            },
+            {
+              "frame": "s000044132",
+              "fact": "P1 brings the foot through the ball between s000043965 and s000044082. By s000044098–s000044132 the ball has separated and is travelling rightward, slightly above the turf. P1 is the uniquely supported releasing actor."
+            }
+          ],
+          "outcome_ms": 46015,
+          "selected_player": true,
+          "actor": "p1",
+          "actor_scope": "continuous_pass_link:0",
+          "actor_evidence_frames": [
+            "s000043948",
+            "s000044132"
+          ],
+          "reference_ids": [
+            "r2"
+          ],
+          "outcome_evidence": [
+            {
+              "frame": "s000045682",
+              "fact": "The low outgoing ball continues past the diving goalkeeper, passes the retreating blue defender, crosses into the goal and travels farther across its interior. This is moving active-ball evidence, not a stationary background ball."
+            },
+            {
+              "frame": "s000045915",
+              "fact": "The low outgoing ball continues past the diving goalkeeper, passes the retreating blue defender, crosses into the goal and travels farther across its interior. This is moving active-ball evidence, not a stationary background ball."
+            },
+            {
+              "frame": "s000046015",
+              "fact": "The low outgoing ball continues past the diving goalkeeper, passes the retreating blue defender, crosses into the goal and travels farther across its interior. This is moving active-ball evidence, not a stationary background ball."
+            },
+            {
+              "frame": "s000046131",
+              "fact": "The low outgoing ball continues past the diving goalkeeper, passes the retreating blue defender, crosses into the goal and travels farther across its interior. This is moving active-ball evidence, not a stationary background ball."
+            }
+          ],
+          "receiver": "p4",
+          "finisher": "p4",
+          "reason": "VISIBLE_DIRECT_ASSIST",
+          "details": "P1 brings the foot through the ball between s000043965 and s000044082. By s000044098–s000044132 the ball has separated and is travelling rightward, slightly above the turf. P1 is the uniquely supported releasing actor. Remaining alternatives: The subsequent defender's attempted interception is not itself an established touch.",
+          "receipts": [
+            {
+              "packet_id": "continuous_pass_link",
+              "payload_sha256": "23bd60aab3097ab898f4151f6f0c0c4262e49e6a376997cbd6de29779534b410",
+              "response_sha256": "211a33fc775829734650d2e3e05397227f1e925e69e643387b8647fa7a9d092c",
+              "origin": "LIVE_MODEL_REQUEST"
+            }
+          ],
+          "review_phase": "INITIAL",
+          "proof_eligible": true,
+          "model_requested_clarification": false,
+          "answers_source_action_keys": [],
+          "approval_status": "APPROVED",
+          "receiver_interval_ms": [
+            44598,
+            45332
+          ],
+          "finishing_contact_interval_ms": [
+            45448,
+            45682
+          ],
+          "intervening_control": {
+            "status": "NOT_OBSERVED",
+            "frames": [
+              "s000044265",
+              "s000044515",
+              "s000044598",
+              "s000045332"
+            ],
+            "observation": "P6 stretches and bends as the ball travels past, then turns to pursue. No trap, sustained defensive carry or deliberate intervening pass is visible before p4 receives. The pass connection is supported separately by the ball's forward motion."
+          },
+          "defensive_contact": {
+            "status": "UNCERTAIN",
+            "frames": [
+              "s000044332",
+              "s000044598",
+              "s000045515",
+              "s000045682",
+              "s000045848",
+              "s000045915"
+            ],
+            "observation": "The initial interception attempt brings a boot close to the ball without a clear contact or decisive redirection. The finishing challenge obscures the exact strike, and the ball later passes close to a retreating defender's foot. Slight brushes cannot be resolved; none establishes controlled possession or an interruption of the supported attacking sequence."
+          },
+          "last_touch_actor": null
+        }
+      ],
+      "counts": {
+        "ASSIST": 1
+      },
+      "independent_visual_correctness_verified": false,
+      "identity_review": {
+        "status": "STRUCTURALLY_CONSISTENT",
+        "reasons": [],
+        "conflicting_person_ids": [],
+        "independent_visual_correctness_verified": false,
+        "target_events": []
+      },
+      "link_review": {
+        "status": "ASSIST_SUPPORTED_BY_MODEL_OBSERVATIONS",
+        "reasons": [],
+        "independent_visual_correctness_verified": false,
+        "target_events": [],
+        "releaser": "p1",
+        "finisher": "p4"
+      },
+      "normalized_observations": {
+        "plays": [
+          {
+            "start_frame": "s000038632",
+            "end_frame": "s000047131",
+            "people": [
+              {
+                "person_id": "p1",
+                "selected": true,
+                "reference_ids": [
+                  "r2"
+                ],
+                "evidence_frames": [
+                  "s000041632",
+                  "s000041915",
+                  "s000043965",
+                  "s000044115",
+                  "s000045265"
+                ]
+              },
+              {
+                "person_id": "p2",
+                "selected": false,
+                "reference_ids": [],
+                "evidence_frames": [
+                  "s000038765",
+                  "s000040765",
+                  "s000043732",
+                  "s000045332"
+                ]
+              },
+              {
+                "person_id": "p3",
+                "selected": false,
+                "reference_ids": [],
+                "evidence_frames": [
+                  "s000041265",
+                  "s000041382",
+                  "s000044648",
+                  "s000045515",
+                  "s000046015"
+                ]
+              },
+              {
+                "person_id": "p4",
+                "selected": false,
+                "reference_ids": [],
+                "evidence_frames": [
+                  "s000044115",
+                  "s000045215",
+                  "s000045332",
+                  "s000045498",
+                  "s000045598"
+                ]
+              },
+              {
+                "person_id": "p5",
+                "selected": false,
+                "reference_ids": [],
+                "evidence_frames": [
+                  "s000042765",
+                  "s000042882",
+                  "s000043132"
+                ]
+              },
+              {
+                "person_id": "p6",
+                "selected": false,
+                "reference_ids": [],
+                "evidence_frames": [
+                  "s000044198",
+                  "s000044332",
+                  "s000044515",
+                  "s000045515"
+                ]
+              },
+              {
+                "person_id": "p7",
+                "selected": false,
+                "reference_ids": [],
+                "evidence_frames": [
+                  "s000039015",
+                  "s000040882",
+                  "s000045782",
+                  "s000045915"
+                ]
+              },
+              {
+                "person_id": "p8",
+                "selected": false,
+                "reference_ids": [],
+                "evidence_frames": [
+                  "s000039015",
+                  "s000045515",
+                  "s000045815",
+                  "s000046015"
+                ]
+              }
+            ],
+            "actions": [
+              {
+                "action_id": "pass",
+                "kind": "PASS",
+                "actor": "p1",
+                "start_frame": "s000043948",
+                "end_frame": "s000046015",
+                "contact_frame": null,
+                "contact_before_frame": "s000043948",
+                "contact_after_frame": "s000044132",
+                "contact_actor_unique": true,
+                "contact_evidence": [
+                  {
+                    "frame": "s000043948",
+                    "fact": "P1 brings the foot through the ball between s000043965 and s000044082. By s000044098–s000044132 the ball has separated and is travelling rightward, slightly above the turf. P1 is the uniquely supported releasing actor."
+                  },
+                  {
+                    "frame": "s000044132",
+                    "fact": "P1 brings the foot through the ball between s000043965 and s000044082. By s000044098–s000044132 the ball has separated and is travelling rightward, slightly above the turf. P1 is the uniquely supported releasing actor."
+                  }
+                ],
+                "actor_evidence_frames": [
+                  "s000043948",
+                  "s000044132"
+                ],
+                "ball_id": "active:continuous_pass_link",
+                "same_active_ball": true,
+                "continuous_play": true,
+                "outcome_frame": "s000046015",
+                "outcome_evidence": [
+                  {
+                    "frame": "s000045682",
+                    "fact": "The low outgoing ball continues past the diving goalkeeper, passes the retreating blue defender, crosses into the goal and travels farther across its interior. This is moving active-ball evidence, not a stationary background ball."
+                  },
+                  {
+                    "frame": "s000045915",
+                    "fact": "The low outgoing ball continues past the diving goalkeeper, passes the retreating blue defender, crosses into the goal and travels farther across its interior. This is moving active-ball evidence, not a stationary background ball."
+                  },
+                  {
+                    "frame": "s000046015",
+                    "fact": "The low outgoing ball continues past the diving goalkeeper, passes the retreating blue defender, crosses into the goal and travels farther across its interior. This is moving active-ball evidence, not a stationary background ball."
+                  },
+                  {
+                    "frame": "s000046131",
+                    "fact": "The low outgoing ball continues past the diving goalkeeper, passes the retreating blue defender, crosses into the goal and travels farther across its interior. This is moving active-ball evidence, not a stationary background ball."
+                  }
+                ],
+                "details": "P1 brings the foot through the ball between s000043965 and s000044082. By s000044098–s000044132 the ball has separated and is travelling rightward, slightly above the turf. P1 is the uniquely supported releasing actor. Remaining alternatives: The subsequent defender's attempted interception is not itself an established touch.",
+                "outcome": "TEAMMATE_GOAL",
+                "receiver": "p4",
+                "finisher": "p4",
+                "receiver_is_teammate": true,
+                "receiver_frame": "s000045332",
+                "shot_frame": null
+              },
+              {
+                "action_id": "shot",
+                "kind": "SHOT",
+                "actor": "p4",
+                "start_frame": "s000045448",
+                "end_frame": "s000046015",
+                "contact_frame": null,
+                "contact_before_frame": "s000045448",
+                "contact_after_frame": "s000045682",
+                "contact_actor_unique": true,
+                "contact_evidence": [
+                  {
+                    "frame": "s000045448",
+                    "fact": "P4 has the ball immediately ahead, plants and swings through as a blue defender closes. The kicking leg follows through in s000045532–s000045598, and the ball emerges travelling rapidly rightward along the ground at s000045648–s000045682. This short body-and-ball sequence uniquely identifies p4 as the attacking finisher."
+                  },
+                  {
+                    "frame": "s000045682",
+                    "fact": "P4 has the ball immediately ahead, plants and swings through as a blue defender closes. The kicking leg follows through in s000045532–s000045598, and the ball emerges travelling rapidly rightward along the ground at s000045648–s000045682. This short body-and-ball sequence uniquely identifies p4 as the attacking finisher."
+                  }
+                ],
+                "actor_evidence_frames": [
+                  "s000045448",
+                  "s000045682"
+                ],
+                "ball_id": "active:continuous_pass_link",
+                "same_active_ball": true,
+                "continuous_play": true,
+                "outcome_frame": "s000046015",
+                "outcome_evidence": [
+                  {
+                    "frame": "s000045682",
+                    "fact": "The low outgoing ball continues past the diving goalkeeper, passes the retreating blue defender, crosses into the goal and travels farther across its interior. This is moving active-ball evidence, not a stationary background ball."
+                  },
+                  {
+                    "frame": "s000045915",
+                    "fact": "The low outgoing ball continues past the diving goalkeeper, passes the retreating blue defender, crosses into the goal and travels farther across its interior. This is moving active-ball evidence, not a stationary background ball."
+                  },
+                  {
+                    "frame": "s000046015",
+                    "fact": "The low outgoing ball continues past the diving goalkeeper, passes the retreating blue defender, crosses into the goal and travels farther across its interior. This is moving active-ball evidence, not a stationary background ball."
+                  },
+                  {
+                    "frame": "s000046131",
+                    "fact": "The low outgoing ball continues past the diving goalkeeper, passes the retreating blue defender, crosses into the goal and travels farther across its interior. This is moving active-ball evidence, not a stationary background ball."
+                  }
+                ],
+                "details": "P4 has the ball immediately ahead, plants and swings through as a blue defender closes. The kicking leg follows through in s000045532–s000045598, and the ball emerges travelling rapidly rightward along the ground at s000045648–s000045682. This short body-and-ball sequence uniquely identifies p4 as the attacking finisher. Remaining alternatives: The exact foot-ball instant is obscured by the challenge. A slight defensive brush remains unresolved, but neither p2 nor p3 is an alternative attacking finisher.",
+                "outcome": "GOAL"
+              }
+            ],
+            "questions": []
+          }
+        ]
+      },
+      "resolver_invalid_rows": [],
+      "events": [
+        {
+          "event_id": "8a2678eb0a7c4143655e",
+          "source_packet_ids": [
+            "continuous_pass_link"
+          ],
+          "source_action_keys": [
+            "continuous_pass_link:0:pass"
+          ],
+          "source_video_sha256": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+          "kind": "PASS",
+          "event_type": "ASSIST",
+          "outcome": "TEAMMATE_GOAL",
+          "start_ms": 43948,
+          "end_ms": 46015,
+          "contact_ms": null,
+          "contact_interval_ms": [
+            43948,
+            44132
+          ],
+          "contact_basis": "BRACKETED_VISUAL_SEQUENCE",
+          "contact_evidence": [
+            {
+              "frame": "s000043948",
+              "fact": "P1 brings the foot through the ball between s000043965 and s000044082. By s000044098–s000044132 the ball has separated and is travelling rightward, slightly above the turf. P1 is the uniquely supported releasing actor."
+            },
+            {
+              "frame": "s000044132",
+              "fact": "P1 brings the foot through the ball between s000043965 and s000044082. By s000044098–s000044132 the ball has separated and is travelling rightward, slightly above the turf. P1 is the uniquely supported releasing actor."
+            }
+          ],
+          "outcome_ms": 46015,
+          "selected_player": true,
+          "actor": "p1",
+          "actor_scope": "continuous_pass_link:0",
+          "actor_evidence_frames": [
+            "s000043948",
+            "s000044132"
+          ],
+          "reference_ids": [
+            "r2"
+          ],
+          "outcome_evidence": [
+            {
+              "frame": "s000045682",
+              "fact": "The low outgoing ball continues past the diving goalkeeper, passes the retreating blue defender, crosses into the goal and travels farther across its interior. This is moving active-ball evidence, not a stationary background ball."
+            },
+            {
+              "frame": "s000045915",
+              "fact": "The low outgoing ball continues past the diving goalkeeper, passes the retreating blue defender, crosses into the goal and travels farther across its interior. This is moving active-ball evidence, not a stationary background ball."
+            },
+            {
+              "frame": "s000046015",
+              "fact": "The low outgoing ball continues past the diving goalkeeper, passes the retreating blue defender, crosses into the goal and travels farther across its interior. This is moving active-ball evidence, not a stationary background ball."
+            },
+            {
+              "frame": "s000046131",
+              "fact": "The low outgoing ball continues past the diving goalkeeper, passes the retreating blue defender, crosses into the goal and travels farther across its interior. This is moving active-ball evidence, not a stationary background ball."
+            }
+          ],
+          "receiver": "p4",
+          "finisher": "p4",
+          "reason": "VISIBLE_DIRECT_ASSIST",
+          "details": "P1 brings the foot through the ball between s000043965 and s000044082. By s000044098–s000044132 the ball has separated and is travelling rightward, slightly above the turf. P1 is the uniquely supported releasing actor. Remaining alternatives: The subsequent defender's attempted interception is not itself an established touch.",
+          "receipts": [
+            {
+              "packet_id": "continuous_pass_link",
+              "payload_sha256": "23bd60aab3097ab898f4151f6f0c0c4262e49e6a376997cbd6de29779534b410",
+              "response_sha256": "211a33fc775829734650d2e3e05397227f1e925e69e643387b8647fa7a9d092c",
+              "origin": "LIVE_MODEL_REQUEST"
+            }
+          ],
+          "review_phase": "INITIAL",
+          "proof_eligible": true,
+          "model_requested_clarification": false,
+          "answers_source_action_keys": [],
+          "approval_status": "APPROVED",
+          "receiver_interval_ms": [
+            44598,
+            45332
+          ],
+          "finishing_contact_interval_ms": [
+            45448,
+            45682
+          ],
+          "intervening_control": {
+            "status": "NOT_OBSERVED",
+            "frames": [
+              "s000044265",
+              "s000044515",
+              "s000044598",
+              "s000045332"
+            ],
+            "observation": "P6 stretches and bends as the ball travels past, then turns to pursue. No trap, sustained defensive carry or deliberate intervening pass is visible before p4 receives. The pass connection is supported separately by the ball's forward motion."
+          },
+          "defensive_contact": {
+            "status": "UNCERTAIN",
+            "frames": [
+              "s000044332",
+              "s000044598",
+              "s000045515",
+              "s000045682",
+              "s000045848",
+              "s000045915"
+            ],
+            "observation": "The initial interception attempt brings a boot close to the ball without a clear contact or decisive redirection. The finishing challenge obscures the exact strike, and the ball later passes close to a retreating defender's foot. Slight brushes cannot be resolved; none establishes controlled possession or an interruption of the supported attacking sequence."
+          },
+          "last_touch_actor": null
+        },
+        {
+          "event_id": "d2f730e6ea5a22310440",
+          "source_packet_ids": [
+            "continuous_pass_link"
+          ],
+          "source_action_keys": [
+            "continuous_pass_link:0:shot"
+          ],
+          "source_video_sha256": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+          "kind": "SHOT",
+          "event_type": "GOAL",
+          "outcome": "GOAL",
+          "start_ms": 45448,
+          "end_ms": 46015,
+          "contact_ms": null,
+          "contact_interval_ms": [
+            45448,
+            45682
+          ],
+          "contact_basis": "BRACKETED_VISUAL_SEQUENCE",
+          "contact_evidence": [
+            {
+              "frame": "s000045448",
+              "fact": "P4 has the ball immediately ahead, plants and swings through as a blue defender closes. The kicking leg follows through in s000045532–s000045598, and the ball emerges travelling rapidly rightward along the ground at s000045648–s000045682. This short body-and-ball sequence uniquely identifies p4 as the attacking finisher."
+            },
+            {
+              "frame": "s000045682",
+              "fact": "P4 has the ball immediately ahead, plants and swings through as a blue defender closes. The kicking leg follows through in s000045532–s000045598, and the ball emerges travelling rapidly rightward along the ground at s000045648–s000045682. This short body-and-ball sequence uniquely identifies p4 as the attacking finisher."
+            }
+          ],
+          "outcome_ms": 46015,
+          "selected_player": false,
+          "actor": "p4",
+          "actor_scope": "continuous_pass_link:0",
+          "actor_evidence_frames": [
+            "s000045448",
+            "s000045682"
+          ],
+          "reference_ids": [],
+          "outcome_evidence": [
+            {
+              "frame": "s000045682",
+              "fact": "The low outgoing ball continues past the diving goalkeeper, passes the retreating blue defender, crosses into the goal and travels farther across its interior. This is moving active-ball evidence, not a stationary background ball."
+            },
+            {
+              "frame": "s000045915",
+              "fact": "The low outgoing ball continues past the diving goalkeeper, passes the retreating blue defender, crosses into the goal and travels farther across its interior. This is moving active-ball evidence, not a stationary background ball."
+            },
+            {
+              "frame": "s000046015",
+              "fact": "The low outgoing ball continues past the diving goalkeeper, passes the retreating blue defender, crosses into the goal and travels farther across its interior. This is moving active-ball evidence, not a stationary background ball."
+            },
+            {
+              "frame": "s000046131",
+              "fact": "The low outgoing ball continues past the diving goalkeeper, passes the retreating blue defender, crosses into the goal and travels farther across its interior. This is moving active-ball evidence, not a stationary background ball."
+            }
+          ],
+          "receiver": null,
+          "finisher": null,
+          "reason": "VISIBLE_SHOT_OUTCOME",
+          "details": "P4 has the ball immediately ahead, plants and swings through as a blue defender closes. The kicking leg follows through in s000045532–s000045598, and the ball emerges travelling rapidly rightward along the ground at s000045648–s000045682. This short body-and-ball sequence uniquely identifies p4 as the attacking finisher. Remaining alternatives: The exact foot-ball instant is obscured by the challenge. A slight defensive brush remains unresolved, but neither p2 nor p3 is an alternative attacking finisher.",
+          "receipts": [
+            {
+              "packet_id": "continuous_pass_link",
+              "payload_sha256": "23bd60aab3097ab898f4151f6f0c0c4262e49e6a376997cbd6de29779534b410",
+              "response_sha256": "211a33fc775829734650d2e3e05397227f1e925e69e643387b8647fa7a9d092c",
+              "origin": "LIVE_MODEL_REQUEST"
+            }
+          ],
+          "review_phase": "INITIAL",
+          "proof_eligible": false,
+          "model_requested_clarification": false,
+          "answers_source_action_keys": []
+        }
+      ],
+      "questions": [],
+      "conflicts": [],
+      "reason": "VISIBLE_DIRECT_ASSIST"
+    },
+    "counts": {
+      "ASSIST": 1
+    }
+  }
+}

@@ -178,3 +178,18 @@ def test_historical_untyped_actual_reply_cannot_be_promoted_by_inventing_missing
     saved=json.loads(path.read_text())
     result=resolve_assist(json.loads(saved['raw_response']),saved['result'],saved)
     assert result['status']=='UNRESOLVED' and result['reasons']==['TYPED_EVENT_MAPPING_REQUIRED']
+
+
+def test_actual_live_reply_replays_to_the_same_approved_assist_through_the_event_resolver():
+    path=Path(__file__).resolve().parents[2]/'docs/examples/native-assist-approval-receipt.json'
+    saved=json.loads(path.read_text());context=saved['result']
+    result=resolve_assist(json.loads(saved['raw_response']),context,saved)
+    assert result==context['automatic_approval']
+    assert result['status']=='APPROVED' and result['counts']=={'ASSIST':1}
+    event=result['target_events'][0]
+    assert event['approval_status']=='APPROVED' and event['reason']=='VISIBLE_DIRECT_ASSIST'
+    assert event['contact_ms'] is None and event['contact_basis']=='BRACKETED_VISUAL_SEQUENCE'
+    assert event['actor']!=event['receiver']==event['finisher']
+    assert event['receipts'][0]['response_sha256']==saved['response_sha256']
+    assert event['defensive_contact']['status']=='UNCERTAIN'
+    # Replaying a real reply checks the code path; it is not a second model read.

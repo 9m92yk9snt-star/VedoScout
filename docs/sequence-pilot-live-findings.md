@@ -711,3 +711,43 @@ new GPT-6-astra medium call sees the same 184 source/reference images plus the
 neutral typed-mapping instruction. No historical action reply or desired result
 is provided. Local source preparation retains the prior image hashes, the 50ms
 maximum detail gap and 19,199,413 request bytes. The actual approval result follows.
+
+Run 39164556304 on commit e3509ea completed successfully, including its automatic
+approval check. The actual GPT-6-astra medium reply supplies typed indexes 4/5/6
+for its observed pass, reception and finish, and explicitly supports the teammate
+relationship, same active ball, continuous play and unique attacking actors.
+These are returned model observations, not input answers. Identity and all three
+physical-link checks pass. The existing event resolver returns VISIBLE_DIRECT_ASSIST,
+proof_eligible=true, and the mapper emits APPROVED with counts {"ASSIST":1}.
+The selected passer is p1 with original r2; p4 is the distinct recipient/finisher,
+not the foreground teammate or blond runner. No selected-player goal is credited.
+
+The approved event 8a2678eb0a7c4143655e preserves:
+
+| Evidence | Source interval or frame |
+| --- | --- |
+| Passing action | 43.948–44.132s |
+| Recipient's arrival/reception | 44.598–45.332s |
+| Recipient's finishing action | 45.448–45.682s |
+| Moving active ball established in goal | 46.015s, supported by 45.915/46.131s |
+
+Exact contact_ms remains null, with BRACKETED_VISUAL_SEQUENCE as its basis.
+The relatively broad receiving bracket does not claim a precise first touch.
+Intervening control remains NOT_OBSERVED and possible slight defensive contact
+remains UNCERTAIN in the approved event. Absolute last-touch ownership stays null;
+the supported attacking finisher and complete causal chain determine this assist.
+The raw reply and the emitted event are retained together in
+docs/examples/native-assist-approval-receipt.json. Replaying that hash-checked raw
+reply reproduces exactly the saved automatic decision without a new model call.
+
+The actual call took 68.600 seconds; probe time including preparation was 72.169
+seconds, with 3.394 seconds preparation. Separate whole-source preparation took
+19.288 seconds. This remains one bounded play, not measured fresh whole-video
+latency or proof of all five actions. The original image hashes were retained;
+the only new model instruction requests the typed event mapping.
+The image hashes and byte sizes for all 184 images also match run 39161654199
+exactly, checked against its actual workflow receipt; model and reasoning match.
+195 relevant local tests pass, including the actual-reply replay and substantive rejection
+cases. The earlier separately documented later assist is preserved. This assist
+is now automatically approved in the standalone experiment's event path; applying
+that implementation to the live report remains a subsequent integration step.
