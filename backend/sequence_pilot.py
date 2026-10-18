@@ -422,6 +422,59 @@ def parse_response(text):
     return data
 
 
+def positive_identity_conflicts(people, canonical_reference_ids):
+    """Check positive match claims, without deciding which physical person is right.
+
+    Separate physical people cannot both positively match the selected profile.
+    A negative comparison belongs outside reference_ids and is not a match.
+    """
+    canonical = set(canonical_reference_ids)
+    matches = {pid for pid, person in people.items()
+               if canonical.intersection(person.get("reference_ids") or [])
+               and person.get("evidence_frames")}
+    denied = any(people[pid].get("selected") is not True for pid in matches)
+    if len(matches) > 1 or denied:
+        return matches | {pid for pid, person in people.items() if person.get("selected") is True}
+    return set()
+
+
+def assess_actor_identity(data, canonical_reference_ids, supplied_frame_ids):
+    """Structural identity review only; never a visual correctness approval."""
+    frames, people, errors = set(supplied_frame_ids), {}, []
+    rows = data.get("players") if isinstance(data, dict) else None
+    if not isinstance(rows, list):
+        errors.append("PLAYERS_ARRAY_REQUIRED")
+        rows = []
+    for row in rows:
+        if not isinstance(row, dict):
+            errors.append("INVALID_PERSON"); continue
+        pid = row.get("person_id")
+        if not isinstance(pid, str) or not pid or pid in people:
+            errors.append("INVALID_OR_DUPLICATE_PERSON_ID"); continue
+        refs, evidence = row.get("reference_ids"), row.get("evidence_frames")
+        if not isinstance(refs, list) or not isinstance(evidence, list):
+            errors.append("UNTYPED_IDENTITY_EVIDENCE")
+            refs, evidence = [], []
+        if any(not isinstance(v, str) or v not in frames for v in evidence):
+            errors.append("UNSUPPLIED_IDENTITY_FRAME")
+            evidence = []
+        if any(not isinstance(v, str) or v not in canonical_reference_ids for v in refs):
+            errors.append("UNKNOWN_IDENTITY_REFERENCE")
+            refs = []
+        selected = row.get("selected") if type(row.get("selected")) is bool else None
+        if selected is True and (not refs or not evidence):
+            errors.append("SELECTED_IDENTITY_UNSUPPORTED")
+        people[pid] = {"selected": selected, "reference_ids": refs, "evidence_frames": evidence}
+    conflicts = positive_identity_conflicts(people, canonical_reference_ids)
+    if conflicts:
+        errors.append("CONFLICTING_POSITIVE_IDENTITY_MATCHES")
+    if sum(v["selected"] is True for v in people.values()) != 1:
+        errors.append("SELECTED_PERSON_NOT_UNIQUE")
+    return {"status": "UNRESOLVED" if errors else "STRUCTURALLY_CONSISTENT",
+            "reasons": sorted(set(errors)), "conflicting_person_ids": sorted(conflicts),
+            "independent_visual_correctness_verified": False, "target_events": []}
+
+
 def resolve_response(data, manifest, packet, receipt):
     """One owner for attribution, causal outcomes and missing-link questions."""
     frames = {f["frame_id"]: f["media_ms"] for f in manifest["frames"] if f["frame_id"] in packet["frame_ids"]}
@@ -473,6 +526,8 @@ def resolve_response(data, manifest, packet, receipt):
             if selected is True and (not ref_support or not support or p.get("kit_consistent") is False):
                 selected = None
             people[pid] = {"selected": selected, "reference_ids": ref_support, "evidence_frames": support}
+        identity_conflicts.update(positive_identity_conflicts(people,
+            (manifest.get("identity_profile") or {}).get("canonical_reference_ids", [])))
         selected_ids = [pid for pid, p in people.items() if p["selected"] is True]
         if len(selected_ids) > 1:
             identity_conflicts.update(selected_ids)
@@ -899,3 +954,4 @@ def assess_reference_cases(cases, resolved):
             "unexpected_scoring_event_ids": extras, "cases": checks,
             "expected_answers_supplied_to_model": False,
             "note": "Matching stored model observations is not independent proof of visual correctness."}
+

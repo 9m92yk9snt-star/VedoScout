@@ -110,10 +110,15 @@ def prepare(manifest_path, gap_path, profile_path, output):
         'viewing band containing all detected people: it supplies no identities or contact facts. '
         'Full-play overviews remain available outside that band. Native detail is every decoded '
         'source instant in the unresolved interval, with original source times. '
+        'reference_ids must list only POSITIVE same-person matches to the original identity '
+        'examples; put negative comparisons in appearance. evidence_frames must list supplied '
+        'source frames showing that physical person. A player positively matching a selected '
+        'identity example cannot simultaneously be selected=false. If examples appear to match '
+        'different physical players, keep identity unresolved rather than choosing between them. '
         'Do not infer identity from a jersey number which is not readable. No expected actions, '
         'times, count or outcomes are provided. Do not force a verdict if hidden. '
         'Return JSON {"players":[{"person_id":"p1","selected":null,"appearance":"visible features",'
-        '"identity_evidence":["s..."]}],"contact_chain":[{"actor":"p1","kind":"observed action",'
+        '"reference_ids":["r1"],"evidence_frames":["s..."]}],"contact_chain":[{"actor":"p1","kind":"observed action",'
         '"before_frame":"s...","after_frame":"s...","recipient":null,'
         '"visible_evidence":"before/after movement","remaining_alternatives":"unresolved or empty"}],'
         '"outcome":{"kind":"observed result or UNKNOWN","last_touch_actor":null,'
@@ -138,6 +143,7 @@ def prepare(manifest_path, gap_path, profile_path, output):
     model = 'gemini-3.8-flash'
     _, _, audit = t.build_request('emergent', model, items, reasoning_effort='low', image_detail='high')
     result = {'status':'PREPARED_ACTOR_CONTINUITY_PROBE','origin_run':gap['origin_run'],
+        'identity_reference_ids':ids,
         'prior_response_sha256':gap['receipt']['response_sha256'],'source_video_sha256':source_hash,
         'question':q, 'source_crop_box':box,'detector_source_sha256':detector.model_sha256,
         'detector_samples':samples,'detector_forwards':len(samples),'native_source_instants':times,
@@ -162,5 +168,9 @@ if __name__ == '__main__':
         result.update(status=response['status'],probe_seconds=round(time.monotonic()-started,3))
         if response['status'] == 'COMPLETED':
             result['raw_observations'] = json.loads(response['raw_response'])
+            result['identity_review'] = p.assess_actor_identity(result['raw_observations'],
+                result['identity_reference_ids'], [f's{ms:09}' for ms in
+                    result['native_source_instants']+result['full_play_overview_instants']])
         p.write_json(Path(a.output)/'result.json',result)
         raise SystemExit(0 if response['status'] == 'COMPLETED' else 3)
+

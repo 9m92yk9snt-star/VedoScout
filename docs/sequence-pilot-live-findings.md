@@ -491,3 +491,22 @@ passed. No further identical-input vote, full-source replay, merge or deployment
 is justified by this result. The next useful experiment must resolve physical
 identity across local play context before treating another contact verdict as
 selected-player evidence. Detector-bounded native detail alone did not solve it.
+
+
+Post-response identity consistency check: the actor probe now asks for separate
+positive reference_ids and source evidence_frames. A free-text citation alone
+cannot establish whether it means the same person or a negative comparison.
+The retained 39152527031 response therefore remains UNRESOLVED under this
+structural review; its original receipt and response hash are unchanged. See
+native-actor-identity-review.json. No model request was repeated for this check.
+
+The canonical event resolver also now rejects selected-player credit when
+positive matches to the same selected identity profile are split between
+separate physical people, including a person marked false or unknown. It does
+not choose a winner or reinterpret a negative comparison as a positive match.
+The actor probe records this review separately from transport COMPLETED, and
+STRUCTURALLY_CONSISTENT explicitly does not mean visually verified or approve
+any events. Thirteen new regression cases pass locally, including replay of
+the retained failed actor response and the actual event resolver's assist path.
+The source inspection still cannot uniquely establish the middle finishing
+actor; all-five acceptance and fresh full-source latency remain unproven.
