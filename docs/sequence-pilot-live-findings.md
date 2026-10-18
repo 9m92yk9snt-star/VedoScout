@@ -239,3 +239,26 @@ delivery policy, not an isolated claim about JPEG quality. Preflight retained
 all 145 image appearances and fits at 10,583,205 bytes. At most one new call,
 150 seconds overall and 120 seconds per call. If this does not recover the
 known source-inspected contact, stop scaling this approach to the whole video.
+
+
+Restored-detail run 39148103504 took 42.179 seconds including preparation
+(23.044 seconds for its model call). It still described a number-15 shot into
+goal and left a contact question; no assist was established. Thus neither extra
+reasoning, a contact-bracket instruction nor this restored crop policy reliably
+recovers the contact. Do not scale these failed still-image variants to all plays.
+
+The next single-play input is a different temporal representation: synchronized
+normal-duration overview video (8 fps) and native-pixel band video (30 fps), both
+covering the same complete automatically tap-density-selected source play. Source
+interval and crop derive only from the original image packet and human boxes.
+Reuse only the hash-matched identity profile; no historical action reply or
+reference event answer is read. Original duration is preserved; audio is removed.
+The output asks for players, ball motion and last touch, retaining native-video
+times as approximate raw observations rather than exact-frame proof.
+
+Local preflight: 5 identity pictures, 2 videos covering the same 5.999-second
+source interval, 8,143,046 encoded request bytes, 3.393 seconds including encoding.
+The available Gemini 3.1 Pro model gets one call, at most 120 seconds and an
+overall probe budget of 150 seconds. This differs from the failed whole-video
+Gemini trial by supplying a short complete play and synchronized native detail;
+a successful response alone would still not establish all five reference cases.

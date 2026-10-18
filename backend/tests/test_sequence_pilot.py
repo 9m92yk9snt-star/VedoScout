@@ -608,6 +608,22 @@ def test_restored_native_detail_changes_only_crop_delivery_not_timestamps_or_ove
         f["sha256"] for f in restored["frames"] if f["frame_id"] in initial]
 
 
+def test_native_play_views_keep_normal_duration_and_source_geometry(tmp_path):
+    from scripts.probe_native_play import prepare_videos
+    manifest = p.prepare(source_export(tmp_path), tmp_path / "prepared", fps=8, scene_packets=True)
+    packet, local, views, box = prepare_videos(manifest, tmp_path / "native")
+    assert (packet["core_start_ms"], packet["core_end_ms"]) == (0, 750)
+    assert local == manifest["references"]
+    assert box == [0, 0, 96, 160]
+    assert len(views) == 2
+    for view in views:
+        meta = view["metadata"]
+        assert .65 <= float(meta["format"]["duration"]) <= .90
+        assert view["sha256"] == p.digest(view["path"])
+    detail = views[1]["metadata"]["streams"][0]
+    assert (detail["width"], detail["height"], detail["r_frame_rate"]) == (96, 160, "30/1")
+
+
 def test_runner_preserves_initial_observations_if_targeted_preparation_fails(tmp_path, monkeypatch):
     root = source_export(tmp_path)
     manifest = p.prepare(root, tmp_path / "prepared")
