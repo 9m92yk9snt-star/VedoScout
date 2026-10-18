@@ -7,7 +7,7 @@ import sys
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from scripts.probe_attempt_outcome import outcome_gap, identity_review_manifest
+from scripts.probe_attempt_outcome import outcome_gap, identity_review_manifest, local_selection_band
 import sequence_pilot as p
 
 
@@ -145,3 +145,11 @@ def test_terminal_attempt_rejects_mismatched_or_unusable_source_navigation(chang
     else:
         next(a for a in play["raw_native_observations"]["ball_sequence"] if a["action"] == "shot")["clip_s"] = 100
     with pytest.raises(ValueError): outcome_gap(manifest,native,"sequence_004")
+
+
+def test_local_band_uses_only_original_geometry_with_margin_and_requires_local_selection():
+    rows=[{"box":{"y":.4,"h":.2}},{"box":{"y":.55,"h":.15}}]
+    assert local_selection_band(rows,1000) == (300,800)
+    assert local_selection_band([{"box":{"y":.05,"h":.9}}],1000) == (0,1000)
+    with pytest.raises(ValueError,match="LOCAL_ORIGINAL_SELECTION_REQUIRED"):
+        local_selection_band([],1000)

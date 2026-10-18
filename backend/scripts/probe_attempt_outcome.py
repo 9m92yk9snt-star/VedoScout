@@ -62,8 +62,18 @@ def identity_review_manifest(manifest, profile, recheck_identity=False):
     return checked, checked["identity_profile"]["canonical_reference_ids"]
 
 
+def local_selection_band(local, height):
+    """Original selection union plus half a player, never an outcome-derived ROI."""
+    if not local:
+        raise ValueError("LOCAL_ORIGINAL_SELECTION_REQUIRED")
+    margin = .5*max(r["box"]["h"] for r in local)
+    top = max(0,min(r["box"]["y"] for r in local)-margin)
+    bottom = min(1,max(r["box"]["y"]+r["box"]["h"] for r in local)+margin)
+    return int(top*height),int(bottom*height)
+
+
 def prepare(manifest_path, native_path, profile_path, output, recheck_identity=False, terminal_packet=None,
-            detail_quality=50):
+            detail_quality=50, local_band=False):
     import cv2
     started, output = time.monotonic(), Path(output)
     if output.exists() and any(output.iterdir()):
@@ -90,6 +100,9 @@ def prepare(manifest_path, native_path, profile_path, output, recheck_identity=F
     top = max(0, min(r["box"]["y"]-r["box"]["h"] for r in manifest["references"]))
     bottom = min(1, max(r["box"]["y"]+2*r["box"]["h"] for r in manifest["references"]))
     box = [0, int(top*height), width, int(bottom*height)]
+    if local_band:
+        band_top,band_bottom = local_selection_band(local,height)
+        box = [0,band_top,width,band_bottom]
     detail = []
     try:
         while True:
@@ -149,6 +162,7 @@ def prepare(manifest_path, native_path, profile_path, output, recheck_identity=F
               "native_first_ms":detail[0]["media_ms"], "native_last_ms":detail[-1]["media_ms"],
               "source_crop_box":box, "spatial_reference_audit":spatial_audit,
               "detail_jpeg_quality":detail_quality, "overview_jpeg_quality":70,
+              "detail_band_policy":"LOCAL_ORIGINAL_UNION_HALF_PLAYER_MARGIN" if local_band else "ALL_ORIGINAL_SELECTIONS_WIDE_UNION",
               "identity_mode":"FRESH_ORIGINAL_SELECTIONS" if recheck_identity else "SHARED_PROFILE",
               "previous_identity_response_sha256":receipt["response_sha256"],
               "previous_identity_claims_supplied":not recheck_identity,
@@ -161,7 +175,8 @@ def run(args):
     started = time.monotonic()
     result, manifest, packet, items = prepare(args.prepared, args.native_result, args.resume_profile, args.output,
                                              getattr(args, "recheck_identity", False),
-                                             getattr(args, "terminal_packet", None), getattr(args, "detail_quality", 50))
+                                             getattr(args, "terminal_packet", None), getattr(args, "detail_quality", 50),
+                                             getattr(args, "local_band", False))
     if args.preflight_only:
         return result
     receipt = t.run_jobs([{"packet_id":packet["packet_id"], "items":items,
@@ -190,6 +205,7 @@ if __name__ == "__main__":
     cli.add_argument("--recheck-identity", action="store_true")
     cli.add_argument("--terminal-packet")
     cli.add_argument("--detail-quality", type=int, default=50)
+    cli.add_argument("--local-band", action="store_true")
     args = cli.parse_args()
     result = run(args)
     raise SystemExit(0 if args.preflight_only or result["status"] == "COMPLETED" else 3)

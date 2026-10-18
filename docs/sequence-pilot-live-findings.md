@@ -1076,3 +1076,21 @@ The overview remains quality 70. Preparation took 4.277s locally. At most one
 GPT-6-astra medium request, 120-second call limit, no expected result supplied.
 A completed request alone is not approval. Three assists and the accepted
 saved-shot receipt are untouched. No merge or deployment.
+
+
+The actual terminal request in run 39177797116 received HTTP 429 after
+64.714s, with no model answer. The error receipt/result are preserved in
+`docs/examples/native-goal-terminal-rate-limit-receipt.json`; no goal was
+approved from that run. The error does not distinguish quota from throttling.
+
+One smaller follow-up request changes the native detail band using only the
+union of the two original in-play selection boxes, expanded vertically by
+half the largest original player-box height. It retains the full source width,
+all 69 overview images and all 109 continuous native instants. Bounds become
+[0,641,1080,1560], compared with [0,464,1080,1713]. Source inspection confirms
+players, active-ball path, goalkeeper and the visible goal remain in this
+local band across the detail window. JPEG quality returns to 50; the request
+shrinks to 16,220,155 bytes. This reduces redundant image area without removing
+source instants; it is not proof that the service will accept the request or
+that perception will succeed. The unchanged whole-play overview preserves
+context beyond the local band. Preparation took 4.381s locally.
