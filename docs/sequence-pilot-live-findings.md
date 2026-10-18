@@ -415,3 +415,36 @@ are subtracted from the same 300-second accounting bound, leaving 179.034 second
 for source preparation and these reviews. Offline source preparation took 7.945
 seconds; request sizes are 13.479, 14.665 and 12.205 MB. All fit without deleting
 whole-play instants. Actual correctness and time remain to be measured.
+
+
+Source-gap run 39151281244 completed all three GPT-6-astra image requests.
+Preparation and calls took 124.775 seconds (source image preparation 10.844);
+the separate repeated whole-source preparation took 19.279 seconds. Calls took
+48.360, 46.278 and 67.319 seconds. The shot review now gives concrete active-ball
+evidence for a goalkeeper parry: contact region around 24.366 seconds followed
+by a slower, floating departure, descent and bounce outside the near post, with
+the spare stationary. The earlier-assist review supports number 15's pass, a
+glancing defensive touch without controlled possession and a distinct teammate
+shot into goal; the receiving touch remains occluded. The middle-attack review
+favors a separate teammate as finisher but explicitly cannot securely resolve
+the hidden striking actor. Do not turn that uncertainty into an approved assist
+or retain the earlier wrong own-goal attribution as confirmed.
+
+The next review is one new Gemini 3.8 image call for that explicitly unresolved
+final-touch actor. It downloads the previous checked source JPEGs and manifest;
+all original overview/detail image hashes must match the earlier wire audit in
+order. Canonical identity crops are recovered by exact source PTS and their
+original JPEG hashes. No whole-source decode or completed model call repeats.
+A pixel-only white/blue kit mask proposes a tighter cluster around the actual
+model-derived contact focus. It does not label a person, ball contact or result.
+The unchanged whole-play overview remains alongside the newly cropped detail.
+A blank/uninformative mask falls back to the full checked source band. Every
+new crop records its parent JPEG hash and original-source bounds. Geometry is
+unit-tested before the credential-bearing model step.
+
+The native/source-review work plus repeated preparation accounts for 265.020
+seconds so far; this last preparation/call gets at most the remaining 34.980
+seconds of the 300-second accounting bound. This remains a series with cached
+work, not measured fresh production latency. Correctness is still unproven for
+the hidden finishing connection. Code, source observations and explicit failed
+readings stay preserved; production remains unchanged.

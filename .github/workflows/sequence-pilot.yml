@@ -9,6 +9,8 @@ on:
       - 'backend/scripts/probe_native_play.py'
       - 'backend/scripts/run_native_batch.py'
       - 'backend/scripts/probe_native_gaps.py'
+      - 'backend/scripts/refine_contact_cluster.py'
+      - 'backend/tests/test_native_cluster.py'
       - 'backend/tests/test_sequence_pilot.py'
       - 'backend/player_selection.py'
       - '.github/workflows/sequence-pilot.yml'
@@ -41,4 +43,4 @@ jobs:
       - name: Install isolated offline-test dependencies
         run: python -m pip install 'numpy<3' 'opencv-python-headless<5' 'Pillow>=10,<15' 'pytest>=8,<10' 'python-dotenv>=1,<2'
       - name: Verify input sampling, attribution, causal outcomes and worker deadlines
-        run: python -m pytest backend/tests/test_sequence_pilot.py backend/tests/test_player_selection.py backend/tests/test_fix39_selection_box_edge.py -q
+        run: python -m pytest backend/tests/test_sequence_pilot.py backend/tests/test_native_cluster.py backend/tests/test_player_selection.py backend/tests/test_fix39_selection_box_edge.py -q

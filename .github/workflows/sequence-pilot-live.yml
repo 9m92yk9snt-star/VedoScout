@@ -9,6 +9,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   actual_video_experiment:
@@ -17,7 +18,7 @@ jobs:
       github.event.pull_request.number == 39 &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.event.pull_request.head.ref == 'codex/sequence-pilot-foundation' &&
-      github.event.before == '6609869b038c67eda9944c9fe17fbb991c369bf3' &&
+      github.event.before == '94c771ab474bf076a2013a6b7634b1c77be4e83d' &&
       github.run_attempt == 1
     runs-on: ubuntu-latest
     timeout-minutes: 9
@@ -39,12 +40,15 @@ jobs:
             /backend/scripts/probe_native_play.py
             /backend/scripts/run_native_batch.py
             /backend/scripts/probe_native_gaps.py
+            /backend/scripts/refine_contact_cluster.py
+            /backend/tests/test_native_cluster.py
             /docs/examples/five_action_reference_cases.json
             /docs/examples/gpt6-focused-action-receipt.json
             /docs/examples/gpt6-focused-profile-receipt.json
             /docs/examples/native-spatial-baseline-receipt.json
             /docs/examples/native-flash-known-play-receipt.json
             /docs/examples/native-full-source-observations.json
+            /docs/examples/native-gap-review-observations.json
             /docs/examples/gpt6-missing-contact-receipt.json
             /docs/examples/gpt6-full-initial-receipts.json
             /docs/examples/gpt6-contact-review-low-receipt.json
@@ -58,7 +62,7 @@ jobs:
           sudo apt-get install -y -qq ffmpeg
           ffprobe -version
       - name: Install source image preparation dependencies
-        run: python -m pip install 'numpy<3' 'opencv-python-headless<5' 'Pillow>=10,<15'
+        run: python -m pip install 'numpy<3' 'opencv-python-headless<5' 'Pillow>=10,<15' 'pytest>=8,<10'
       - name: Reassemble and verify exact original source and taps
         run: |
           python - <<'PY'
@@ -85,12 +89,19 @@ jobs:
           print(json.dumps({'source_video_bytes':video.stat().st_size, 'source_checksums_verified':True,
                             'historical_model_results_loaded':False}))
           PY
-      - name: Prepare actual source images and original selections once
-        run: python backend/scripts/run_sequence_pilot.py prepare --evidence-dir "$RUNNER_TEMP/sequence-pilot-input" --output "$RUNNER_TEMP/sequence-pilot-prepared" --scene-packets --max-edge 1280
+      - name: Reuse verified source JPEGs and original manifest
+        uses: actions/download-artifact@v4
+        with:
+          name: sequence-pilot-orman400-39151281244
+          run-id: 39151281244
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/source-gap-cache
+      - name: Verify automatic detail crop bounds before model work
+        run: python -m pytest backend/tests/test_native_cluster.py -q
       - name: Read complete plays with the actual model
         env:
           EMERGENT_LLM_KEY: ${{ secrets.EMERGENT_LLM_KEY }}
-        run: python backend/scripts/probe_native_gaps.py --prepared "$RUNNER_TEMP/sequence-pilot-prepared/manifest.json" --native-result docs/examples/native-full-source-observations.json --resume-profile docs/examples/gpt6-focused-profile-receipt.json --output "$RUNNER_TEMP/sequence-pilot-result"
+        run: python backend/scripts/refine_contact_cluster.py --cached "$RUNNER_TEMP/source-gap-cache" --video "$RUNNER_TEMP/sequence-pilot-input/video/source.mp4" --profile docs/examples/gpt6-focused-profile-receipt.json --previous docs/examples/native-gap-review-observations.json --output "$RUNNER_TEMP/sequence-pilot-result"
       - name: Evaluate returned observations separately and print actual receipts
         if: always()
         run: |
