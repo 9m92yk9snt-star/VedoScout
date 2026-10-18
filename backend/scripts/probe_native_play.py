@@ -7,6 +7,7 @@ import argparse
 import hashlib
 import json
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import time
@@ -30,7 +31,7 @@ def select_play(manifest):
     return packet, local, top, bottom
 
 
-def prepare_videos(manifest, output):
+def prepare_videos(manifest, output, *, replay_dir=None):
     if pilot.digest(manifest["source_video"]) != manifest["source_video_sha256"]:
         raise ValueError("SOURCE_VIDEO_CHANGED")
     packet, local, top, bottom = select_play(manifest)
@@ -48,11 +49,14 @@ def prepare_videos(manifest, output):
     for name, fps, filters in (("overview", 8, "scale=720:1280"),
             ("native_detail", 24, f"crop={width}:{crop_height}:0:{y}")):
         path = output/(name+".mp4")
-        subprocess.run(["ffmpeg", "-nostdin", "-y", "-v", "error", "-ss", str(start),
-            "-i", manifest["source_video"], "-t", str(duration), "-map", "0:v:0", "-an",
-            "-vf", filters+f",fps={fps}", "-c:v", "libx264", "-preset", "fast", "-crf", "18",
-            "-pix_fmt", "yuv420p", "-movflags", "+faststart", str(path)],
-            check=True, capture_output=True, timeout=30)
+        if replay_dir:
+            shutil.copyfile(Path(replay_dir)/(name+".mp4"), path)
+        else:
+            subprocess.run(["ffmpeg", "-nostdin", "-y", "-v", "error", "-ss", str(start),
+                "-i", manifest["source_video"], "-t", str(duration), "-map", "0:v:0", "-an",
+                "-vf", filters+f",fps={fps}", "-c:v", "libx264", "-preset", "fast", "-crf", "18",
+                "-pix_fmt", "yuv420p", "-movflags", "+faststart", str(path)],
+                check=True, capture_output=True, timeout=30)
         probe = json.loads(subprocess.run(["ffprobe", "-v", "error", "-show_entries",
             "format=duration,size:stream=width,height,r_frame_rate,nb_frames", "-of", "json", str(path)],
             check=True, capture_output=True, timeout=10).stdout)
@@ -100,9 +104,11 @@ def spatial_reference_items(manifest, packet, local, output):
     return items, audit
 
 
-def run(manifest_path, output, profile_path, *, spatial_references=False, model="gemini-3.1-pro-preview", comparison_receipt=None):
+def run(manifest_path, output, profile_path, *, spatial_references=False, model="gemini-3.1-pro-preview", comparison_receipt=None, reuse_encoded_videos=None):
     if model not in {"gemini-3.1-pro-preview", "gemini-3.8-flash"}:
         raise ValueError("UNREVIEWED_NATIVE_MODEL")
+    if reuse_encoded_videos and not comparison_receipt:
+        raise ValueError("REPLAY_REQUIRES_EXACT_COMPARISON_RECEIPT")
     started = time.monotonic(); output = Path(output)
     if output.exists() and any(output.iterdir()):
         raise ValueError("OUTPUT_MUST_BE_NEW_OR_EMPTY")
@@ -114,7 +120,7 @@ def run(manifest_path, output, profile_path, *, spatial_references=False, model=
             or sorted(i["sha256"] for i in receipt["images"]) != sorted(r["sha256"] for r in manifest["references"])):
         raise ValueError("IDENTITY_PROFILE_UNRESOLVED")
     manifest = pilot.apply_identity_profile(manifest, json.loads(receipt["raw_response"]))
-    packet, local, views, box = prepare_videos(manifest, output/"videos")
+    packet, local, views, box = prepare_videos(manifest, output/"videos", replay_dir=reuse_encoded_videos)
     refs = {r["reference_id"]: r for r in manifest["references"]}
     ids = list(dict.fromkeys(manifest["identity_profile"]["canonical_reference_ids"]+
                              [r["reference_id"] for r in local]))
@@ -194,6 +200,7 @@ def run(manifest_path, output, profile_path, *, spatial_references=False, model=
         "detail_source_crop_box": box, "reference_ids": ids, "request_audit": audit,
         "spatial_reference_audit": spatial_audit,
         "model_comparison": comparison,
+        "encoded_video_bytes_reused": bool(reuse_encoded_videos),
         "encoded_views": [{k:v for k,v in view.items() if k != "path"} for view in views]}
     pilot.write_json(output/"result.json", result)
     response = transport.run_jobs([{"packet_id": "native_short_play", "items": items,
@@ -215,7 +222,9 @@ if __name__ == "__main__":
     parser.add_argument("--spatial-references", action="store_true")
     parser.add_argument("--model", choices=["gemini-3.1-pro-preview", "gemini-3.8-flash"], default="gemini-3.1-pro-preview")
     parser.add_argument("--comparison-receipt")
+    parser.add_argument("--reuse-encoded-videos")
     args = parser.parse_args()
     result = run(args.prepared, args.output, args.resume_profile,
-                 spatial_references=args.spatial_references, model=args.model, comparison_receipt=args.comparison_receipt)
+                 spatial_references=args.spatial_references, model=args.model, comparison_receipt=args.comparison_receipt,
+                 reuse_encoded_videos=args.reuse_encoded_videos)
     raise SystemExit(0 if result["model_status"] == "COMPLETED" else 3)

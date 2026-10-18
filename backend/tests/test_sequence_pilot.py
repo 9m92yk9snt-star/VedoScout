@@ -632,6 +632,20 @@ def test_native_play_views_keep_normal_duration_and_source_geometry(tmp_path):
     assert (detail["width"], detail["height"], detail["r_frame_rate"]) == (96, 160, "24/1")
 
 
+def test_video_comparison_reuses_exact_encoded_bytes_without_encoder_work(tmp_path, monkeypatch):
+    import subprocess
+    from scripts.probe_native_play import prepare_videos
+    manifest = p.prepare(source_export(tmp_path), tmp_path / "prepared", scene_packets=True)
+    _, _, initial, _ = prepare_videos(manifest, tmp_path / "baseline")
+    original = subprocess.run
+    def no_encode(command, **kwargs):
+        assert command[0] != "ffmpeg", "A comparison must not re-encode its baseline videos"
+        return original(command, **kwargs)
+    monkeypatch.setattr(subprocess, "run", no_encode)
+    _, _, reused, _ = prepare_videos(manifest, tmp_path / "reused", replay_dir=tmp_path / "baseline")
+    assert [v["sha256"] for v in initial] == [v["sha256"] for v in reused]
+
+
 def test_native_play_cli_reports_failed_model_access_as_failed_process(tmp_path, monkeypatch):
     import subprocess
     monkeypatch.delenv("EMERGENT_LLM_KEY", raising=False)

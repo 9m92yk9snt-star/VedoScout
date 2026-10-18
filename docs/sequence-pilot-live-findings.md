@@ -348,3 +348,16 @@ uncertainty when the evidence does not resolve it. Production remains unchanged.
 
 
 The proxy catalog also lists gemini/gemini-3.8-flash. A final controlled model comparison changes only the model to this available video model. The previous spatial-reference request's full wire payload hash must reproduce exactly before any paid request is sent. The new request body must be identical apart from its model field; input bytes, order, video sampling, original selection geometry, profile and prompts remain fixed. The baseline action reply is checked for integrity and never inserted into the prompt. One call, 150 seconds overall and 120 seconds per call. This tests a different model, not another vote from the failed model.
+
+
+Run 39149532820 stopped before any model call: COMPARISON_INPUT_NOT_IDENTICAL.
+Inspection of its artifact showed that both annotated JPEGs exactly match the
+baseline, while re-encoding produced different MP4 bytes (overview 3,119,886
+versus 3,120,074 bytes; native detail 2,834,413 versus 2,835,083). Identical source
+and encoding settings do not guarantee identical encoded files across runners.
+The exact-input guard was retained. The comparison now downloads the measured
+baseline's own two MP4s through the normal GitHub artifact API, copies them
+without invoking the encoder, and still requires the complete old request hash
+to match before changing only the model field. A regression checks byte-exact
+reuse and that no encoder process runs. No failed comparison is counted as a
+Gemini 3.8 perception result.

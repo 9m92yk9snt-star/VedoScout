@@ -9,6 +9,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   actual_video_experiment:
@@ -17,7 +18,7 @@ jobs:
       github.event.pull_request.number == 39 &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.event.pull_request.head.ref == 'codex/sequence-pilot-foundation' &&
-      github.event.before == 'b742a6c67c48f0d85bfee408fd0f25a3fd5a0b98' &&
+      github.event.before == 'e8686e92d2213878a983c26579b895cac5b83527' &&
       github.run_attempt == 1
     runs-on: ubuntu-latest
     timeout-minutes: 9
@@ -83,10 +84,17 @@ jobs:
           PY
       - name: Prepare actual source images and original selections once
         run: python backend/scripts/run_sequence_pilot.py prepare --evidence-dir "$RUNNER_TEMP/sequence-pilot-input" --output "$RUNNER_TEMP/sequence-pilot-prepared" --scene-packets --max-edge 1280
+      - name: Reuse exact encoded bytes from the measured baseline
+        uses: actions/download-artifact@v4
+        with:
+          name: sequence-pilot-orman400-39149235839
+          run-id: 39149235839
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/native-baseline
       - name: Read complete plays with the actual model
         env:
           EMERGENT_LLM_KEY: ${{ secrets.EMERGENT_LLM_KEY }}
-        run: python backend/scripts/probe_native_play.py --prepared "$RUNNER_TEMP/sequence-pilot-prepared/manifest.json" --output "$RUNNER_TEMP/sequence-pilot-result" --resume-profile docs/examples/gpt6-focused-profile-receipt.json --spatial-references --model gemini-3.8-flash --comparison-receipt docs/examples/native-spatial-baseline-receipt.json
+        run: python backend/scripts/probe_native_play.py --prepared "$RUNNER_TEMP/sequence-pilot-prepared/manifest.json" --output "$RUNNER_TEMP/sequence-pilot-result" --resume-profile docs/examples/gpt6-focused-profile-receipt.json --spatial-references --model gemini-3.8-flash --comparison-receipt docs/examples/native-spatial-baseline-receipt.json --reuse-encoded-videos "$RUNNER_TEMP/native-baseline/sequence-pilot-result/videos"
       - name: Evaluate returned observations separately and print actual receipts
         if: always()
         run: |
