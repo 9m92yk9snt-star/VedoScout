@@ -9,6 +9,7 @@ import hashlib
 import json
 import math
 from pathlib import Path
+import re
 import sys
 import time
 
@@ -35,6 +36,56 @@ def unresolved_gap(saved):
     return question
 
 
+def pass_finish_gap(saved):
+    """Derive both detail windows from an actual observed pass/shot chain."""
+    receipt = saved['receipt']
+    if (receipt.get('status') != 'COMPLETED' or receipt.get('origin') != 'LIVE_MODEL_REQUEST'
+            or hashlib.sha256(receipt['raw_response'].encode()).hexdigest() != receipt['response_sha256']):
+        raise ValueError('INVALID_PRIOR_OBSERVATION')
+    raw, q = json.loads(receipt['raw_response']), dict(saved['question'])
+    if q['packet_id'] != receipt['packet_id']:
+        raise ValueError('INVALID_CONTACT_INTERVAL')
+    def instant(value):
+        if not isinstance(value, str) or not re.fullmatch(r's\d{9}', value):
+            raise ValueError('EXACT_OBSERVED_SOURCE_FRAME_REQUIRED')
+        return int(value[1:])
+    chain = raw.get('ball_contact_chain', [])
+    passes = [a for a in chain if a.get('type') == 'pass']
+    if len(passes) != 1:
+        raise ValueError('ONE_OBSERVED_PASS_REQUIRED')
+    passing = passes[0]
+    shots = [a for a in chain if a.get('type') == 'shot' and
+             instant(a.get('before_frame')) > instant(passing.get('after_frame'))]
+    if len(shots) != 1 or not any(a.get('uncertainty') for a in chain):
+        raise ValueError('ONE_UNRESOLVED_PASS_FINISH_CHAIN_REQUIRED')
+    windows = []
+    for role, action in (('release', passing), ('finish', shots[0])):
+        lo, hi = instant(action.get('before_frame')), instant(action.get('after_frame'))
+        if not q['start_ms'] <= lo <= hi <= q['end_ms']:
+            raise ValueError('OBSERVED_CONTACT_OUTSIDE_SOURCE_PLAY')
+        windows.append({'start_ms':max(q['start_ms'],lo-250),
+                        'end_ms':min(q['end_ms'],hi+250),'role':role})
+    if windows[0]['end_ms'] >= windows[1]['start_ms']:
+        raise ValueError('DISTINCT_CONTACT_WINDOWS_REQUIRED')
+    if sum(w['end_ms']-w['start_ms'] for w in windows) > 3000:
+        raise ValueError('CONTACT_DETAIL_BUDGET_EXCEEDED')
+    q.update(reason='OBSERVED_PASS_RECEIVE_FINISH_LINK', detail_windows=windows,
+             detail_start_ms=windows[0]['start_ms'],detail_end_ms=windows[-1]['end_ms'],
+             selection_policy='PRIOR_SOURCE_CITED_PASS_AND_LATER_SHOT_NOT_REFERENCE_ANSWERS')
+    return q
+
+
+def validate_native_coverage(times, windows):
+    """Missing the later finish must fail, even when the pass is fully covered."""
+    if times != sorted(set(times)):
+        raise ValueError('NATIVE_CONTACT_COVERAGE_INCOMPLETE')
+    for window in windows:
+        points = [ms for ms in times if window['start_ms'] <= ms <= window['end_ms']]
+        if (len(points) < 2 or points[0]-window['start_ms'] > 35 or
+                window['end_ms']-points[-1] > 35 or max(b-a for a,b in zip(points,points[1:])) > 35):
+            raise ValueError('NATIVE_CONTACT_COVERAGE_INCOMPLETE')
+
+
 def viewing_band(rows, width, height):
     """Union all detected people, with body-height margins; no target choice."""
     boxes = [box for row in rows for box in row]
@@ -50,14 +101,17 @@ def viewing_band(rows, width, height):
     return [0, y0, width, y1]
 
 
-def prepare(manifest_path, gap_path, profile_path, output):
+def prepare(manifest_path, gap_path, profile_path, output, *, link_mode='finisher'):
     import cv2
     from cv_detect import PersonDetector
     started, output = time.monotonic(), Path(output)
     if output.exists() and any(output.iterdir()):
         raise ValueError('OUTPUT_MUST_BE_NEW_OR_EMPTY')
     manifest, gap, profile = (p.read_json(x) for x in (manifest_path, gap_path, profile_path))
-    q = unresolved_gap(gap)
+    if link_mode not in {'finisher','pass-finish'}:
+        raise ValueError('INVALID_LINK_MODE')
+    q = pass_finish_gap(gap) if link_mode == 'pass-finish' else unresolved_gap(gap)
+    windows = q.get('detail_windows', [{'start_ms':q['detail_start_ms'],'end_ms':q['detail_end_ms']}])
     source_hash = p.digest(manifest['source_video'])
     if any(x['source_video_sha256'] != source_hash for x in (manifest, gap, profile)):
         raise ValueError('SOURCE_INPUT_MISMATCH')
@@ -85,6 +139,8 @@ def prepare(manifest_path, gap_path, profile_path, output):
                 break
             if ms < q['detail_start_ms']:
                 continue
+            if not any(w['start_ms'] <= ms <= w['end_ms'] for w in windows):
+                continue
             frames.append((ms, pixels))
             if ms >= next_detect:
                 boxes = detector.detect(pixels)
@@ -95,9 +151,7 @@ def prepare(manifest_path, gap_path, profile_path, output):
     finally:
         cap.release()
     times = [ms for ms, _ in frames]
-    if (len(times) < 2 or times[0]-q['detail_start_ms'] > 35 or q['detail_end_ms']-times[-1] > 35 or
-            max(b-a for a,b in zip(times,times[1:])) > 35 or times != sorted(set(times))):
-        raise ValueError('NATIVE_CONTACT_COVERAGE_INCOMPLETE')
+    validate_native_coverage(times, windows)
     box = viewing_band([s['boxes_xywh_conf'] for s in samples], width, height)
     items = [{'type':'text','text':
         'Read this one complete football play and the new original-source contact detail. '
@@ -132,8 +186,14 @@ def prepare(manifest_path, gap_path, profile_path, output):
                       {'type':'image','path':r['path'],'sha256':r['sha256']}])
     spatial, _ = spatial_reference_items(manifest, {'core_start_ms':q['start_ms']}, local, output/'spatial')
     items.extend(spatial)
-    rows = [(f['media_ms'], 'full-play overview', f) for f in manifest['frames']
-            if q['start_ms'] <= f['media_ms'] <= q['end_ms']]
+    rows = []
+    for f in manifest['frames']:
+        if q['start_ms'] <= f['media_ms'] <= q['end_ms']:
+            image = f
+            if link_mode == 'pass-finish':
+                image = {'frame_id':f['frame_id'], **p._save_image(output/'overview'/(f['frame_id']+'.jpg'),
+                    cv2.imread(f['path']),768,70)}
+            rows.append((f['media_ms'],'full-play overview',image))
     for ms, pixels in frames:
         im = p._save_image(output/'detail'/f's{ms:09}.jpg', pixels[box[1]:box[3]], 1280, 85)
         rows.append((ms, 'native contact detail', {'frame_id':f's{ms:09}', **im}))
@@ -143,6 +203,7 @@ def prepare(manifest_path, gap_path, profile_path, output):
     model = 'gemini-3.8-flash'
     _, _, audit = t.build_request('emergent', model, items, reasoning_effort='low', image_detail='high')
     result = {'status':'PREPARED_ACTOR_CONTINUITY_PROBE','origin_run':gap['origin_run'],
+        'link_mode':link_mode,
         'identity_reference_ids':ids,
         'prior_response_sha256':gap['receipt']['response_sha256'],'source_video_sha256':source_hash,
         'question':q, 'source_crop_box':box,'detector_source_sha256':detector.model_sha256,
@@ -160,8 +221,9 @@ if __name__ == '__main__':
     for name in ('prepared','gap-receipt','resume-profile','output'):
         cli.add_argument('--'+name, required=True)
     cli.add_argument('--prepare-only', action='store_true')
+    cli.add_argument('--link-mode', choices=['finisher','pass-finish'], default='finisher')
     a = cli.parse_args()
-    result, job, started = prepare(a.prepared, a.gap_receipt, a.resume_profile, a.output)
+    result, job, started = prepare(a.prepared, a.gap_receipt, a.resume_profile, a.output,link_mode=a.link_mode)
     if not a.prepare_only:
         response = t.run_jobs([job],'emergent','gemini-3.8-flash',deadline=started+90,per_call_s=45,workers=1)[0]
         p.write_json(Path(a.output)/'responses/unresolved_actor.json',response)

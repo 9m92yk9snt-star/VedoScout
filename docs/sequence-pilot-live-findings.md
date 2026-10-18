@@ -510,3 +510,29 @@ any events. Thirteen new regression cases pass locally, including replay of
 the retained failed actor response and the actual event resolver's assist path.
 The source inspection still cannot uniquely establish the middle finishing
 actor; all-five acceptance and fresh full-source latency remain unproven.
+
+## Complete pass-to-finish detail experiment
+
+The owner clarified that the intended review is the earlier play beginning near
+42 seconds, with a turn, release to a teammate and an obscured finishing foot.
+That clarification selects the play for diagnosis; it is not supplied as the
+model's expected answer and does not make this a blind full-video recall test.
+
+The existing sequence_006 review's native detail ended at 44.932 seconds, while
+its actual returned shot bracket was 45.382–45.765. That finishing contact was
+only represented in the coarser full-play overview. The new pass-finish mode
+derives two detail windows from the saved, integrity-checked pass and shot source
+frame IDs, padded by 250ms: 43.732–44.382 and 45.132–46.015. These are observed
+contact brackets, not reference-event timestamps. It preserves the complete
+38.632–47.264 source-play overview, including the original in-play selections.
+No historical action wording, desired assist or reference answer is inserted.
+The prompt retains uncertainty if before/after movement cannot determine a touch.
+
+All 70 overview instants remain at 768-edge/quality 70, beside 94 original-rate
+source contact instants in the shared full-width person-union band. Preparation
+took 2.917 seconds with seven sparse detector forwards. The preflighted request
+is 17,275,044 bytes. Missing the later finishing window now fails the coverage
+check even when the passing window is complete. Four new regressions and all
+141 relevant local tests pass. One Gemini 3.8 Flash call has a 45-second request
+limit and a separate 90-second probe bound. This is not fresh full-video timing.
+Actual response and football correctness remain pending; production is unchanged.
