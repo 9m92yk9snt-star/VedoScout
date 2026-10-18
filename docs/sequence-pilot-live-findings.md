@@ -220,3 +220,22 @@ This is an experimental representation, not a waiver of physical evidence or
 a production change. The previous baseline payload hash must match before the
 new request is sent, and ordered image hashes must remain identical. One new
 call, 150 seconds overall, 120 seconds per request. No expected answers enter it.
+
+
+Contact-representation run 39147827003 took 33.776 seconds including detail
+preparation; the model call took 24.052 seconds. It confidently assigned the
+recipient's goal to number 15 and omitted number 10's finishing touch. The
+result is an incorrect goal, not an assist recovery. A contact bracket does not
+make an incorrect causal reading correct. Do not promote this experiment.
+107 isolated code tests and production verification passed; perception failed.
+
+Next focused test restores the native detail geometry/quality of the earlier
+source-inspected success: union of original local boxes with one player-height
+margin, JPEG quality 80. The overview stays exactly at the failed baseline's
+768 edge/quality 70; original source instants, order, question, references,
+model and low reasoning stay fixed. No contact-bracket instruction is added.
+The old wire hash is first reproduced. This tests the combined native-detail
+delivery policy, not an isolated claim about JPEG quality. Preflight retained
+all 145 image appearances and fits at 10,583,205 bytes. At most one new call,
+150 seconds overall and 120 seconds per call. If this does not recover the
+known source-inspected contact, stop scaling this approach to the whole video.

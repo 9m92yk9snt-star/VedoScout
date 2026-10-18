@@ -590,6 +590,24 @@ def test_contact_review_keeps_overview_and_uses_actual_native_source_clock(tmp_p
     assert any(f.get("source_crop_box") for f in enriched["frames"])
 
 
+def test_restored_native_detail_changes_only_crop_delivery_not_timestamps_or_overview(tmp_path):
+    manifest = p.prepare(source_export(tmp_path), tmp_path / "prepared", fps=8)
+    original = {"packet_id": "review", "phase": "FOLLOWUP", "start_ms": 0, "end_ms": 750,
+                "reference_ids": ["r1"], "question": {"focus_ms": 350}}
+    low, low_jobs = p.prepare_contact_reviews(manifest, [deepcopy(original)], tmp_path / "low")
+    restored, restored_jobs = p.prepare_contact_reviews(manifest, [deepcopy(original)], tmp_path / "restored",
+                                                       native_detail_policy="local_span_q80")
+    assert low_jobs[0]["frame_ids"] == restored_jobs[0]["frame_ids"]
+    assert low_jobs[0]["question"] == restored_jobs[0]["question"]
+    assert restored_jobs[0]["source_crop_box"] == [0, 0, 96, 160]
+    assert restored_jobs[0]["native_crop_count"] == low_jobs[0]["native_crop_count"]
+    assert restored["contact_review_delivery"]["native_crop_jpeg_quality"] == 80
+    assert restored["references"] == low["references"] == manifest["references"]
+    initial = {f["frame_id"] for f in manifest["frames"]}
+    assert [f["sha256"] for f in low["frames"] if f["frame_id"] in initial] == [
+        f["sha256"] for f in restored["frames"] if f["frame_id"] in initial]
+
+
 def test_runner_preserves_initial_observations_if_targeted_preparation_fails(tmp_path, monkeypatch):
     root = source_export(tmp_path)
     manifest = p.prepare(root, tmp_path / "prepared")
