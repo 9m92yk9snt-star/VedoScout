@@ -4,6 +4,7 @@ import "@testing-library/jest-dom";
 import ScoutMode from "./ScoutMode";
 import authority from "./videoFrameAuthority.cjs";
 import { detectSceneCuts, selectTapHints } from "./sceneDetect";
+import policy from "./scoutTapPolicy.cjs";
 
 jest.mock("./sceneDetect", () => ({
   detectSceneCuts: jest.fn(async () => ({ cuts: [20, 40], samples: [] })),
@@ -58,6 +59,18 @@ async function boot(props = {}) {
   fireEvent.load(screen.getByTestId("scout-presented-frame"));
   return { ...result, onConfirm, onCancel };
 }
+function edit() {
+  if (screen.getByTestId("scout-refine").getAttribute("aria-expanded") !== "true") fireEvent.click(screen.getByTestId("scout-refine"));
+  fireEvent.click(screen.getByTestId("scout-zoom-reset"));
+}
+function tools() {
+  edit();
+  if (screen.getByTestId("scout-advanced").getAttribute("aria-expanded") !== "true") fireEvent.click(screen.getByTestId("scout-advanced"));
+}
+function behind() {
+  fireEvent.click(screen.getByTestId("scout-hidden-player"));
+  fireEvent.click(screen.getByTestId("scout-partial-player"));
+}
 function tap() { fireEvent.click(screen.getByTestId("scout-stage"), { clientX: 195, clientY: 250 }); }
 const nativeMask = { width: 96, height: 192, runs: [5760, 2880, 9792], method: "native_person_instance" };
 async function mark() {
@@ -106,7 +119,7 @@ test("tapping automatically previews the native outline beside its whole area an
   await screen.findByTestId("scout-player-mask");
   expect(crop).toHaveAttribute("data-mask", JSON.stringify(nativeMask));
   expect(crop).toHaveAttribute("data-box", JSON.stringify(fitted));
-  expect(within(screen.getByTestId("scout-cutout-context")).getByTestId("crop")).not.toHaveAttribute("data-mask");
+  expect(screen.queryByTestId("scout-cutout-context")).not.toBeInTheDocument();
   fireEvent.click(screen.getByTestId("scout-confirm-mark"));
   fireEvent.load(screen.getByTestId("scout-presented-frame"));
   tap(); await screen.findByTestId("scout-player-mask"); fireEvent.click(screen.getByTestId("scout-confirm-mark"));
@@ -124,7 +137,7 @@ test("tapping automatically previews the native outline beside its whole area an
 test("an automatic outline can be discarded without losing the selected frame or point", async () => {
   const requestMask = jest.fn(async () => ({ mask: nativeMask }));
   const { onConfirm } = await boot({ requestMask }); tap();
-  fireEvent.click(screen.getByTestId("scout-refine"));
+  tools();
   await screen.findByTestId("scout-player-mask");
   expect(requestMask).toHaveBeenCalledTimes(1);
   expect(within(screen.getByTestId("scout-cutout-context")).getByTestId("crop")).not.toHaveAttribute("data-mask");
@@ -197,7 +210,7 @@ test("cancel nearby check restores selection without manufacturing a link", asyn
 test("explicit visible choice exits partial mode without trapping the user", async () => {
   const { onConfirm } = await boot();
   fireEvent.click(screen.getByTestId("scout-hidden-player")); fireEvent.click(screen.getByTestId("scout-partial-player")); tap();
-  fireEvent.click(screen.getByTestId("scout-hidden-player")); fireEvent.click(screen.getByText("Player visible — tap now", { exact: true }));
+  fireEvent.click(screen.getByTestId("scout-hidden-player")); fireEvent.click(screen.getByTestId("scout-player-visible"));
   await mark(); await mark(); await mark();
   fireEvent.click(screen.getByTestId("scout-finish-early")); fireEvent.click(screen.getByTestId("scout-submit"));
   await waitFor(() => expect(onConfirm).toHaveBeenCalledTimes(1));
@@ -207,7 +220,7 @@ test("explicit visible choice exits partial mode without trapping the user", asy
 test("tracking preview uses captured PTS and stores only human approval", async () => {
   const requestTracking = jest.fn(async frames => frames.map(f => ({ t: f.t, box: { x: .46, y: .425, w: .08, h: .18 }, status: "suggested" })));
   const { onConfirm } = await boot({ requestTracking }); tap();
-  fireEvent.click(screen.getByTestId("scout-check-tracking"));
+  tools(); fireEvent.click(screen.getByTestId("scout-check-tracking"));
   await screen.findByTestId("scout-tracking-preview");
   requestTracking.mock.calls[0][0].forEach((f, i) => expect(f.t).toBeCloseTo([2.989, 3.103, 3.228, 3.353, 3.478][i]));
   fireEvent.click(screen.getByTestId("scout-preview-approve"));
@@ -225,7 +238,7 @@ test("tracking preview uses captured PTS and stores only human approval", async 
 
 test("uncertain preview cannot be approved and correction requires a new human tap", async () => {
   const requestTracking = jest.fn(async frames => frames.map((f, i) => ({ t: f.t, box: i ? null : { x: .46, y: .425, w: .08, h: .18 }, status: i ? "uncertain" : "human_seed" })));
-  await boot({ requestTracking }); tap(); fireEvent.click(screen.getByTestId("scout-check-tracking"));
+  await boot({ requestTracking }); tap(); tools(); fireEvent.click(screen.getByTestId("scout-check-tracking"));
   await screen.findByTestId("scout-tracking-preview");
   expect(screen.getByTestId("scout-preview-approve")).toBeDisabled();
   fireEvent.click(screen.getByTestId("scout-preview-correct-1"));
@@ -239,7 +252,7 @@ test("uncertain preview cannot be approved and correction requires a new human t
 
 test("a cut immediately after the tap keeps the selection and explains the stop", async () => {
   const requestTracking = jest.fn(async frames => frames.map((f, i) => ({ t: f.t, box: i ? null : { x: .46, y: .425, w: .08, h: .18 }, status: i ? "scene_cut" : "human_seed" })));
-  await boot({ requestTracking }); tap(); fireEvent.click(screen.getByTestId("scout-check-tracking"));
+  await boot({ requestTracking }); tap(); tools(); fireEvent.click(screen.getByTestId("scout-check-tracking"));
   await waitFor(() => expect(screen.getByTestId("scout-notice")).toHaveTextContent("The video cuts here"));
   expect(screen.queryByTestId("scout-tracking-preview")).not.toBeInTheDocument();
   expect(screen.getByTestId("scout-presented-frame")).toHaveAttribute("data-frame-time", "2.989");
@@ -250,7 +263,7 @@ test("a cut immediately after the tap keeps the selection and explains the stop"
 
 test("a later cut trims the preview and approval to real frames before the cut", async () => {
   const requestTracking = jest.fn(async frames => frames.map((f, i) => ({ t: f.t, box: i < 3 ? { x: .46, y: .425, w: .08, h: .18 } : null, status: i < 3 ? "suggested" : "scene_cut" })));
-  const { onConfirm } = await boot({ requestTracking }); tap(); fireEvent.click(screen.getByTestId("scout-check-tracking"));
+  const { onConfirm } = await boot({ requestTracking }); tap(); tools(); fireEvent.click(screen.getByTestId("scout-check-tracking"));
   await screen.findByTestId("scout-tracking-preview");
   expect(screen.getByTestId("scout-notice")).toHaveTextContent("stops before a video cut");
   expect(screen.getByTestId("scout-preview-correct-2")).toBeInTheDocument();
@@ -318,15 +331,14 @@ test("two selections plus skipped frames cannot pass as three", async () => {
   expect(screen.getByTestId("scout-notice")).toHaveTextContent("3 visible moments");
 });
 
-test("a hidden player is replaced by a real nearby frame, not an inferred anchor", async () => {
+test("nearby filmstrip uses real frames and never infers an anchor", async () => {
   const { onConfirm } = await boot();
-  fireEvent.click(screen.getByTestId("scout-hidden-player"));
-  expect(screen.getByTestId("scout-hidden-help")).toHaveTextContent("Do not mark the player in front");
-  fireEvent.click(screen.getByTestId("scout-nearby-later"));
-  await waitFor(() => expect(Number(screen.getByTestId("scout-presented-frame").getAttribute("data-frame-time"))).toBeCloseTo(3.478));
+  fireEvent.click(screen.getByTestId("scout-open-nearby"));
+  await screen.findByTestId("scout-nearby-filmstrip");
+  fireEvent.click(screen.getByRole("button", { name: /Use frame at 3.48 seconds/ }));
+  expect(screen.getByTestId("scout-presented-frame")).toHaveAttribute("data-frame-time", "3.4779999999999998");
   expect(screen.getByTestId("scout-progress-counter")).toHaveTextContent("0/10");
   expect(onConfirm).not.toHaveBeenCalled();
-  fireEvent.click(screen.getByText("Player visible — tap now"));
   fireEvent.load(screen.getByTestId("scout-presented-frame"));
   tap(); expect(screen.getByTestId("scout-selection-preview")).toBeInTheDocument();
 });
@@ -354,16 +366,17 @@ test("failed capture gives a retry, never an empty editor or manual fallback", a
   await screen.findByTestId("scout-progress-counter");
 });
 
-test("seeking to a nearby frame disables taps until its pixels arrive", async () => {
+test("opening nearby frames disables taps; a chosen frame needs its pixels to load", async () => {
   await boot();
   let resolveFrame;
   authority.seekPresentedFrame.mockImplementation(() => new Promise(resolve => { resolveFrame = resolve; }));
-  fireEvent.click(screen.getByTestId("scout-hidden-player"));
-  fireEvent.click(screen.getByTestId("scout-nearby-later"));
+  fireEvent.click(screen.getByTestId("scout-open-nearby"));
   tap(); expect(screen.queryByTestId("scout-selection-preview")).not.toBeInTheDocument();
-  await act(async () => resolveFrame({ mediaTime: 3.478 }));
-  expect(screen.getByTestId("scout-presented-frame")).toHaveAttribute("data-frame-time", "3.478");
-  fireEvent.click(screen.getByText("Player visible — tap now"));
+  authority.seekPresentedFrame.mockImplementation(async (_, t) => ({ mediaTime: t - .011 }));
+  await act(async () => resolveFrame({ mediaTime: 1.978 }));
+  await screen.findByTestId("scout-nearby-filmstrip");
+  fireEvent.click(screen.getByRole("button", { name: /Use frame at 3.48 seconds/ }));
+  tap(); expect(screen.queryByTestId("scout-selection-preview")).not.toBeInTheDocument();
   fireEvent.load(screen.getByTestId("scout-presented-frame")); tap();
   expect(screen.getByTestId("scout-selection-preview")).toBeInTheDocument();
 });
@@ -397,7 +410,7 @@ test("pinch zoom does not accidentally select a player; a following tap still wo
 });
 
 test("dragging and resizing adjust only the selected box without changing its frame", async () => {
-  await boot(); tap();
+  await boot(); tap(); edit();
   const stage = screen.getByTestId("scout-stage");
   const before = JSON.parse(screen.getAllByTestId("crop")[0].getAttribute("data-box"));
   fireEvent.pointerDown(screen.getByTestId("scout-draft-marker"), { pointerId: 1, clientX: 195, clientY: 250 });
@@ -405,7 +418,7 @@ test("dragging and resizing adjust only the selected box without changing its fr
   fireEvent.pointerUp(stage, { pointerId: 1 });
   const moved = JSON.parse(screen.getAllByTestId("crop")[0].getAttribute("data-box"));
   expect(moved.x).toBeGreaterThan(before.x);
-  fireEvent.pointerDown(screen.getByTestId("scout-draft-resize"), { pointerId: 1, clientX: 220, clientY: 290 });
+  fireEvent.pointerDown(screen.getByTestId("scout-draft-resize-se"), { pointerId: 1, clientX: 220, clientY: 290 });
   fireEvent.pointerMove(stage, { pointerId: 1, clientX: 240, clientY: 320 });
   fireEvent.pointerUp(stage, { pointerId: 1 });
   const resized = JSON.parse(screen.getAllByTestId("crop")[0].getAttribute("data-box"));
@@ -445,7 +458,7 @@ test.each(["no mask", "request error", "legacy mask"])("%s keeps a retry and the
   requestMask.mockResolvedValue({ mask: nativeMask });
   await boot({ requestMask }); tap();
   expect(screen.getByTestId("scout-confirm-mark")).toBeDisabled();
-  fireEvent.click(screen.getByTestId("scout-refine"));
+  tools();
   await screen.findByTestId("scout-refine-cutout");
   expect(screen.queryByTestId("scout-player-mask")).not.toBeInTheDocument();
   const first = requestMask.mock.calls[0];
@@ -463,7 +476,7 @@ test("behind keeps the area, accepts foreground first, and requires the visible 
   const requestMask = jest.fn(async (_, draft) => ({ mask: { ...nativeMask, method: draft.player_behind ? "native_person_prompt" : "native_person_instance" } }));
   const { onConfirm } = await boot({ requestMask }); tap(); await screen.findByTestId("scout-player-mask");
   const area = JSON.parse(screen.getAllByTestId("crop")[0].getAttribute("data-box"));
-  fireEvent.click(screen.getByTestId("scout-player-behind"));
+  behind();
   expect(screen.getByTestId("scout-confirm-mark")).toBeDisabled();
   expect(JSON.parse(screen.getAllByTestId("crop")[0].getAttribute("data-box"))).toEqual(area);
   fireEvent.click(screen.getByTestId("scout-exclude-opponent"));
@@ -493,9 +506,9 @@ test("behind can return to a visible player without losing the area", async () =
   const requestMask = jest.fn(async () => ({ mask: nativeMask }));
   await boot({ requestMask }); tap(); await screen.findByTestId("scout-player-mask");
   const box = requestMask.mock.calls[0][1].box;
-  fireEvent.click(screen.getByTestId("scout-player-behind"));
-  fireEvent.click(screen.getByTestId("scout-player-behind"));
-  expect(screen.getByTestId("scout-player-behind")).toHaveAttribute("aria-pressed", "false");
+  behind();
+  fireEvent.click(screen.getByTestId("scout-hidden-player")); fireEvent.click(screen.getByTestId("scout-player-visible"));
+  expect(screen.queryByTestId("scout-player-behind")).not.toBeInTheDocument();
   expect(screen.getByTestId("scout-confirm-mark")).toBeDisabled();
   tap(); await screen.findByTestId("scout-player-mask");
   expect(requestMask.mock.calls[1][1]).toMatchObject({ box, target_point: { x: .5, y: .5 } });
@@ -507,7 +520,7 @@ test("an old response cannot overwrite a new tap on the same still", async () =>
   const resolve = [];
   const requestMask = jest.fn(() => new Promise(r => resolve.push(r)));
   await boot({ requestMask }); tap(); await waitFor(() => expect(requestMask).toHaveBeenCalledTimes(1));
-  fireEvent.click(screen.getByTestId("scout-retap"));
+  edit(); fireEvent.click(screen.getByTestId("scout-retap"));
   fireEvent.click(screen.getByTestId("scout-stage"), { clientX: 225, clientY: 250 });
   await waitFor(() => expect(requestMask).toHaveBeenCalledTimes(2));
   expect(requestMask.mock.calls[0][2].aborted).toBe(true);
@@ -521,7 +534,7 @@ test("an old response cannot overwrite a new tap on the same still", async () =>
 
 test("moving the box outside the original tap does not manufacture a new positive", async () => {
   const requestMask = jest.fn(async () => ({ mask: nativeMask }));
-  await boot({ requestMask }); tap(); await screen.findByTestId("scout-player-mask");
+  await boot({ requestMask }); tap(); await screen.findByTestId("scout-player-mask"); edit();
   const stage = screen.getByTestId("scout-stage");
   fireEvent.pointerDown(screen.getByTestId("scout-draft-marker"), { pointerId: 1, clientX: 195, clientY: 250 });
   fireEvent.pointerMove(stage, { pointerId: 1, clientX: 235, clientY: 250 });
@@ -540,12 +553,111 @@ test("moving the box outside the original tap does not manufacture a new positiv
 test("resizing a behind area without a visible tap leaves identity unresolved", async () => {
   const requestMask = jest.fn(async () => ({ mask: nativeMask }));
   await boot({ requestMask }); tap(); await screen.findByTestId("scout-player-mask");
-  fireEvent.click(screen.getByTestId("scout-player-behind"));
+  behind();
   const stage = screen.getByTestId("scout-stage");
-  fireEvent.pointerDown(screen.getByTestId("scout-draft-resize"), { pointerId: 1, clientX: 220, clientY: 290 });
+  fireEvent.pointerDown(screen.getByTestId("scout-draft-resize-se"), { pointerId: 1, clientX: 220, clientY: 290 });
   fireEvent.pointerMove(stage, { pointerId: 1, clientX: 240, clientY: 320 });
   fireEvent.pointerUp(stage, { pointerId: 1 });
   expect(requestMask).toHaveBeenCalledTimes(1);
   expect(screen.getByTestId("scout-confirm-mark")).toBeDisabled();
   expect(screen.queryByTestId("scout-player-mask")).not.toBeInTheDocument();
+});
+
+test("the default view has one clear save action and no expert or duel controls", async () => {
+  await boot(); tap();
+  expect(screen.getByRole("button", { name: /Save player/ })).toBeEnabled();
+  expect(screen.queryByTestId("scout-advanced")).not.toBeInTheDocument();
+  expect(screen.queryByTestId("scout-exclude-opponent")).not.toBeInTheDocument();
+  expect(screen.queryByText(/Hidden \/ duel/)).not.toBeInTheDocument();
+  expect(screen.queryByTestId("scout-draft-resize-se")).not.toBeInTheDocument();
+  expect(screen.getByTestId("scout-target-point")).toBeInTheDocument();
+});
+
+test("an accidental background tap and a locked-box drag preserve the selection", async () => {
+  const requestMask = jest.fn(async () => ({ mask: nativeMask }));
+  await boot({ requestMask }); tap(); await screen.findByTestId("scout-player-mask");
+  const before = screen.getAllByTestId("crop")[0].getAttribute("data-box");
+  fireEvent.click(screen.getByTestId("scout-stage"), { clientX: 250, clientY: 350 });
+  fireEvent.pointerDown(screen.getByTestId("scout-draft-marker"), { pointerId: 1, clientX: 195, clientY: 250 });
+  fireEvent.pointerMove(screen.getByTestId("scout-stage"), { pointerId: 1, clientX: 230, clientY: 250 });
+  fireEvent.pointerUp(screen.getByTestId("scout-stage"), { pointerId: 1 });
+  expect(screen.getAllByTestId("crop")[0]).toHaveAttribute("data-box", before);
+  expect(requestMask).toHaveBeenCalledTimes(1);
+});
+
+test("opening and closing visibility help keeps the current draft", async () => {
+  await boot(); tap();
+  const before = screen.getAllByTestId("crop")[0].getAttribute("data-box");
+  fireEvent.click(screen.getByTestId("scout-hidden-player"));
+  fireEvent.click(screen.getByRole("button", { name: "Close selection help" }));
+  expect(screen.getAllByTestId("crop")[0]).toHaveAttribute("data-box", before);
+  expect(screen.getByTestId("scout-confirm-mark")).toBeEnabled();
+});
+
+test.each(["nw", "ne", "sw", "se"])("%s corner resizes the corresponding edges without moving the opposite corner", async corner => {
+  await boot(); tap(); edit();
+  const before = JSON.parse(screen.getAllByTestId("crop")[0].getAttribute("data-box"));
+  fireEvent.pointerDown(screen.getByTestId("scout-draft-resize-" + corner), { pointerId: 1, clientX: 195, clientY: 250 });
+  fireEvent.pointerMove(screen.getByTestId("scout-stage"), { pointerId: 1, clientX: 200, clientY: 255 });
+  fireEvent.pointerUp(screen.getByTestId("scout-stage"), { pointerId: 1 });
+  const after = JSON.parse(screen.getAllByTestId("crop")[0].getAttribute("data-box"));
+  expect(policy.validBox(after)).toBe(true);
+  if (corner.includes("w")) expect(after.x + after.w).toBeCloseTo(before.x + before.w);
+  else expect(after.x).toBe(before.x);
+  if (corner.includes("n")) expect(after.y + after.h).toBeCloseTo(before.y + before.h);
+  else expect(after.y).toBe(before.y);
+  expect(after).not.toEqual(before);
+  expect(screen.getByTestId("scout-presented-frame")).toHaveAttribute("data-frame-time", "2.989");
+});
+
+test("corner handles support keyboard adjustment and keep the actual target point", async () => {
+  await boot(); tap(); edit();
+  const pointStyle = screen.getByTestId("scout-target-point").getAttribute("style");
+  const before = JSON.parse(screen.getAllByTestId("crop")[0].getAttribute("data-box"));
+  fireEvent.keyDown(screen.getByRole("button", { name: "Resize top left" }), { key: "ArrowLeft", shiftKey: true });
+  const after = JSON.parse(screen.getAllByTestId("crop")[0].getAttribute("data-box"));
+  expect(after.x).toBeCloseTo(before.x - 10 / 1080);
+  expect(screen.getByTestId("scout-target-point")).toHaveAttribute("style", pointStyle);
+});
+
+test("a drag requests one updated outline only after the gesture finishes", async () => {
+  const requestMask = jest.fn(async () => ({ mask: nativeMask }));
+  await boot({ requestMask }); tap(); await screen.findByTestId("scout-player-mask"); edit();
+  const stage = screen.getByTestId("scout-stage");
+  fireEvent.pointerDown(screen.getByTestId("scout-draft-resize-se"), { pointerId: 1, clientX: 195, clientY: 250 });
+  fireEvent.pointerMove(stage, { pointerId: 1, clientX: 200, clientY: 255 });
+  await act(async () => new Promise(resolve => setTimeout(resolve, 300)));
+  expect(requestMask).toHaveBeenCalledTimes(1);
+  fireEvent.pointerMove(stage, { pointerId: 1, clientX: 205, clientY: 260 });
+  fireEvent.pointerUp(stage, { pointerId: 1 });
+  await waitFor(() => expect(requestMask).toHaveBeenCalledTimes(2));
+});
+
+test("browsing nearby frames and cancelling preserves the box, point and source frame", async () => {
+  await boot(); tap();
+  const before = screen.getAllByTestId("crop")[0].getAttribute("data-box");
+  fireEvent.click(screen.getByTestId("scout-open-nearby"));
+  await screen.findByTestId("scout-nearby-filmstrip");
+  fireEvent.click(screen.getByRole("button", { name: "Close nearby moments" }));
+  expect(screen.getAllByTestId("crop")[0]).toHaveAttribute("data-box", before);
+  expect(screen.getByTestId("scout-presented-frame")).toHaveAttribute("data-frame-time", "2.989");
+});
+
+test("decoded nearby frames across an actual scene boundary are excluded", async () => {
+  selectTapHints.mockReturnValue([19.9, 30, 50]);
+  await boot();
+  authority.seekPresentedFrame.mockImplementation(async (_, t) => ({ mediaTime: t > 19.5 ? 20.1 : t }));
+  fireEvent.click(screen.getByTestId("scout-open-nearby"));
+  await screen.findByTestId("scout-nearby-filmstrip");
+  expect(screen.queryByRole("button", { name: /Use frame at 20.10/ })).not.toBeInTheDocument();
+  expect(screen.getByTestId("scout-presented-frame")).toHaveAttribute("data-frame-time", "19.889");
+});
+
+test.each(["nw", "ne", "sw", "se"])("%s resizing clamps to source pixels without inverted boxes", corner => {
+  for (const dx of [-2, 2]) for (const dy of [-2, 2]) {
+    const box = policy.resizeBox({ x: .4, y: .3, w: .1, h: .2 }, corner, dx, dy);
+    expect(policy.validBox(box)).toBe(true);
+    expect(box.w).toBeGreaterThanOrEqual(.02 - 1e-9);
+    expect(box.h).toBeGreaterThanOrEqual(.04 - 1e-9);
+  }
 });

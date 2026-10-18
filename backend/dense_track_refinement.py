@@ -863,6 +863,8 @@ def _resolve_dense_target(identity_authority: dict, media_ms: int, players: list
             selection_box=rb, visible_mask=mask)
         players = [players[i] for i in indices]
         authority_evidence["selection_binding"] = "USER_SELECTED_POINT_AND_VISIBLE_MASK" if mask is not None else "USER_SELECTED_POINT"
+        if mask is None and indices != point_indices:
+            authority_evidence["selection_binding"] = "USER_SELECTED_BOX_EDGE_RECONCILIATION"
         if len(players) != 1:
             return {"status": "HYPOTHESES" if players else "UNRESOLVED",
                     "reason": ("TAP_POINT_BODY_AMBIGUOUS" if players else

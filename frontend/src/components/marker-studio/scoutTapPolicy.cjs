@@ -60,6 +60,26 @@ function nearbyTime(time, direction, duration, cuts = []) {
   return Math.abs(next - time) < 0.02 ? null : next;
 }
 
+// Same-scene candidates only. Each candidate must still be decoded before use;
+// a requested seek time never becomes an identity anchor by itself.
+function nearbyMoments(time, duration, cuts = []) {
+  if (!Number.isFinite(time) || !Number.isFinite(duration)) return [];
+  const boundaries = [0, ...cuts.filter(t => t > 0 && t < duration).sort((a, b) => a - b), duration];
+  const index = boundaries.findIndex((t, i) => i < boundaries.length - 1 && time >= t && time < boundaries[i + 1]);
+  if (index < 0) return [];
+  const low = boundaries[index] + .04, high = boundaries[index + 1] - .04;
+  if (high <= low) return [time];
+  return [...new Set([-1, -.5, 0, .5, 1].map(delta => delta === 0 ? time : clamp(time + delta, low, high)))].sort((a, b) => a - b);
+}
+
+function resizeBox(box, corner, dx, dy) {
+  const left = corner.includes('w') ? clamp(box.x + dx, 0, box.x + box.w - .02) : box.x;
+  const top = corner.includes('n') ? clamp(box.y + dy, 0, box.y + box.h - .04) : box.y;
+  const right = corner.includes('e') ? clamp(box.x + box.w + dx, left + .02, 1) : box.x + box.w;
+  const bottom = corner.includes('s') ? clamp(box.y + box.h + dy, top + .04, 1) : box.y + box.h;
+  return { x: left, y: top, w: right - left, h: bottom - top };
+}
+
 function verifyTime(duration, index) { return duration * [0.2, 0.5, 0.8][index]; }
 function distinctVerifyTime(time, marks) {
   return Number.isFinite(time) && time >= 0 && marks.every(m => Math.abs(m.t - time) >= VERIFY_SPACING);
@@ -101,4 +121,4 @@ function buildPayload(frames, marks, verifyMarks, cuts) {
   };
 }
 
-module.exports = { TARGET_TAPS, MIN_TAPS, VERIFY_TAPS, VERIFY_SPACING, validBox, screenToVideo, tapBox, prioritizeTapMoments, markingProgress, nearbyTime, verifyTime, distinctVerifyTime, buildPayload };
+module.exports = { TARGET_TAPS, MIN_TAPS, VERIFY_TAPS, VERIFY_SPACING, validBox, screenToVideo, tapBox, prioritizeTapMoments, markingProgress, nearbyTime, nearbyMoments, resizeBox, verifyTime, distinctVerifyTime, buildPayload };

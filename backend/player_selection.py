@@ -56,8 +56,10 @@ def body_indices_at_point(boxes, point, exclude_points=(), *, selection_box=None
     """Return bodies containing the selected point in the same coordinate units.
 
     ``boxes`` are (x, y, w, h) rectangles; points are (x, y). Ambiguity is
-    preserved as multiple indices. Neither the crop centre nor proximity to a
-    different body can replace the user's point.
+    preserved as multiple indices. A crop centre cannot replace a valid point
+    match. For a full selection, a grazing hit on a body mostly outside the
+    selected rectangle may instead bind to a uniquely enclosed adjacent body.
+    Masks retain ownership of the selected foreground and never use that repair.
     """
     def usable_point(value):
         return isinstance(value, (tuple, list)) and len(value) == 2 and all(number(v) for v in value)
@@ -80,7 +82,60 @@ def body_indices_at_point(boxes, point, exclude_points=(), *, selection_box=None
             if coverage is None or coverage < .90:
                 continue
         selected.append(index)
+    if visible_mask is None and selection_box is not None and len(selected) == 1:
+        return _resolve_box_edge_hit(boxes, point, negatives, selection_box, selected)
     return selected
+
+
+def _resolve_box_edge_hit(boxes, point, negatives, selection_box, selected):
+    """Reconcile one boundary hit with the same-frame full-body rectangle.
+
+    This is neither nearest-person selection nor a temporal identity proof.
+    Keep a point's ordinary body match, including off-centre/broad selections.
+    Only repair a geometric contradiction: the hit body lies mostly outside
+    the selection and the point grazes both it and the selection's boundary.
+    A replacement must already be measured, nearly enclosed, substantial in
+    the selection and immediately adjacent to that point. Multiple candidates
+    remain ambiguous; no candidate leaves the conflicting hit unverified.
+    All ratios are unitless, so overview/dense/native-pixel consumers agree.
+    """
+    if isinstance(selection_box, dict):
+        selection_box = tuple(selection_box.get(k) for k in ("x", "y", "w", "h"))
+    if (not isinstance(selection_box, (tuple, list)) or len(selection_box) != 4
+            or not all(number(v) for v in selection_box)
+            or selection_box[2] <= 0 or selection_box[3] <= 0):
+        return selected
+    sx, sy, sw, sh = selection_box
+    px, py = point
+    if not (sx <= px <= sx + sw and sy <= py <= sy + sh):
+        return selected
+
+    def overlap_fraction(box):
+        x, y, w, h = box
+        area = max(0., min(x + w, sx + sw) - max(x, sx)) * max(0., min(y + h, sy + sh) - max(y, sy))
+        return area / (w * h)
+
+    hit = boxes[selected[0]]
+    hx, hy, hw, hh = hit
+    selection_edge = min((px - sx) / sw, (sx + sw - px) / sw,
+                         (py - sy) / sh, (sy + sh - py) / sh)
+    body_edge = min((px - hx) / hw, (hx + hw - px) / hw,
+                    (py - hy) / hh, (hy + hh - py) / hh)
+    if overlap_fraction(hit) >= .5 or selection_edge > .15 or body_edge > .15:
+        return selected
+    candidates = []
+    for i, box in enumerate(boxes):
+        if (not isinstance(box, (tuple, list)) or len(box) != 4
+                or not all(number(v) for v in box) or box[2] <= 0 or box[3] <= 0):
+            continue
+        x, y, w, h = box
+        if any(x <= p[0] <= x + w and y <= p[1] <= y + h for p in negatives):
+            continue
+        dx, dy = max(x - px, 0., px - x - w), max(y - py, 0., py - y - h)
+        if (overlap_fraction(box) >= .9 and w * h >= .25 * sw * sh
+                and dx <= .35 * w and dy <= .15 * h):
+            candidates.append(i)
+    return candidates
 
 
 def valid_mask(mask):

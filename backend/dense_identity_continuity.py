@@ -124,6 +124,8 @@ def apply_reference_matches(frames, observation):
     by_ms = {f["media_ms"]: f for f in rows}
     votes = {}
     for match in (observation or {}).get("target_observations") or []:
+        if match.get("same_player") is False or match.get("kit_consistent") is False:
+            continue
         f = by_ms.get(match.get("media_ms"))
         track = match.get("local_track_id")
         features = set(v for v in match.get("features") or [] if isinstance(v, str)

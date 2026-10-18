@@ -140,9 +140,30 @@ def video_observations(observation, frames, window):
             "outcome_evidence_ms": outcome_evidence, "source_frame_indices": sorted({row[2] for row in actor_samples}),
             "source_bounds_ms": [times[0], times[-1]], "provider_requested_fps": transport.get("requested_fps"),
             "source_sampling_fps": transport.get("source_sampling_fps"), "playback_fps": transport.get("playback_fps")}
+        reference = obs.get("selected_reference") or {}
+        match = raw.get("selected_reference_match") or {}
+        if (isinstance(match, dict) and isinstance(reference, dict) and type(match.get("same_player")) is bool
+                and reference.get("source") == "USER_SELECTED_SOURCE_PIXELS"
+                and obs.get("source_video_sha256")
+                and reference.get("source_video_sha256") == obs.get("source_video_sha256")
+                and reference.get("input_sha256") and isinstance(transport.get("reference_sha256"), list)
+                and transport["reference_sha256"] and all(isinstance(v, str) and v for v in transport["reference_sha256"])):
+            # Reuse this same video's actual reference comparison. A negative
+            # comparison must survive native tracking that wrongly selected
+            # the actor. The existing canonical resolver owns the decision.
+            actor_times = {e["media_ms"] for e in actor_evidence}
+            evidence = sorted({at(i) for i in _rows(match.get("evidence_indices"))
+                               if at(i) in actor_times})
+            if evidence:
+                action["video_observation"]["reference_sha256"] = deepcopy(transport["reference_sha256"])
+                action["video_observation"]["selected_reference_match"] = {
+                    "same_player": match["same_player"], "confidence": match.get("confidence"),
+                    "evidence_ms": evidence, "features": _rows(match.get("features")),
+                    "continuous_visible_actor": match.get("continuous_visible_actor") is True}
         if isinstance(raw.get("save_sequence_evidence"), dict):
             action["video_observation"]["save_sequence"] = deepcopy(raw["save_sequence_evidence"])
-        if raw.get("outcome") == "TEAMMATE_GOAL":
+        if (action.get("kind") in {"PASS", "CROSS", "KEY_PASS"}
+                and any(k in raw for k in ("receiver_team", "receiver_finisher_same_player"))):
             action["video_observation"]["assist_roles"] = {
                 k: raw[k] for k in ("receiver_team", "receiver_finisher_same_player") if k in raw}
         actions.append(action)
