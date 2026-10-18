@@ -128,6 +128,8 @@ Both adapters' complete payloads were constructed and size-checked offline.
 The tests exercise actual source decoding/cropping/checksums, attribution and
 causal failures, duplicate/rebound handling, process termination, access-stop
 behaviour and no-key failure. Their observation fixtures are synthetic tests.
+The standalone GitHub Actions workflow runs these checks plus the shared
+selection tests without model credentials or uploaded match footage.
 No new model perception, five-action success, production report completion or
 end-to-end speed improvement has been verified. An authenticated model endpoint
 is the outstanding requirement for that next experiment.
