@@ -9,7 +9,6 @@ on:
 
 permissions:
   contents: read
-  actions: read
 
 jobs:
   actual_video_experiment:
@@ -18,7 +17,7 @@ jobs:
       github.event.pull_request.number == 39 &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.event.pull_request.head.ref == 'codex/sequence-pilot-foundation' &&
-      github.event.before == 'd5ce751afd3e5e4ead0ccfa4967b6e7d2a6c772a' &&
+      github.event.before == '6609869b038c67eda9944c9fe17fbb991c369bf3' &&
       github.run_attempt == 1
     runs-on: ubuntu-latest
     timeout-minutes: 9
@@ -39,11 +38,13 @@ jobs:
             /backend/scripts/probe_sequence_detail.py
             /backend/scripts/probe_native_play.py
             /backend/scripts/run_native_batch.py
+            /backend/scripts/probe_native_gaps.py
             /docs/examples/five_action_reference_cases.json
             /docs/examples/gpt6-focused-action-receipt.json
             /docs/examples/gpt6-focused-profile-receipt.json
             /docs/examples/native-spatial-baseline-receipt.json
             /docs/examples/native-flash-known-play-receipt.json
+            /docs/examples/native-full-source-observations.json
             /docs/examples/gpt6-missing-contact-receipt.json
             /docs/examples/gpt6-full-initial-receipts.json
             /docs/examples/gpt6-contact-review-low-receipt.json
@@ -86,17 +87,10 @@ jobs:
           PY
       - name: Prepare actual source images and original selections once
         run: python backend/scripts/run_sequence_pilot.py prepare --evidence-dir "$RUNNER_TEMP/sequence-pilot-input" --output "$RUNNER_TEMP/sequence-pilot-prepared" --scene-packets --max-edge 1280
-      - name: Reuse exact encoded bytes from the measured baseline
-        uses: actions/download-artifact@v4
-        with:
-          name: sequence-pilot-orman400-39149235839
-          run-id: 39149235839
-          github-token: ${{ github.token }}
-          path: ${{ runner.temp }}/native-baseline
       - name: Read complete plays with the actual model
         env:
           EMERGENT_LLM_KEY: ${{ secrets.EMERGENT_LLM_KEY }}
-        run: python backend/scripts/run_native_batch.py --prepared "$RUNNER_TEMP/sequence-pilot-prepared/manifest.json" --output "$RUNNER_TEMP/sequence-pilot-result" --resume-profile docs/examples/gpt6-focused-profile-receipt.json --known-receipt docs/examples/native-flash-known-play-receipt.json --baseline-receipt docs/examples/native-spatial-baseline-receipt.json --known-videos "$RUNNER_TEMP/native-baseline/sequence-pilot-result/videos"
+        run: python backend/scripts/probe_native_gaps.py --prepared "$RUNNER_TEMP/sequence-pilot-prepared/manifest.json" --native-result docs/examples/native-full-source-observations.json --resume-profile docs/examples/gpt6-focused-profile-receipt.json --output "$RUNNER_TEMP/sequence-pilot-result"
       - name: Evaluate returned observations separately and print actual receipts
         if: always()
         run: |

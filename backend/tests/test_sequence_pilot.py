@@ -656,6 +656,24 @@ def test_full_source_play_without_local_tap_does_not_invent_a_local_marker(tmp_p
     assert spatial_reference_items(manifest, packet, local, tmp_path / "spatial") == ([], [])
 
 
+def test_native_gap_plan_uses_observed_scoring_uncertainty_not_contested_tackles():
+    from scripts.probe_native_gaps import plan
+    manifest = {"references": []}
+    def observed(pid, kind, action, uncertainty, start):
+        return {"selected_packet":pid,"source_start_ms":start,"source_end_ms":start+4000,
+            "raw_native_observations":{"players":[{"id":"p","selected":True}],
+                "ball_sequence":[{"actor":"p","action":action,"uncertainty":uncertainty,"clip_s":2}],
+                "outcome":{"kind":kind}}}
+    source = {"plays":[observed("tackle","tackle","tackled","contested",0),
+        observed("miss","miss","shot","",10000), observed("link","goal","pass","deflection or control",20000),
+        observed("identity","goal","shot","",30000)]}
+    jobs = plan(manifest, source)
+    assert [j["packet_id"] for j in jobs] == ["miss","link","identity"]
+    assert jobs[0]["focus_ms"] == 12700
+    assert jobs[1]["focus_ms"] == 22000
+    assert jobs[2]["reason"] == "FINAL_TOUCH_ACTOR_WITHOUT_LOCAL_IDENTITY_MARK"
+
+
 def test_native_play_cli_reports_failed_model_access_as_failed_process(tmp_path, monkeypatch):
     import subprocess
     monkeypatch.delenv("EMERGENT_LLM_KEY", raising=False)

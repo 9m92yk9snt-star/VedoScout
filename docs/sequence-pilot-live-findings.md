@@ -384,3 +384,34 @@ duration. Raw native times/observations stay separate from exact-frame approval.
 Elapsed time in this resumed trial must not be relabelled a fresh ten-call
 production-analysis time. Production is unchanged and all five remain unproven
 until the returned observations and source evidence have been examined.
+
+
+All-play run 39150431172 completed all ten packet observations: nine new Gemini
+3.8 calls and one exact-request cached response. Native preparation/model work
+took 108.837 seconds, including 48.176 seconds of request preparation. Full-source
+preparation separately took 12.129 seconds, for 120.966 seconds in this resumed
+trial. No request exceeded the byte cap. This is not fresh ten-call production
+latency. The raw observations match the selected goal and the last 15-to-10
+finishing sequence. They still call the saved-shot reference a miss and give
+number 15 the recipient's goal in the middle attack. The earlier assist includes
+an explicitly unresolved defender touch/control. Other-play identity also remains
+inconsistent. These results do not establish five correct actions or production
+readiness. No broad replay or deployment follows from the execution success.
+
+Next bounded review plans three source gaps from the actual native observations,
+not the reference-answer file: an own attempt labelled miss with a keeper; an
+explicit uncertain intervening contact in a scoring play; and an attributed own
+goal without an in-play human identity example. It retains every prepared 8-fps
+whole-play instant and adds 24-fps native-pixel detail around model-derived times.
+The detail crop is the union of original selection vertical extents/margins across
+the source, avoiding the earlier narrow band that could lose a later ball outcome.
+Original visual identity marks are retained; the old model's speculative appearance
+contradictions are not supplied as facts. No expected saved shot, assist, goal or
+event time is provided. Responses remain raw observations for source review.
+
+The available GPT-6-astra gets these three image requests with medium reasoning,
+two workers and 120 seconds per call. The resumed native trial's 120.966 seconds
+are subtracted from the same 300-second accounting bound, leaving 179.034 seconds
+for source preparation and these reviews. Offline source preparation took 7.945
+seconds; request sizes are 13.479, 14.665 and 12.205 MB. All fit without deleting
+whole-play instants. Actual correctness and time remain to be measured.
