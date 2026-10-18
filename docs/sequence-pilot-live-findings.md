@@ -808,3 +808,31 @@ uses a tighter source-pixel crop. All original source instants, whole-play
 overviews and original identity examples remain. A neutral instruction compares
 same-person continuity and a distinct teammate, without giving either old verdict.
 This is a changed-view physical-separation trial, not an unchanged-input vote.
+
+Focused run 39168769510 completed its call in 86.098 seconds. Probe time was
+90.079 seconds, including 3.779 seconds preparation; repeated full-source
+preparation separately took 19.204 seconds. The 17,342,144-byte request retained
+208 images/source instants. Detail from 50.281–50.798s uses the native source
+region [0,806,633,1177]. Preparation explicitly checks the detector's top-left
+xywh convention and the head/foot extents; the focused view was inspected before
+the call. No erroneous crop or hypothetical touch becomes event evidence.
+
+The reply now keeps the lighter-haired selected player and the deeper dark-haired
+white teammate explicitly separate throughout the overlap. It no longer uniquely
+attributes the finishing movement to the selected player's following stride.
+The responsible attacking actor remains null: either white player's contact, and
+a possible defensive brush, remain unresolved around 50.381–50.681s. The moving
+active ball is still followed past the goalkeeper and into goal at 51.131s.
+Same-ball goal evidence is not enough to decide which attacker struck it.
+
+The decision remains UNRESOLVED, with no target event or count. Neither a third
+selected-player assist nor an extra selected-player goal is approved. The actual
+focused response is retained in native-contact-separation-receipt.json; replay
+reproduces its refusal without another call. Both prior approved assist receipts
+continue to pass their separate structural/event regressions. Current validation
+has 215 relevant local tests, including first-time finishing and preservation of
+the disputed actor. This trial has narrowed the remaining failure to the selected
+player's onward release and the attacking finisher, rather than goal outcome or
+a demand for visible every-pixel contact. No merge/deployment follows from the
+unsuccessful assist-acceptance checks. Further identical-input votes are not a
+solution to the remaining physical ambiguity.

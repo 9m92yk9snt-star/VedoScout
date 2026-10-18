@@ -96,6 +96,18 @@ def test_person_geometry_keeps_the_largest_cluster_and_records_source_coordinate
         geometry_cluster([{'boxes_xywh_conf':[[.5,.5,.1,.1,.9]]}],1080,1920,[0,700,1080,1300])
 
 
+def test_actual_focused_reply_does_not_turn_a_hidden_actor_into_an_assist_or_selected_goal():
+    from scripts.probe_continuous_pass import resolve_assist
+    saved=p.read_json(ROOT/'docs/examples/native-contact-separation-receipt.json')
+    raw=json.loads(saved['raw_response']);context=saved['result']
+    result=resolve_assist(raw,context,saved)
+    assert result==context['automatic_approval']
+    assert result['status']=='UNRESOLVED' and result['counts']=={} and result['target_events']==[]
+    assert raw['event_mapping']['finishing_actor_unique'] is None
+    assert raw['link_assessment']['receiver_finishing_action']['status']=='UNCERTAIN'
+    assert context['contact_focus']['source_crop_box'][3] > 1100  # feet remain in the focused source view
+
+
 def test_previously_documented_later_assist_still_resolves_from_its_unchanged_actual_reply():
     saved=p.read_json(ROOT/'docs/examples/gpt6-native-contact-receipt.json');receipt=saved['receipt']
     assert receipt['origin']=='LIVE_MODEL_REQUEST' and receipt['status']=='COMPLETED'
