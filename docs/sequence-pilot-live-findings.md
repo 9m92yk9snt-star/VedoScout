@@ -982,3 +982,25 @@ comparison must resolve identity; a contradiction must remain an IDENTITY
 question. The local point alone does not prove cross-play identity. This is
 one fresh model call, with no desired action or outcome supplied. A new result
 is required before claiming any improvement.
+
+
+Actual original-selection review run 39175286826 did not return a model answer:
+HTTP 429 / MODEL_QUOTA_OR_RATE_LIMIT after 64.816 seconds (69.036 seconds for
+the probe). The provider error cannot distinguish temporary throttling from
+quota exhaustion. No new identity or football conclusion is justified. The
+failed receipt and preflight/result are retained in
+`docs/examples/native-attempt-identity-review-error.json`; GitHub artifact
+12154212011 preserves prepared images for 14 days. No immediate repeated
+paid request was issued after the rate/quota failure.
+
+All 52 overview images, 109 native-detail images and the original r5 spatial
+selection image are byte-identical to the preceding attempt-outcome probe.
+The fresh request has 172 images including all ten original identity crops;
+the prior request had 166. Previous profile assertions are not in the new
+request. Profile removal, more reference crops and the identity-review
+instruction change together: this is not a single-variable causal test.
+The old raw response still resolves to a non-selected SAVED shot with zero
+selected target events. 234 relevant local offline tests pass; the standalone
+GitHub offline check also passes. These tests do not establish model accuracy.
+The three previously documented assists and unresolved anatomical side remain
+unchanged. PR remains draft, with no merge or deployment.
