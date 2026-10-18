@@ -685,3 +685,29 @@ The final local suite passes 160 tests. Four additional contradiction tests requ
 an explicit overall GOAL outcome, so an asserted goal-link cannot override SAVED,
 NO_GOAL, UNKNOWN or a missing outcome. Rechecking this saved actual reply against
 that guard preserves the supported-assist result without another model call.
+
+## Automatic approval through the existing assist resolver
+
+The owner clarified that this play must reach the same automatic event decision
+as the previously documented later assist. The continuous reader previously
+stopped at a link-support label and left target_events empty. Add a typed mapping
+from its observed contact_chain into sequence_pilot.resolve_response/reconcile,
+the existing event path used for that later assist. The event resolver itself and
+its contact/identity requirements are unchanged.
+
+The model must explicitly identify the pass, reception and finish rows, the
+teammate relationship, same active ball, continuous play, unique attacking actors
+and a source-cited goal frame. The mapper checks source/request/response hashes,
+recomputes identity and physical-link checks, validates chronology and intervening
+actions, and preserves short contact brackets instead of inventing exact touches.
+It feeds a PASS ending in TEAMMATE_GOAL and the recipient's bracketed SHOT into
+the resolver. Only an eligible selected-player ASSIST with no unresolved question
+or conflict receives APPROVED. Defensive-contact uncertainty remains attached.
+No expected answers, player numbers, row indexes or source times choose the event.
+
+The previous actual reply lacks the typed event mapping and remains unchanged;
+it cannot be retroactively promoted by supplying missing model claims. A bounded
+new GPT-6-astra medium call sees the same 184 source/reference images plus the
+neutral typed-mapping instruction. No historical action reply or desired result
+is provided. Local source preparation retains the prior image hashes, the 50ms
+maximum detail gap and 19,199,413 request bytes. The actual approval result follows.

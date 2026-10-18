@@ -1,12 +1,14 @@
 """Physical-link decisions must not mistake hypotheses for observed events."""
 from copy import deepcopy
+import hashlib
+import json
 from pathlib import Path
 import sys
 
 import pytest
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
-from scripts.probe_continuous_pass import assess_link
+from scripts.probe_continuous_pass import assess_link, resolve_assist
 
 
 def observed():
@@ -66,3 +68,113 @@ def test_missing_new_observations_keeps_historical_reply_unapproved():
 def test_supported_goal_link_cannot_override_a_conflicting_overall_outcome(kind):
     data=observed();data['outcome']['kind']=kind
     assert review(data)['status']=='UNRESOLVED'
+
+
+def mapped_observation():
+    """Entirely synthetic input; these tests are not model perception evidence."""
+    def fid(ms): return f's{ms:09}'
+    def row(actor,before,after,recipient=None):
+        return {'actor':actor,'recipient':recipient,'before_frame':fid(before),'after_frame':fid(after),
+                'visible_evidence':'Synthetic actor and moving-ball evidence','remaining_alternatives':'Possible slight brush'}
+    def fact(status,instants):
+        return {'status':status,'frames':[fid(ms) for ms in instants],
+                'observation':'Synthetic source motion through this link'}
+    data={'players':[
+        {'person_id':'passer','selected':True,'reference_ids':['r1'],'evidence_frames':[fid(100),fid(200)]},
+        {'person_id':'receiver','selected':False,'reference_ids':[],'evidence_frames':[fid(300),fid(500)]}],
+        'contact_chain':[row('passer',100,200,'receiver'),row('receiver',300,400),row('receiver',500,600)],
+        'outcome':{'kind':'GOAL','last_touch_actor':None,'evidence':[fid(700),fid(800)]},
+        'link_assessment':{'releaser':'passer','receiver':'receiver','finisher':'receiver',
+            'same_ball_release_to_receiver':fact('SUPPORTED',[100,200,300,400]),
+            'receiver_finishing_action':fact('SUPPORTED',[400,500,600]),
+            'goal_from_that_finish':fact('SUPPORTED',[600,700,800]),
+            'intervening_control':fact('NOT_OBSERVED',[200,300]),
+            'defensive_contact':fact('UNCERTAIN',[200,300])},
+        'event_mapping':{'pass_chain_index':0,'receive_chain_index':1,'finish_chain_index':2,
+            'receiver_is_teammate':True,'same_active_ball':True,'continuous_play':True,
+            'pass_actor_unique':True,'finishing_actor_unique':True,'goal_frame':fid(800)}}
+    context={'source_video_sha256':'a'*64,'source_start_ms':0,'source_end_ms':900,
+        'retained_overview_instants':list(range(0,901,100)),'identity_reference_ids':['r1'],
+        'request_audit':{'payload_sha256':'b'*64}}
+    return data,context
+
+
+def mapped_review(data=None,context=None):
+    if data is None: data,context=mapped_observation()
+    raw=json.dumps(data)
+    receipt={'origin':'LIVE_MODEL_REQUEST','status':'COMPLETED','fixture_origin':'SYNTHETIC_TEST_ONLY',
+        'packet_id':'synthetic','source_video_sha256':context['source_video_sha256'],
+        'payload_sha256':'b'*64,'raw_response':raw,'response_sha256':hashlib.sha256(raw.encode()).hexdigest()}
+    return resolve_assist(data,context,receipt)
+
+
+def test_typed_chain_uses_existing_resolver_to_approve_passer_assist_without_invented_contact():
+    data,context=mapped_observation(); unchanged=deepcopy((data,context))
+    result=mapped_review(data,context)
+    assert result['status']=='APPROVED' and result['counts']=={'ASSIST':1}
+    event=result['target_events'][0]
+    assert event['actor']=='passer' and event['receiver']==event['finisher']=='receiver'
+    assert event['reason']=='VISIBLE_DIRECT_ASSIST' and event['proof_eligible']
+    assert event['contact_ms'] is None and event['contact_interval_ms']==[100,200]
+    assert event['receiver_interval_ms']==[300,400] and event['finishing_contact_interval_ms']==[500,600]
+    assert event['defensive_contact']['status']=='UNCERTAIN' and event['last_touch_actor'] is None
+    assert (data,context)==unchanged
+
+
+@pytest.mark.parametrize('key',['receiver_is_teammate','same_active_ball','continuous_play',
+    'pass_actor_unique','finishing_actor_unique'])
+@pytest.mark.parametrize('value',[False,None,'true'])
+def test_typed_chain_requires_each_positive_link_instead_of_filling_missing_evidence(key,value):
+    data,context=mapped_observation();data['event_mapping'][key]=value
+    assert mapped_review(data,context)['target_events']==[]
+
+
+@pytest.mark.parametrize('mutation',[
+    lambda d:d['link_assessment']['intervening_control'].update(status='OBSERVED'),
+    lambda d:d['link_assessment']['same_ball_release_to_receiver'].update(status='UNCERTAIN'),
+    lambda d:d['link_assessment']['receiver_finishing_action'].update(status='CONTRADICTED'),
+    lambda d:d['contact_chain'][0].update(recipient='other'),
+    lambda d:d['contact_chain'][2].update(actor='passer'),
+    lambda d:d['contact_chain'][1].update(recipient='another_teammate'),
+    lambda d:d['contact_chain'][1].update(before_frame='s000000100'),
+    lambda d:d['contact_chain'][2].update(after_frame='invented'),
+    lambda d:d['event_mapping'].update(pass_chain_index=True),
+    lambda d:d['event_mapping'].update(finish_chain_index=1),
+    lambda d:d['event_mapping'].update(goal_frame='s000000600'),
+    lambda d:d['outcome'].update(kind='SAVED'),
+    lambda d:d.update(questions=[{'reason':'CONTACT'}]),
+    lambda d:d['players'][1].update(selected=True,reference_ids=['r1']),
+    lambda d:d['link_assessment']['same_ball_release_to_receiver'].update(frames=['s000000700','s000000800']),
+])
+def test_contradictions_wrong_roles_and_unresolved_brackets_cannot_become_approved_assists(mutation):
+    data,context=mapped_observation();mutation(data)
+    result=mapped_review(data,context)
+    assert result['status']=='UNRESOLVED' and not result['target_events']
+
+
+def test_changed_reply_source_or_request_hash_cannot_reuse_a_live_receipt():
+    data,context=mapped_observation();raw=json.dumps(data)
+    receipt={'origin':'LIVE_MODEL_REQUEST','status':'COMPLETED','packet_id':'synthetic',
+        'source_video_sha256':context['source_video_sha256'],'payload_sha256':'b'*64,
+        'raw_response':raw,'response_sha256':hashlib.sha256(raw.encode()).hexdigest()}
+    for key,value in [('source_video_sha256','c'*64),('payload_sha256','c'*64),
+                      ('response_sha256','c'*64),('origin','SYNTHETIC_TEST_ONLY')]:
+        changed={**receipt,key:value}
+        assert resolve_assist(data,context,changed)['target_events']==[]
+    data['event_mapping']['goal_frame']='s000000700'
+    assert resolve_assist(data,context,receipt)['reasons']==['OBSERVATIONS_DIFFER_FROM_RECEIPT']
+
+
+def test_another_actors_intervening_chain_action_prevents_direct_assist():
+    data,context=mapped_observation()
+    extra=deepcopy(data['contact_chain'][1]);extra.update(actor='opponent',before_frame='s000000200',after_frame='s000000300')
+    data['contact_chain'].insert(1,extra)
+    data['event_mapping'].update(receive_chain_index=2,finish_chain_index=3)
+    assert mapped_review(data,context)['reasons']==['INTERVENING_CHAIN_ACTION_UNRESOLVED']
+
+
+def test_historical_untyped_actual_reply_cannot_be_promoted_by_inventing_missing_mapping():
+    path=Path(__file__).resolve().parents[2]/'docs/examples/native-continuous-pass-receipt.json'
+    saved=json.loads(path.read_text())
+    result=resolve_assist(json.loads(saved['raw_response']),saved['result'],saved)
+    assert result['status']=='UNRESOLVED' and result['reasons']==['TYPED_EVENT_MAPPING_REQUIRED']

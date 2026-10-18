@@ -2,9 +2,10 @@
 
 Prior request hashes are verified before modifying input. Historical observations
 choose only the missing source interval; they are never supplied as model facts.
-An experimental supported-assist decision remains separate from visual review.
+Typed source observations feed the existing automatic assist resolver.
 """
 import argparse
+from copy import deepcopy
 import hashlib
 import json
 from pathlib import Path
@@ -47,6 +48,23 @@ NOT_OBSERVED control alone cannot establish a pass connection: the separate
 same-ball and recipient-finishing links require affirmative motion evidence.
 For each field cite supplied source IDs, not identity-example IDs. Do not list
 every frame: cite the few decisive before/after instants and retain uncertainty.
+'''
+
+MAPPING_INSTRUCTION = '''Also return "event_mapping" so the observed chain can be
+read by the event resolver. Use zero-based indexes into YOUR contact_chain array:
+{"pass_chain_index":null,"receive_chain_index":null,"finish_chain_index":null,
+ "receiver_is_teammate":null,"same_active_ball":null,"continuous_play":null,
+ "pass_actor_unique":null,"finishing_actor_unique":null,"goal_frame":null}.
+Use integers only for uniquely supported chain rows, true/false/null for the five
+boolean fields, and a supplied source frame ID for goal_frame only when the moving
+active ball is established inside the goal. Otherwise leave the relevant fields
+null. The receive index identifies reception before the finishing action; do not
+confuse a separate teammate, a defender or a further pass with that receiver.
+Uniqueness means the attacking actor is established by the before/after movement;
+it does not assert an exact visible foot-ball pixel or exclude every slight brush.
+Keep source brackets and uncertainty in contact_chain. Describe the actual result
+even when a pass, finish, goal or their connection is unsupported. This mapping is
+not an instruction to approve an event or to select a particular outcome.
 '''
 
 
@@ -97,7 +115,147 @@ def assess_link(observed, identity_review, allowed_frames):
     return result
 
 
-def prepare(manifest_path,gap_path,profile_path,profile_baseline,local_baseline,output):
+def resolve_assist(observed, context, receipt):
+    """Translate typed source observations through the existing event resolver.
+
+    No natural-language keyword matching, jersey numbers, expected timestamps or
+    target counts choose the actors or action rows. Missing typed evidence stops
+    approval. An attacking contact bracket does not invent an exact last touch.
+    """
+    result = {'status':'UNRESOLVED','reasons':[], 'target_events':[], 'counts':{},
+              'independent_visual_correctness_verified':False}
+    def stop(reason):
+        result['reasons'].append(reason)
+        return result
+    times = sum((context.get(k,[]) for k in
+        ('retained_overview_instants','retained_native_instants','new_bridge_instants')), [])
+    lo,hi = context.get('source_start_ms'),context.get('source_end_ms')
+    if (type(lo) is not int or type(hi) is not int or not 0 <= lo < hi or not times or
+            any(type(ms) is not int or not lo <= ms <= hi for ms in times)):
+        return stop('INVALID_SOURCE_CATALOG')
+    source_hash=context.get('source_video_sha256','')
+    if (not isinstance(source_hash,str) or not re.fullmatch(r'[a-f0-9]{64}',source_hash) or
+            receipt.get('source_video_sha256')!=source_hash):
+        return stop('SOURCE_INPUT_MISMATCH')
+    raw=receipt.get('raw_response')
+    payload_hash=(context.get('request_audit') or {}).get('payload_sha256')
+    if (receipt.get('status')!='COMPLETED' or receipt.get('origin')!='LIVE_MODEL_REQUEST' or
+            not isinstance(raw,str) or not isinstance(payload_hash,str) or
+            not re.fullmatch(r'[a-f0-9]{64}',payload_hash) or receipt.get('payload_sha256')!=payload_hash or
+            hashlib.sha256(raw.encode()).hexdigest()!=receipt.get('response_sha256')):
+        return stop('UNVERIFIED_MODEL_RECEIPT')
+    try:
+        if json.loads(raw)!=observed:
+            return stop('OBSERVATIONS_DIFFER_FROM_RECEIPT')
+    except (ValueError,TypeError):
+        return stop('INVALID_MODEL_JSON')
+    frame_times={f's{ms:09}':ms for ms in times}
+    identity=p.assess_actor_identity(observed,context.get('identity_reference_ids',[]),frame_times)
+    result['identity_review']=identity
+    support=assess_link(observed,identity,frame_times)
+    result['link_review']=support
+    if support['status']!='ASSIST_SUPPORTED_BY_MODEL_OBSERVATIONS':
+        return stop('PHYSICAL_LINK_NOT_ESTABLISHED')
+    mapping=observed.get('event_mapping')
+    if not isinstance(mapping,dict):
+        return stop('TYPED_EVENT_MAPPING_REQUIRED')
+    for key in ('receiver_is_teammate','same_active_ball','continuous_play',
+                'pass_actor_unique','finishing_actor_unique'):
+        if mapping.get(key) is not True:
+            return stop('UNRESOLVED_EVENT_MAPPING:'+key)
+    if observed.get('questions'):
+        return stop('EXPLICIT_MODEL_QUESTION_REMAINS')
+    indexes=[mapping.get(k) for k in ('pass_chain_index','receive_chain_index','finish_chain_index')]
+    chain=observed.get('contact_chain')
+    if (not isinstance(chain,list) or any(type(i) is not int or not 0 <= i < len(chain) for i in indexes)
+            or not indexes[0] < indexes[1] < indexes[2]):
+        return stop('INVALID_CONTACT_CHAIN_MAPPING')
+    rows=[chain[i] for i in indexes]
+    def interval(row):
+        if not isinstance(row,dict) or not isinstance(row.get('visible_evidence'),str) or not row['visible_evidence'].strip():
+            return None
+        before,after=(frame_times.get(row.get(k)) if isinstance(row.get(k),str) else None
+                      for k in ('before_frame','after_frame'))
+        return [before,after] if None not in (before,after) and 0 < after-before <= 1000 else None
+    intervals=[interval(row) for row in rows]
+    if any(i is None for i in intervals):
+        return stop('MISSING_OR_INVALID_CONTACT_BRACKET')
+    passing,receiving,finishing=rows
+    release_i,receive_i,finish_i=intervals
+    link=observed['link_assessment']
+    passer,receiver,finisher=(link[k] for k in ('releaser','receiver','finisher'))
+    if (passing.get('actor')!=passer or passing.get('recipient')!=receiver or
+            receiving.get('actor')!=receiver or receiving.get('recipient') is not None or
+            finishing.get('actor')!=finisher or finishing.get('recipient') is not None):
+        return stop('CONTACT_ROLES_CONTRADICT_MAPPING')
+    if not release_i[1] <= receive_i[0] < receive_i[1] <= finish_i[0]:
+        return stop('INVALID_PASS_RECEIVE_FINISH_ORDER')
+    for row in chain[indexes[0]+1:indexes[2]]:
+        if (interval(row) is None or row.get('actor')!=receiver or row.get('recipient') is not None or
+                not release_i[1] <= interval(row)[0] <= interval(row)[1] <= finish_i[0]):
+            return stop('INTERVENING_CHAIN_ACTION_UNRESOLVED')
+    pass_frames=link['same_ball_release_to_receiver']['frames']
+    finish_frames=link['receiver_finishing_action']['frames']
+    if (not any(release_i[0] <= frame_times[f] <= release_i[1] for f in pass_frames) or
+            not any(receive_i[0] <= frame_times[f] <= receive_i[1] for f in pass_frames) or
+            sum(finish_i[0] <= frame_times[f] <= finish_i[1] for f in set(finish_frames))<2):
+        return stop('LINK_CITATIONS_DO_NOT_SUPPORT_CONTACT_BRACKETS')
+    outcome=observed['outcome']
+    goal=mapping.get('goal_frame')
+    goal_facts=link['goal_from_that_finish']
+    if (outcome.get('kind')!='GOAL' or not isinstance(goal,str) or goal not in frame_times or
+            not isinstance(outcome.get('evidence'),list) or goal not in outcome['evidence'] or
+            goal not in goal_facts['frames'] or frame_times[goal] <= finish_i[1]):
+        return stop('MOVING_BALL_GOAL_AFTER_FINISH_NOT_ESTABLISHED')
+    packet_id=receipt.get('packet_id')
+    if not isinstance(packet_id,str) or not packet_id:
+        return stop('SOURCE_PACKET_REQUIRED')
+    people=[{k:deepcopy(person[k]) for k in ('person_id','selected','reference_ids','evidence_frames')}
+            for person in observed['players']]
+    evidence=[{'frame':f,'fact':goal_facts['observation']} for f in goal_facts['frames']
+              if frame_times[f]>=finish_i[1]]
+    def action(row,kind,actor):
+        return {'action_id':kind.lower(),'kind':kind,'actor':actor,
+            'start_frame':row['before_frame'],'end_frame':goal,'contact_frame':None,
+            'contact_before_frame':row['before_frame'],'contact_after_frame':row['after_frame'],
+            'contact_actor_unique':True,'contact_evidence':[
+                {'frame':row[k],'fact':row['visible_evidence']} for k in ('before_frame','after_frame')],
+            'actor_evidence_frames':[row['before_frame'],row['after_frame']],
+            'ball_id':'active:'+packet_id,'same_active_ball':True,'continuous_play':True,
+            'outcome_frame':goal,'outcome_evidence':evidence,
+            'details':row['visible_evidence']+' Remaining alternatives: '+str(row.get('remaining_alternatives') or '')}
+    passing_action=action(passing,'PASS',passer)
+    passing_action.update(outcome='TEAMMATE_GOAL',receiver=receiver,finisher=finisher,
+        receiver_is_teammate=True,receiver_frame=receiving['after_frame'],shot_frame=None)
+    finishing_action=action(finishing,'SHOT',finisher)
+    finishing_action['outcome']='GOAL'
+    normalized={'plays':[{'start_frame':min(frame_times,key=frame_times.get),
+        'end_frame':max(frame_times,key=frame_times.get),'people':people,
+        'actions':[passing_action,finishing_action],'questions':[]}]}
+    manifest={'source_video_sha256':source_hash,
+        'identity_profile':{'canonical_reference_ids':context['identity_reference_ids']},
+        'frames':[{'frame_id':fid,'media_ms':ms} for fid,ms in sorted(frame_times.items())]}
+    packet={'packet_id':packet_id,'phase':'INITIAL','frame_ids':list(frame_times),
+            'reference_ids':context['identity_reference_ids']}
+    citation={k:receipt[k] for k in ('packet_id','payload_sha256','response_sha256','origin')}
+    resolved=p.resolve_response(normalized,manifest,packet,citation)
+    merged=p.reconcile([resolved])
+    result['normalized_observations']=normalized
+    result['resolver_invalid_rows']=resolved['invalid_rows']
+    if (resolved['invalid_rows'] or merged['questions'] or merged['conflicts'] or
+            len(merged['target_events'])!=1 or merged['target_events'][0]['event_type']!='ASSIST'):
+        return stop('EVENT_RESOLVER_DID_NOT_APPROVE_ASSIST')
+    event=merged['target_events'][0]
+    event.update(approval_status='APPROVED',receiver_interval_ms=receive_i,
+        finishing_contact_interval_ms=finish_i,
+        intervening_control=deepcopy(link['intervening_control']),
+        defensive_contact=deepcopy(link['defensive_contact']),
+        last_touch_actor=outcome.get('last_touch_actor'))
+    result.update(merged,status='APPROVED',reason=event['reason'])
+    return result
+
+
+def prepare(manifest_path,gap_path,profile_path,profile_baseline,local_baseline,output,*,event_mapping=False):
     import cv2
     started, output = time.monotonic(),Path(output)
     if output.exists() and any(output.iterdir()): raise ValueError('OUTPUT_MUST_BE_NEW_OR_EMPTY')
@@ -140,6 +298,8 @@ def prepare(manifest_path,gap_path,profile_path,profile_baseline,local_baseline,
         rows.append((int(match[1]),label['text'],[label,image]))
     prefix=[dict(item) for item in original[:first]]
     prefix[0]={'type':'text','text':prefix[0]['text']+'\n'+LINK_INSTRUCTION}
+    if event_mapping:
+        prefix[0]['text']+='\n'+MAPPING_INSTRUCTION
     chosen=None
     for quality in (85,80,75,70):
         extra=[]
@@ -170,6 +330,8 @@ def prepare(manifest_path,gap_path,profile_path,profile_baseline,local_baseline,
         'expected_answers_used_as_input':False,'independent_visual_correctness_verified':False,'target_events':[]}
     result['comparison'].update(messages_images_and_source_instants_unchanged=False,
         changed_settings=['added_continuous_bridge_images','explicit_neutral_link_observation_schema'])
+    if event_mapping:
+        result['comparison']['changed_settings'].append('typed_contact_chain_event_mapping')
     p.write_json(output/'result.json',result)
     return result,{'packet_id':'continuous_pass_link','items':items,'reasoning_effort':'medium','image_detail':'high'},started
 
@@ -179,7 +341,8 @@ if __name__=='__main__':
     for name in ('prepared','gap-receipt','resume-profile','profile-baseline','local-baseline','output'):
         cli.add_argument('--'+name,required=True)
     cli.add_argument('--prepare-only',action='store_true')
-    a=cli.parse_args();result,job,started=prepare(a.prepared,a.gap_receipt,a.resume_profile,a.profile_baseline,a.local_baseline,a.output)
+    cli.add_argument('--event-mapping',action='store_true')
+    a=cli.parse_args();result,job,started=prepare(a.prepared,a.gap_receipt,a.resume_profile,a.profile_baseline,a.local_baseline,a.output,event_mapping=a.event_mapping)
     if not a.prepare_only:
         response=t.run_jobs([job],'emergent','gpt-6-astra',deadline=started+120,per_call_s=90,workers=1)[0]
         p.write_json(Path(a.output)/'responses/continuous_pass_link.json',response)
@@ -189,5 +352,10 @@ if __name__=='__main__':
             allowed={f's{ms:09}' for ms in result['retained_overview_instants']+result['retained_native_instants']+result['new_bridge_instants']}
             result['identity_review']=p.assess_actor_identity(observed,result['identity_reference_ids'],allowed)
             result['experimental_link_decision']=assess_link(observed,result['identity_review'],allowed)
+            if a.event_mapping:
+                result['automatic_approval']=resolve_assist(observed,result,
+                    {**response,'source_video_sha256':result['source_video_sha256']})
+                result['target_events']=result['automatic_approval']['target_events']
+                result['counts']=result['automatic_approval']['counts']
         p.write_json(Path(a.output)/'result.json',result)
         raise SystemExit(0 if response['status']=='COMPLETED' else 3)
