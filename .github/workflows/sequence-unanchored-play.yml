@@ -1,4 +1,4 @@
-name: One-off source attempt outcome probe
+name: One-off original-selection identity review
 
 on:
   pull_request:
@@ -17,7 +17,7 @@ jobs:
       github.event.pull_request.number == 39 &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.event.pull_request.head.ref == 'codex/sequence-pilot-foundation' &&
-      github.event.before == 'cbf5bf8670ac11ddbf0448e556805a7de1cce6fd' &&
+      github.event.before == '39c7d8506013705274456b342961539db95cccbf' &&
       github.run_attempt == 1
     runs-on: ubuntu-latest
     timeout-minutes: 9
@@ -102,7 +102,7 @@ jobs:
       - name: Read complete plays with the actual model
         env:
           EMERGENT_LLM_KEY: ${{ secrets.EMERGENT_LLM_KEY }}
-        run: python backend/scripts/probe_attempt_outcome.py --prepared "$RUNNER_TEMP/sequence-pilot-prepared/manifest.json" --native-result docs/examples/native-full-source-observations.json --resume-profile docs/examples/gpt6-focused-profile-receipt.json --output "$RUNNER_TEMP/sequence-pilot-result"
+        run: python backend/scripts/probe_attempt_outcome.py --prepared "$RUNNER_TEMP/sequence-pilot-prepared/manifest.json" --native-result docs/examples/native-full-source-observations.json --resume-profile docs/examples/gpt6-focused-profile-receipt.json --output "$RUNNER_TEMP/sequence-pilot-result" --recheck-identity
       - name: Report the automatic event decision without forcing a result
         run: |
           python - <<'PY'

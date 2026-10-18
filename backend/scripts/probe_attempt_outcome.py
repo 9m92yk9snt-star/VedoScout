@@ -27,7 +27,20 @@ def outcome_gap(manifest, native):
     return candidates[0]
 
 
-def prepare(manifest_path, native_path, profile_path, output):
+def identity_review_manifest(manifest, profile, recheck_identity=False):
+    """Retain the old inference for audit; optionally reread original selections.
+
+    A fresh reading is a diagnostic, not permission to overwrite a conflicting
+    original selection or to silently approve cross-play identity.
+    """
+    checked = p.apply_identity_profile(manifest, profile)
+    if recheck_identity:
+        checked.pop("identity_profile")
+        return checked, [r["reference_id"] for r in checked["references"]]
+    return checked, checked["identity_profile"]["canonical_reference_ids"]
+
+
+def prepare(manifest_path, native_path, profile_path, output, recheck_identity=False):
     import cv2
     started, output = time.monotonic(), Path(output)
     if output.exists() and any(output.iterdir()):
@@ -42,9 +55,9 @@ def prepare(manifest_path, native_path, profile_path, output):
             or sorted(i["sha256"] for i in receipt["images"]) != sorted(r["sha256"] for r in manifest["references"])):
         raise ValueError("IDENTITY_PROFILE_UNRESOLVED")
     question = outcome_gap(manifest, native)
-    manifest = p.apply_identity_profile(manifest, json.loads(receipt["raw_response"]))
+    manifest, base_ids = identity_review_manifest(manifest, json.loads(receipt["raw_response"]), recheck_identity)
     local = [r for r in manifest["references"] if question["start_ms"] <= r["media_ms"] <= question["end_ms"]]
-    ids = list(dict.fromkeys(manifest["identity_profile"]["canonical_reference_ids"] +
+    ids = list(dict.fromkeys(base_ids +
                              [r["reference_id"] for r in local]))
     cap = cv2.VideoCapture(manifest["source_video"])
     width, height = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
@@ -81,9 +94,20 @@ def prepare(manifest_path, native_path, profile_path, output):
     packet = {"packet_id": question["packet_id"], "start_ms": question["start_ms"],
               "end_ms": question["end_ms"], "core_start_ms": question["start_ms"],
               "core_end_ms": question["end_ms"]+1, "reference_ids": ids,
-              "frame_ids": list(rows), "question": question["question"], "contact_sequence_evidence": True}
+              "frame_ids": list(rows), "question": {"question": question["question"]}, "contact_sequence_evidence": True}
     # packet_items supplies the existing action/contact-bracket schema unchanged.
     items = p.packet_items(enriched, {**packet, "frame_ids": []})
+    if recheck_identity:
+        items.insert(1, {"type":"text", "text":
+            "Fresh identity review using all original user selections. No earlier model identity "
+            "description or action answer is supplied. A local user point identifies the intended "
+            "physical person at that source instant; the surrounding box can include other people. "
+            "Locate that point in the synchronized source frame, then follow the person forward "
+            "and backward through the play. Compare against the other original references. "
+            "Do not infer facial hair, age or a number from blur or shadow. Distinguish a visible "
+            "contradiction from insufficient detail. If local continuity and cross-play identity "
+            "disagree, record the conflict explicitly and leave selected=null with an IDENTITY "
+            "question until resolved. Do not treat the local point alone as proof of cross-play identity."})
     spatial, spatial_audit = spatial_reference_items(manifest, packet, local, output/"identity")
     items.extend(spatial)
     for frame, kind in sorted([(f,"overview") for f in overview]+[(f,"native detail") for f in detail],
@@ -100,6 +124,9 @@ def prepare(manifest_path, native_path, profile_path, output):
               "native_first_ms":detail[0]["media_ms"], "native_last_ms":detail[-1]["media_ms"],
               "source_crop_box":box, "spatial_reference_audit":spatial_audit,
               "detail_jpeg_quality":50, "overview_jpeg_quality":70,
+              "identity_mode":"FRESH_ORIGINAL_SELECTIONS" if recheck_identity else "SHARED_PROFILE",
+              "previous_identity_response_sha256":receipt["response_sha256"],
+              "previous_identity_claims_supplied":not recheck_identity,
               "source_preparation_seconds":round(time.monotonic()-started,3), "request_audit":audit}
     p.write_json(output/"preflight.json", result)
     return result, enriched, packet, items
@@ -107,7 +134,8 @@ def prepare(manifest_path, native_path, profile_path, output):
 
 def run(args):
     started = time.monotonic()
-    result, manifest, packet, items = prepare(args.prepared, args.native_result, args.resume_profile, args.output)
+    result, manifest, packet, items = prepare(args.prepared, args.native_result, args.resume_profile, args.output,
+                                             getattr(args, "recheck_identity", False))
     if args.preflight_only:
         return result
     receipt = t.run_jobs([{"packet_id":packet["packet_id"], "items":items,
@@ -115,6 +143,8 @@ def run(args):
                          "emergent", "gpt-6-astra", deadline=time.monotonic()+125, per_call_s=120)[0]
     p.write_json(Path(args.output)/"responses"/(packet["packet_id"]+".json"), receipt)
     result.update(status=receipt["status"], model_seconds=receipt.get("elapsed_seconds"))
+    # Preserve transport completion and the raw receipt even if parsing fails.
+    p.write_json(Path(args.output)/"result.json", result)
     if receipt["status"] == "COMPLETED":
         observed = p.resolve_response(p.parse_response(receipt["raw_response"]), manifest, packet,
             {k:receipt[k] for k in ("packet_id","payload_sha256","response_sha256","origin")})
@@ -131,6 +161,7 @@ if __name__ == "__main__":
     for name in ("prepared", "native-result", "resume-profile", "output"):
         cli.add_argument("--"+name, required=True)
     cli.add_argument("--preflight-only", action="store_true")
+    cli.add_argument("--recheck-identity", action="store_true")
     args = cli.parse_args()
     result = run(args)
     raise SystemExit(0 if args.preflight_only or result["status"] == "COMPLETED" else 3)

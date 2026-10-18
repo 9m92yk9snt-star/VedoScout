@@ -956,3 +956,29 @@ There are now three separately documented assist experiments. This successful
 play used the owner's timestamp for navigation; automatic full-video discovery,
 fresh whole-video latency, all-five acceptance and live integration still require
 their own end-to-end verification. No merge or deployment is part of this trial.
+
+
+## Saved-attempt identity disagreement: original-selection review
+
+Actual run 39174579835 completed a GPT-6-astra request in 63.217 seconds.
+The raw response describes SAVED, incoming ball at the goalkeeper glove and
+changed outgoing motion, and keeps the stationary spare ball separate. It
+labels the shooter unselected, citing darker hair and a beard. This is not an
+approved shot for the selected player. The raw receipt is retained in
+`docs/examples/native-attempt-outcome-receipt.json`.
+
+The reused Gemini identity-only response already claims that r5 depicts a
+different person with a dark beard. Original r5 is a 93x198 crop at 21.482s,
+with an original point inside this play. Blur/shadow does not independently
+establish facial hair. Agreement between that profile and the later request
+is not independent verification of the disputed identity.
+
+A bounded diagnostic now removes the prior inferred profile from the action
+request, supplies all ten original selections (rather than canonical three plus
+r5), and retains the same source overview, native outcome images, spatial
+reference and event resolver. The old profile is still checksum-validated and
+retained as audit, not rewritten. Original spatial selection and fresh image
+comparison must resolve identity; a contradiction must remain an IDENTITY
+question. The local point alone does not prove cross-play identity. This is
+one fresh model call, with no desired action or outcome supplied. A new result
+is required before claiming any improvement.

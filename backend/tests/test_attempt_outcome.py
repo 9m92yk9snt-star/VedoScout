@@ -6,7 +6,7 @@ import sys
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from scripts.probe_attempt_outcome import outcome_gap
+from scripts.probe_attempt_outcome import outcome_gap, identity_review_manifest
 
 
 def native_gap():
@@ -43,3 +43,16 @@ def test_real_navigation_is_the_existing_native_models_unresolved_attempt():
     assert job["packet_id"] == "sequence_003"
     assert (job["start_ms"], job["end_ms"]) == (19266,25631)
     assert (job["detail_start_ms"], job["detail_end_ms"]) == (23566,25366)
+
+
+def test_fresh_identity_does_not_inherit_disputed_description_or_drop_references():
+    manifest = {"references":[{"reference_id":f"r{i}", "media_ms":i} for i in range(1,11)], "packets":[]}
+    profile = {"identity_clear":True, "appearance":"prior claim about a beard",
+               "canonical_reference_ids":["r2","r6","r7"], "contradictions":"r5 is different"}
+    fresh, ids = identity_review_manifest(manifest, profile, True)
+    assert "identity_profile" not in fresh
+    assert ids == [f"r{i}" for i in range(1,11)]
+    assert "beard" not in json.dumps(fresh)
+    shared, canonical = identity_review_manifest(manifest, profile)
+    assert shared["identity_profile"] == profile and canonical == ["r2","r6","r7"]
+    assert "identity_profile" not in manifest
