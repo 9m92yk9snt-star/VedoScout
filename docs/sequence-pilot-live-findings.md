@@ -892,3 +892,45 @@ guessing an unseen contact by counting leftover legs alone. No candidate actor,
 kicking side, recipient or expected result is supplied. The same positive
 ownership and complete assist-link checks apply; uncertainty cannot be promoted
 by this presentation. Preflight: 255 images, 19,144,787 bytes, quality 85.
+
+Comparison run 39171853971 completed successfully, including automatic event
+acceptance. The actual reply now supports selected p1's release through the cluster
+at 49.715–50.081s, the same ball arriving at distinct teammate p3, p3's first-time
+receiving finish at 50.331–50.648s, and the moving ball inside goal at 51.131s.
+The leg review positively identifies the white sock/dark boot's forward sweep,
+the selected player's other leg, the separately moving blue legs and the deeper
+teammate's separate stance. Ownership is established by this before/after motion,
+not simply by an unmatched leg count or uninterrupted visibility of every joint.
+
+Identity and all three links pass. contact_ownership_review is SUPPORTED with a
+positive selected release actor and source citations in the inspection interval.
+The existing resolver returns APPROVED / VISIBLE_DIRECT_ASSIST and {"ASSIST":1}.
+Approved event 369acbc54dce00fca4a7 preserves the 49.715–50.081s passing bracket,
+the shared reception/finishing bracket [50.331,50.648]s and one_touch_finish=true.
+Exact contact_ms stays null. Possible slight defensive brushes and absolute last
+touch remain unresolved, with no observed intervening defensive control. The
+teammate's goal is not attributed as a selected-player goal.
+
+The model calls the releasing foot LEFT; the owner had described RIGHT. This
+disagreement is explicitly retained in the receipt's review_notes and is not
+silently corrected or supplied as a desired input answer. Actor/ball/recipient/
+finishing ownership determines the assist; independent kicking-side verification
+has not been claimed. The schema accepts LEFT, RIGHT or UNKNOWN only when the
+selected release owner itself is affirmatively supported.
+
+The actual call took 85.405 seconds; preparation plus model probe was 88.148
+seconds including 2.627 seconds preparation. Separate source preparation took
+12.708 seconds. The actual wire hash matches preflight, with 19,144,787 bytes.
+Every one of the preceding 250 image hashes, byte sizes AND order is unchanged;
+only five comparison-panel images are added. Both simultaneous comparison and
+the occlusion-ownership instruction changed, so no isolated causal effect or
+independent new raw-source evidence is claimed.
+
+The complete actual reply and approved event are retained in
+native-third-assist-approval-receipt.json. Replaying it reproduces the same
+automatic decision, while the earlier refusals remain unchanged. 230 relevant
+local tests pass, including the two prior assist controls and this third assist.
+There are now three separately documented assist experiments. This successful
+play used the owner's timestamp for navigation; automatic full-video discovery,
+fresh whole-video latency, all-five acceptance and live integration still require
+their own end-to-end verification. No merge or deployment is part of this trial.

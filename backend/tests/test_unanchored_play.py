@@ -145,6 +145,23 @@ def test_actual_limb_review_supports_distinct_finisher_but_cannot_invent_the_sel
     assert context['target_events']==[] and context['counts']=={}
 
 
+def test_actual_comparison_reply_reproduces_the_approved_third_assist_with_positive_release_ownership():
+    from scripts.probe_continuous_pass import resolve_assist
+    saved=p.read_json(ROOT/'docs/examples/native-third-assist-approval-receipt.json');context=saved['result']
+    raw=json.loads(saved['raw_response'])
+    decision=resolve_assist(raw,context,saved)
+    assert decision==context['automatic_approval']
+    assert decision['status']=='APPROVED' and decision['counts']=={'ASSIST':1}
+    event=decision['target_events'][0]
+    assert event['actor']!=event['receiver']==event['finisher'] and event['one_touch_finish']
+    assert event['contact_ms'] is None and event['proof_eligible']
+    assert raw['contact_ownership_review']['status']=='SUPPORTED'
+    assert raw['contact_ownership_review']['release_actor']==event['actor']
+    assert saved['source_input_comparison']['all_prior_image_hashes_sizes_and_order_retained']
+    assert saved['review_notes']['model_reported_kicking_side']=='LEFT'
+    assert not saved['review_notes']['side_agreement']  # Preserve the user/model discrepancy, never rewrite the reply.
+
+
 def test_previously_documented_later_assist_still_resolves_from_its_unchanged_actual_reply():
     saved=p.read_json(ROOT/'docs/examples/gpt6-native-contact-receipt.json');receipt=saved['receipt']
     assert receipt['origin']=='LIVE_MODEL_REQUEST' and receipt['status']=='COMPLETED'
