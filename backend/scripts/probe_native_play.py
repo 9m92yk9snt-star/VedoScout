@@ -17,24 +17,25 @@ import sequence_pilot as pilot
 import sequence_pilot_transport as transport
 
 
-def select_play(manifest):
+def select_play(manifest, packet_id=None):
     def density(packet):
         lo, hi = packet["core_start_ms"], packet["core_end_ms"]
         return sum(lo <= r["media_ms"] < hi for r in manifest["references"]) / max(1, hi-lo)
-    packet = max(manifest["packets"], key=density)
+    packet = next(p for p in manifest["packets"] if p["packet_id"] == packet_id) if packet_id else max(manifest["packets"], key=density)
     lo, hi = packet["core_start_ms"], packet["core_end_ms"]
     local = [r for r in manifest["references"] if lo <= r["media_ms"] < hi]
-    if not local:
+    if not local and not packet_id:
         raise ValueError("LOCAL_SELECTION_REQUIRED")
-    top = max(0, min(r["box"]["y"]-r["box"]["h"] for r in local))
-    bottom = min(1, max(r["box"]["y"]+2*r["box"]["h"] for r in local))
+    anchors = local or sorted(manifest["references"], key=lambda r: abs(r["media_ms"]-(lo+hi)/2))[:2]
+    top = max(0, min(r["box"]["y"]-r["box"]["h"] for r in anchors))
+    bottom = min(1, max(r["box"]["y"]+2*r["box"]["h"] for r in anchors))
     return packet, local, top, bottom
 
 
-def prepare_videos(manifest, output, *, replay_dir=None):
+def prepare_videos(manifest, output, *, replay_dir=None, packet_id=None):
     if pilot.digest(manifest["source_video"]) != manifest["source_video_sha256"]:
         raise ValueError("SOURCE_VIDEO_CHANGED")
-    packet, local, top, bottom = select_play(manifest)
+    packet, local, top, bottom = select_play(manifest, packet_id)
     metadata = json.loads(subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0",
         "-show_entries", "stream=width,height", "-of", "json", manifest["source_video"]],
         check=True, capture_output=True, timeout=10).stdout)["streams"][0]
@@ -104,7 +105,7 @@ def spatial_reference_items(manifest, packet, local, output):
     return items, audit
 
 
-def run(manifest_path, output, profile_path, *, spatial_references=False, model="gemini-3.1-pro-preview", comparison_receipt=None, reuse_encoded_videos=None):
+def prepare_request(manifest_path, output, profile_path, *, spatial_references=False, model="gemini-3.1-pro-preview", comparison_receipt=None, reuse_encoded_videos=None, packet_id=None):
     if model not in {"gemini-3.1-pro-preview", "gemini-3.8-flash"}:
         raise ValueError("UNREVIEWED_NATIVE_MODEL")
     if reuse_encoded_videos and not comparison_receipt:
@@ -120,7 +121,7 @@ def run(manifest_path, output, profile_path, *, spatial_references=False, model=
             or sorted(i["sha256"] for i in receipt["images"]) != sorted(r["sha256"] for r in manifest["references"])):
         raise ValueError("IDENTITY_PROFILE_UNRESOLVED")
     manifest = pilot.apply_identity_profile(manifest, json.loads(receipt["raw_response"]))
-    packet, local, views, box = prepare_videos(manifest, output/"videos", replay_dir=reuse_encoded_videos)
+    packet, local, views, box = prepare_videos(manifest, output/"videos", replay_dir=reuse_encoded_videos, packet_id=packet_id)
     refs = {r["reference_id"]: r for r in manifest["references"]}
     ids = list(dict.fromkeys(manifest["identity_profile"]["canonical_reference_ids"]+
                              [r["reference_id"] for r in local]))
@@ -194,7 +195,7 @@ def run(manifest_path, output, profile_path, *, spatial_references=False, model=
         "production_pipeline_changed": False, "expected_answers_used_as_input": False,
         "independent_visual_correctness_verified": False,
         "source_video_sha256": manifest["source_video_sha256"],
-        "selected_packet": packet["packet_id"], "selection_strategy": "ORIGINAL_TAP_DENSITY_PER_SOURCE_SECOND",
+        "selected_packet": packet["packet_id"], "selection_strategy": "SOURCE_PACKET_PLAN" if packet_id else "ORIGINAL_TAP_DENSITY_PER_SOURCE_SECOND",
         "source_start_ms": packet["core_start_ms"], "source_end_ms": packet["core_end_ms"],
         "timestamp_policy": "APPROXIMATE_CLIP_RELATIVE_TIMES_NOT_EXACT_SOURCE_PROOF",
         "detail_source_crop_box": box, "reference_ids": ids, "request_audit": audit,
@@ -203,9 +204,15 @@ def run(manifest_path, output, profile_path, *, spatial_references=False, model=
         "encoded_video_bytes_reused": bool(reuse_encoded_videos),
         "encoded_views": [{k:v for k,v in view.items() if k != "path"} for view in views]}
     pilot.write_json(output/"result.json", result)
-    response = transport.run_jobs([{"packet_id": "native_short_play", "items": items,
-        "reasoning_effort": "low", "image_detail": "high"}], "emergent", model,
-        deadline=started+150, per_call_s=120)[0]
+    job = {"packet_id": "native_short_play", "items": items, "reasoning_effort": "low", "image_detail": "high"}
+    return result, job, started
+
+
+def run(manifest_path, output, profile_path, **options):
+    result, job, started = prepare_request(manifest_path, output, profile_path, **options)
+    model = options.get("model", "gemini-3.1-pro-preview")
+    output = Path(output)
+    response = transport.run_jobs([job], "emergent", model, deadline=started+150, per_call_s=120)[0]
     pilot.write_json(output/"responses"/"native_short_play.json", response)
     if response["status"] == "COMPLETED":
         result["raw_native_observations"] = json.loads(response["raw_response"])

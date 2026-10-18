@@ -361,3 +361,26 @@ without invoking the encoder, and still requires the complete old request hash
 to match before changing only the model field. A regression checks byte-exact
 reuse and that no encoder process runs. No failed comparison is counted as a
 Gemini 3.8 perception result.
+
+
+Run 39149857306 reproduced the complete baseline wire hash and changed only
+the model. Gemini 3.8 Flash returned in 8.198 seconds (9.637 seconds probe time,
+excluding separately measured full-source preparation). Its ending sequence is
+selected white 15 playing toward goal, then white 10 tapping the moving ball in;
+white 13 has no intervening action. This matches the source-inspected ending.
+The native approximate release time is early, and the opening midfield possession
+still needs inspection; do not claim exact contact time or all-five correctness.
+
+Next trial reads every source-derived packet with the same model/input approach.
+No reference event time, count or outcome guides the packet plan. In-play original
+marks appear only where actual taps exist; packets without taps retain canonical
+identity pictures and a full-frame overview, with no invented local markers.
+All nine new request preflights fit the 19.5 MB cap; largest about 17.02 MB.
+The demonstrated play is reused only if the newly constructed request exactly
+matches its Gemini 3.8 receipt; that completed call is not repeated. The other
+nine packets make new calls with two owned workers, 90 seconds per call and a
+300-second combined preparation/model budget. Actual video encodes retain normal
+duration. Raw native times/observations stay separate from exact-frame approval.
+Elapsed time in this resumed trial must not be relabelled a fresh ten-call
+production-analysis time. Production is unchanged and all five remain unproven
+until the returned observations and source evidence have been examined.

@@ -646,6 +646,16 @@ def test_video_comparison_reuses_exact_encoded_bytes_without_encoder_work(tmp_pa
     assert [v["sha256"] for v in initial] == [v["sha256"] for v in reused]
 
 
+def test_full_source_play_without_local_tap_does_not_invent_a_local_marker(tmp_path):
+    from scripts.probe_native_play import select_play, spatial_reference_items
+    manifest = p.prepare(source_export(tmp_path), tmp_path / "prepared", scene_packets=True)
+    packet = {**manifest["packets"][0], "packet_id": "untapped", "core_start_ms": 500}
+    manifest["packets"].append(packet)
+    selected, local, top, bottom = select_play(manifest, "untapped")
+    assert selected == packet and local == [] and 0 <= top < bottom <= 1
+    assert spatial_reference_items(manifest, packet, local, tmp_path / "spatial") == ([], [])
+
+
 def test_native_play_cli_reports_failed_model_access_as_failed_process(tmp_path, monkeypatch):
     import subprocess
     monkeypatch.delenv("EMERGENT_LLM_KEY", raising=False)
