@@ -153,3 +153,42 @@ def test_local_band_uses_only_original_geometry_with_margin_and_requires_local_s
     assert local_selection_band([{"box":{"y":.05,"h":.9}}],1000) == (0,1000)
     with pytest.raises(ValueError,match="LOCAL_ORIGINAL_SELECTION_REQUIRED"):
         local_selection_band([],1000)
+
+
+def retained_goal():
+    path = Path(__file__).resolve().parents[2]/"docs/examples/native-goal-approval-receipt.json"
+    saved = json.loads(path.read_text())
+    receipt,context = saved["receipt"],saved["replay_context"]
+    assert hashlib.sha256(receipt["raw_response"].encode()).hexdigest() == receipt["response_sha256"]
+    packet={"packet_id":"sequence_004", "start_ms":25632,"end_ms":34131,
+            "frame_ids":[f["frame_id"] for f in context["frames"]],
+            "reference_ids":[r["reference_id"] for r in context["references"]]}
+    return saved,context,packet,json.loads(receipt["raw_response"])
+
+
+def test_actual_goal_reply_accepts_selected_goal_and_keeps_unrelated_uncertainty():
+    saved,context,packet,data = retained_goal()
+    result=shot_replay(saved,context,packet,data)
+    assert result["target_events"] == saved["result"]["target_events"]
+    goals=[e for e in result["target_events"] if e["event_type"] == "GOAL"]
+    assert len(goals) == 1 and goals[0]["selected_player"] and goals[0]["proof_eligible"]
+    assert goals[0]["contact_ms"] == 30915 and goals[0]["outcome_ms"] == 31982
+    assert goals[0]["reference_ids"] == ["r6","r7","r2"]
+    assert not goals[0]["model_requested_clarification"]
+    assert len(result["questions"]) == 1 and result["questions"][0]["target_related"] is False
+    observed=p.resolve_response(data,context,packet,{})
+    assert observed["invalid_rows"] == ["ACTION_SOURCE_ORDER_INVALID"]
+    assert not any(e["kind"] == "RECOVERY" for e in result["events"])
+    # Actual-response replay is a regression, not an additional model trial.
+
+
+@pytest.mark.parametrize("change",["identity","same_ball","outcome","goal_question"])
+def test_goal_credit_cannot_survive_missing_actor_ball_outcome_or_target_clarification(change):
+    saved,context,packet,data = retained_goal()
+    play=data["plays"][0]
+    shot=next(a for a in play["actions"] if a["action_id"] == "a4")
+    if change == "identity": play["people"][0].update(selected=None,reference_ids=[])
+    elif change == "same_ball": shot["same_active_ball"] = False
+    elif change == "outcome": shot["outcome_evidence"] = []
+    else: play["questions"].append({"reason":"OUTCOME","action_id":"a4"})
+    assert not any(e["event_type"] == "GOAL" for e in shot_replay(saved,context,packet,data)["target_events"])

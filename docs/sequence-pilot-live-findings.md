@@ -1094,3 +1094,45 @@ shrinks to 16,220,155 bytes. This reduces redundant image area without removing
 source instants; it is not proof that the service will accept the request or
 that perception will succeed. The unchanged whole-play overview preserves
 context beyond the local band. Preparation took 4.381s locally.
+
+
+## Selected-player goal accepted in the smaller terminal request
+
+Actual run [39178048465](https://github.com/9m92yk9snt-star/VedoScout/actions/runs/39178048465)
+returned a completed GPT-6-astra medium reply in 59.907s; the bounded probe
+including its preparation took 66.729s. Whole-video preparation and workflow
+setup are additional. The raw reply, full
+result, request/response hashes and replay frame catalog are retained in
+`docs/examples/native-goal-approval-receipt.json`. This is a fresh model
+observation, separate from the earlier HTTP-429 refusal and historical native
+video description. No expected goal answer entered the request.
+
+The model identifies number 15 as the selected shooter using positive matches
+r6/r7/r2 and motion between the two original in-play selections. It cites
+striking contact at source 30.915s, the ball leaving at 30.982s, the airborne
+active ball near the post at 31.199s, occlusion around 31.265s, and a moving
+second ball inside goal at 31.982/32.015s, beside the pre-existing stationary
+spare. It does not reconstruct an unseen trajectory or claim that the
+goalkeeper's reaching motion establishes a save. The run-away afterward is
+identity continuity, not independent evidence of a goal. Original source
+inspection of the contact and inside-goal frames supports this reading.
+The owner's approximate 30.83s remains navigation; the newly cited source
+contact is 30.915s and must not be silently relabelled as that approximate time.
+
+The existing resolver emits one proof-eligible selected GOAL with no
+goal-specific clarification. It also retains one CONTACT question about an
+UNSELECTED player's earlier duel. One malformed RECOVERY row cites an actor
+frame before its own start and is rejected as ACTION_SOURCE_ORDER_INVALID;
+that row is not silently repaired or counted. Neither issue is a missing link
+in the separately source-supported shooting/goal observation. The original
+reply and these limitations remain intact. The generic raw result's independent
+verification flag is retained unchanged; the source inspection above is a
+separate human review, not another automatic perception system.
+
+Actual-response replay preserves the selected GOAL and verifies rejection when
+actor identity, active-ball continuity, outcome evidence or target-specific
+certainty are removed. The unrelated duel question and rejected recovery row
+remain visible. The three previous assist receipts and selected SAVED shot
+are unchanged. All five reference scoring actions now have separate accepted
+bounded model experiments. This is not fresh whole-video discovery, combined
+latency or production-report integration verification. No merge or deployment.
