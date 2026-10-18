@@ -46,7 +46,8 @@ def build_request(provider, model, items):
             "temperature": 0, "responseMimeType": "application/json", "maxOutputTokens": 16384}}
     else:
         url = "https://integrations.emergentagent.com/llm/chat/completions"
-        body = {"model": model, "messages": [{"role": "user", "content": content}],
+        wire_model = "gemini/" + model if model.startswith("gemini-") else model
+        body = {"model": wire_model, "messages": [{"role": "user", "content": content}],
                 "temperature": 0, "response_format": {"type": "json_object"}, "max_tokens": 16384}
     payload = json.dumps(body, separators=(",", ":")).encode()
     if len(payload) > MAX_REQUEST_BYTES:

@@ -56,6 +56,22 @@ def probe():
         result.update(http_status=exc.code, status=("MODEL_ACCESS_DENIED" if exc.code in {401, 403}
             else "MODEL_QUOTA_OR_RATE_LIMIT" if exc.code in {402, 429}
             else "MODEL_REDIRECT_REFUSED" if 300 <= exc.code < 400 else "MODEL_HTTP_ERROR"))
+        # Inspect a bounded error body locally, but export only fixed categories.
+        # Upstream text may contain credentials or request data and is never saved.
+        error_text = exc.read(65536).decode("utf-8", errors="replace").lower()
+        categories = (
+            ("provider not provided", "MODEL_PROVIDER_REQUIRED"),
+            ("invalid api key", "INVALID_MODEL_KEY"),
+            ("invalid_api_key", "INVALID_MODEL_KEY"),
+            ("insufficient", "MODEL_BALANCE_OR_QUOTA"),
+            ("not allowed", "MODEL_ACCESS_RESTRICTED"),
+            ("ip address", "MODEL_NETWORK_RESTRICTION"),
+            ("unsupported", "UNSUPPORTED_REQUEST_PARAMETER"),
+            ("not found", "MODEL_OR_ROUTE_NOT_FOUND"),
+            ("max_tokens", "OUTPUT_TOKEN_PARAMETER_REJECTED"),
+        )
+        result["failure_reason"] = next((code for phrase, code in categories if phrase in error_text),
+                                      "UNCLASSIFIED_UPSTREAM_ERROR")
         exc.close()
     except (urllib.error.URLError, TimeoutError, OSError):
         result["status"] = "MODEL_CONNECTION_FAILED"
