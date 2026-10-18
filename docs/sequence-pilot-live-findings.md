@@ -583,3 +583,30 @@ original in-play r2 selection stays. The baseline action reply is never supplied
 Local preflight: 2.829 seconds, 17,245,280 bytes, all 70 overview and 94 native
 contact instants retained. All 143 relevant tests pass. One 90-second request,
 120-second probe bound; actual perception result remains pending.
+
+Run 39155426908 reproduced the previous full GPT-6-astra request before removing
+only the two out-of-play reference pairs. All source-play images/timestamps,
+contact windows, prompt, model and reasoning remained unchanged. The call took
+66.735 seconds; probe time was 69.455 seconds including 2.536 seconds preparation.
+Separately repeated whole-source preparation took 17.499 seconds. This is one
+8.6-second source play, not fresh full-video latency or a five-action PASS.
+
+The returned original-r2 track is selected=true and uniquely identified. The
+response follows reception, outward dribble, turn and release, keeps the selected
+player back on the left, identifies a different dark-haired white forward as the
+finishing attacker and observes the active ball continuing into goal. Blond p3
+is separate; no new touch by that player is established. The identity consistency
+review now passes STRUCTURALLY_CONSISTENT without changing its rejection rules.
+This is an identity improvement on this local play, not independent event proof.
+
+The source-supported finishing movement is assigned to p4 despite the obscured
+foot/ball instant. A defensive touch at that shot cannot be excluded. The remaining
+pass-to-finish gap is p6's attempted interception: the response cannot conclusively
+distinguish a light touch from the ball passing the boot and does not establish
+controlled possession. The hidden passage before p4 appears at the ball remains
+explicitly uncertain. Do not manufacture a complete direct-assist approval from
+that response or count the teammate's goal as the selected player's own goal.
+The actual reply, source brackets, timing and comparison hashes are preserved in
+docs/examples/native-pass-finish-local-receipt.json and workflow 39155426908.
+143 relevant local tests and GitHub's isolated suite pass. All-five correctness,
+the direct-assist connection and fresh full-video latency remain unproven.
