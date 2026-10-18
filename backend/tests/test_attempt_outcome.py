@@ -115,3 +115,33 @@ def test_actual_old_profile_reply_remains_unselected_on_replay():
     data = json.loads(old["receipt"]["raw_response"])
     result = shot_replay(old,context,packet,data)
     assert result["target_events"] == []
+
+
+def terminal_navigation_fixture():
+    path = Path(__file__).resolve().parents[2]/"docs/examples/native-full-source-observations.json"
+    native = json.loads(path.read_text())
+    manifest = {"source_video_sha256":native["source_video_sha256"], "packets":[{
+        "packet_id":"sequence_004", "core_start_ms":25632,"core_end_ms":34132}]}
+    return manifest,native
+
+
+def test_terminal_attempt_uses_observed_navigation_without_supplying_old_goal_answer():
+    manifest,native = terminal_navigation_fixture()
+    job = outcome_gap(manifest,native,"sequence_004")
+    assert (job["focus_ms"],job["detail_start_ms"],job["detail_end_ms"]) == (30932,30282,32082)
+    assert "goal" not in json.dumps(job).lower()
+    for row in native["plays"]:
+        if row["selected_packet"] == "sequence_004":
+            row["raw_native_observations"]["outcome"] = {"kind":"SAVED", "uncertainty":"invented alternative"}
+    assert outcome_gap(manifest,native,"sequence_004") == job
+
+
+@pytest.mark.parametrize("change", ["bounds","missing_attempt","out_of_bounds"])
+def test_terminal_attempt_rejects_mismatched_or_unusable_source_navigation(change):
+    manifest,native = terminal_navigation_fixture()
+    play = next(r for r in native["plays"] if r["selected_packet"] == "sequence_004")
+    if change == "bounds": manifest["packets"][0]["core_start_ms"] += 1
+    elif change == "missing_attempt": play["raw_native_observations"]["ball_sequence"] = []
+    else:
+        next(a for a in play["raw_native_observations"]["ball_sequence"] if a["action"] == "shot")["clip_s"] = 100
+    with pytest.raises(ValueError): outcome_gap(manifest,native,"sequence_004")

@@ -17,9 +17,31 @@ from scripts.probe_native_gaps import plan
 from scripts.probe_native_play import spatial_reference_items
 
 
-def outcome_gap(manifest, native):
+def outcome_gap(manifest, native, terminal_packet=None):
     if native["source_video_sha256"] != manifest["source_video_sha256"]:
         raise ValueError("SOURCE_INPUT_MISMATCH")
+    if terminal_packet is not None:
+        plays = [row for row in native["plays"] if row["selected_packet"] == terminal_packet]
+        packets = [row for row in manifest["packets"] if row["packet_id"] == terminal_packet]
+        if len(plays) != 1 or len(packets) != 1:
+            raise ValueError("UNIQUE_SOURCE_TERMINAL_PLAY_REQUIRED")
+        play, packet = plays[0], packets[0]
+        lo, hi = play["source_start_ms"], play["source_end_ms"]
+        if (lo,hi) != (packet["core_start_ms"],packet["core_end_ms"]):
+            raise ValueError("SOURCE_PACKET_BOUNDS_MISMATCH")
+        attempts = [a for a in play["raw_native_observations"]["ball_sequence"]
+                    if str(a.get("action", "")).lower() == "shot"]
+        if len(attempts) != 1 or type(attempts[0].get("clip_s")) not in (int,float):
+            raise ValueError("UNIQUE_OBSERVED_TERMINAL_ATTEMPT_REQUIRED")
+        focus = lo+round(attempts[0]["clip_s"]*1000)
+        if not lo <= focus < hi:
+            raise ValueError("TERMINAL_ATTEMPT_OUTSIDE_SOURCE_PLAY")
+        return {"packet_id":terminal_packet, "start_ms":lo, "end_ms":hi-1,
+                "focus_ms":focus, "detail_start_ms":max(lo,focus-650),
+                "detail_end_ms":min(hi-1,focus+1150),
+                "reason":"VERIFY_OBSERVED_TERMINAL_ATTEMPT",
+                "question":"Follow the active ball before and after the terminal attempt. Establish the physical actor, any intervening touch, and the visible outcome. Preserve uncertainty through occlusion; distinguish the moving ball from spares.",
+                "selection_policy":"PRIOR_NATIVE_ATTEMPT_TIMING_ONLY_NO_OUTCOME_ANSWER"}
     candidates = [j for j in plan(manifest, native)
                   if j["reason"] == "ACTIVE_BALL_OUTCOME_AFTER_ATTEMPT"]
     if len(candidates) != 1:
@@ -40,7 +62,8 @@ def identity_review_manifest(manifest, profile, recheck_identity=False):
     return checked, checked["identity_profile"]["canonical_reference_ids"]
 
 
-def prepare(manifest_path, native_path, profile_path, output, recheck_identity=False):
+def prepare(manifest_path, native_path, profile_path, output, recheck_identity=False, terminal_packet=None,
+            detail_quality=50):
     import cv2
     started, output = time.monotonic(), Path(output)
     if output.exists() and any(output.iterdir()):
@@ -54,7 +77,9 @@ def prepare(manifest_path, native_path, profile_path, output, recheck_identity=F
             or hashlib.sha256(receipt["raw_response"].encode()).hexdigest() != receipt["response_sha256"]
             or sorted(i["sha256"] for i in receipt["images"]) != sorted(r["sha256"] for r in manifest["references"])):
         raise ValueError("IDENTITY_PROFILE_UNRESOLVED")
-    question = outcome_gap(manifest, native)
+    if type(detail_quality) is not int or not 35 <= detail_quality <= 90:
+        raise ValueError("INVALID_DETAIL_JPEG_QUALITY")
+    question = outcome_gap(manifest, native, terminal_packet)
     manifest, base_ids = identity_review_manifest(manifest, json.loads(receipt["raw_response"]), recheck_identity)
     local = [r for r in manifest["references"] if question["start_ms"] <= r["media_ms"] <= question["end_ms"]]
     ids = list(dict.fromkeys(base_ids +
@@ -77,7 +102,7 @@ def prepare(manifest_path, native_path, profile_path, output, recheck_identity=F
             if ms > question["detail_end_ms"]:
                 break
             if question["detail_start_ms"] <= ms:
-                image = p._save_image(output/"detail"/f"s{ms:09}.jpg", pixels[box[1]:box[3]], 1280, 50)
+                image = p._save_image(output/"detail"/f"s{ms:09}.jpg", pixels[box[1]:box[3]], 1280, detail_quality)
                 detail.append({"frame_id": f"s{ms:09}", "media_ms": ms, "source_crop_box": box, **image})
     finally:
         cap.release()
@@ -123,7 +148,7 @@ def prepare(manifest_path, native_path, profile_path, output, recheck_identity=F
               "overview_instants":len(overview), "native_instants":len(detail),
               "native_first_ms":detail[0]["media_ms"], "native_last_ms":detail[-1]["media_ms"],
               "source_crop_box":box, "spatial_reference_audit":spatial_audit,
-              "detail_jpeg_quality":50, "overview_jpeg_quality":70,
+              "detail_jpeg_quality":detail_quality, "overview_jpeg_quality":70,
               "identity_mode":"FRESH_ORIGINAL_SELECTIONS" if recheck_identity else "SHARED_PROFILE",
               "previous_identity_response_sha256":receipt["response_sha256"],
               "previous_identity_claims_supplied":not recheck_identity,
@@ -135,7 +160,8 @@ def prepare(manifest_path, native_path, profile_path, output, recheck_identity=F
 def run(args):
     started = time.monotonic()
     result, manifest, packet, items = prepare(args.prepared, args.native_result, args.resume_profile, args.output,
-                                             getattr(args, "recheck_identity", False))
+                                             getattr(args, "recheck_identity", False),
+                                             getattr(args, "terminal_packet", None), getattr(args, "detail_quality", 50))
     if args.preflight_only:
         return result
     receipt = t.run_jobs([{"packet_id":packet["packet_id"], "items":items,
@@ -162,6 +188,8 @@ if __name__ == "__main__":
         cli.add_argument("--"+name, required=True)
     cli.add_argument("--preflight-only", action="store_true")
     cli.add_argument("--recheck-identity", action="store_true")
+    cli.add_argument("--terminal-packet")
+    cli.add_argument("--detail-quality", type=int, default=50)
     args = cli.parse_args()
     result = run(args)
     raise SystemExit(0 if args.preflight_only or result["status"] == "COMPLETED" else 3)

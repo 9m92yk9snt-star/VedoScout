@@ -1054,3 +1054,25 @@ Three assists plus this saved shot are documented in separate bounded
 experiments. Fresh whole-video discovery, combined latency and production
 report integration remain unverified. The middle assist's LEFT/RIGHT
 disagreement is unchanged. No merge or deployment.
+
+
+## Remaining terminal-attempt verification
+
+The existing native-video observation for source packet sequence_004
+(25.632–34.132s) describes one terminal attempt at clip-relative 5.3s. That
+approximate time selects inspection only; neither its claimed outcome nor
+identity/action wording enters the new model request. All ten original identity
+references, two local original spatial selections and the existing event
+resolver are retained, without the disputed inferred Gemini identity profile.
+
+The new bounded request retains all 69 whole-play overview instants and 109
+continuous native detail instants at 30.282–32.082s. Source PTS remain authoritative.
+Local preflights at native JPEG quality 50 and 45 exceeded the unchanged wire
+byte cap and made no model calls. Explicit quality 40 fits at 18,574,423 bytes;
+source dimensions, source-rate instants and crop bounds remain intact. This is
+additional JPEG compression and can affect fine details; it is not silently
+equated to unchanged image quality. No source instants are dropped to fit.
+The overview remains quality 70. Preparation took 4.277s locally. At most one
+GPT-6-astra medium request, 120-second call limit, no expected result supplied.
+A completed request alone is not approval. Three assists and the accepted
+saved-shot receipt are untouched. No merge or deployment.

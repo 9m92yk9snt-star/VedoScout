@@ -1,4 +1,4 @@
-name: One-off original-selection identity review
+name: One-off source terminal attempt verification
 
 on:
   pull_request:
@@ -17,7 +17,7 @@ jobs:
       github.event.pull_request.number == 39 &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.event.pull_request.head.ref == 'codex/sequence-pilot-foundation' &&
-      github.event.before == '717532d52cb394827895bcece21fcc3593396b99' &&
+      github.event.before == 'd6e569e9a3846286e024babd5706e197484c3719' &&
       github.run_attempt == 1
     runs-on: ubuntu-latest
     timeout-minutes: 9
@@ -102,7 +102,7 @@ jobs:
       - name: Read complete plays with the actual model
         env:
           EMERGENT_LLM_KEY: ${{ secrets.EMERGENT_LLM_KEY }}
-        run: python backend/scripts/probe_attempt_outcome.py --prepared "$RUNNER_TEMP/sequence-pilot-prepared/manifest.json" --native-result docs/examples/native-full-source-observations.json --resume-profile docs/examples/gpt6-focused-profile-receipt.json --output "$RUNNER_TEMP/sequence-pilot-result" --recheck-identity
+        run: python backend/scripts/probe_attempt_outcome.py --prepared "$RUNNER_TEMP/sequence-pilot-prepared/manifest.json" --native-result docs/examples/native-full-source-observations.json --resume-profile docs/examples/gpt6-focused-profile-receipt.json --output "$RUNNER_TEMP/sequence-pilot-result" --recheck-identity --terminal-packet sequence_004 --detail-quality 40
       - name: Report the automatic event decision without forcing a result
         run: |
           python - <<'PY'
