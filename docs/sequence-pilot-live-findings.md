@@ -202,3 +202,21 @@ and require its hash to match run 39145583264 before sending anything. Then chan
 only reasoning_effort from low to medium: same model, images, ordering, timestamps,
 identity examples and question. One new call, 150-second overall bound, 120 seconds
 per call. Compare actual observation accuracy and latency; no full-source replay.
+
+
+Run 39145977560 changed only low to medium reasoning on hash-identical input.
+It took 47.779 seconds including detail preparation (40.424 seconds for the call)
+and still could not establish the passing and finishing contacts. Extra reasoning
+alone did not recover the previously observed assist.
+
+Next controlled call retains the exact 145 image bytes, ordering, timestamps,
+references, model and low reasoning from run 39145583264. Only an additional
+contact-evidence instruction changes: a short before/after bracket may express
+a uniquely visible actor when the exact simultaneous foot/ball instant is absent.
+It requires two cited source instants, concrete motion evidence, a unique actor
+and at most one second; contact_ms stays null. Explicit unresolved questions,
+ambiguous actors, spare balls and unconnected outcomes still prevent approval.
+This is an experimental representation, not a waiver of physical evidence or
+a production change. The previous baseline payload hash must match before the
+new request is sent, and ordered image hashes must remain identical. One new
+call, 150 seconds overall, 120 seconds per request. No expected answers enter it.

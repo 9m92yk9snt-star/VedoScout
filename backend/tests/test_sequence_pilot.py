@@ -126,6 +126,42 @@ def test_direct_assist_credits_passer_not_receivers_goal():
     assert r["target_events"][0]["actor"] == "passer"
 
 
+def bracketed_shot():
+    data = shot()
+    a = data["plays"][0]["actions"][0]
+    a.update(contact_frame=None, contact_before_frame="s000000750", contact_after_frame="s000001000",
+             contact_actor_unique=True, contact_evidence=[
+                 {"frame": "s000000750", "fact": "Only the actor swings toward the incoming ball."},
+                 {"frame": "s000001000", "fact": "The ball leaves along the direction of that foot swing."}])
+    return data
+
+
+def test_contact_bracket_preserves_interval_without_inventing_exact_touch():
+    e = p.reconcile([resolved(bracketed_shot())])["target_events"][0]
+    assert e["event_type"] == "GOAL"
+    assert e["contact_ms"] is None
+    assert e["contact_interval_ms"] == [750, 1000]
+    assert e["contact_basis"] == "BRACKETED_VISUAL_SEQUENCE"
+
+
+@pytest.mark.parametrize("field,value", [
+    ("contact_actor_unique", False), ("contact_actor_unique", "true"),
+    ("contact_after_frame", "not_supplied"), ("contact_after_frame", "s000000500"),
+    ("contact_after_frame", "s000002000"), ("contact_evidence", []),
+    ("contact_before_frame", "s000000000")])
+def test_unproven_or_invalid_contact_bracket_cannot_approve_goal(field, value):
+    data = bracketed_shot(); data["plays"][0]["actions"][0][field] = value
+    assert p.reconcile([resolved(data)])["counts"] == {}
+
+
+def test_contact_bracket_cannot_override_explicit_uncertainty_or_spare_ball():
+    data = bracketed_shot(); data["plays"][0]["questions"] = [{"reason": "CONTACT", "action_id": "a1"}]
+    assert p.reconcile([resolved(data)])["counts"] == {}
+    data["plays"][0]["questions"] = []
+    data["plays"][0]["actions"][0]["same_active_ball"] = False
+    assert p.reconcile([resolved(data)])["counts"] == {}
+
+
 @pytest.mark.parametrize("field,value", [("same_active_ball", False), ("continuous_play", False),
     ("receiver_is_teammate", None), ("receiver_frame", "not_supplied"), ("shot_frame", None), ("finisher", "another_person")])
 def test_missing_causal_link_does_not_become_assist(field, value):

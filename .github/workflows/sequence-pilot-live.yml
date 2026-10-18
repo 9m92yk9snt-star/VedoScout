@@ -17,7 +17,7 @@ jobs:
       github.event.pull_request.number == 39 &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.event.pull_request.head.ref == 'codex/sequence-pilot-foundation' &&
-      github.event.before == '7807407eb70ce369fddfd8d4e8de6adf1cee5ecb' &&
+      github.event.before == '4ef8c332f2498860ef12f8f434a3395485bc9f07' &&
       github.run_attempt == 1
     runs-on: ubuntu-latest
     timeout-minutes: 9
@@ -79,7 +79,7 @@ jobs:
       - name: Read complete plays with the actual model
         env:
           EMERGENT_LLM_KEY: ${{ secrets.EMERGENT_LLM_KEY }}
-        run: python backend/scripts/probe_sequence_detail.py --prepared "$RUNNER_TEMP/sequence-pilot-prepared/manifest.json" --output "$RUNNER_TEMP/sequence-pilot-result" --model gpt-6-sol --initial-receipts docs/examples/gpt6-full-initial-receipts.json --resume-profile docs/examples/gpt6-focused-profile-receipt.json --compare-reasoning-low-receipt docs/examples/gpt6-contact-review-low-receipt.json
+        run: python backend/scripts/probe_sequence_detail.py --prepared "$RUNNER_TEMP/sequence-pilot-prepared/manifest.json" --output "$RUNNER_TEMP/sequence-pilot-result" --model gpt-6-sol --initial-receipts docs/examples/gpt6-full-initial-receipts.json --resume-profile docs/examples/gpt6-focused-profile-receipt.json --compare-reasoning-low-receipt docs/examples/gpt6-contact-review-low-receipt.json --sequence-contact-evidence
       - name: Evaluate returned observations separately and print actual receipts
         if: always()
         run: |

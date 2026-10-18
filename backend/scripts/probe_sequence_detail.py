@@ -288,8 +288,8 @@ def run_contact_zoom(manifest_path, out, model, action_path, profile_path):
     pilot.write_json(out / "result.json", result)
 
 
-def run_reasoning_comparison(manifest_path, out, model, initial_path, profile_path, low_path):
-    """One controlled call: identical failed contact input, only reasoning changes."""
+def run_reasoning_comparison(manifest_path, out, model, initial_path, profile_path, low_path, *, sequence_contact=False):
+    """One controlled call; change reasoning OR contact representation, never both."""
     started, out = time.monotonic(), Path(out)
     manifest = pilot.read_json(manifest_path)
     saved, profile, low = (pilot.read_json(x) for x in (initial_path, profile_path, low_path))
@@ -317,16 +317,24 @@ def run_reasoning_comparison(manifest_path, out, model, initial_path, profile_pa
     if (previous["packet_id"] != job["packet_id"] or previous["requested_model"] != model
             or previous["payload_sha256"] != before["payload_sha256"]):
         raise ValueError("COMPARISON_INPUT_NOT_IDENTICAL")
-    _, _, after = transport.build_request("emergent", model, items, reasoning_effort="medium", image_detail="high")
-    result = {"status": "CONTROLLED_REASONING_COMPARISON", "source_video_sha256": manifest["source_video_sha256"],
+    effort = "low" if sequence_contact else "medium"
+    if sequence_contact:
+        job["contact_sequence_evidence"] = True
+        items = pilot.packet_items(detailed, job)
+    _, _, after = transport.build_request("emergent", model, items, reasoning_effort=effort, image_detail="high")
+    if before["images"] != after["images"]:
+        raise ValueError("COMPARISON_IMAGES_CHANGED")
+    result = {"status": "CONTROLLED_CONTACT_REPRESENTATION_COMPARISON" if sequence_contact else "CONTROLLED_REASONING_COMPARISON", "source_video_sha256": manifest["source_video_sha256"],
         "production_pipeline_changed": False, "expected_answers_used_as_input": False,
         "independent_visual_correctness_verified": False, "target_events": [],
         "baseline_run": low["origin_run"], "baseline_payload_sha256": before["payload_sha256"],
-        "same_images_prompt_model_as_baseline": True, "changed_parameter": {"reasoning_effort": ["low", "medium"]},
+        "same_images_as_baseline": True, "same_model_as_baseline": True,
+        "same_images_prompt_model_as_baseline": not sequence_contact,
+        "changed_parameter": {"contact_sequence_evidence": [False, True]} if sequence_contact else {"reasoning_effort": ["low", "medium"]},
         "request_audit": after}
     pilot.write_json(out / "result.json", result)
     receipt = transport.run_jobs([{ "packet_id": job["packet_id"], "items": items,
-        "reasoning_effort": "medium", "image_detail": "high"}], "emergent", model,
+        "reasoning_effort": effort, "image_detail": "high"}], "emergent", model,
         deadline=started+150, per_call_s=120)[0]
     pilot.write_json(out / "responses" / (job["packet_id"]+".json"), receipt)
     if receipt["status"] == "COMPLETED":
@@ -349,10 +357,11 @@ if __name__ == "__main__":
     parser.add_argument("--native-contact-zoom", action="store_true")
     parser.add_argument("--compare-reasoning-low-receipt")
     parser.add_argument("--initial-receipts")
+    parser.add_argument("--sequence-contact-evidence", action="store_true")
     args = parser.parse_args()
     if args.compare_reasoning_low_receipt:
         run_reasoning_comparison(args.prepared, args.output, args.model, args.initial_receipts,
-            args.resume_profile, args.compare_reasoning_low_receipt)
+            args.resume_profile, args.compare_reasoning_low_receipt, sequence_contact=args.sequence_contact_evidence)
     elif args.native_contact_zoom:
         run_contact_zoom(args.prepared, args.output, args.model, args.resume_action, args.resume_profile)
     elif args.resume_action and args.resume_profile:

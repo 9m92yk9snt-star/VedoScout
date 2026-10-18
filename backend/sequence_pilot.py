@@ -378,6 +378,25 @@ def packet_items(manifest, packet):
     if packet.get("question"):
         items.append({"type": "text", "text": "Inspect this missing connection in the whole supplied play: "
                       + json.dumps(packet["question"], separators=(",", ":"))})
+    if packet.get("contact_sequence_evidence"):
+        items.append({"type": "text", "text":
+            "Distinguish certainty about WHO played the ball from precision about the exact contact instant. "
+            "Simultaneous foot-and-ball pixels are not required when the visible before/after sequence "
+            "establishes a unique actor and the ball's change of motion. If contact_frame cannot be "
+            "isolated, leave it null and add contact_before_frame and contact_after_frame bracketing "
+            "the touch within at most one source second, contact_actor_unique=true only when visible "
+            "body/foot motion and the ball's approach/departure exclude other plausible actors, and "
+            "contact_evidence=[{frame:before_frame,fact:concrete visible fact},"
+            "{frame:after_frame,fact:concrete visible fact}]. Describe the alternatives in details. "
+            "A short occlusion is not itself evidence of another pass or controlled interception. "
+            "Separate a deflection/block from deliberate opponent control using the visible next motion. "
+            "If identity, touching actor or outcome genuinely remains unresolved, keep the question. "
+            "Do not ask CONTACT solely because an exact instant is unavailable when this visual "
+            "sequence establishes the actor. For an assist with an imprecise finishing instant, include "
+            "the recipient's separate SHOT action with its own contact bracket and outcome evidence; "
+            "leave the passer's shot_frame null instead of inventing a frame. Keep recipient, finisher "
+            "and passer distinct. Before/after reasoning can establish a touch, but proximity, a keeper "
+            "dive or an unseen path alone cannot. Report the observed result even if unsuccessful."})
     for frame_id in packet["frame_ids"]:
         f = frames[frame_id]
         label = f"Source frame {frame_id}, media_ms={f['media_ms']}"
@@ -412,6 +431,20 @@ def resolve_response(data, manifest, packet, receipt):
         return frames.get(key) if isinstance(key, str) else None
     def cited(values):
         return list(dict.fromkeys(v for v in values if isinstance(v, str) and v in frames)) if isinstance(values, list) else []
+    def contact_support(action):
+        exact = ms(action.get("contact_frame"))
+        if exact is not None:
+            return [exact, exact], "VISIBLE_FRAME", []
+        before, after = ms(action.get("contact_before_frame")), ms(action.get("contact_after_frame"))
+        start, end = ms(action.get("start_frame")), ms(action.get("end_frame"))
+        facts = [{"frame": v["frame"], "fact": str(v.get("fact") or "")[:500]}
+            for v in action.get("contact_evidence") or [] if isinstance(v, dict)
+            and ms(v.get("frame")) is not None and str(v.get("fact") or "").strip()]
+        if (action.get("contact_actor_unique") is True and None not in (before, after, start, end)
+                and start <= before < after <= end and after-before <= 1000
+                and {action.get("contact_before_frame"), action.get("contact_after_frame")} <= {v["frame"] for v in facts}):
+            return [before, after], "BRACKETED_VISUAL_SEQUENCE", facts
+        return None, "UNRESOLVED", facts
     def question(play, reason, action_id=None, focus_ms=None, explicit=False, target_related=None):
         questions.append({"reason": reason, "action_id": action_id, "start_ms": ms(play.get("start_frame")),
                           "end_ms": ms(play.get("end_frame")), "focus_ms": focus_ms,
@@ -465,7 +498,8 @@ def resolve_response(data, manifest, packet, receipt):
             if any(not astart <= frames[f] <= aend for f in evidence) or (contact is not None and not astart <= contact <= aend):
                 invalid.append("ACTION_SOURCE_ORDER_INVALID"); continue
             action_id = action.get("action_id", f"a{action_index}")
-            if contact is None and kind in {"SHOT", "PASS", "CROSS"}:
+            contact_interval, contact_basis, contact_facts = contact_support(action)
+            if contact_interval is None and kind in {"SHOT", "PASS", "CROSS"}:
                 question(play, "CONTACT", action_id, astart)
             if actor["selected"] is None:
                 question(play, "IDENTITY", action_id, contact or astart)
@@ -474,8 +508,8 @@ def resolve_response(data, manifest, packet, receipt):
             outcome_evidence = [{"frame": v["frame"], "fact": str(v.get("fact") or "")[:500]}
                 for v in action.get("outcome_evidence") or [] if isinstance(v, dict)
                 and ms(v.get("frame")) is not None and str(v.get("fact") or "").strip()]
-            visible_outcome = bool(contact is not None and oms is not None and contact <= oms <= end
-                and any(contact <= frames[v["frame"]] <= end for v in outcome_evidence)
+            visible_outcome = bool(contact_interval is not None and oms is not None and contact_interval[1] <= oms <= end
+                and any(contact_interval[1] <= frames[v["frame"]] <= end for v in outcome_evidence)
                 and action.get("same_active_ball") is True and action.get("continuous_play") is True)
             event_type, resolved_outcome, reason = kind, outcome, "VISIBLE_ACTION"
             receiver = people.get(action.get("receiver"))
@@ -490,10 +524,22 @@ def resolve_response(data, manifest, packet, receipt):
                 if action.get("receiver_is_teammate") is False:
                     resolved_outcome, reason = "INCOMPLETE", "VISIBLE_OPPONENT_RECEIPT"
                 elif outcome == "TEAMMATE_GOAL":
+                    shot_interval = [shot_ms, shot_ms] if shot_ms is not None else None
+                    if shot_interval is None:
+                        finishes = [a for a in play.get("actions") or [] if isinstance(a, dict)
+                            and a.get("kind") == "SHOT" and a.get("actor") == action.get("finisher")
+                            and a.get("action_id") not in unresolved_ids and a.get("same_active_ball") is True
+                            and a.get("continuous_play") is True and a.get("ball_id") == action.get("ball_id")]
+                        intervals = [contact_support(a)[0] for a in finishes]
+                        intervals = [i for i in intervals if i is not None and receiver_ms is not None
+                                     and oms is not None and receiver_ms <= i[1] <= oms]
+                        if len(intervals) == 1:
+                            shot_interval = intervals[0]
                     chain = (visible_outcome and receiver is not None and bool(receiver["evidence_frames"])
                         and action.get("receiver") == action.get("finisher")
                         and action.get("receiver_is_teammate") is True and receiver["selected"] is False
-                        and receiver_ms is not None and shot_ms is not None and contact <= receiver_ms <= shot_ms <= oms)
+                        and receiver_ms is not None and shot_interval is not None
+                        and contact_interval[1] <= receiver_ms <= shot_interval[1] <= oms)
                     if chain:
                         event_type, reason = "ASSIST", "VISIBLE_DIRECT_ASSIST"
                     else:
@@ -506,6 +552,7 @@ def resolve_response(data, manifest, packet, receipt):
                 "source_action_keys": [f"{packet['packet_id']}:{play_index}:{action_id}"],
                 "source_video_sha256": manifest["source_video_sha256"], "kind": kind, "event_type": event_type,
                 "outcome": resolved_outcome, "start_ms": astart, "end_ms": aend, "contact_ms": contact,
+                "contact_interval_ms": contact_interval, "contact_basis": contact_basis, "contact_evidence": contact_facts,
                 "outcome_ms": oms, "selected_player": actor["selected"], "actor": action.get("actor"),
                 "actor_scope": f"{packet['packet_id']}:{play_index}", "actor_evidence_frames": evidence,
                 "reference_ids": actor["reference_ids"], "outcome_evidence": outcome_evidence,
@@ -513,7 +560,7 @@ def resolve_response(data, manifest, packet, receipt):
                 "reason": reason, "details": str(action.get("details") or "")[:1500],
                 "receipts": [receipt], "review_phase": packet.get("phase", "INITIAL"),
                 "proof_eligible": bool(actor["selected"] is True and
-                    ((kind not in {"SHOT", "PASS", "CROSS"}) or (contact is not None and reason in
+                    ((kind not in {"SHOT", "PASS", "CROSS"}) or (contact_interval is not None and reason in
                          {"VISIBLE_SHOT_OUTCOME", "VISIBLE_DIRECT_ASSIST", "VISIBLE_ACTION", "VISIBLE_OPPONENT_RECEIPT"})))}
             uncertain = action_id in unresolved_ids or (event_type == "ASSIST" and action.get("finisher") in uncertain_finishers)
             event["model_requested_clarification"] = uncertain
@@ -597,7 +644,7 @@ def reconcile(results, *, sampling_gap_ms=125):
                 continue
             if q["reason"] == "IDENTITY" and e["selected_player"] is not None:
                 return True
-            if q["reason"] == "CONTACT" and e["contact_ms"] is not None:
+            if q["reason"] == "CONTACT" and (e["contact_ms"] is not None or e.get("contact_interval_ms")):
                 return True
             if q["reason"] == "OUTCOME" and e["proof_eligible"] and e["outcome"] != "UNKNOWN":
                 return True
@@ -829,7 +876,7 @@ def assess_reference_cases(cases, resolved):
         for e in events:
             if e["event_id"] in used or (e["event_type"], e["outcome"]) != (case["expected_type"], case["expected_outcome"]):
                 continue
-            contact = e["contact_ms"] if e["contact_ms"] is not None else e["start_ms"]
+            contact = e["contact_ms"] if e["contact_ms"] is not None else (e.get("contact_interval_ms") or [e["start_ms"]])[-1]
             # User times locate the actor's action, not necessarily its final kick.
             distance = max(e["start_ms"] - reference, reference - contact, 0)
             if distance <= tolerance:
@@ -839,7 +886,8 @@ def assess_reference_cases(cases, resolved):
             used.add(winner["event_id"])
         checks.append({"case_id": case["case_id"], "status": "MATCHED" if winner else "NOT_VERIFIED",
                        "event_id": winner["event_id"] if winner else None,
-                       "observed_contact_ms": winner["contact_ms"] if winner else None})
+                       "observed_contact_ms": winner["contact_ms"] if winner else None,
+                       "observed_contact_interval_ms": winner.get("contact_interval_ms") if winner else None})
     extras = [e["event_id"] for e in events if e["event_type"] in {"GOAL", "ASSIST", "SHOT"} and e["event_id"] not in used]
     return {"all_reference_cases_matched": all(c["status"] == "MATCHED" for c in checks),
             "unexpected_scoring_event_ids": extras, "cases": checks,
