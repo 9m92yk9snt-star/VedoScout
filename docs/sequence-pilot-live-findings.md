@@ -1004,3 +1004,53 @@ selected target events. 234 relevant local offline tests pass; the standalone
 GitHub offline check also passes. These tests do not establish model accuracy.
 The three previously documented assists and unresolved anatomical side remain
 unchanged. PR remains draft, with no merge or deployment.
+
+
+
+## Selected saved shot accepted after the identity-profile removal
+
+Actual retry run [39177196943](https://github.com/9m92yk9snt-star/VedoScout/actions/runs/39177196943)
+returned a completed GPT-6-astra medium answer in 60.307 seconds; the bounded
+probe including preparation took 64.834 seconds. This is a fresh model result,
+not a replay of the earlier refusal or the HTTP-429 error. Whole-video
+preparation and workflow setup are additional and not included in that probe
+time. Raw reply, request/response hashes, actual result and a replay frame
+catalog are retained in `docs/examples/native-saved-shot-approval-receipt.json`.
+
+The model identifies the white shooter as selected, cites original references
+r5/r6/r10, reads dark 15 on his back, and connects continuous motion to the r5
+selection at 21.482s. It emits a selected SHOT / SAVED with bracketed contact
+23.682–23.749s, goalkeeper glove encounter at 24.366s and changed motion by
+24.432s. No exact contact instant is invented. It separates the moving active
+ball from the stationary spare in goal. There are no model questions or
+resolver identity conflicts; the selected saved shot is proof-eligible through
+the existing resolver. The additional DRIBBLE and DUEL describe the approach;
+they are not additional scoring actions. No selected-player goal is awarded.
+
+Independent source inspection of the r5 instant, the visible back number near
+22.016s, the continuing white runner and the striking/follow-through sequence
+agrees with this player attribution. The owner's screenshots at displayed
+23.63/23.69/23.73s provide navigation and visual corroboration; those screenshots
+and the claimed desired outcome were not supplied as model facts. Source PTS,
+not screenshot display rounding, remain the contact-time authority. The raw
+result's generic independent-verification flag is retained unchanged; this
+paragraph records the separate human/source review, not a second automated
+verification system.
+
+The new prompt uses all ten original references and omits the old Gemini
+profile that asserted r5 showed a bearded different person. All 52 overview
+images, 109 native outcome images and the local original-selection spatial
+view remain byte-identical to the old input. Reference scope and instruction
+change together, so the single successful reading does not isolate causality
+or establish reliability on unseen videos. The old refusal and failed request
+remain intact alongside this accepted result. No lower acceptance threshold
+or production runtime change was introduced.
+
+Actual-reply replay now verifies the selected SAVED event and rejects altered
+identity, missing contact support, missing outcome evidence and broken
+active-ball continuity. The original unselected reply still earns no selected
+credit. These are code regression checks, not additional model trials.
+Three assists plus this saved shot are documented in separate bounded
+experiments. Fresh whole-video discovery, combined latency and production
+report integration remain unverified. The middle assist's LEFT/RIGHT
+disagreement is unchanged. No merge or deployment.
