@@ -610,3 +610,39 @@ The actual reply, source brackets, timing and comparison hashes are preserved in
 docs/examples/native-pass-finish-local-receipt.json and workflow 39155426908.
 143 relevant local tests and GitHub's isolated suite pass. All-five correctness,
 the direct-assist connection and fresh full-video latency remain unproven.
+
+## Continuous passage through the attempted interception
+
+The owner explicitly requested one cropped-play experiment on the earlier assist.
+The reader retains the full 38.632–47.264s source-derived play and the original
+r2 in-play identity anchor. It rebuilds the exact local-anchor request from run
+39155426908 and checks its complete wire hash before changing any input.
+
+The previous 60-fps contact windows had a 44.382–45.132s gap covered only by the
+8-fps overview. Add native-pixel source samples at 24fps across that gap, keeping
+all 70 original overview images and all 94 previous native contact images byte
+for byte. The 18 added samples make the maximum detailed-source gap 50ms. Only
+the newly added JPEGs use quality 80 to fit the request cap; no existing image
+or source instant is removed or recompressed. Original source timestamps remain.
+
+The neutral prompt also requests explicit evidence for same-ball passage to the
+receiver, that receiver's finishing movement, the goal, defensive contact and
+intervening control/deliberate passing. It supplies no desired assist, no assertion
+that a defender missed, and no expected result. The prior action reply is not sent.
+This changes both delivery and the observation schema; it is not an isolated
+measurement of either change alone.
+
+An experimental link review requires all three affirmative links, distinct
+selected passer/receiver-finisher identities, valid supplied source citations and
+no observed intervening control. A possible unconfirmed defensive touch alone
+does not veto otherwise supported links, but NOT_OBSERVED control cannot fill
+a missing or uncertain same-ball/receiver/goal link. Structural and link reviews
+are still model-observation checks, not independent visual proof or production
+canonical events. The source review and actual response determine whether this
+particular experiment is useful; no desired answer is hard-coded.
+
+Local preflight: 3.927 seconds, 19,198,197 request bytes, all prior image hashes
+retained, 18 new detail samples, JPEG quality 80 for those new samples only.
+156 relevant local tests pass, including unsupported links, identity conflicts,
+invented citations and observed intervening control. One GPT-6-astra medium call,
+90-second request and 120-second probe bounds; actual result remains pending.
