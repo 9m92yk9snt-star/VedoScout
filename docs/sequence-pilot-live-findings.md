@@ -113,5 +113,19 @@ edge and explicit high detail. This is a best-input model trial, not a claim
 that model and resolution effects have been isolated. Source instants remain
 the same 8-fps observations; no event navigation answers enter the input.
 
+GPT-6-sol run 39142443248 took 38.518 s plus preparation (13.575 s identity,
+24.456 s action reading). It retained uncertainty about the forward white runner
+and number 10's final contact, so it did not establish an assist. It did not
+silently award the receiver's goal to the selected person.
+
+Next probe resumes that actual request/profile receipt without replaying either
+completed model call. Verify source/response hashes, select the same tap-dense
+packet, and inspect the model's own unresolved focused action. Preserve the full
+core play, add 24-fps detail around its missing contact, and restore original local
+selection crops alongside canonical references. The earlier profile reduction
+had discarded in-play r8/r9 identity examples. Bound context to the source packet
+core to avoid unrelated adjacent plays. No reference action answers are read.
+This is one new model request, not a second approval of an already proven event.
+
 The source video and original taps were published as test input with the
 owner's explicit permission. Credentials remain in GitHub Actions secrets.

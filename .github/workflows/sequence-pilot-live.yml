@@ -17,7 +17,7 @@ jobs:
       github.event.pull_request.number == 39 &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.event.pull_request.head.ref == 'codex/sequence-pilot-foundation' &&
-      github.event.before == 'c157a31f077f7ee88e9a8e9e91ee20dd5889046b' &&
+      github.event.before == '73a942c96db6970ec3db2d9b0be8023150399378' &&
       github.run_attempt == 1
     runs-on: ubuntu-latest
     timeout-minutes: 9
@@ -37,6 +37,8 @@ jobs:
             /backend/scripts/run_sequence_pilot.py
             /backend/scripts/probe_sequence_detail.py
             /docs/examples/five_action_reference_cases.json
+            /docs/examples/gpt6-focused-action-receipt.json
+            /docs/examples/gpt6-focused-profile-receipt.json
             /testdata/sequence-pilot-orman400/
       - uses: actions/setup-python@v5
         with:
@@ -74,7 +76,7 @@ jobs:
       - name: Read complete plays with the actual model
         env:
           EMERGENT_LLM_KEY: ${{ secrets.EMERGENT_LLM_KEY }}
-        run: python backend/scripts/probe_sequence_detail.py --prepared "$RUNNER_TEMP/sequence-pilot-prepared/manifest.json" --output "$RUNNER_TEMP/sequence-pilot-result" --model gpt-6-sol --single
+        run: python backend/scripts/probe_sequence_detail.py --prepared "$RUNNER_TEMP/sequence-pilot-prepared/manifest.json" --output "$RUNNER_TEMP/sequence-pilot-result" --model gpt-6-sol --resume-action docs/examples/gpt6-focused-action-receipt.json --resume-profile docs/examples/gpt6-focused-profile-receipt.json
       - name: Evaluate returned observations separately and print actual receipts
         if: always()
         run: |

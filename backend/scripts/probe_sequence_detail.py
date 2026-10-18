@@ -1,5 +1,6 @@
 """Bounded paired perception probe; no expected action answers enter requests."""
 import argparse
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -153,6 +154,60 @@ def run_native(manifest_path, out, model):
     pilot.write_json(out / "result.json", result)
 
 
+def run_followup(manifest_path, out, model, action_path, profile_path):
+    """Resume this experiment's real missing link; never replay completed calls."""
+    started, out = time.monotonic(), Path(out)
+    manifest = pilot.read_json(manifest_path)
+    def receipt(path):
+        saved = pilot.read_json(path)
+        r = saved["receipt"]
+        assert saved["source_video_sha256"] == manifest["source_video_sha256"]
+        assert r["origin"] == "LIVE_MODEL_REQUEST" and r["status"] == "COMPLETED"
+        assert hashlib.sha256(r["raw_response"].encode()).hexdigest() == r["response_sha256"]
+        return r
+    initial_receipt, profile_receipt = receipt(action_path), receipt(profile_path)
+    manifest = pilot.apply_identity_profile(manifest, json.loads(profile_receipt["raw_response"]))
+    def density(packet):
+        lo, hi = packet["core_start_ms"], packet["core_end_ms"]
+        return sum(lo <= r["media_ms"] < hi for r in manifest["references"]) / max(1, hi-lo)
+    packet = max(manifest["packets"], key=density)
+    initial = pilot.resolve_response(pilot.parse_response(initial_receipt["raw_response"]), manifest, packet,
+        {k: initial_receipt[k] for k in ("packet_id", "payload_sha256", "response_sha256", "origin")})
+    lo, hi = packet["core_start_ms"], packet["core_end_ms"]
+    questions = [q for q in initial["questions"] if isinstance(q.get("focus_ms"), (int, float))
+                 and lo <= q["focus_ms"] < hi]
+    if not questions:
+        raise ValueError("NO_FOCUSED_MISSING_LINK")
+    q = questions[0]
+    ids = list(dict.fromkeys(packet["reference_ids"] + [r["reference_id"] for r in manifest["references"]
+                                                        if lo <= r["media_ms"] < hi]))
+    job = {"packet_id": "missing_link", "phase": "FOLLOWUP", "round": 1,
+           "start_ms": lo, "end_ms": hi-1, "reference_ids": ids,
+           "question": {**q, "also_inspect": "Resolve the actor identity and actual last ball contact before the observed outcome. "
+                        "Distinguish a pass to another finisher from an uninterrupted shot. Use the original in-play selections "
+                        "as local identity evidence; they are not outcome answers."}}
+    enriched, jobs = pilot.prepare_followups(manifest, [job], out, timeout_s=30)
+    items = pilot.packet_items(enriched, jobs[0])
+    transport.build_request("emergent", model, items, reasoning_effort="low", image_detail="high")
+    result = {"status": "TARGETED_LINK_PROBE", "source_video_sha256": manifest["source_video_sha256"],
+        "expected_answers_used_as_input": False, "production_pipeline_changed": False,
+        "independent_visual_correctness_verified": False, "prior_preparation_seconds": manifest["preparation_seconds"],
+        "completed_requests_replayed": False, "resumed_response_sha256": initial_receipt["response_sha256"],
+        "question": job["question"], "reference_ids": ids, "initial": pilot.reconcile([initial]), "target_events": []}
+    pilot.write_json(out / "result.json", result)
+    r = transport.run_jobs([{"packet_id": "missing_link", "items": items, "reasoning_effort": "low", "image_detail": "high"}],
+        "emergent", model, deadline=started+180, per_call_s=120)[0]
+    pilot.write_json(out / "responses" / "missing_link.json", r)
+    if r["status"] == "COMPLETED":
+        followup = pilot.resolve_response(pilot.parse_response(r["raw_response"]), enriched, jobs[0],
+            {k: r[k] for k in ("packet_id", "payload_sha256", "response_sha256", "origin")})
+        # Keep conflicting initial and follow-up readings separately for inspection.
+        result["followup"] = pilot.reconcile([followup])
+        result["target_events"] = result["followup"]["target_events"]
+    result["analysis_seconds"] = round(time.monotonic()-started, 3)
+    pilot.write_json(out / "result.json", result)
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--prepared", required=True)
@@ -160,8 +215,12 @@ if __name__ == "__main__":
     parser.add_argument("--model", default="gemini-2.5-pro")
     parser.add_argument("--native-video", action="store_true")
     parser.add_argument("--single", action="store_true")
+    parser.add_argument("--resume-action")
+    parser.add_argument("--resume-profile")
     args = parser.parse_args()
-    if args.native_video:
+    if args.resume_action and args.resume_profile:
+        run_followup(args.prepared, args.output, args.model, args.resume_action, args.resume_profile)
+    elif args.native_video:
         run_native(args.prepared, args.output, args.model)
     else:
         run(args.prepared, args.output, args.model, args.single)

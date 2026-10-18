@@ -1,0 +1,78 @@
+{
+  "source_video_sha256": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+  "origin_run": 39142443248,
+  "receipt": {
+    "packet_id": "identity_profile",
+    "provider": "emergent",
+    "requested_model": "gemini-2.5-pro",
+    "origin": "LIVE_MODEL_REQUEST",
+    "status": "COMPLETED",
+    "requested_reasoning_effort": "low",
+    "payload_sha256": "527d880674c3be25452b6ea2b76681690fa6dc343902b706ddea2962142d67cf",
+    "payload_bytes": 108505,
+    "explicit_image_count": 10,
+    "images": [
+      {
+        "sha256": "3a1c5a1dd42221c8bc7a92eb59105c36a2a0f148d80f6a55f7442e0188289217",
+        "bytes": 5465
+      },
+      {
+        "sha256": "07ade3bd308f037c88df80c6263e6bb78dd40b79fd0b7e4e18e7d83d02f2c4a6",
+        "bytes": 11688
+      },
+      {
+        "sha256": "b27c75fac95669fa30f3cdc8e27901a7eb102c880ff61ee4a9539da31f255dec",
+        "bytes": 6347
+      },
+      {
+        "sha256": "bfa6f5aeaf67b977349ce4ce9d80282cc1595e61cf177ae8288817735066fa89",
+        "bytes": 10406
+      },
+      {
+        "sha256": "701f00516cd66001007c7d83ac856293599c11135ae1113c511c0822fb0473b6",
+        "bytes": 5118
+      },
+      {
+        "sha256": "923cffbd1ee55df6ecf2f8b3fe3110c318a2606cc0500726d923a1832a891759",
+        "bytes": 8737
+      },
+      {
+        "sha256": "aaccfeb6493345ab3d27192569f96f2cc09782389e0d525a7afbbc7745d72454",
+        "bytes": 13380
+      },
+      {
+        "sha256": "872357c7749fdd2359f1fa303872c08d74fb97ba5bb33d23dd9851237e056c60",
+        "bytes": 6652
+      },
+      {
+        "sha256": "721c5dee7a3e8980b7585d745626cd8016b25912e7176308d2a47b746458d93f",
+        "bytes": 6238
+      },
+      {
+        "sha256": "a399aa3c7a6191dbc52db2acb94cb7c7a1c7dbbaaa9e85350bb353b9921bcc08",
+        "bytes": 5769
+      }
+    ],
+    "frame_sampling_in_provider_metadata": false,
+    "videos": [],
+    "requested_image_detail": null,
+    "model_version": "gemini/gemini-2.5-pro",
+    "response_id": "X-vUas-HJfT4-8YPgMrjKQ",
+    "usage": {
+      "completion_tokens": 794,
+      "prompt_tokens": 2762,
+      "total_tokens": 3556,
+      "completion_tokens_details": {
+        "reasoning_tokens": 649,
+        "text_tokens": 145
+      },
+      "prompt_tokens_details": {
+        "text_tokens": 182,
+        "image_tokens": 2580
+      }
+    },
+    "raw_response": "{\n  \"identity_clear\": true,\n  \"appearance\": \"A slim-built, fair-skinned player with short, light brown hair. He wears an all-white kit with a dark crest on the chest and the number 15 on the back.\",\n  \"canonical_reference_ids\": [\n    \"r2\",\n    \"r6\",\n    \"r7\"\n  ],\n  \"ambiguous_reference_ids\": [],\n  \"contradictions\": \"r3 and r5 appear to show different players; r3 has a darker skin tone and r5 appears to have a dark beard, which contradicts the clearer images of the intended player.\"\n}",
+    "response_sha256": "a42f4780f49b77cdaafcfd7503be2b9bf3cce274a0ca332fb33fb1b4eefd7250",
+    "elapsed_seconds": 13.575
+  }
+}
