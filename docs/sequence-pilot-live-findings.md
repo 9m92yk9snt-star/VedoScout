@@ -645,4 +645,43 @@ Local preflight: 3.927 seconds, 19,198,197 request bytes, all prior image hashes
 retained, 18 new detail samples, JPEG quality 80 for those new samples only.
 156 relevant local tests pass, including unsupported links, identity conflicts,
 invented citations and observed intervening control. One GPT-6-astra medium call,
-90-second request and 120-second probe bounds; actual result remains pending.
+90-second request and 120-second probe bounds; the actual result follows.
+
+Run 39161654199 completed successfully on commit 3f335cc. GPT-6-astra medium took
+61.037 seconds; preparation plus the model probe took 63.362 seconds, including
+2.206 seconds probe preparation. Separate whole-source preparation took 12.826
+seconds. This is a measured isolated 8.632-second play, not fresh full-video
+latency. The 19,198,197-byte request retained all previous image hashes and added
+the 18 original-source bridge instants. The actual reply and measured result are
+saved in docs/examples/native-continuous-pass-receipt.json; its unmodified response
+hash is 2ba52e4798ceb6c96cc3feca0d40cca80e85b4f24d60460fa6f1b21dced9a1da.
+
+The model now affirmatively supports all three physical links: p1's release to
+p4's reception, p4's finishing movement, and the goal from that finish. It cites
+the continuing ball emerging beyond the reaching defender at 44.598s and entering
+the recipient's channel, rather than inferring the pass only from a lack of
+defensive control. The selected r2 player is uniquely p1; p4 is a different
+dark-haired white attacker, while the blond teammate remains separate. The
+identity review is STRUCTURALLY_CONSISTENT. The experimental link decision is
+ASSIST_SUPPORTED_BY_MODEL_OBSERVATIONS, with no missing-link reasons.
+
+Intervening defensive control is NOT_OBSERVED. Defensive contact is UNCERTAIN:
+the response does not demonstrate a touch or interruption at the reaching boot,
+but cannot exclude a slight brush there or around the finishing action. Thus this
+result does not establish the stronger claim that no defender touched the ball.
+An unproven hypothetical brush does not veto the separately supported attacking
+chain. The attacking finisher is identified; absolute last-touch ownership is
+left null. This distinction is deliberate, not a removal of uncertainty.
+
+Manual source inspection agrees with the distinct selected passer, central
+finishing attacker and moving ball in goal; the bridge shows the defender reaching
+and the ball continuing. It does not independently resolve every possible brush.
+The experiment therefore supports this assist, but emits no production canonical
+event: target_events remains empty and independent_visual_correctness_verified
+remains false. No merge or deployment; the earlier #15-to-#10 ending is preserved
+separately. Five-action correctness and fresh full-video latency remain unproven.
+
+The final local suite passes 160 tests. Four additional contradiction tests require
+an explicit overall GOAL outcome, so an asserted goal-link cannot override SAVED,
+NO_GOAL, UNKNOWN or a missing outcome. Rechecking this saved actual reply against
+that guard preserves the supported-assist result without another model call.

@@ -13,6 +13,7 @@ def observed():
     def field(status):
         return {'status':status,'frames':['s100','s200'],'observation':'Synthetic before/after motion'}
     return {'players':[{'person_id':'passer','selected':True},{'person_id':'receiver','selected':False}],
+        'outcome':{'kind':'GOAL'},
         'link_assessment':{'releaser':'passer','receiver':'receiver','finisher':'receiver',
             'same_ball_release_to_receiver':field('SUPPORTED'),
             'receiver_finishing_action':field('SUPPORTED'),'goal_from_that_finish':field('SUPPORTED'),
@@ -59,3 +60,9 @@ def test_self_goal_and_identity_conflict_cannot_become_an_assist():
 
 def test_missing_new_observations_keeps_historical_reply_unapproved():
     assert review({'players':[]})['status']=='UNRESOLVED'
+
+
+@pytest.mark.parametrize('kind',['SAVED','NO_GOAL','UNKNOWN',None])
+def test_supported_goal_link_cannot_override_a_conflicting_overall_outcome(kind):
+    data=observed();data['outcome']['kind']=kind
+    assert review(data)['status']=='UNRESOLVED'

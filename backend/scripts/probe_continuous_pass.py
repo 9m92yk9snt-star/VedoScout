@@ -58,6 +58,10 @@ def assess_link(observed, identity_review, allowed_frames):
         result['reasons'].append('IDENTITY_UNRESOLVED'); return result
     if not isinstance(observed,dict):
         result['reasons'].append('INVALID_OBSERVATION_OBJECT'); return result
+    outcome=observed.get('outcome',{})
+    kind=outcome.get('kind','') if isinstance(outcome,dict) else ''
+    if not isinstance(kind,str) or not re.match(r'^GOAL(?:$|[\s:.,])',kind.upper()):
+        result['reasons'].append('GOAL_OUTCOME_NOT_ESTABLISHED'); return result
     link = observed.get('link_assessment')
     if not isinstance(link,dict):
         result['reasons'].append('MISSING_LINK_OBSERVATIONS'); return result
