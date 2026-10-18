@@ -4,6 +4,28 @@ These are standalone source-image experiments, not production report latency.
 Expected reference answers are evaluated after requests, never supplied as input.
 No merge or deployment is justified by the results so far.
 
+## Follow-up source review and the remaining attempt outcome
+
+Manual reinspection of original instants 49.131, 49.348, 49.565 and 50.198s,
+alongside the earlier release images and the owner's red/black-arrow screenshot,
+does not establish anatomical foot side through the occlusion. The rear white
+sock is easier to distinguish than the ball-side leg; the pelvis-to-knee-to-foot
+connection at release is obscured. LEFT remains the actual model claim, RIGHT
+the owner's reading, and independent side verification remains false. No raw
+reply or approved assist is rewritten by this review.
+
+The next bounded probe selects the unique ACTIVE_BALL_OUTCOME_AFTER_ATTEMPT
+gap from the existing native-source model observations: sequence_003,
+19.266–25.631s, with continuous native detail at 23.566–25.366s. The old claimed
+outcome only schedules inspection; it is not supplied to the new model. Original
+identity references, full-play overview and native images go through the existing
+event schema and resolver, including its existing contact-bracket support. No
+expected result is prefilled. A stationary ball inside the goal and the moving
+ball near the goalkeeper must be distinguished using their source motion.
+The probe makes at most one GPT-6-astra medium request, with a 120-second request
+limit, and retains the actual receipt separately from source preparation and
+any resolved events. A completed request does not establish a saved shot.
+
 | Run | Preparation | Model phase | Reference matches | Quality |
 | --- | --- | --- | --- | --- |
 | 39138207424 | 17.809 s | 175.529 s | 0/5 | Two of three calls timed out; remaining response misattributed the goal. |

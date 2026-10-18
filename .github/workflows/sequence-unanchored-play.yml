@@ -1,4 +1,4 @@
-name: One-off unanchored-play assist probe
+name: One-off source attempt outcome probe
 
 on:
   pull_request:
@@ -17,7 +17,7 @@ jobs:
       github.event.pull_request.number == 39 &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.event.pull_request.head.ref == 'codex/sequence-pilot-foundation' &&
-      github.event.before == 'a7e3ef110262ce63c828afc7b0deb6eb21f5e25e' &&
+      github.event.before == 'cbf5bf8670ac11ddbf0448e556805a7de1cce6fd' &&
       github.run_attempt == 1
     runs-on: ubuntu-latest
     timeout-minutes: 9
@@ -44,6 +44,7 @@ jobs:
             /backend/scripts/probe_actor_continuity.py
             /backend/scripts/probe_continuous_pass.py
             /backend/scripts/probe_unanchored_play.py
+            /backend/scripts/probe_attempt_outcome.py
             /docs/examples/native-unresolved-finisher-receipt.json
             /docs/examples/native-unanchored-play-receipt.json
             /docs/examples/five_action_reference_cases.json
@@ -101,17 +102,17 @@ jobs:
       - name: Read complete plays with the actual model
         env:
           EMERGENT_LLM_KEY: ${{ secrets.EMERGENT_LLM_KEY }}
-        run: python backend/scripts/probe_unanchored_play.py --prepared "$RUNNER_TEMP/sequence-pilot-prepared/manifest.json" --gap-receipt docs/examples/native-unresolved-finisher-receipt.json --output "$RUNNER_TEMP/sequence-pilot-result" --focus-receipt docs/examples/native-unanchored-play-receipt.json --limb-focus-ms 49850 --limb-panels
-      - name: Check the automatic event decision
+        run: python backend/scripts/probe_attempt_outcome.py --prepared "$RUNNER_TEMP/sequence-pilot-prepared/manifest.json" --native-result docs/examples/native-full-source-observations.json --resume-profile docs/examples/gpt6-focused-profile-receipt.json --output "$RUNNER_TEMP/sequence-pilot-result"
+      - name: Report the automatic event decision without forcing a result
         run: |
           python - <<'PY'
           import os
           from pathlib import Path
           import sequence_pilot as pilot
           result = pilot.read_json(Path(os.environ['RUNNER_TEMP']) / 'sequence-pilot-result' / 'result.json')
-          decision = result.get('automatic_approval', {})
-          assert decision.get('status') == 'APPROVED', decision.get('reasons', ['NO_AUTOMATIC_DECISION'])
-          print(decision['status'], decision['reason'], decision['counts'])
+          assert result['status'] == 'COMPLETED', result['status']
+          print('Actual returned counts:', result.get('counts', {}))
+          print('Remaining questions:', result.get('questions', []))
           PY
       - name: Evaluate returned observations separately and print actual receipts
         if: always()
