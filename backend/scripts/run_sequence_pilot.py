@@ -21,12 +21,12 @@ import sequence_pilot_transport as transport
 
 def run(manifest_path, output_dir, *, provider="gemini", model="gemini-2.5-pro", budget_s=300., max_initial=4,
         max_followups=2, per_call_s=90., reasoning_effort=None, identity_profile=False, image_detail=None,
-        identity_profile_receipt=None, contact_reviews=False):
+        identity_profile_receipt=None, contact_reviews=False, resume_initial_receipts=None):
     started, out = time.monotonic(), Path(output_dir).resolve()
     if out.exists() and any(out.iterdir()):
         raise ValueError("OUTPUT_MUST_BE_NEW_OR_EMPTY")
     manifest = pilot.read_json(manifest_path)
-    if not 1 <= budget_s <= 600 or not 0 <= max_followups <= 4 or not 1 <= max_initial <= 12:
+    if not 1 <= budget_s <= 600 or not 0 <= max_followups <= 6 or not 1 <= max_initial <= 12:
         raise ValueError("INVALID_EXPERIMENT_BUDGET")
     if reasoning_effort not in {None, "low"}:
         raise ValueError("INVALID_REASONING_EFFORT")
@@ -90,6 +90,8 @@ def run(manifest_path, output_dir, *, provider="gemini", model="gemini-2.5-pro",
                 raw = pilot.parse_response(receipt["raw_response"])
                 result = pilot.resolve_response(raw, current_manifest, by_id[receipt["packet_id"]],
                     {k: receipt[k] for k in ("packet_id", "payload_sha256", "response_sha256", "origin")})
+                result["packet_id"] = receipt["packet_id"]
+                result["replaces_initial_packet_id"] = by_id[receipt["packet_id"]].get("replaces_initial_packet_id")
                 resolved_results.append(result)
             except (ValueError, KeyError, TypeError):
                 receipts[-1].update(status="INVALID_OBSERVATION_RESPONSE")
@@ -118,7 +120,30 @@ def run(manifest_path, output_dir, *, provider="gemini", model="gemini-2.5-pro",
             manifest = pilot.apply_identity_profile(manifest, json.loads(profile_receipt["raw_response"]))
             owner_manifest = manifest
             summary["identity_profile"] = manifest["identity_profile"]
-        execute(manifest["packets"], manifest)
+        if resume_initial_receipts:
+            saved = pilot.read_json(resume_initial_receipts)
+            specs = [{k: packet[k] for k in ("packet_id", "start_ms", "end_ms", "frame_ids", "reference_ids")} for packet in manifest["packets"]]
+            fingerprint = hashlib.sha256(json.dumps(specs, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+            if (saved["source_video_sha256"] != manifest["source_video_sha256"]
+                or saved["original_taps_sha256"] != manifest["original_taps_sha256"]
+                or saved["packet_fingerprint"] != fingerprint
+                or {r["packet_id"] for r in saved["receipts"]} != {p["packet_id"] for p in manifest["packets"]}):
+                raise ValueError("INITIAL_RECEIPT_INPUT_MISMATCH")
+            by_id = {p["packet_id"]: p for p in manifest["packets"]}
+            for r in saved["receipts"]:
+                if (r["origin"] != "LIVE_MODEL_REQUEST" or r["status"] != "COMPLETED"
+                    or r["requested_model"] != model
+                    or hashlib.sha256(r["raw_response"].encode()).hexdigest() != r["response_sha256"]):
+                    raise ValueError("INITIAL_RECEIPT_INPUT_MISMATCH")
+                pilot.write_json(out / "responses" / (r["packet_id"]+".json"), {**r, "reused_in_this_run": True})
+                observed = pilot.resolve_response(pilot.parse_response(r["raw_response"]), manifest, by_id[r["packet_id"]],
+                    {k: r[k] for k in ("packet_id", "payload_sha256", "response_sha256", "origin")})
+                observed["packet_id"] = r["packet_id"]
+                resolved_results.append(observed)
+            summary.update(reused_initial_run_id=saved["origin_run"], reused_initial_model_jobs=len(saved["receipts"]),
+                           previous_run_analysis_seconds=saved["previous_run_analysis_seconds"], completed_initial_requests_replayed=False)
+        else:
+            execute(manifest["packets"], manifest)
         merged = pilot.reconcile(resolved_results, sampling_gap_ms=manifest["input_coverage"]["max_sample_gap_ms"])
         summary.update(merged)  # preserve completed observations if later work fails
         access_failed = any(r.get("error") in {"MODEL_ACCESS_DENIED", "MODEL_KEY_NOT_CONFIGURED"} for r in receipts)
@@ -129,16 +154,21 @@ def run(manifest_path, output_dir, *, provider="gemini", model="gemini-2.5-pro",
             owner_manifest, followups = preparer(manifest, followups, out,
                 timeout_s=min(30., max(1., deadline - time.monotonic() - 5)))
             execute(followups, owner_manifest)
-        merged = pilot.reconcile(resolved_results, sampling_gap_ms=manifest["input_coverage"]["max_sample_gap_ms"])
+        replaced = {r["replaces_initial_packet_id"] for r in resolved_results
+                    if r.get("replaces_initial_packet_id") and r["events"]}
+        active = [r for r in resolved_results if r.get("packet_id") not in replaced]
+        merged = pilot.reconcile(active, sampling_gap_ms=manifest["input_coverage"]["max_sample_gap_ms"])
+        summary["superseded_initial_packet_ids"] = sorted(replaced)
         summary.update(merged)
-        complete = len([r for r in receipts if r.get("status") == "COMPLETED"]) == len(manifest["packets"]) + len(followups)
+        initial_count = 0 if resume_initial_receipts else len(manifest["packets"])
+        complete = len([r for r in receipts if r.get("status") == "COMPLETED"]) == initial_count + len(followups)
         summary["status"] = "MODEL_OBSERVATIONS_RETURNED" if complete else "PARTIAL_MODEL_RUN"
         if access_failed:
             summary["status"] = "MODEL_ACCESS_DENIED"
     except (ValueError, TimeoutError, OSError) as exc:
         # Exception text is intentionally not persisted: providers may include secrets.
         safe_codes = {"REQUEST_IMAGE_BUDGET_EXCEEDED", "PREPARED_IMAGE_CHANGED", "SOURCE_VIDEO_CHANGED",
-                      "DETAIL_PREPARATION_TIME_BUDGET_EXHAUSTED", "INVALID_EXECUTION_BUDGET", "IDENTITY_PROFILE_UNRESOLVED"}
+                      "DETAIL_PREPARATION_TIME_BUDGET_EXHAUSTED", "INVALID_EXECUTION_BUDGET", "IDENTITY_PROFILE_UNRESOLVED", "INITIAL_RECEIPT_INPUT_MISMATCH"}
         summary.update(status="EXPERIMENT_STOPPED", error_type=type(exc).__name__,
                        error_code=str(exc) if str(exc) in safe_codes else "EXPERIMENT_PROCESSING_FAILED")
     finally:
@@ -174,6 +204,7 @@ def main():
     model.add_argument("--image-detail", choices=["high"], default=None, help="Request model-side high detail independently of JPEG size")
     model.add_argument("--identity-profile-receipt", type=Path, help="Reuse a source-and-reference-hash-matched identity receipt")
     model.add_argument("--contact-reviews", action="store_true", help="Inspect unresolved target contacts with native source pixels/rate")
+    model.add_argument("--resume-initial-receipts", type=Path, help="Reuse verified initial model receipts on identical source/reference/frame inputs")
     evaluate = commands.add_parser("evaluate", help="Offline matching; never passes expected answers to a model")
     evaluate.add_argument("--result", type=Path, required=True)
     evaluate.add_argument("--cases", type=Path, required=True)
@@ -188,7 +219,8 @@ def main():
         result = run(args.prepared, args.output, provider=args.provider, model=args.model, budget_s=args.budget_s,
                      per_call_s=args.per_call_s, max_followups=args.max_followups, max_initial=args.max_initial,
                      reasoning_effort=args.reasoning_effort, identity_profile=args.identity_profile, image_detail=args.image_detail,
-                     identity_profile_receipt=args.identity_profile_receipt, contact_reviews=args.contact_reviews)
+                     identity_profile_receipt=args.identity_profile_receipt, contact_reviews=args.contact_reviews,
+                     resume_initial_receipts=args.resume_initial_receipts)
         print(json.dumps({k: result.get(k) for k in ("status", "analysis_seconds", "model_jobs_completed", "counts")}, indent=2))
         return 0 if result["status"] == "MODEL_OBSERVATIONS_RETURNED" else 3
     else:

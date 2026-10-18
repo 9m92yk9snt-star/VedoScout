@@ -92,6 +92,29 @@ def test_estimated_finishing_contact_does_not_answer_its_own_model_question():
     assert not any(q.get("explicit_model_question") for q in final["questions"])
 
 
+def test_contact_question_is_not_filtered_out_by_coarse_run_label():
+    manifest, packet, data = fixture()
+    a = data["plays"][0]["actions"][0]
+    a.update(kind="RUN", contact_frame=None, outcome="UNKNOWN", receiver=None, finisher=None)
+    data["plays"][0]["questions"] = [{"reason": "CONTACT", "action_id": "a1"}]
+    jobs = p.plan_contact_reviews(manifest, p.reconcile([p.resolve_response(data, manifest, packet, {})]))
+    assert len(jobs) == 1 and jobs[0]["question"]["reason"] == "CONTACT"
+
+
+def test_apparent_selected_control_loss_does_not_hide_later_chance():
+    manifest, packet, data = fixture()
+    a = data["plays"][0]["actions"][0]
+    a.update(kind="DRIBBLE", contact_frame=None, end_frame="s000001000", outcome="INCOMPLETE", receiver=None, finisher=None)
+    data["plays"][0]["actions"].append({"action_id": "finish", "kind": "SHOT", "actor": "finisher",
+        "start_frame": "s000001250", "contact_frame": None, "end_frame": "s000002000",
+        "actor_evidence_frames": ["s000001250", "s000001500"], "outcome": "UNKNOWN", "outcome_frame": "s000002000",
+        "same_active_ball": True, "continuous_play": True,
+        "outcome_evidence": [{"frame": "s000002000", "fact": "A chance develops near the goal."}]})
+    jobs = p.plan_contact_reviews(manifest, p.reconcile([p.resolve_response(data, manifest, packet, {})]))
+    assert len(jobs) == 1
+    assert jobs[0]["detail_start_ms"] < 1000 < 1250 < jobs[0]["detail_end_ms"]
+
+
 def resolved(data=None):
     manifest, packet, original = fixture()
     return p.resolve_response(data or original, manifest, packet, {"origin": "SYNTHETIC_TEST_ONLY"})
@@ -446,6 +469,29 @@ def test_actual_decoder_preparation_retains_taps_masks_and_source_clock(tmp_path
     assert ref["media_ms"] == 150 and ref["target_point"] == {"x": .3, "y": .4}
     assert ref["masked_view"] and ref["selection_hints"]["player_behind"]
     assert ref["selection_hints"]["exclude_points"] == [{"x": .45, "y": .5}]
+
+
+def test_initial_receipt_resume_never_repeats_paid_calls_and_rejects_changed_inputs(tmp_path, monkeypatch):
+    manifest = p.prepare(source_export(tmp_path), tmp_path / "prepared")
+    specs = [{k: packet[k] for k in ("packet_id", "start_ms", "end_ms", "frame_ids", "reference_ids")} for packet in manifest["packets"]]
+    raw = '{"plays":[]}'
+    cache = {"source_video_sha256": manifest["source_video_sha256"], "original_taps_sha256": manifest["original_taps_sha256"],
+        "packet_fingerprint": hashlib.sha256(json.dumps(specs, sort_keys=True, separators=(",", ":")).encode()).hexdigest(),
+        "origin_run": "SYNTHETIC_TEST_ONLY", "previous_run_analysis_seconds": 1,
+        "receipts": [{"packet_id": manifest["packets"][0]["packet_id"], "origin": "LIVE_MODEL_REQUEST", "status": "COMPLETED",
+            "requested_model": "gemini-2.5-pro", "raw_response": raw, "response_sha256": hashlib.sha256(raw.encode()).hexdigest(),
+            "payload_sha256": "SYNTHETIC_TEST_ONLY"}]}
+    path = tmp_path / "cache.json"; p.write_json(path, cache)
+    monkeypatch.setenv("GEMINI_API_KEY", "SYNTHETIC_TEST_ONLY")
+    def no_calls(*args, **kwargs):
+        raise AssertionError("A completed initial request must not be replayed")
+    monkeypatch.setattr(t, "run_jobs", no_calls)
+    result = run(tmp_path / "prepared" / "manifest.json", tmp_path / "resumed", max_followups=0, resume_initial_receipts=path)
+    assert result["status"] == "MODEL_OBSERVATIONS_RETURNED" and result["model_jobs_completed"] == 0
+    assert result["reused_initial_model_jobs"] == 1
+    cache["packet_fingerprint"] = "CHANGED"; p.write_json(path, cache)
+    rejected = run(tmp_path / "prepared" / "manifest.json", tmp_path / "rejected", max_followups=0, resume_initial_receipts=path)
+    assert rejected["error_code"] == "INITIAL_RECEIPT_INPUT_MISMATCH"
 
 
 def test_changed_source_checksum_stops_before_sampling(tmp_path):

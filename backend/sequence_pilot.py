@@ -609,35 +609,71 @@ def reconcile(results, *, sampling_gap_ms=125):
             "questions": questions, "conflicts": conflicts}
 
 
-def plan_contact_reviews(manifest, resolved, *, limit=4):
+def plan_contact_reviews(manifest, resolved, *, limit=6):
     """One focused review per source packet, only unresolved target releases."""
     events = {key: e for e in resolved["events"] for key in e["source_action_keys"]}
     candidates = []
     for q in resolved["questions"]:
         event = events.get(q.get("source_action_key"))
-        if event is None or event["kind"] not in {"PASS", "CROSS", "SHOT"}:
+        if event is None:
             continue
         if q.get("target_related") is False or (event["selected_player"] is False and not q.get("target_related")):
             continue
         focus = q.get("focus_ms")
         if not _number(focus):
-            focus = event.get("contact_ms") or event.get("outcome_ms")
+            focus = (event.get("outcome_ms") or event["end_ms"]) if q["reason"] == "OUTCOME" else (
+                event.get("contact_ms") or event["end_ms"])
         base = next((p for p in manifest["packets"] if p["packet_id"] == q.get("source_packet_id")), None)
         if not base or not _number(focus):
             continue
         lo, hi = base.get("core_start_ms", base["start_ms"]), base.get("core_end_ms", base["end_ms"])
         if not lo <= focus < hi:
             continue
-        priority = (not q.get("explicit_model_question"), {"CONTACT": 0, "RECEIVER": 1, "OUTCOME": 2, "IDENTITY": 3}.get(q["reason"], 4), lo)
-        candidates.append((priority, q, focus, base, lo, hi))
+        terminal = event["kind"] == "SHOT" or event["outcome"] in {"GOAL", "SAVED", "TEAMMATE_GOAL", "TEAMMATE_SHOT"}
+        priority = (not terminal, not q.get("explicit_model_question"), {"CONTACT": 0, "RECEIVER": 1, "OUTCOME": 2, "IDENTITY": 3}.get(q["reason"], 4), lo)
+        detail_end = min(hi-1, focus+750)
+        if _number(event.get("outcome_ms")) and focus < event["outcome_ms"] <= focus+2000:
+            detail_end = min(hi-1, max(detail_end, event["outcome_ms"]))
+        candidates.append((priority, q, focus, base, lo, hi, max(lo, focus-750), detail_end,
+                           [v["frame"] for v in event["outcome_evidence"]]))
+    # A coarse reader can call a hidden release a run/duel or an apparent loss.
+    # Preserve the whole play and inspect the transition into a later chance.
+    # Classification is not permission to see the underlying source contact.
+    rows = resolved["events"]
+    for terminal in rows:
+        if terminal["kind"] not in {"SHOT", "OTHER"} or not terminal.get("outcome_evidence"):
+            continue
+        controls = [e for e in rows if e["actor_scope"] == terminal["actor_scope"]
+            and e["selected_player"] is True and e["kind"] in {"CARRY", "DRIBBLE", "RECOVERY", "DUEL"}
+            and 0 <= terminal["start_ms"]-e["end_ms"] <= 5000]
+        if not controls:
+            continue
+        control = max(controls, key=lambda e: e["end_ms"])
+        base = next((p for p in manifest["packets"] if p["packet_id"] in control["source_packet_ids"]), None)
+        if not base:
+            continue
+        lo, hi = base.get("core_start_ms", base["start_ms"]), base.get("core_end_ms", base["end_ms"])
+        focus = round((control["end_ms"]+terminal["start_ms"])/2)
+        if not lo <= focus < hi:
+            continue
+        ds, de = max(lo, control["end_ms"]-400), min(hi-1, terminal["start_ms"]+400)
+        if de-ds > 3000:
+            ds, de = max(lo, focus-750), min(hi-1, focus+750)
+        q = {"reason": "CONTACT", "focus_ms": focus, "source_packet_id": base["packet_id"],
+            "source_action_key": control["source_action_keys"][0], "target_related": True,
+            "instruction": "Follow the selected player's last control into the later chance. Establish the actual release, "
+                           "any opponent control, recipient and finisher from the new source detail, regardless of coarse action labels."}
+        candidates.append(((False, True, 0, lo), q, focus, base, lo, hi, ds, de,
+                           [v["frame"] for v in terminal["outcome_evidence"]]))
     jobs, seen = [], set()
-    for _, q, focus, base, lo, hi in sorted(candidates, key=lambda x: x[0]):
+    for _, q, focus, base, lo, hi, ds, de, extra in sorted(candidates, key=lambda x: x[0]):
         if base["packet_id"] in seen or len(jobs) >= limit:
             continue
         seen.add(base["packet_id"])
         jobs.append({"packet_id": f"contact_review_{len(jobs)+1:03}", "phase": "FOLLOWUP", "round": 1,
             "start_ms": lo, "end_ms": hi-1, "reference_ids": base["reference_ids"][:],
-            "question": {**q, "focus_ms": focus}})
+            "question": {**q, "focus_ms": focus}, "replaces_initial_packet_id": base["packet_id"],
+            "detail_start_ms": ds, "detail_end_ms": de, "extra_detail_frame_ids": extra})
     return jobs
 
 
@@ -654,13 +690,25 @@ def prepare_contact_reviews(manifest, jobs, output_dir, *, timeout_s=30.):
         focus = j["question"]["focus_ms"]
         local = [r for r in manifest["references"] if j["start_ms"] <= r["media_ms"] <= j["end_ms"]]
         anchors = local or sorted(manifest["references"], key=lambda r: abs(r["media_ms"]-focus))[:2]
-        margin = 1 if local else 2
-        top = max(0, min(r["box"]["y"]-margin*r["box"]["h"] for r in anchors))
-        bottom = min(1, max(r["box"]["y"]+(1+margin)*r["box"]["h"] for r in anchors))
+        centres = sorted(r["box"]["y"]+r["box"]["h"]/2 for r in anchors)
+        heights = sorted(r["box"]["h"] for r in anchors)
+        centre = (centres[(len(centres)-1)//2]+centres[len(centres)//2])/2
+        half_height = max(.22, min(.24, 1.8*heights[len(heights)//2]))
+        top, bottom = max(0, centre-half_height), min(1, centre+half_height)
         j["source_crop_box"] = [0, int(top*height), width, int(bottom*height)]
-        j["detail_start_ms"], j["detail_end_ms"] = max(j["start_ms"], focus-750), min(j["end_ms"], focus+750)
+        j.setdefault("detail_start_ms", max(j["start_ms"], focus-750))
+        j.setdefault("detail_end_ms", min(j["end_ms"], focus+750))
         j["native_crop_count"] = 0
+        extra_ids = set(j.get("extra_detail_frame_ids", []))
+        j["extra_detail_frame_ms"] = [f["media_ms"] for f in manifest["frames"]
+            if f["frame_id"] in extra_ids and j["start_ms"] <= f["media_ms"] <= j["end_ms"]]
         j["reference_ids"] = list(dict.fromkeys(j["reference_ids"]+[r["reference_id"] for r in local]))
+        for f in enriched["frames"]:
+            if j["start_ms"] <= f["media_ms"] <= j["end_ms"]:
+                overview = cv2.imread(f["path"])
+                if overview is None:
+                    raise ValueError("PREPARED_IMAGE_UNREADABLE")
+                f.update(_save_image(Path(output_dir) / "review-overview" / (f["frame_id"]+".jpg"), overview, 768, 70))
     try:
         while jobs:
             if time.monotonic()-started > timeout_s:
@@ -669,13 +717,13 @@ def prepare_contact_reviews(manifest, jobs, output_dir, *, timeout_s=30.):
             if not ok:
                 break
             ms = round(cap.get(cv2.CAP_PROP_POS_MSEC))
-            if ms > max(j["detail_end_ms"] for j in jobs):
+            if ms > max(max([j["detail_end_ms"]]+j["extra_detail_frame_ms"]) for j in jobs):
                 break
             for j in jobs:
-                if j["detail_start_ms"] <= ms <= j["detail_end_ms"]:
+                if j["detail_start_ms"] <= ms <= j["detail_end_ms"] or ms in j["extra_detail_frame_ms"]:
                     box = j["source_crop_box"]
                     crop = _save_image(Path(output_dir) / j["packet_id"] / f"s{ms:09}.jpg",
-                        pixels[box[1]:box[3], :], 1280, 80)
+                        pixels[box[1]:box[3], :], 1280, 60)
                     crop["source_crop_box"] = box
                     if ms in by_ms:
                         by_ms[ms]["zoom_view"] = crop
@@ -688,6 +736,8 @@ def prepare_contact_reviews(manifest, jobs, output_dir, *, timeout_s=30.):
     for j in jobs:
         j["frame_ids"] = [f["frame_id"] for f in enriched["frames"] if j["start_ms"] <= f["media_ms"] <= j["end_ms"]]
     enriched["contact_review_preparation_seconds"] = round(time.monotonic()-started, 3)
+    enriched["contact_review_delivery"] = {"overview_max_edge": 768, "overview_jpeg_quality": 70,
+        "native_crop_max_edge": 1280, "native_crop_jpeg_quality": 60, "source_instants_removed": 0}
     write_json(Path(output_dir) / "contact-review-manifest.json", enriched)
     return enriched, jobs
 

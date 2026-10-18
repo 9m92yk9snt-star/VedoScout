@@ -161,3 +161,27 @@ or previously observed action results enter the full-source trial.
 
 The source video and original taps were published as test input with the
 owner's explicit permission. Credentials remain in GitHub Actions secrets.
+
+## Resume the completed full-source trial without repeating model work
+
+Run 39143973766 completed all ten initial GPT-6-sol requests. Preparation took
+19.565 seconds and the analysis phase 149.166 seconds, but the five-action goal
+was not achieved. The follow-up planner wrongly excluded uncertain contacts
+labelled RUN or DUEL, and missed selected-player control before a later chance.
+The planned goal review also exceeded the wire-size limit and was never sent.
+These are observed failures, not evidence that a green workflow proves accuracy.
+
+The next experiment reuses those ten exact raw initial responses, after checking
+source, original taps, packet fingerprint, response hashes and model identity.
+No initial or identity model call is repeated. Up to six reviews are derived
+from actual unresolved observations, including selected control before a chance.
+Each review reads the complete source play and replaces its coarse observation
+graph; original responses remain saved. An explicit model question still prevents
+the questioned action or dependent assist from being counted as documented.
+
+Every 8-fps overview instant is retained at 768-edge JPEG quality 70. Contact
+detail uses native source-rate crops at 1280 edge, JPEG quality 60, with bounds
+derived from original tap geometry; cited outcome instants receive native crops
+too. Source timestamps and crop hashes are recorded. This controls wire bytes
+without deleting contact instants. Model quality must still be verified against
+the real source. Cached-resume elapsed time is not fresh end-to-end analysis time.
