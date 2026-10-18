@@ -20,12 +20,13 @@ import sequence_pilot_transport as transport
 
 
 def run(manifest_path, output_dir, *, provider="gemini", model="gemini-2.5-pro", budget_s=300., max_initial=4,
-        max_followups=2, per_call_s=90., reasoning_effort=None, identity_profile=False, image_detail=None):
+        max_followups=2, per_call_s=90., reasoning_effort=None, identity_profile=False, image_detail=None,
+        identity_profile_receipt=None, contact_reviews=False):
     started, out = time.monotonic(), Path(output_dir).resolve()
     if out.exists() and any(out.iterdir()):
         raise ValueError("OUTPUT_MUST_BE_NEW_OR_EMPTY")
     manifest = pilot.read_json(manifest_path)
-    if not 1 <= budget_s <= 600 or not 0 <= max_followups <= 2 or not 1 <= max_initial <= 12:
+    if not 1 <= budget_s <= 600 or not 0 <= max_followups <= 4 or not 1 <= max_initial <= 12:
         raise ValueError("INVALID_EXPERIMENT_BUDGET")
     if reasoning_effort not in {None, "low"}:
         raise ValueError("INVALID_REASONING_EFFORT")
@@ -94,7 +95,18 @@ def run(manifest_path, output_dir, *, provider="gemini", model="gemini-2.5-pro",
                 receipts[-1].update(status="INVALID_OBSERVATION_RESPONSE")
 
     try:
-        if identity_profile:
+        if identity_profile_receipt:
+            saved = pilot.read_json(identity_profile_receipt)
+            r = saved["receipt"]
+            if (saved["source_video_sha256"] != manifest["source_video_sha256"]
+                or r["status"] != "COMPLETED" or r["origin"] != "LIVE_MODEL_REQUEST"
+                or hashlib.sha256(r["raw_response"].encode()).hexdigest() != r["response_sha256"]
+                or sorted(x["sha256"] for x in r["images"]) != sorted(x["sha256"] for x in manifest["references"])):
+                raise ValueError("IDENTITY_PROFILE_UNRESOLVED")
+            manifest = pilot.apply_identity_profile(manifest, json.loads(r["raw_response"]))
+            owner_manifest = manifest
+            summary.update(identity_profile=manifest["identity_profile"], reused_identity_profile_response_sha256=r["response_sha256"])
+        elif identity_profile:
             profile_receipt = transport.run_jobs([{"packet_id": "identity_profile",
                 "items": pilot.identity_items(manifest), "reasoning_effort": reasoning_effort, "image_detail": image_detail}],
                 provider, model, deadline=deadline, per_call_s=per_call_s)[0]
@@ -110,9 +122,11 @@ def run(manifest_path, output_dir, *, provider="gemini", model="gemini-2.5-pro",
         merged = pilot.reconcile(resolved_results, sampling_gap_ms=manifest["input_coverage"]["max_sample_gap_ms"])
         summary.update(merged)  # preserve completed observations if later work fails
         access_failed = any(r.get("error") in {"MODEL_ACCESS_DENIED", "MODEL_KEY_NOT_CONFIGURED"} for r in receipts)
-        followups = [] if access_failed else pilot.followup_plan(manifest, merged, limit=max_followups)
+        planner = pilot.plan_contact_reviews if contact_reviews else pilot.followup_plan
+        followups = [] if access_failed else planner(manifest, merged, limit=max_followups)
         if followups and time.monotonic() + 5 < deadline:
-            owner_manifest, followups = pilot.prepare_followups(manifest, followups, out,
+            preparer = pilot.prepare_contact_reviews if contact_reviews else pilot.prepare_followups
+            owner_manifest, followups = preparer(manifest, followups, out,
                 timeout_s=min(30., max(1., deadline - time.monotonic() - 5)))
             execute(followups, owner_manifest)
         merged = pilot.reconcile(resolved_results, sampling_gap_ms=manifest["input_coverage"]["max_sample_gap_ms"])
@@ -158,6 +172,8 @@ def main():
     model.add_argument("--reasoning-effort", choices=["low"], default=None)
     model.add_argument("--identity-profile", action="store_true", help="Infer one shared identity from original crops before reading plays")
     model.add_argument("--image-detail", choices=["high"], default=None, help="Request model-side high detail independently of JPEG size")
+    model.add_argument("--identity-profile-receipt", type=Path, help="Reuse a source-and-reference-hash-matched identity receipt")
+    model.add_argument("--contact-reviews", action="store_true", help="Inspect unresolved target contacts with native source pixels/rate")
     evaluate = commands.add_parser("evaluate", help="Offline matching; never passes expected answers to a model")
     evaluate.add_argument("--result", type=Path, required=True)
     evaluate.add_argument("--cases", type=Path, required=True)
@@ -171,7 +187,8 @@ def main():
     elif args.command == "run":
         result = run(args.prepared, args.output, provider=args.provider, model=args.model, budget_s=args.budget_s,
                      per_call_s=args.per_call_s, max_followups=args.max_followups, max_initial=args.max_initial,
-                     reasoning_effort=args.reasoning_effort, identity_profile=args.identity_profile, image_detail=args.image_detail)
+                     reasoning_effort=args.reasoning_effort, identity_profile=args.identity_profile, image_detail=args.image_detail,
+                     identity_profile_receipt=args.identity_profile_receipt, contact_reviews=args.contact_reviews)
         print(json.dumps({k: result.get(k) for k in ("status", "analysis_seconds", "model_jobs_completed", "counts")}, indent=2))
         return 0 if result["status"] == "MODEL_OBSERVATIONS_RETURNED" else 3
     else:

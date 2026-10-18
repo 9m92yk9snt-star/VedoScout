@@ -61,6 +61,37 @@ def test_unclear_identity_profile_does_not_silently_choose_a_player():
                                           "canonical_reference_ids": ["r1"]})
 
 
+def test_shared_profile_preserves_original_in_play_identity_examples():
+    manifest, _, _ = fixture()
+    manifest["references"] = [{"reference_id": "r1", "media_ms": 9000}, {"reference_id": "r2", "media_ms": 1500}]
+    profile = {"identity_clear": True, "appearance": "white player", "canonical_reference_ids": ["r1"]}
+    assert p.apply_identity_profile(manifest, profile)["packets"][0]["reference_ids"] == ["r1", "r2"]
+
+
+def test_estimated_finishing_contact_does_not_answer_its_own_model_question():
+    manifest, packet, data = fixture()
+    data["plays"][0]["actions"].append({"action_id": "finish", "kind": "SHOT", "actor": "finisher",
+        "start_frame": "s000001250", "contact_frame": "s000001500", "end_frame": "s000002000",
+        "actor_evidence_frames": ["s000001250", "s000001500"], "outcome": "GOAL", "outcome_frame": "s000002000",
+        "same_active_ball": True, "continuous_play": True,
+        "outcome_evidence": [{"frame": "s000002000", "fact": "The active ball enters the goal."}]})
+    data["plays"][0]["questions"] = [{"reason": "CONTACT", "action_id": "finish"}]
+    initial = p.resolve_response(data, manifest, packet, {"origin": "SYNTHETIC_TEST_ONLY"})
+    merged = p.reconcile([initial])
+    assert "ASSIST" not in merged["counts"]
+    q = next(q for q in merged["questions"] if q.get("explicit_model_question"))
+    assert q["focus_ms"] == 1500 and q["target_related"] is True
+    jobs = p.plan_contact_reviews(manifest, merged)
+    assert len(jobs) == 1 and jobs[0]["question"]["source_action_key"] == q["source_action_key"]
+    # Only a genuinely clarified later reading can resolve the question.
+    data["plays"][0]["questions"] = []
+    review = {**packet, "packet_id": "review", "phase": "FOLLOWUP", "question": q}
+    clarified = p.resolve_response(data, manifest, review, {"origin": "SYNTHETIC_TEST_ONLY"})
+    final = p.reconcile([initial, clarified])
+    assert final["counts"].get("ASSIST") == 1
+    assert not any(q.get("explicit_model_question") for q in final["questions"])
+
+
 def resolved(data=None):
     manifest, packet, original = fixture()
     return p.resolve_response(data or original, manifest, packet, {"origin": "SYNTHETIC_TEST_ONLY"})
@@ -461,6 +492,19 @@ def test_targeted_detail_adds_real_frames_without_rebuilding_identity(tmp_path):
     assert all(f["media_ms"] % 50 == 0 for f in enriched["frames"])
     assert enriched["references"] == manifest["references"]
     assert len(jobs) == 1 and jobs[0]["round"] == 1
+
+
+def test_contact_review_keeps_overview_and_uses_actual_native_source_clock(tmp_path):
+    root = source_export(tmp_path)
+    manifest = p.prepare(root, tmp_path / "prepared", fps=8)
+    job = {"packet_id": "review", "phase": "FOLLOWUP", "start_ms": 0, "end_ms": 750,
+           "reference_ids": ["r1"], "question": {"focus_ms": 350}}
+    enriched, jobs = p.prepare_contact_reviews(manifest, [job], tmp_path / "review")
+    assert {f["frame_id"] for f in manifest["frames"]} <= {f["frame_id"] for f in enriched["frames"]}
+    assert jobs[0]["native_crop_count"] == 16
+    assert all(f["media_ms"] % 50 == 0 for f in enriched["frames"])
+    assert any(f.get("zoom_view") for f in enriched["frames"])
+    assert any(f.get("source_crop_box") for f in enriched["frames"])
 
 
 def test_runner_preserves_initial_observations_if_targeted_preparation_fails(tmp_path, monkeypatch):

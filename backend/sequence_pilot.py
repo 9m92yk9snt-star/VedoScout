@@ -332,7 +332,10 @@ def apply_identity_profile(manifest, data):
     updated = deepcopy(manifest)
     updated["identity_profile"] = data
     for packet in updated["packets"]:
-        packet["reference_ids"] = chosen[:]
+        lo, hi = packet.get("core_start_ms", packet["start_ms"]), packet.get("core_end_ms", packet["end_ms"])
+        local = [r["reference_id"] for r in updated["references"]
+                 if _number(r.get("media_ms")) and lo <= r["media_ms"] < hi]
+        packet["reference_ids"] = list(dict.fromkeys(chosen + local))
     return updated
 
 
@@ -409,11 +412,12 @@ def resolve_response(data, manifest, packet, receipt):
         return frames.get(key) if isinstance(key, str) else None
     def cited(values):
         return list(dict.fromkeys(v for v in values if isinstance(v, str) and v in frames)) if isinstance(values, list) else []
-    def question(play, reason, action_id=None, focus_ms=None):
+    def question(play, reason, action_id=None, focus_ms=None, explicit=False, target_related=None):
         questions.append({"reason": reason, "action_id": action_id, "start_ms": ms(play.get("start_frame")),
                           "end_ms": ms(play.get("end_frame")), "focus_ms": focus_ms,
                           "source_action_key": f"{packet['packet_id']}:{play_index}:{action_id}" if action_id else None,
-                          "source_packet_id": packet["packet_id"]})
+                          "source_packet_id": packet["packet_id"], "explicit_model_question": explicit,
+                          "target_related": target_related})
     for play_index, play in enumerate(data["plays"][:100]):
         if not isinstance(play, dict) or ms(play.get("start_frame")) is None or ms(play.get("end_frame")) is None:
             invalid.append("PLAY_SOURCE_BOUNDS_MISSING"); continue
@@ -441,6 +445,11 @@ def resolve_response(data, manifest, packet, receipt):
             identity_conflicts.update(selected_ids)
         for pid in identity_conflicts:
             people[pid]["selected"] = None
+        model_questions = [q for q in play.get("questions") or [] if isinstance(q, dict)
+                           and q.get("reason") in {"IDENTITY", "CONTACT", "RECEIVER", "OUTCOME"}]
+        unresolved_ids = {q.get("action_id") for q in model_questions}
+        uncertain_finishers = {a.get("actor") for a in play.get("actions") or [] if isinstance(a, dict)
+                              and a.get("action_id") in unresolved_ids}
         if identity_conflicts:
             question(play, "IDENTITY_CONFLICT")
         for action_index, action in enumerate(play.get("actions") or []):
@@ -506,10 +515,23 @@ def resolve_response(data, manifest, packet, receipt):
                 "proof_eligible": bool(actor["selected"] is True and
                     ((kind not in {"SHOT", "PASS", "CROSS"}) or (contact is not None and reason in
                          {"VISIBLE_SHOT_OUTCOME", "VISIBLE_DIRECT_ASSIST", "VISIBLE_ACTION", "VISIBLE_OPPONENT_RECEIPT"})))}
+            uncertain = action_id in unresolved_ids or (event_type == "ASSIST" and action.get("finisher") in uncertain_finishers)
+            event["model_requested_clarification"] = uncertain
+            if uncertain:
+                event["proof_eligible"] = False
+            parent_key = (packet.get("question") or {}).get("source_action_key")
+            event["answers_source_action_keys"] = ([parent_key] if parent_key and packet.get("phase") == "FOLLOWUP"
+                and event["proof_eligible"] and kind in {"PASS", "CROSS", "SHOT"} else [])
             events.append(event)
-        for q in play.get("questions") or []:
-            if isinstance(q, dict) and q.get("reason") in {"IDENTITY", "CONTACT", "RECEIVER", "OUTCOME"}:
-                question(play, q["reason"], q.get("action_id"))
+        for q in model_questions:
+            a = next((a for a in play.get("actions") or [] if isinstance(a, dict) and a.get("action_id") == q.get("action_id")), {})
+            actor = people.get(a.get("actor"), {})
+            linked = any(isinstance(other, dict) and other.get("finisher") == a.get("actor")
+                and other.get("outcome") == "TEAMMATE_GOAL" and people.get(other.get("actor"), {}).get("selected") is not False
+                for other in play.get("actions") or [])
+            focus = ms(a.get("outcome_frame")) if q["reason"] == "OUTCOME" else ms(a.get("contact_frame"))
+            question(play, q["reason"], q.get("action_id"), focus, explicit=True,
+                     target_related=actor.get("selected") is not False or linked)
     return {"events": events, "questions": questions, "invalid_rows": invalid}
 
 
@@ -568,6 +590,8 @@ def reconcile(results, *, sampling_gap_ms=125):
     # A wider overlapping packet may already provide exactly the missing link.
     # Do not ask the model to approve that completed observation again.
     def answered(q):
+        if q.get("explicit_model_question"):
+            return any(q.get("source_action_key") in e.get("answers_source_action_keys", []) and e["proof_eligible"] for e in events)
         for e in events:
             if not q.get("source_action_key") or q["source_action_key"] not in e["source_action_keys"]:
                 continue
@@ -583,6 +607,89 @@ def reconcile(results, *, sampling_gap_ms=125):
     questions = [q for q in questions if not answered(q)]
     return {"events": events, "target_events": target, "counts": dict(Counter(e["event_type"] for e in target)),
             "questions": questions, "conflicts": conflicts}
+
+
+def plan_contact_reviews(manifest, resolved, *, limit=4):
+    """One focused review per source packet, only unresolved target releases."""
+    events = {key: e for e in resolved["events"] for key in e["source_action_keys"]}
+    candidates = []
+    for q in resolved["questions"]:
+        event = events.get(q.get("source_action_key"))
+        if event is None or event["kind"] not in {"PASS", "CROSS", "SHOT"}:
+            continue
+        if q.get("target_related") is False or (event["selected_player"] is False and not q.get("target_related")):
+            continue
+        focus = q.get("focus_ms")
+        if not _number(focus):
+            focus = event.get("contact_ms") or event.get("outcome_ms")
+        base = next((p for p in manifest["packets"] if p["packet_id"] == q.get("source_packet_id")), None)
+        if not base or not _number(focus):
+            continue
+        lo, hi = base.get("core_start_ms", base["start_ms"]), base.get("core_end_ms", base["end_ms"])
+        if not lo <= focus < hi:
+            continue
+        priority = (not q.get("explicit_model_question"), {"CONTACT": 0, "RECEIVER": 1, "OUTCOME": 2, "IDENTITY": 3}.get(q["reason"], 4), lo)
+        candidates.append((priority, q, focus, base, lo, hi))
+    jobs, seen = [], set()
+    for _, q, focus, base, lo, hi in sorted(candidates, key=lambda x: x[0]):
+        if base["packet_id"] in seen or len(jobs) >= limit:
+            continue
+        seen.add(base["packet_id"])
+        jobs.append({"packet_id": f"contact_review_{len(jobs)+1:03}", "phase": "FOLLOWUP", "round": 1,
+            "start_ms": lo, "end_ms": hi-1, "reference_ids": base["reference_ids"][:],
+            "question": {**q, "focus_ms": focus}})
+    return jobs
+
+
+def prepare_contact_reviews(manifest, jobs, output_dir, *, timeout_s=30.):
+    """One shared decode for native contact detail; retain all overview instants."""
+    import cv2
+    if digest(manifest["source_video"]) != manifest["source_video_sha256"]:
+        raise ValueError("SOURCE_VIDEO_CHANGED")
+    started, enriched = time.monotonic(), deepcopy(manifest)
+    by_ms = {f["media_ms"]: f for f in enriched["frames"]}
+    cap = cv2.VideoCapture(manifest["source_video"])
+    width, height = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    for j in jobs:
+        focus = j["question"]["focus_ms"]
+        local = [r for r in manifest["references"] if j["start_ms"] <= r["media_ms"] <= j["end_ms"]]
+        anchors = local or sorted(manifest["references"], key=lambda r: abs(r["media_ms"]-focus))[:2]
+        margin = 1 if local else 2
+        top = max(0, min(r["box"]["y"]-margin*r["box"]["h"] for r in anchors))
+        bottom = min(1, max(r["box"]["y"]+(1+margin)*r["box"]["h"] for r in anchors))
+        j["source_crop_box"] = [0, int(top*height), width, int(bottom*height)]
+        j["detail_start_ms"], j["detail_end_ms"] = max(j["start_ms"], focus-750), min(j["end_ms"], focus+750)
+        j["native_crop_count"] = 0
+        j["reference_ids"] = list(dict.fromkeys(j["reference_ids"]+[r["reference_id"] for r in local]))
+    try:
+        while jobs:
+            if time.monotonic()-started > timeout_s:
+                raise TimeoutError("DETAIL_PREPARATION_TIME_BUDGET_EXHAUSTED")
+            ok, pixels = cap.read()
+            if not ok:
+                break
+            ms = round(cap.get(cv2.CAP_PROP_POS_MSEC))
+            if ms > max(j["detail_end_ms"] for j in jobs):
+                break
+            for j in jobs:
+                if j["detail_start_ms"] <= ms <= j["detail_end_ms"]:
+                    box = j["source_crop_box"]
+                    crop = _save_image(Path(output_dir) / j["packet_id"] / f"s{ms:09}.jpg",
+                        pixels[box[1]:box[3], :], 1280, 80)
+                    crop["source_crop_box"] = box
+                    if ms in by_ms:
+                        by_ms[ms]["zoom_view"] = crop
+                    else:
+                        by_ms[ms] = {"frame_id": f"s{ms:09}", "media_ms": ms, **crop}
+                    j["native_crop_count"] += 1
+    finally:
+        cap.release()
+    enriched["frames"] = sorted(by_ms.values(), key=lambda f: f["media_ms"])
+    for j in jobs:
+        j["frame_ids"] = [f["frame_id"] for f in enriched["frames"] if j["start_ms"] <= f["media_ms"] <= j["end_ms"]]
+    enriched["contact_review_preparation_seconds"] = round(time.monotonic()-started, 3)
+    write_json(Path(output_dir) / "contact-review-manifest.json", enriched)
+    return enriched, jobs
 
 
 def followup_plan(manifest, resolved, *, limit=2, max_span_ms=30000):

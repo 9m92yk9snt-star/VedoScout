@@ -17,7 +17,7 @@ jobs:
       github.event.pull_request.number == 39 &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.event.pull_request.head.ref == 'codex/sequence-pilot-foundation' &&
-      github.event.before == 'a387872d65a160edcc4213d1a55837b7eeb85540' &&
+      github.event.before == 'd5f53575cf0e019c992e4a1247c1242e16087c9f' &&
       github.run_attempt == 1
     runs-on: ubuntu-latest
     timeout-minutes: 9
@@ -77,7 +77,7 @@ jobs:
       - name: Read complete plays with the actual model
         env:
           EMERGENT_LLM_KEY: ${{ secrets.EMERGENT_LLM_KEY }}
-        run: python backend/scripts/probe_sequence_detail.py --prepared "$RUNNER_TEMP/sequence-pilot-prepared/manifest.json" --output "$RUNNER_TEMP/sequence-pilot-result" --model gpt-6-sol --resume-action docs/examples/gpt6-missing-contact-receipt.json --resume-profile docs/examples/gpt6-focused-profile-receipt.json --native-contact-zoom
+        run: python backend/scripts/run_sequence_pilot.py run --prepared "$RUNNER_TEMP/sequence-pilot-prepared/manifest.json" --output "$RUNNER_TEMP/sequence-pilot-result" --provider emergent --model gpt-6-sol --budget-s 300 --per-call-s 90 --max-initial 12 --max-followups 4 --reasoning-effort low --image-detail high --identity-profile-receipt docs/examples/gpt6-focused-profile-receipt.json --contact-reviews
       - name: Evaluate returned observations separately and print actual receipts
         if: always()
         run: |

@@ -138,5 +138,26 @@ with one player-height margin. No detector coordinates or expected event times
 are used. This changes actual visible detail rather than asking for another vote
 on unchanged images. Each crop retains actual source PTS, bounds and checksum.
 
+Native-contact run 39143372317 completed in 32.797 s (25.155 s model call).
+Its actual response separates #15's cross at 56.448 s, #10's finishing contact
+at 57.164 s and the goal at 57.264 s, with #13 uninvolved in the final contact.
+No explicit model question remains. Independent source-image inspection agrees
+with this sequence. This documents one assist, not the complete five-action goal.
+The 145-image request (including 91 native source-rate crops) was 14.433 MB.
+
+## Full-source trial of the demonstrated input approach
+
+Reuse the source/reference-hash-matched identity-only receipt, not action answers.
+Read all ten source-derived packets with GPT-6-sol, 1280 edge, high detail and 8 fps.
+Preserve original in-play selection references beside canonical examples.
+Respect explicit unresolved model questions even when estimated contact fields
+are filled; uncertainty about the finisher also keeps a proposed assist unverified.
+One targeted native-contact review can answer such a question with new evidence.
+Choose only unresolved target-related releases, one review per source packet,
+at most four within the same 300-second overall budget. A single shared decode
+prepares all native contact crops; retain every overview source instant.
+These limits constrain work, not desired event counts. No reference answers
+or previously observed action results enter the full-source trial.
+
 The source video and original taps were published as test input with the
 owner's explicit permission. Credentials remain in GitHub Actions secrets.
