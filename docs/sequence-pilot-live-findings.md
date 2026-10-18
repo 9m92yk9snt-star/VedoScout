@@ -279,3 +279,20 @@ rejects sampling above 24 locally, and native detail encoding/sampling uses 24
 fps. The synchronized views, source interval, prompt, model and references
 remain the same. No claim about perception exists for this rejected request.
 109 isolated GitHub code tests passed at the preceding commit.
+
+
+Run 39148754244 completed the 24-fps synchronized video call in 24.973 seconds;
+probe time was 31.459 seconds, plus 18.945 seconds full-source preparation.
+The selected play was 53.015–59.014 seconds. The returned model swapped the
+selected passer with the final recipient, described an uncertain goalkeeper
+interaction and returned UNKNOWN outcome. No assist was established. The raw
+response and input hashes are retained in the run artifact. A green job is
+execution success, not football accuracy.
+
+Next single-call comparison keeps both encoded views, model, profile and source
+interval fixed. Reference labels now include existing source timestamps and
+normalized original human selection boxes/points. Local references also carry
+clip-relative times so the model can ground identity in the actual play rather
+than matching jersey numbers across unrelated pictures. These are original
+selection metadata, not action labels or evaluation answers. Ambiguous crops
+must remain uncertain. This input change still needs real model verification.

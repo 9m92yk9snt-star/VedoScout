@@ -103,7 +103,19 @@ def run(manifest_path, output, profile_path):
         "Identity-only profile: "+json.dumps(manifest["identity_profile"])}]
     for ref_id in ids:
         r = refs[ref_id]
-        items.extend([{"type": "text", "text": "Identity reference "+ref_id+" (not action evidence)"},
+        inside = packet["core_start_ms"] <= r["media_ms"] < packet["core_end_ms"]
+        location = {"reference_id": ref_id, "source_ms": r["media_ms"],
+            "in_this_play": inside, "original_full_frame_box_xywh": r["box"],
+            "original_user_point": r.get("target_point")}
+        if inside:
+            location["clip_s"] = round((r["media_ms"]-packet["core_start_ms"])/1000, 3)
+        items.extend([{"type": "text", "text": "Identity reference, not action evidence: "
+            +json.dumps(location)+". Box and user point use normalized full overview coordinates, "
+            "not the cropped detail video's coordinates. For an in-play reference, match the "
+            "pictured person at that clip time before following them through the play. A crop "
+            "can contain nearby players; do not transfer identity to the eventual recipient "
+            "merely because their number is easier to read. Preserve uncertainty if the "
+            "reference is ambiguous."},
                       {"type": "image", "path": r["path"], "sha256": r["sha256"]}])
     for view in views:
         items.extend([{"type": "text", "text": view["name"]+"; same clip-relative time zero"},
