@@ -260,6 +260,25 @@ def image_item(tmp_path):
 
 
 @pytest.mark.parametrize("provider", ["gemini", "emergent"])
+def test_native_video_keeps_exact_bytes_and_explicit_fps(tmp_path, provider):
+    video = tmp_path / "source.mp4"; video.write_bytes(b"synthetic-video")
+    item = {"type": "video", "path": str(video), "sha256": p.digest(video), "fps": 8}
+    _, body, audit = t.build_request(provider, "gemini-3.1-pro-preview", [item], image_detail="high")
+    body = json.loads(body)
+    assert audit["explicit_image_count"] == 0
+    assert audit["videos"] == [{"sha256": p.digest(video), "bytes": 15, "requested_fps": 8}]
+    if provider == "gemini":
+        part = body["contents"][0]["parts"][0]
+        assert part["inlineData"]["mimeType"] == "video/mp4"
+        assert part["videoMetadata"]["fps"] == 8
+    else:
+        part = body["messages"][0]["content"][0]
+        assert part["type"] == "file"
+        assert part["file"]["file_data"].startswith("data:video/mp4;base64,")
+        assert part["file"]["video_metadata"] == {"fps": 8}
+
+
+@pytest.mark.parametrize("provider", ["gemini", "emergent"])
 def test_gemini3_uses_its_supported_reasoning_and_temperature_defaults(provider):
     _, body, _ = t.build_request(provider, "gemini-3.1-pro-preview", [{"type": "text", "text": "observe"}], reasoning_effort="low")
     body = json.loads(body)

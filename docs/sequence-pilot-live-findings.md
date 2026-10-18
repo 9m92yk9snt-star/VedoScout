@@ -77,5 +77,19 @@ packet. Its temperature is left at the provider default, as Google recommends
 for Gemini 3 (https://ai.google.dev/gemini-api/docs/gemini-3).
 The profile request remains Gemini 2.5 for a consistent identity-only stage.
 
+Gemini 3.1 focused run 39141394306 completed in 37.696 s. The default-detail
+response attributed an assist at 56.764 s to #15, but the high-detail response
+misidentified #13 as the selected player. Both used 67,068 image tokens. This
+isolated match is not reliable five-action validation.
+
+Next: normal-duration native video, using the available Gemini 3.1 model for
+both identity and action reading. A 720x1280, 8 fps H.264 copy retains the full
+source timeline without held frames; audio is removed. Compare requested native
+sampling at 1 versus 8 fps on the SAME encoded bytes. At most three model calls,
+240 seconds including encoding, 120 seconds per action call, two workers.
+Raw JSON observations are retained separately: approximate native video times
+must not be relabelled as exact-frame proof or silently passed through the
+still-image citation resolver. No reference event answers enter either request.
+
 The source video and original taps were published as test input with the
 owner's explicit permission. Credentials remain in GitHub Actions secrets.

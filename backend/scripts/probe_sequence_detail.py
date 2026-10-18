@@ -4,6 +4,7 @@ import json
 import os
 from pathlib import Path
 import re
+import subprocess
 import sys
 import time
 import urllib.error
@@ -83,10 +84,79 @@ def run(manifest_path, out, model="gemini-2.5-pro"):
     pilot.write_json(out / "result.json", result)
 
 
+def run_native(manifest_path, out, model):
+    """Compare normal-duration video sampling, retaining raw observations only."""
+    started, out = time.monotonic(), Path(out)
+    manifest = pilot.read_json(manifest_path)
+    if pilot.digest(manifest["source_video"]) != manifest["source_video_sha256"]:
+        raise ValueError("SOURCE_VIDEO_CHANGED")
+    out.mkdir(parents=True, exist_ok=False)
+    video = out / "normal_source_8fps.mp4"
+    subprocess.run(["ffmpeg", "-nostdin", "-v", "error", "-i", manifest["source_video"],
+        "-map", "0:v:0", "-vf", "fps=8,scale=720:1280", "-an", "-c:v", "libx264",
+        "-preset", "fast", "-crf", "29", "-movflags", "+faststart", str(video)],
+        check=True, timeout=60, capture_output=True)
+    probe = json.loads(subprocess.run(["ffprobe", "-v", "error", "-show_entries",
+        "format=duration,size:stream=width,height,r_frame_rate,nb_frames", "-of", "json", str(video)],
+        check=True, timeout=10, capture_output=True).stdout)
+    deadline = started + 240
+    result = {"status": "NATIVE_VIDEO_SAMPLING_PROBE", "production_pipeline_changed": False,
+        "expected_answers_used_as_input": False, "independent_visual_correctness_verified": False,
+        "target_events": [], "source_video_sha256": manifest["source_video_sha256"],
+        "prior_preparation_seconds": manifest["preparation_seconds"], "encoded_video": probe,
+        "encoded_video_sha256": pilot.digest(video), "requested_model": model,
+        "encoding": {"width": 720, "height": 1280, "fps": 8, "codec": "libx264", "crf": 29, "audio": False},
+        "native_observations": {}, "timestamp_policy": "MODEL_VIDEO_TIMES_APPROXIMATE; NOT_EXACT_FRAME_PROOF"}
+    pilot.write_json(out / "result.json", result)
+    receipt = transport.run_jobs([{"packet_id": "identity_profile", "items": pilot.identity_items(manifest),
+        "reasoning_effort": "low"}], "emergent", model, deadline=deadline, per_call_s=60)[0]
+    pilot.write_json(out / "responses" / "identity_profile.json", receipt)
+    if receipt["status"] != "COMPLETED":
+        return
+    manifest = pilot.apply_identity_profile(manifest, json.loads(receipt["raw_response"]))
+    result["identity_profile"] = manifest["identity_profile"]
+    refs = {r["reference_id"]: r for r in manifest["references"]}
+    items = [{"type": "text", "text": "Read this normal-speed football video from beginning to end. "
+        "Video time zero is original source time zero. Reference pictures are identity examples only, not plays. "
+        "Observe the active ball and keep passer, recipient and finisher as different physical people. "
+        "A pass directly to the teammate who scores is an assist for the passer; never give the passer the teammate's goal. "
+        "Track the same person across the camera pan. Do not guess hidden numbers. "
+        "A stationary spare ball inside a goal is not the active shot ball. Follow the active ball after keeper contact; "
+        "a dive alone is not a save, and a stationary spare ball is not goal evidence. "
+        "Ignore music and audio. Include selected-player attempts, saved shots, goals, passes leading to teammates' "
+        "finishes and other clear ball actions. Identify actual release, reception, finish and outcome, not preparation touches. "
+        "No expected event counts, times or outcomes are given. When unseen, say uncertain. "
+        'Return JSON {"events":[{"type":"SHOT|GOAL|ASSIST|PASS|OTHER",'
+        '"selected_actor":true,"actor_description":"visible identity",'
+        '"start_s":0,"contact_s":0,"receiver_description":null,"receive_s":null,'
+        '"finisher_description":null,"shot_s":null,"outcome_s":0,'
+        '"outcome":"SAVED|GOAL|TEAMMATE_GOAL|COMPLETED|UNKNOWN|OTHER",'
+        '"evidence":"concrete visible before/after ball and identity evidence",'
+        '"uncertainty":"unseen connection or empty"}]} . '
+        "Shared identity profile: " + json.dumps(manifest["identity_profile"])}]
+    for ref_id in manifest["identity_profile"]["canonical_reference_ids"]:
+        r = refs[ref_id]
+        items.extend([{"type": "text", "text": "Identity reference " + ref_id},
+                      {"type": "image", "path": r["path"], "sha256": r["sha256"]}])
+    jobs = []
+    for fps in (1, 8):
+        media = items + [{"type": "text", "text": "Original action video follows; it is not slowed or held."},
+            {"type": "video", "path": str(video), "sha256": pilot.digest(video), "fps": fps}]
+        transport.build_request("emergent", model, media, reasoning_effort="low", image_detail="high")
+        jobs.append({"packet_id": f"native_{fps}fps", "items": media, "reasoning_effort": "low", "image_detail": "high"})
+    for receipt in transport.run_jobs(jobs, "emergent", model, deadline=deadline, per_call_s=120):
+        pilot.write_json(out / "responses" / (receipt["packet_id"] + ".json"), receipt)
+        if receipt["status"] == "COMPLETED":
+            result["native_observations"][receipt["packet_id"]] = json.loads(receipt["raw_response"])
+    result["analysis_seconds"] = round(time.monotonic() - started, 3)
+    pilot.write_json(out / "result.json", result)
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--prepared", required=True)
     parser.add_argument("--output", required=True)
     parser.add_argument("--model", default="gemini-2.5-pro")
+    parser.add_argument("--native-video", action="store_true")
     args = parser.parse_args()
-    run(args.prepared, args.output, args.model)
+    (run_native if args.native_video else run)(args.prepared, args.output, args.model)

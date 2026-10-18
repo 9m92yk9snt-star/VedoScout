@@ -29,7 +29,7 @@ def build_request(provider, model, items, *, reasoning_effort=None, image_detail
     gemini3 = model.removeprefix("gemini/").startswith("gemini-3")
     if image_detail not in {None, "high"}:
         raise ValueError("INVALID_IMAGE_DETAIL")
-    parts, content, image_audit = [], [], []
+    parts, content, image_audit, video_audit = [], [], [], []
     for item in items:
         if item["type"] == "text":
             parts.append({"text": item["text"]})
@@ -40,6 +40,18 @@ def build_request(provider, model, items, *, reasoning_effort=None, image_detail
             if sha != item["sha256"]:
                 raise ValueError("PREPARED_IMAGE_CHANGED")
             encoded = base64.b64encode(pixels).decode()
+            if item["type"] == "video":
+                fps = item.get("fps")
+                if isinstance(fps, bool) or not isinstance(fps, (int, float)) or not 1 <= fps <= 30:
+                    raise ValueError("INVALID_VIDEO_FPS")
+                parts.append({"inlineData": {"mimeType": "video/mp4", "data": encoded}, "videoMetadata": {"fps": fps}})
+                file = {"file_data": "data:video/mp4;base64," + encoded, "format": "video/mp4",
+                        "video_metadata": {"fps": fps}}
+                if image_detail:
+                    file["detail"] = image_detail
+                content.append({"type": "file", "file": file})
+                video_audit.append({"sha256": sha, "bytes": len(pixels), "requested_fps": fps})
+                continue
             parts.append({"inlineData": {"mimeType": "image/jpeg", "data": encoded}})
             image_url = {"url": "data:image/jpeg;base64," + encoded}
             if image_detail:
@@ -73,7 +85,8 @@ def build_request(provider, model, items, *, reasoning_effort=None, image_detail
         raise ValueError("REQUEST_IMAGE_BUDGET_EXCEEDED")
     return url, payload, {"payload_sha256": hashlib.sha256(payload).hexdigest(), "payload_bytes": len(payload),
                           "explicit_image_count": len(image_audit), "images": image_audit,
-                          "frame_sampling_in_provider_metadata": False, "requested_image_detail": image_detail}
+                          "frame_sampling_in_provider_metadata": bool(video_audit), "videos": video_audit,
+                          "requested_image_detail": image_detail}
 
 
 def extract_reply(provider, body):
