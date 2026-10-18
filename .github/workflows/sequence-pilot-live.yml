@@ -17,7 +17,7 @@ jobs:
       github.event.pull_request.number == 39 &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.event.pull_request.head.ref == 'codex/sequence-pilot-foundation' &&
-      github.event.before == 'fc5f53546d8d44fa17107f48b419acdf04ad67d1' &&
+      github.event.before == '97c5e58daa51ea44b0bd7f2e090bd356ff99c425' &&
       github.run_attempt == 1
     runs-on: ubuntu-latest
     timeout-minutes: 9
@@ -69,11 +69,11 @@ jobs:
                             'historical_model_results_loaded':False}))
           PY
       - name: Prepare actual source images and original selections once
-        run: python backend/scripts/run_sequence_pilot.py prepare --evidence-dir "$RUNNER_TEMP/sequence-pilot-input" --output "$RUNNER_TEMP/sequence-pilot-prepared" --scene-packets --max-edge 1280
+        run: python backend/scripts/run_sequence_pilot.py prepare --evidence-dir "$RUNNER_TEMP/sequence-pilot-input" --output "$RUNNER_TEMP/sequence-pilot-prepared" --scene-packets
       - name: Read complete plays with the actual model
         env:
           EMERGENT_LLM_KEY: ${{ secrets.EMERGENT_LLM_KEY }}
-        run: python backend/scripts/run_sequence_pilot.py run --prepared "$RUNNER_TEMP/sequence-pilot-prepared/manifest.json" --output "$RUNNER_TEMP/sequence-pilot-result" --provider emergent --model gemini-2.5-pro --budget-s 300 --per-call-s 60 --max-initial 12 --max-followups 2 --reasoning-effort low
+        run: python backend/scripts/run_sequence_pilot.py run --prepared "$RUNNER_TEMP/sequence-pilot-prepared/manifest.json" --output "$RUNNER_TEMP/sequence-pilot-result" --provider emergent --model gemini-2.5-pro --budget-s 300 --per-call-s 60 --max-initial 12 --max-followups 2 --reasoning-effort low --identity-profile
       - name: Evaluate returned observations separately and print actual receipts
         if: always()
         run: |

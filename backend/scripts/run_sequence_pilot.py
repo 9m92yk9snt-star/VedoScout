@@ -20,7 +20,7 @@ import sequence_pilot_transport as transport
 
 
 def run(manifest_path, output_dir, *, provider="gemini", model="gemini-2.5-pro", budget_s=300., max_initial=4,
-        max_followups=2, per_call_s=90., reasoning_effort=None):
+        max_followups=2, per_call_s=90., reasoning_effort=None, identity_profile=False):
     started, out = time.monotonic(), Path(output_dir).resolve()
     if out.exists() and any(out.iterdir()):
         raise ValueError("OUTPUT_MUST_BE_NEW_OR_EMPTY")
@@ -59,8 +59,17 @@ def run(manifest_path, output_dir, *, provider="gemini", model="gemini-2.5-pro",
         for packet in packets:
             items = pilot.packet_items(current_manifest, packet)
             # Validate the complete wire request before starting any paid job.
-            _url, _payload, request_audit = transport.build_request(provider, model, items,
-                reasoning_effort=reasoning_effort)
+            try:
+                _url, _payload, request_audit = transport.build_request(provider, model, items,
+                    reasoning_effort=reasoning_effort)
+            except ValueError as exc:
+                if str(exc) != "REQUEST_IMAGE_BUDGET_EXCEEDED":
+                    raise
+                skipped = {"packet_id": packet["packet_id"], "status": "NOT_SENT",
+                           "error": "REQUEST_IMAGE_BUDGET_EXCEEDED", "origin": "LOCAL_PREFLIGHT"}
+                receipts.append(skipped)
+                pilot.write_json(out / "responses" / (packet["packet_id"] + ".json"), skipped)
+                continue
             pilot.write_json(out / "requests" / (packet["packet_id"] + ".json"),
                 {**packet, "image_delivery": request_audit,
                  "prompt_sha256": hashlib.sha256("\n".join(x["text"] for x in items if x["type"] == "text").encode()).hexdigest()})
@@ -84,6 +93,18 @@ def run(manifest_path, output_dir, *, provider="gemini", model="gemini-2.5-pro",
                 receipts[-1].update(status="INVALID_OBSERVATION_RESPONSE")
 
     try:
+        if identity_profile:
+            profile_receipt = transport.run_jobs([{"packet_id": "identity_profile",
+                "items": pilot.identity_items(manifest), "reasoning_effort": reasoning_effort}],
+                provider, model, deadline=deadline, per_call_s=per_call_s)[0]
+            pilot.write_json(out / "responses" / "identity_profile.json", profile_receipt)
+            summary["identity_profile_receipt"] = {k: v for k, v in profile_receipt.items()
+                if k not in {"raw_response", "images"}}
+            if profile_receipt["status"] != "COMPLETED":
+                raise ValueError("IDENTITY_PROFILE_UNRESOLVED")
+            manifest = pilot.apply_identity_profile(manifest, json.loads(profile_receipt["raw_response"]))
+            owner_manifest = manifest
+            summary["identity_profile"] = manifest["identity_profile"]
         execute(manifest["packets"], manifest)
         merged = pilot.reconcile(resolved_results, sampling_gap_ms=manifest["input_coverage"]["max_sample_gap_ms"])
         summary.update(merged)  # preserve completed observations if later work fails
@@ -102,7 +123,7 @@ def run(manifest_path, output_dir, *, provider="gemini", model="gemini-2.5-pro",
     except (ValueError, TimeoutError, OSError) as exc:
         # Exception text is intentionally not persisted: providers may include secrets.
         safe_codes = {"REQUEST_IMAGE_BUDGET_EXCEEDED", "PREPARED_IMAGE_CHANGED", "SOURCE_VIDEO_CHANGED",
-                      "DETAIL_PREPARATION_TIME_BUDGET_EXHAUSTED", "INVALID_EXECUTION_BUDGET"}
+                      "DETAIL_PREPARATION_TIME_BUDGET_EXHAUSTED", "INVALID_EXECUTION_BUDGET", "IDENTITY_PROFILE_UNRESOLVED"}
         summary.update(status="EXPERIMENT_STOPPED", error_type=type(exc).__name__,
                        error_code=str(exc) if str(exc) in safe_codes else "EXPERIMENT_PROCESSING_FAILED")
     finally:
@@ -134,6 +155,7 @@ def main():
     model.add_argument("--max-followups", type=int, default=2)
     model.add_argument("--max-initial", type=int, default=4)
     model.add_argument("--reasoning-effort", choices=["low"], default=None)
+    model.add_argument("--identity-profile", action="store_true", help="Infer one shared identity from original crops before reading plays")
     evaluate = commands.add_parser("evaluate", help="Offline matching; never passes expected answers to a model")
     evaluate.add_argument("--result", type=Path, required=True)
     evaluate.add_argument("--cases", type=Path, required=True)
@@ -147,7 +169,7 @@ def main():
     elif args.command == "run":
         result = run(args.prepared, args.output, provider=args.provider, model=args.model, budget_s=args.budget_s,
                      per_call_s=args.per_call_s, max_followups=args.max_followups, max_initial=args.max_initial,
-                     reasoning_effort=args.reasoning_effort)
+                     reasoning_effort=args.reasoning_effort, identity_profile=args.identity_profile)
         print(json.dumps({k: result.get(k) for k in ("status", "analysis_seconds", "model_jobs_completed", "counts")}, indent=2))
         return 0 if result["status"] == "MODEL_OBSERVATIONS_RETURNED" else 3
     else:

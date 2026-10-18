@@ -36,6 +36,28 @@ def fixture():
     return manifest, packet, {"plays": [play]}
 
 
+def test_shared_profile_cannot_invent_references_or_change_source_frames():
+    manifest, _, _ = fixture()
+    manifest["references"] = [{"reference_id": "r1"}]
+    profile = {"identity_clear": True, "appearance": "Visible white kit and light hair",
+               "canonical_reference_ids": ["r1"]}
+    reused = p.apply_identity_profile(manifest, profile)
+    assert reused["frames"] == manifest["frames"]
+    assert reused["packets"][0]["frame_ids"] == manifest["packets"][0]["frame_ids"]
+    assert "identity_profile" not in manifest
+    profile["canonical_reference_ids"] = ["invented"]
+    with pytest.raises(ValueError, match="IDENTITY_PROFILE_UNRESOLVED"):
+        p.apply_identity_profile(manifest, profile)
+
+
+def test_unclear_identity_profile_does_not_silently_choose_a_player():
+    manifest, _, _ = fixture()
+    manifest["references"] = [{"reference_id": "r1"}]
+    with pytest.raises(ValueError, match="IDENTITY_PROFILE_UNRESOLVED"):
+        p.apply_identity_profile(manifest, {"identity_clear": False, "appearance": "Two different players",
+                                          "canonical_reference_ids": ["r1"]})
+
+
 def resolved(data=None):
     manifest, packet, original = fixture()
     return p.resolve_response(data or original, manifest, packet, {"origin": "SYNTHETIC_TEST_ONLY"})
@@ -341,6 +363,33 @@ def test_changed_source_checksum_stops_before_sampling(tmp_path):
     (root / "anchors.json").write_text("{}")
     with pytest.raises(ValueError, match="SOURCE_INPUT_CHECKSUM_MISMATCH"):
         p.prepare(root, tmp_path / "prepared")
+
+
+def test_oversized_packet_does_not_prevent_other_packet_from_running(tmp_path, monkeypatch):
+    root = source_export(tmp_path)
+    manifest = p.prepare(root, tmp_path / "prepared")
+    second = deepcopy(manifest["packets"][0]); second["packet_id"] = "second"
+    manifest["packets"].append(second)
+    p.write_json(tmp_path / "prepared" / "manifest.json", manifest)
+    original, attempts, executed = t.build_request, [], []
+    def preflight(*args, **kwargs):
+        attempts.append(True)
+        if len(attempts) == 1:
+            raise ValueError("REQUEST_IMAGE_BUDGET_EXCEEDED")
+        return original(*args, **kwargs)
+    def jobs(rows, *args, **kwargs):
+        executed.extend(r["packet_id"] for r in rows)
+        return [{"packet_id": r["packet_id"], "status": "COMPLETED", "raw_response": '{"plays":[]}',
+                 "payload_sha256": "synthetic", "response_sha256": "synthetic",
+                 "origin": "SYNTHETIC_TEST_ONLY"} for r in rows]
+    monkeypatch.setenv("GEMINI_API_KEY", "SYNTHETIC_TEST_ONLY")
+    monkeypatch.setattr(t, "build_request", preflight)
+    monkeypatch.setattr(t, "run_jobs", jobs)
+    result = run(tmp_path / "prepared" / "manifest.json", tmp_path / "result", max_followups=0)
+    assert executed == ["second"]
+    assert result["status"] == "PARTIAL_MODEL_RUN"
+    assert result["model_jobs_completed"] == 1
+    assert result["model_jobs"][0]["error"] == "REQUEST_IMAGE_BUDGET_EXCEEDED"
 
 
 def test_targeted_detail_adds_real_frames_without_rebuilding_identity(tmp_path):

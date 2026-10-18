@@ -299,11 +299,50 @@ def prepare(evidence_dir, output_dir, *, fps=8., max_edge=768, chunk_ms=30000,
     return manifest
 
 
+def identity_items(manifest):
+    """Read the original identity examples once, without action frames or answers."""
+    items = [{"type": "text", "text": "Identify the single intended football player shared across these original user selection crops. "
+        "Some clicks, broad crops and occlusions include neighbours. Compare all examples. "
+        "Describe visible kit, number only when legible, hair and build. Separate contradictory/ambiguous examples. "
+        "Choose at most three clearest reference IDs showing that same person, with complementary front/back views. "
+        "Do not describe football actions, infer outcomes or invent an unseen number. "
+        'Return JSON: {"identity_clear":true,"appearance":"concise visual description",'
+        '"canonical_reference_ids":["r1"],"ambiguous_reference_ids":[],"contradictions":"visible ambiguity or empty"}. '
+        "Use identity_clear=false if the examples cannot establish one intended person."}]
+    for ref in manifest["references"]:
+        items.extend([{"type": "text", "text": "Original selection " + ref["reference_id"]},
+                      {"type": "image", "path": ref["path"], "sha256": ref["sha256"]}])
+    return items
+
+
+def apply_identity_profile(manifest, data):
+    """Reuse an observed profile, never invent a target or select action times."""
+    valid = {r["reference_id"] for r in manifest["references"]}
+    chosen = data.get("canonical_reference_ids")
+    description = data.get("appearance")
+    if (data.get("identity_clear") is not True or not isinstance(chosen, list)
+        or not 1 <= len(chosen) <= 3 or len(set(chosen)) != len(chosen)
+        or any(not isinstance(x, str) or x not in valid for x in chosen)
+        or not isinstance(description, str) or not 1 <= len(description) <= 2000):
+        raise ValueError("IDENTITY_PROFILE_UNRESOLVED")
+    updated = deepcopy(manifest)
+    updated["identity_profile"] = data
+    for packet in updated["packets"]:
+        packet["reference_ids"] = chosen[:]
+    return updated
+
+
 def packet_items(manifest, packet):
     """Ordered typed parts; every image is paired with its actual source time."""
     frames = {f["frame_id"]: f for f in manifest["frames"]}
     references = {r["reference_id"]: r for r in manifest["references"]}
     items = [{"type": "text", "text": PROMPT}]
+    if manifest.get("identity_profile"):
+        items.append({"type": "text", "text": "Shared identity profile inferred ONCE from the original selections; "
+            "it is an identity description, not action evidence. Match this person throughout the play. "
+            "A clearly different number/appearance identifies another person even in the same kit. "
+            "Observe the ball sequence for all participants first; attribute it using the person seen at each contact. "
+            "Do not transfer identity to the recipient or goal scorer. " + json.dumps(manifest["identity_profile"])})
     consensus = manifest.get("reference_policy") == "CONSENSUS_RAW"
     if consensus:
         items.append({"type": "text", "text":
