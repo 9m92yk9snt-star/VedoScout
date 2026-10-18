@@ -17,7 +17,7 @@ jobs:
       github.event.pull_request.number == 39 &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.event.pull_request.head.ref == 'codex/sequence-pilot-foundation' &&
-      github.event.before == 'f114b890add468ecec663d2eb5fa5ce762e357cc' &&
+      github.event.before == '57eaa3da27777016b3382eff7df9bd925afb5cda' &&
       github.run_attempt == 1
     runs-on: ubuntu-latest
     timeout-minutes: 9
@@ -47,6 +47,11 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Install native video tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg
+          ffprobe -version
       - name: Install source image preparation dependencies
         run: python -m pip install 'numpy<3' 'opencv-python-headless<5' 'Pillow>=10,<15'
       - name: Reassemble and verify exact original source and taps

@@ -262,3 +262,10 @@ The available Gemini 3.1 Pro model gets one call, at most 120 seconds and an
 overall probe budget of 150 seconds. This differs from the failed whole-video
 Gemini trial by supplying a short complete play and synchronized native detail;
 a successful response alone would still not establish all five reference cases.
+
+
+Run 39148383227 stopped during preparation because ffprobe was absent from
+the GitHub runner. It made zero native-video model calls. The local test passed
+with installed FFmpeg; the GitHub test exposed the missing workflow dependency.
+Both model and isolated-test workflows now explicitly install FFmpeg before
+any credential-bearing step. The same native-play experiment is retried once.
