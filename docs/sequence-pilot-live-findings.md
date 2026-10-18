@@ -318,3 +318,30 @@ fits at 8,409,638 bytes and prepares in 3.937 seconds.
 
 Native-probe CLI now exits nonzero for a model error while preserving the
 actual failure receipt; a completed GitHub job must not hide model access failure.
+
+
+## Visual selection trial result, 2026-10-18
+
+Run 39149235839 completed the model call in 14.219 seconds, with 21.688 seconds
+probe execution and 19.316 seconds separately measured full-source preparation.
+This reads only the 5.999-second source play, not the complete 76.76-second video.
+The seven-image/two-video request was 8,481,194 bytes. The 116 isolated GitHub
+code tests passed; that is not a perception acceptance result.
+
+The raw reply labels p5 as the selected white number 15 and describes him as
+a passer, while p1 is white number 10 and the final scorer. This corrects the
+previous selected-player/scorer swap in the returned description. However, it
+adds an intervening number-13 shot, goalkeeper save onto the post and rebound.
+These claims are not supported by the source-inspected sequence and do not
+establish the direct 15-to-10 assist. Do not accept this as a verified assist,
+all-five success, complete-video timing, or production-ready replacement.
+The exact response, source hashes, annotated selection geometry, model usage
+and request hashes are retained in the run artifact:
+https://github.com/9m92yk9snt-star/VedoScout/actions/runs/39149235839
+
+The remaining defect is the physical possession/contact chain after identity
+selection, not simply missing runtime dependencies or insufficient reasoning.
+No further identical-input votes are justified by this result. The next useful
+implementation must preserve source-grounded actor continuity and test the
+alleged intervening contact with actual before/after ball motion, while keeping
+uncertainty when the evidence does not resolve it. Production remains unchanged.
