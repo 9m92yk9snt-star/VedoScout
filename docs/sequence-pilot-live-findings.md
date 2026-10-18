@@ -836,3 +836,32 @@ player's onward release and the attacking finisher, rather than goal outcome or
 a demand for visible every-pixel contact. No merge/deployment follows from the
 unsuccessful assist-acceptance checks. Further identical-input votes are not a
 solution to the remaining physical ambiguity.
+
+## Human navigation at 49.85s: paired body and lower-limb review
+
+The owner supplied a new navigation hint at 49.85s and a hypothesis involving
+the selected player's turn, surrounding defenders' legs and an onward release.
+The new request uses only the timestamp and a neutral body-to-limb review method,
+not the claimed action, kicking side, recipient or result as input facts.
+This is human-guided inspection, not automatic discovery of this source interval.
+
+Keep the preceding whole-play overview, original reference images, continuous
+native detail and later contact-cluster view. Add 42 synchronized original-pixel
+lower-body images from 49.500–50.200s. Person-cluster geometry chooses a body view
+[82,799,856,1218] and a lower-body region [82,988,856,1218]; neither assigns an
+identity or a contact. A source inspection confirms knees/socks/boots remain.
+The model must trace shorts/torso through knees to socks/boots across time and
+state visible-leg limitations. Counting unmatched/hidden legs alone cannot prove
+a touch. Anatomical right is distinguished from screen right.
+
+The contact_ownership_review explicitly records whether a selected-player release
+is supported, contradicted or uncertain, with a positive actor, non-forced side
+(LEFT/RIGHT/UNKNOWN), at least two supplied frames in the inspection window and
+concrete before/after motion. It cannot replace recipient, finishing and goal
+links. Missing or uncertain ownership stops approval even if other fields claim
+a positive assist. A request for another side is never hard-coded as evidence.
+
+Preflight: 250 images, quality 85, 18,490,357 request bytes and 17ms continuous
+detail gap. This expanded input has one 120-second model-call bound and a
+150-second total probe bound; the previous reader's bounds remain unchanged for
+other modes. Actual outcome and measured timing follow.

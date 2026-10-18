@@ -156,6 +156,20 @@ def resolve_assist(observed, context, receipt):
     result['link_review']=support
     if support['status']!='ASSIST_SUPPORTED_BY_MODEL_OBSERVATIONS':
         return stop('PHYSICAL_LINK_NOT_ESTABLISHED')
+    if context.get('limb_focus'):
+        limb=observed.get('contact_ownership_review')
+        window=context['limb_focus']
+        if (not isinstance(limb,dict) or limb.get('status')!='SUPPORTED' or
+                limb.get('release_actor')!=support['releaser'] or
+                not isinstance(limb.get('anatomical_side'),str) or
+                limb.get('anatomical_side') not in {'LEFT','RIGHT','UNKNOWN'}):
+            return stop('RELEASE_LIMB_OWNERSHIP_UNRESOLVED')
+        citations=limb.get('frames')
+        if (not isinstance(citations,list) or not all(isinstance(f,str) for f in citations) or
+                len(set(citations))<2 or any(f not in frame_times or
+                    not window['start_ms'] <= frame_times[f] <= window['end_ms'] for f in citations) or
+                not isinstance(limb.get('observation'),str) or not limb['observation'].strip()):
+            return stop('MISSING_LIMB_SOURCE_EVIDENCE')
     mapping=observed.get('event_mapping')
     if not isinstance(mapping,dict):
         return stop('TYPED_EVENT_MAPPING_REQUIRED')

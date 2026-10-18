@@ -55,6 +55,30 @@ Do not invent a separate receiving touch or settled possession. For separate
 reception/finish rows use one_touch_finish=false. Keep null when unresolved.
 '''
 
+LIMB_INSTRUCTION = '''Additional synchronized lower-body crops cover a user-supplied
+navigation instant. The user supplied WHERE to inspect, not an input action label,
+contact actor, kicking side, recipient or expected result. First trace every
+nearby player's torso/shorts to their own knees, socks and boots across the source
+sequence; distinguish anatomical left/right from screen left/right. Count only
+visible or motion-supported limbs. An unused/unseen leg is not, by subtraction,
+evidence of another person's touch. Compare ball motion before/after the relevant
+foot movement and follow any outgoing ball to its next actual toucher and finish.
+Keep both a continued individual action and a possible release to another player
+as alternatives until the visible motion distinguishes them. Do not infer a pass
+or strike from a following run alone. No hidden joints or intervening touches may
+be invented. Give only a few decisive source citations, not per-frame rows.
+ADD "contact_ownership_review":{
+"status":"SUPPORTED|CONTRADICTED|UNCERTAIN","release_actor":null,
+"anatomical_side":"LEFT|RIGHT|UNKNOWN","frames":["s...","s..."],
+"observation":"concrete selected-player release evidence or why unresolved",
+"leg_map":[{"actor":"person ID","visible_leg_count":0,
+"frames":["s..."],"observation":"body-to-foot continuity, not inferred touch"}],
+"limitations":"occluded or ambiguous limbs"}.
+SUPPORTED here means a release of the active ball BY the selected person is
+uniquely supported in the lower-body review window; it does not itself establish
+its recipient, a finish or a goal. Those need the separate contact-chain links.
+'''
+
 
 def temporal_references(references,start,end):
     """Prefer actual in-play taps; otherwise take the nearest temporal neighbours.
@@ -142,7 +166,22 @@ def geometry_cluster(samples,width,height,band):
     return box
 
 
-def prepare(manifest_path,gap_path,output,*,focus_receipt=None):
+def limb_region(centre,question,samples,width,height,band):
+    if type(centre) is not int:
+        raise ValueError('INTEGER_SOURCE_NAVIGATION_REQUIRED')
+    lo,hi=centre-350,centre+350
+    if not question['detail_start_ms'] <= lo < hi <= question['detail_end_ms']:
+        raise ValueError('LIMB_WINDOW_OUTSIDE_SOURCE_DETAIL')
+    nearby=[s for s in samples if abs(s['media_ms']-centre)<=350]
+    body=geometry_cluster(nearby,width,height,band)
+    feet=[body[0],round(body[1]+.45*(body[3]-body[1])),body[2],body[3]]
+    if feet[3]-feet[1]<2:raise ValueError('EMPTY_LOWER_BODY_SOURCE_REGION')
+    return {'centre_ms':centre,'start_ms':lo,'end_ms':hi,'source_crop_box':feet,
+        'body_source_crop_box':body,'navigation_origin':'USER_SUPPLIED_TIMESTAMP_ONLY',
+        'expected_action_or_side_supplied':False}
+
+
+def prepare(manifest_path,gap_path,output,*,focus_receipt=None,limb_focus_ms=None):
     import cv2
     from cv_detect import PersonDetector
     started=time.monotonic();output=Path(output)
@@ -180,6 +219,7 @@ def prepare(manifest_path,gap_path,output,*,focus_receipt=None):
     times=[ms for ms,_ in frames]
     validate_native_coverage(times,[{'start_ms':question['detail_start_ms'],'end_ms':question['detail_end_ms']}])
     box=viewing_band([s['boxes_xywh_conf'] for s in samples],width,height)
+    limb=limb_region(limb_focus_ms,question,samples,width,height,box) if limb_focus_ms is not None else None
     focus=None
     if focus_receipt:
         focus=contact_focus(p.read_json(focus_receipt),source_hash)
@@ -191,6 +231,8 @@ def prepare(manifest_path,gap_path,output,*,focus_receipt=None):
     prefix=[{'type':'text','text':PROMPT+'\n'+LINK_INSTRUCTION+'\n'+MAPPING_INSTRUCTION+'\n'+ONE_TOUCH_INSTRUCTION}]
     if focus:
         prefix[0]['text']+='\nSome contact images now use a tighter native-pixel viewing region containing the largest person cluster. Geometry chooses only the view, never an identity or action. The unchanged whole-play overview and surrounding full-width detail retain context. Compare each visible player\'s separate head, torso, limbs and body movement before and after overlap. Test both same-person continuity and a possible distinct teammate: do not assume either. A running/following motion alone is not a uniquely established strike. Keep the actor unresolved if another player remains a plausible finisher.'
+    if limb:
+        prefix[0]['text']+='\n'+LIMB_INSTRUCTION
     for ref in refs:
         prefix.extend([{'type':'text','text':'IDENTITY ONLY: original selection '+ref['reference_id']+
             ', source_ms='+str(ref['media_ms'])+'. It is outside this play unless its instant lies inside the play bounds.'},
@@ -210,6 +252,11 @@ def prepare(manifest_path,gap_path,output,*,focus_receipt=None):
             label='native continuous detail; source crop='+json.dumps(crop)
             detail.append((ms,label,p._save_image(output/f'detail-q{quality}'/f's{ms:09}.jpg',
                 pixels[crop[1]:crop[3],crop[0]:crop[2]],1280,quality)))
+            if limb and limb['start_ms'] <= ms <= limb['end_ms']:
+                foot=limb['source_crop_box']
+                detail.append((ms,'synchronized lower-body view; source crop='+json.dumps(foot),
+                    p._save_image(output/f'limb-q{quality}'/f's{ms:09}.jpg',
+                        pixels[foot[1]:foot[3],foot[0]:foot[2]],1280,quality)))
         items=list(prefix)
         for ms,label,image in sorted(overview+detail,key=lambda r:(r[0],r[1])):
             items.extend([{'type':'text','text':f'Source frame s{ms:09}; source_ms={ms}; {label}'},
@@ -231,6 +278,7 @@ def prepare(manifest_path,gap_path,output,*,focus_receipt=None):
         'in_play_original_selection_count':sum(question['start_ms'] <= r['media_ms'] <= question['end_ms'] for r in refs),
         'identity_source_audit':spatial_audit,'source_crop_box':box,'detector_samples':samples,
         'contact_focus':focus,
+        'limb_focus':limb,
         'retained_overview_instants':[ms for ms,_,_ in overview],'retained_native_instants':times,
         'new_bridge_instants':[],'detail_jpeg_quality':quality,'max_detail_gap_ms':max(b-a for a,b in zip(times,times[1:])),
         'request_audit':audit,'preparation_seconds':round(time.monotonic()-started,3),
@@ -246,9 +294,11 @@ if __name__=='__main__':
     for key in ('prepared','gap-receipt','output'):cli.add_argument('--'+key,required=True)
     cli.add_argument('--prepare-only',action='store_true')
     cli.add_argument('--focus-receipt')
-    args=cli.parse_args();result,job,started=prepare(args.prepared,args.gap_receipt,args.output,focus_receipt=args.focus_receipt)
+    cli.add_argument('--limb-focus-ms',type=int)
+    args=cli.parse_args();result,job,started=prepare(args.prepared,args.gap_receipt,args.output,focus_receipt=args.focus_receipt,limb_focus_ms=args.limb_focus_ms)
     if not args.prepare_only:
-        receipt=t.run_jobs([job],'emergent','gpt-6-astra',deadline=started+120,per_call_s=90,workers=1)[0]
+        receipt=t.run_jobs([job],'emergent','gpt-6-astra',deadline=started+(150 if result['limb_focus'] else 120),
+            per_call_s=120 if result['limb_focus'] else 90,workers=1)[0]
         p.write_json(Path(args.output)/'responses/unanchored_play.json',receipt)
         result.update(status=receipt['status'],probe_seconds=round(time.monotonic()-started,3))
         if receipt['status']=='COMPLETED':

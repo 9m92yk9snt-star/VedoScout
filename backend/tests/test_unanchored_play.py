@@ -10,7 +10,7 @@ import pytest
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 import sequence_pilot as p
-from scripts.probe_unanchored_play import temporal_references, source_question, contact_focus, geometry_cluster
+from scripts.probe_unanchored_play import temporal_references, source_question, contact_focus, geometry_cluster, limb_region
 
 ROOT=Path(__file__).resolve().parents[2]
 
@@ -94,6 +94,22 @@ def test_person_geometry_keeps_the_largest_cluster_and_records_source_coordinate
     assert 700 <= box[1] < box[3] <= 1300
     with pytest.raises(ValueError,match='NO_SEPARATE_PERSON_CLUSTER'):
         geometry_cluster([{'boxes_xywh_conf':[[.5,.5,.1,.1,.9]]}],1080,1920,[0,700,1080,1300])
+
+
+def test_lower_body_view_records_human_navigation_without_encoding_an_action_or_side():
+    samples=[{'media_ms':5000,'boxes_xywh_conf':[[.25,.5,.1,.12,.9],[.36,.5,.1,.12,.9]]}]
+    result=limb_region(5000,{'detail_start_ms':4000,'detail_end_ms':6000},samples,1080,1920,[0,700,1080,1300])
+    assert result['start_ms']==4650 and result['end_ms']==5350
+    assert result['source_crop_box'][3]>=.62*1920
+    assert result['source_crop_box'][1]>result['body_source_crop_box'][1]
+    assert result['navigation_origin']=='USER_SUPPLIED_TIMESTAMP_ONLY'
+    assert result['expected_action_or_side_supplied'] is False
+
+
+@pytest.mark.parametrize('centre',[None,True,4000,6000])
+def test_limb_navigation_outside_prepared_detail_stops_before_any_model_call(centre):
+    with pytest.raises(ValueError,match='INTEGER_SOURCE_NAVIGATION_REQUIRED|LIMB_WINDOW_OUTSIDE_SOURCE_DETAIL'):
+        limb_region(centre,{'detail_start_ms':4000,'detail_end_ms':6000},[],1080,1920,[0,700,1080,1300])
 
 
 def test_actual_focused_reply_does_not_turn_a_hidden_actor_into_an_assist_or_selected_goal():

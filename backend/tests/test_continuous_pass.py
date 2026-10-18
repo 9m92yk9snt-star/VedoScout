@@ -186,6 +186,25 @@ def test_claimed_one_touch_finish_cannot_contradict_separate_receiving_and_strik
     assert mapped_review(data,context)['target_events']==[]
 
 
+@pytest.mark.parametrize('side',['LEFT','RIGHT','UNKNOWN'])
+def test_limb_review_requires_supported_owner_without_forcing_a_preferred_kicking_side(side):
+    data,context=mapped_observation();context['limb_focus']={'start_ms':100,'end_ms':200}
+    assert mapped_review(data,context)['reasons']==['RELEASE_LIMB_OWNERSHIP_UNRESOLVED']
+    data['contact_ownership_review']={'status':'SUPPORTED','release_actor':'passer','anatomical_side':side,
+        'frames':['s000000100','s000000200'],'observation':'Synthetic body-to-foot and outgoing-ball motion'}
+    assert mapped_review(data,context)['status']=='APPROVED'
+    data['contact_ownership_review']['status']='UNCERTAIN'
+    assert mapped_review(data,context)['target_events']==[]
+
+
+@pytest.mark.parametrize('frames',[['s000000100'],['s000000100','s000000300'],['invented','s000000200']])
+def test_leg_count_or_unsupplied_out_of_window_frames_cannot_replace_release_evidence(frames):
+    data,context=mapped_observation();context['limb_focus']={'start_ms':100,'end_ms':200}
+    data['contact_ownership_review']={'status':'SUPPORTED','release_actor':'passer','anatomical_side':'RIGHT',
+        'frames':frames,'observation':'Synthetic motion','leg_map':[{'visible_leg_count':6}]}
+    assert mapped_review(data,context)['target_events']==[]
+
+
 @pytest.mark.parametrize('fact_key',['observation','fact'])
 def test_source_cited_goal_facts_are_accepted_without_inventing_missing_frame_ids(fact_key):
     data,context=mapped_observation()
