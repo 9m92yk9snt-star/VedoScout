@@ -17,7 +17,7 @@ jobs:
       github.event.pull_request.number == 39 &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.event.pull_request.head.ref == 'codex/sequence-pilot-foundation' &&
-      github.event.before == '4bd3bdaf2f4013a04f73301030fe225de858dea0' &&
+      github.event.before == 'a7e3ef110262ce63c828afc7b0deb6eb21f5e25e' &&
       github.run_attempt == 1
     runs-on: ubuntu-latest
     timeout-minutes: 9
@@ -101,7 +101,7 @@ jobs:
       - name: Read complete plays with the actual model
         env:
           EMERGENT_LLM_KEY: ${{ secrets.EMERGENT_LLM_KEY }}
-        run: python backend/scripts/probe_unanchored_play.py --prepared "$RUNNER_TEMP/sequence-pilot-prepared/manifest.json" --gap-receipt docs/examples/native-unresolved-finisher-receipt.json --output "$RUNNER_TEMP/sequence-pilot-result" --focus-receipt docs/examples/native-unanchored-play-receipt.json --limb-focus-ms 49850
+        run: python backend/scripts/probe_unanchored_play.py --prepared "$RUNNER_TEMP/sequence-pilot-prepared/manifest.json" --gap-receipt docs/examples/native-unresolved-finisher-receipt.json --output "$RUNNER_TEMP/sequence-pilot-result" --focus-receipt docs/examples/native-unanchored-play-receipt.json --limb-focus-ms 49850 --limb-panels
       - name: Check the automatic event decision
         run: |
           python - <<'PY'

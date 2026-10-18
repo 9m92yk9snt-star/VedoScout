@@ -225,6 +225,12 @@ def resolve_assist(observed, context, receipt):
     for fact in outcome.get('evidence',[]) if isinstance(outcome.get('evidence'),list) else [None]:
         if isinstance(fact,str) and fact in frame_times:
             outcome_frames.append(fact)
+        elif isinstance(fact,str) and ':' in fact:
+            prefix,_,description=fact.partition(':')
+            ids=prefix.split(' and ')
+            if not description.strip() or any(fid not in frame_times for fid in ids):
+                return stop('INVALID_GOAL_SOURCE_EVIDENCE')
+            outcome_frames.extend(ids)
         elif (isinstance(fact,dict) and isinstance(fact.get('frame'),str) and fact['frame'] in frame_times
                 and isinstance(fact.get('observation',fact.get('fact')),str)
                 and fact.get('observation',fact.get('fact')).strip()):

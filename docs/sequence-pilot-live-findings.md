@@ -865,3 +865,30 @@ Preflight: 250 images, quality 85, 18,490,357 request bytes and 17ms continuous
 detail gap. This expanded input has one 120-second model-call bound and a
 150-second total probe bound; the previous reader's bounds remain unchanged for
 other modes. Actual outcome and measured timing follow.
+
+Run 39171339112 completed in 90.791 model seconds, 94.862 probe seconds including
+3.871 preparation seconds. Separate source preparation took 19.076 seconds.
+It retains all previous 208 image hashes/sizes and adds only the 42 lower-body
+views. The model now positively distinguishes the separate dark-haired teammate's
+first-time finish at 50.365–50.665s from the selected player's following run.
+Receiver/finisher and goal links are SUPPORTED. The selected release is still
+UNCERTAIN: its actor remains null, with one selected-player leg visible and the
+other contact foot masked. The model's explanation asks for continuously traced
+hip/knee/boot ownership through the decisive overlap. No assist is emitted.
+The actual reply and refusal are in native-limb-release-receipt.json.
+
+The next focused input adds five comparison panels, each stacking four subsequent
+native-pixel lower-body instants with labels outside the crop. Original pixels
+are neither resized nor interpolated; source times, crop geometry and image hashes
+are retained. All 250 preceding images remain. This changes simultaneous visual
+comparison and the ownership instruction; it is not independent new source
+evidence or an isolated comparison of either change alone.
+
+The instruction explicitly allows positive before/after boot/sock movement,
+body stance/anatomical reach and independently accounted alternative legs to
+establish ownership even if a joint is briefly hidden. It does not demand a
+continuously visible hip-knee-boot chain at every instant. It still prohibits
+guessing an unseen contact by counting leftover legs alone. No candidate actor,
+kicking side, recipient or expected result is supplied. The same positive
+ownership and complete assist-link checks apply; uncertainty cannot be promoted
+by this presentation. Preflight: 255 images, 19,144,787 bytes, quality 85.

@@ -215,6 +215,14 @@ def test_source_cited_goal_facts_are_accepted_without_inventing_missing_frame_id
     assert mapped_review(data,context)['reasons']==['INVALID_GOAL_SOURCE_EVIDENCE']
 
 
+def test_explicit_source_ids_with_goal_descriptions_do_not_need_fabricated_replacement_citations():
+    data,context=mapped_observation()
+    data['outcome']['evidence']=['s000000700 and s000000800: The same moving ball travels inside the goal.']
+    assert mapped_review(data,context)['status']=='APPROVED'
+    data['outcome']['evidence']=['invented and s000000800: The ball is inside.']
+    assert mapped_review(data,context)['reasons']==['INVALID_GOAL_SOURCE_EVIDENCE']
+
+
 def test_another_actors_intervening_chain_action_prevents_direct_assist():
     data,context=mapped_observation()
     extra=deepcopy(data['contact_chain'][1]);extra.update(actor='opponent',before_frame='s000000200',after_frame='s000000300')

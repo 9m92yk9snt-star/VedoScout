@@ -181,7 +181,33 @@ def limb_region(centre,question,samples,width,height,band):
         'expected_action_or_side_supplied':False}
 
 
-def prepare(manifest_path,gap_path,output,*,focus_receipt=None,limb_focus_ms=None):
+def comparison_panels(frames,limb,output,quality):
+    """Stack four native-pixel instants; labels live outside unchanged crops."""
+    import cv2
+    import numpy as np
+    chosen=[(ms,pixels) for ms,pixels in frames if limb['start_ms'] <= ms <= limb['end_ms']][::2]
+    rows=[];audit=[];box=limb['source_crop_box']
+    for start in range(0,len(chosen)-3,4):
+        group=chosen[start:start+4];cells=[]
+        for ms,pixels in group:
+            crop=pixels[box[1]:box[3],box[0]:box[2]]
+            cell=cv2.copyMakeBorder(crop,22,0,0,0,cv2.BORDER_CONSTANT,value=(0,0,0))
+            cv2.putText(cell,f's{ms:09} / source_ms={ms}',(6,16),cv2.FONT_HERSHEY_SIMPLEX,.42,(255,255,255),1)
+            cells.append(cell)
+        panel=np.concatenate(cells,axis=0)
+        if max(panel.shape[:2])>1280:raise ValueError('COMPARISON_PANEL_WOULD_RESIZE_SOURCE_PIXELS')
+        image=p._save_image(Path(output)/f'comparison-{start//4:02}.jpg',panel,1280,quality)
+        instants=[ms for ms,_ in group]
+        rows.extend([{'type':'text','text':'Synchronized lower-body comparison, TOP TO BOTTOM: '+
+            json.dumps([f's{ms:09}' for ms in instants])+'. Original source pixels; labels outside each crop. No interpolated motion or new person/event annotation.'},
+            {'type':'image','path':image['path'],'sha256':image['sha256']}])
+        audit.append({'source_instants':instants,'source_crop_box':box,'sha256':image['sha256'],
+                      'native_pixels_not_resized':True,'labels_outside_source_crop':True})
+    if not audit:raise ValueError('INSUFFICIENT_NATIVE_COMPARISON_FRAMES')
+    return rows,audit
+
+
+def prepare(manifest_path,gap_path,output,*,focus_receipt=None,limb_focus_ms=None,limb_panels=False):
     import cv2
     from cv_detect import PersonDetector
     started=time.monotonic();output=Path(output)
@@ -220,6 +246,7 @@ def prepare(manifest_path,gap_path,output,*,focus_receipt=None,limb_focus_ms=Non
     validate_native_coverage(times,[{'start_ms':question['detail_start_ms'],'end_ms':question['detail_end_ms']}])
     box=viewing_band([s['boxes_xywh_conf'] for s in samples],width,height)
     limb=limb_region(limb_focus_ms,question,samples,width,height,box) if limb_focus_ms is not None else None
+    if limb_panels and not limb:raise ValueError('COMPARISON_REQUIRES_LIMB_NAVIGATION')
     focus=None
     if focus_receipt:
         focus=contact_focus(p.read_json(focus_receipt),source_hash)
@@ -233,6 +260,8 @@ def prepare(manifest_path,gap_path,output,*,focus_receipt=None,limb_focus_ms=Non
         prefix[0]['text']+='\nSome contact images now use a tighter native-pixel viewing region containing the largest person cluster. Geometry chooses only the view, never an identity or action. The unchanged whole-play overview and surrounding full-width detail retain context. Compare each visible player\'s separate head, torso, limbs and body movement before and after overlap. Test both same-person continuity and a possible distinct teammate: do not assume either. A running/following motion alone is not a uniquely established strike. Keep the actor unresolved if another player remains a plausible finisher.'
     if limb:
         prefix[0]['text']+='\n'+LIMB_INSTRUCTION
+    if limb_panels:
+        prefix[0]['text']+='\nThe additional comparison panels show consecutive lower-body instants simultaneously. An occluded hip/knee at the instant of contact does NOT by itself make ownership uncertain: positive boot/sock appearance and movement before/after, anatomical reach and the independently accounted alternative legs can uniquely support ownership. An uninterrupted visible hip-to-knee-to-boot chain at every instant is not required. Conversely, counting remaining unseen legs alone is insufficient. State exactly which observed motion supports the owner and which alternatives are excluded; retain uncertainty if another foot is still physically plausible. These criteria apply equally to any player and kicking side.'
     for ref in refs:
         prefix.extend([{'type':'text','text':'IDENTITY ONLY: original selection '+ref['reference_id']+
             ', source_ms='+str(ref['media_ms'])+'. It is outside this play unless its instant lies inside the play bounds.'},
@@ -261,6 +290,10 @@ def prepare(manifest_path,gap_path,output,*,focus_receipt=None,limb_focus_ms=Non
         for ms,label,image in sorted(overview+detail,key=lambda r:(r[0],r[1])):
             items.extend([{'type':'text','text':f'Source frame s{ms:09}; source_ms={ms}; {label}'},
                 {'type':'image','path':image['path'],'sha256':image['sha256']}])
+        panels=[]
+        if limb_panels:
+            extra,panels=comparison_panels(frames,limb,output/f'comparison-q{quality}',quality)
+            items.extend(extra)
         try:
             _,_,audit=t.build_request('emergent','gpt-6-astra',items,reasoning_effort='medium',image_detail='high')
         except ValueError as exc:
@@ -279,6 +312,7 @@ def prepare(manifest_path,gap_path,output,*,focus_receipt=None,limb_focus_ms=Non
         'identity_source_audit':spatial_audit,'source_crop_box':box,'detector_samples':samples,
         'contact_focus':focus,
         'limb_focus':limb,
+        'limb_comparison_panels':panels,
         'retained_overview_instants':[ms for ms,_,_ in overview],'retained_native_instants':times,
         'new_bridge_instants':[],'detail_jpeg_quality':quality,'max_detail_gap_ms':max(b-a for a,b in zip(times,times[1:])),
         'request_audit':audit,'preparation_seconds':round(time.monotonic()-started,3),
@@ -295,7 +329,8 @@ if __name__=='__main__':
     cli.add_argument('--prepare-only',action='store_true')
     cli.add_argument('--focus-receipt')
     cli.add_argument('--limb-focus-ms',type=int)
-    args=cli.parse_args();result,job,started=prepare(args.prepared,args.gap_receipt,args.output,focus_receipt=args.focus_receipt,limb_focus_ms=args.limb_focus_ms)
+    cli.add_argument('--limb-panels',action='store_true')
+    args=cli.parse_args();result,job,started=prepare(args.prepared,args.gap_receipt,args.output,focus_receipt=args.focus_receipt,limb_focus_ms=args.limb_focus_ms,limb_panels=args.limb_panels)
     if not args.prepare_only:
         receipt=t.run_jobs([job],'emergent','gpt-6-astra',deadline=started+(150 if result['limb_focus'] else 120),
             per_call_s=120 if result['limb_focus'] else 90,workers=1)[0]

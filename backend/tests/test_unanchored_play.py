@@ -10,7 +10,7 @@ import pytest
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 import sequence_pilot as p
-from scripts.probe_unanchored_play import temporal_references, source_question, contact_focus, geometry_cluster, limb_region
+from scripts.probe_unanchored_play import temporal_references, source_question, contact_focus, geometry_cluster, limb_region, comparison_panels
 
 ROOT=Path(__file__).resolve().parents[2]
 
@@ -122,6 +122,27 @@ def test_actual_focused_reply_does_not_turn_a_hidden_actor_into_an_assist_or_sel
     assert raw['event_mapping']['finishing_actor_unique'] is None
     assert raw['link_assessment']['receiver_finishing_action']['status']=='UNCERTAIN'
     assert context['contact_focus']['source_crop_box'][3] > 1100  # feet remain in the focused source view
+
+
+def test_comparison_panel_preserves_source_arrays_and_records_ordered_real_instants(tmp_path):
+    import numpy as np
+    frames=[(ms,np.full((12,24,3),ms,dtype=np.uint8)) for ms in range(8)]
+    original=[pixels.copy() for _,pixels in frames]
+    rows,audit=comparison_panels(frames,{'start_ms':0,'end_ms':7,'source_crop_box':[0,0,24,12]},tmp_path,85)
+    assert len(audit)==1 and audit[0]['source_instants']==[0,2,4,6]
+    assert audit[0]['native_pixels_not_resized'] and audit[0]['labels_outside_source_crop']
+    assert rows[1]['sha256']==audit[0]['sha256']
+    assert all(np.array_equal(before,after) for before,(_,after) in zip(original,frames))
+
+
+def test_actual_limb_review_supports_distinct_finisher_but_cannot_invent_the_selected_release():
+    from scripts.probe_continuous_pass import resolve_assist
+    saved=p.read_json(ROOT/'docs/examples/native-limb-release-receipt.json');context=saved['result']
+    raw=json.loads(saved['raw_response'])
+    assert resolve_assist(raw,context,saved)==context['automatic_approval']
+    assert raw['link_assessment']['receiver_finishing_action']['status']=='SUPPORTED'
+    assert raw['contact_ownership_review']['status']=='UNCERTAIN'
+    assert context['target_events']==[] and context['counts']=={}
 
 
 def test_previously_documented_later_assist_still_resolves_from_its_unchanged_actual_reply():
