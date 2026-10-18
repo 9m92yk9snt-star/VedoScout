@@ -296,3 +296,25 @@ clip-relative times so the model can ground identity in the actual play rather
 than matching jersey numbers across unrelated pictures. These are original
 selection metadata, not action labels or evaluation answers. Ambiguous crops
 must remain uncertain. This input change still needs real model verification.
+
+
+Run 39149030812 tested textual source times/normalized selection coordinates
+with the same video views. Its call took 22.670 seconds; probe time was
+29.045 seconds. It still swapped identity onto the final scorer and incorrectly
+attributed a goal to the selected player. Textual coordinate labels did not
+recover the assist. Original geometry is now also tested visually as below.
+
+Next focused input adds the original local human marks in full-source context:
+only their original boxes and positive points at the actual original tap PTS,
+with source/clip times. The videos remain unannotated. No marker is propagated
+to another instant, no detector identity is asserted, and no event is annotated.
+This tests spatial identification information lost by crop-only references.
+The original source is hash-checked and unchanged. The two added pictures were
+visually inspected: both boxes enclose the trailing white number 15, separate
+from white 13 and 10. Clicks are user geometry, not precise body-centre truth.
+All video views, source interval, prompt and model remain as the supported-rate
+run. One additional call under the same 150/120-second bounds. Offline input
+fits at 8,409,638 bytes and prepares in 3.937 seconds.
+
+Native-probe CLI now exits nonzero for a model error while preserving the
+actual failure receipt; a completed GitHub job must not hide model access failure.

@@ -632,6 +632,42 @@ def test_native_play_views_keep_normal_duration_and_source_geometry(tmp_path):
     assert (detail["width"], detail["height"], detail["r_frame_rate"]) == (96, 160, "24/1")
 
 
+def test_native_play_cli_reports_failed_model_access_as_failed_process(tmp_path, monkeypatch):
+    import subprocess
+    monkeypatch.delenv("EMERGENT_LLM_KEY", raising=False)
+    manifest = p.prepare(source_export(tmp_path), tmp_path / "prepared", scene_packets=True)
+    raw = json.dumps({"identity_clear": True, "appearance": "Synthetic green video fixture",
+                      "canonical_reference_ids": ["r1"]})
+    p.write_json(tmp_path / "profile.json", {"source_video_sha256": manifest["source_video_sha256"],
+        "receipt": {"status": "COMPLETED", "origin": "LIVE_MODEL_REQUEST",
+                    "raw_response": raw, "response_sha256": hashlib.sha256(raw.encode()).hexdigest(),
+                    "images": [{"sha256": r["sha256"]} for r in manifest["references"]]}})
+    cli = Path(__file__).resolve().parents[1] / "scripts/probe_native_play.py"
+    result = subprocess.run([sys.executable, str(cli), "--prepared", str(tmp_path / "prepared/manifest.json"),
+        "--output", str(tmp_path / "result"), "--resume-profile", str(tmp_path / "profile.json")],
+        capture_output=True, text=True, timeout=20)
+    assert result.returncode == 3, result.stderr
+    assert p.read_json(tmp_path / "result/result.json")["model_status"] == "ERROR"
+    assert p.read_json(tmp_path / "result/responses/native_short_play.json")["error"] == "MODEL_KEY_NOT_CONFIGURED"
+
+
+def test_spatial_reference_uses_original_full_frame_coordinates_and_preserves_source(tmp_path):
+    import cv2
+    from scripts.probe_native_play import spatial_reference_items
+    manifest = p.prepare(source_export(tmp_path), tmp_path / "prepared", scene_packets=True)
+    before = p.digest(manifest["source_video"])
+    packet = manifest["packets"][0]
+    items, audit = spatial_reference_items(manifest, packet, manifest["references"], tmp_path / "spatial")
+    picture = cv2.imread(items[1]["path"])
+    assert picture.shape[:2] == (160, 96)
+    b, g, r = map(int, picture[64, 29])
+    assert b > 180 and g > 180 and r < 100
+    assert audit[0]["original_positive_point"] == {"x": .3, "y": .4}
+    assert audit[0]["source_ms"] == 150
+    assert audit[0]["approximate_clip_s"] == .15
+    assert p.digest(manifest["source_video"]) == before
+
+
 def test_runner_preserves_initial_observations_if_targeted_preparation_fails(tmp_path, monkeypatch):
     root = source_export(tmp_path)
     manifest = p.prepare(root, tmp_path / "prepared")

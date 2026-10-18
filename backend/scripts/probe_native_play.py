@@ -63,7 +63,44 @@ def prepare_videos(manifest, output):
     return packet, local, views, [0, y, width, y+crop_height]
 
 
-def run(manifest_path, output, profile_path):
+def spatial_reference_items(manifest, packet, local, output):
+    """Original human geometry in its full source frame, never an inferred track."""
+    import cv2
+    output = Path(output)
+    cap = cv2.VideoCapture(manifest["source_video"])
+    items, audit = [], []
+    try:
+        for ref in local:
+            cap.set(cv2.CAP_PROP_POS_MSEC, ref["media_ms"])
+            ok, pixels = cap.read()
+            actual_ms = round(cap.get(cv2.CAP_PROP_POS_MSEC))
+            if not ok or abs(actual_ms-ref["media_ms"]) > 18:
+                raise ValueError("ORIGINAL_SELECTION_SOURCE_FRAME_UNAVAILABLE")
+            height, width = pixels.shape[:2]
+            b, point = ref["box"], ref["target_point"]
+            x, y = round(b["x"]*width), round(b["y"]*height)
+            right, bottom = round((b["x"]+b["w"])*width), round((b["y"]+b["h"])*height)
+            px, py = round(point["x"]*width), round(point["y"]*height)
+            cv2.rectangle(pixels, (x, y), (right, bottom), (255, 255, 0), 3)
+            cv2.drawMarker(pixels, (px, py), (255, 255, 0), cv2.MARKER_CROSS, 22, 3)
+            image = pilot._save_image(output/(ref["reference_id"]+"-source-selection.jpg"), pixels, 1280, 90)
+            description = {"original_selection": ref["reference_id"], "source_ms": actual_ms,
+                "approximate_clip_s": (actual_ms-packet["core_start_ms"])/1000,
+                "original_source_box": b, "original_positive_point": point,
+                "annotation_policy": "ORIGINAL_HUMAN_SELECTION_ONLY_AT_THIS_SOURCE_INSTANT_NOT_A_PREDICTED_TRACK"}
+            items.extend([{"type": "text", "text":
+                "IDENTITY ONLY: cyan box and cross place the ORIGINAL human selection in its full source frame. "
+                "The cross marks the intended player, not the ball. A broad box may contain a neighbour. "
+                "This label applies only at the displayed instant; infer later identity from video motion. "
+                "No event or result is annotated. "+json.dumps(description)},
+                {"type": "image", "path": image["path"], "sha256": image["sha256"]}])
+            audit.append({**description, "annotated_image_sha256": image["sha256"]})
+    finally:
+        cap.release()
+    return items, audit
+
+
+def run(manifest_path, output, profile_path, *, spatial_references=False):
     started = time.monotonic(); output = Path(output)
     if output.exists() and any(output.iterdir()):
         raise ValueError("OUTPUT_MUST_BE_NEW_OR_EMPTY")
@@ -117,6 +154,10 @@ def run(manifest_path, output, profile_path):
             "merely because their number is easier to read. Preserve uncertainty if the "
             "reference is ambiguous."},
                       {"type": "image", "path": r["path"], "sha256": r["sha256"]}])
+    spatial_audit = []
+    if spatial_references:
+        additional, spatial_audit = spatial_reference_items(manifest, packet, local, output/"spatial-references")
+        items.extend(additional)
     for view in views:
         items.extend([{"type": "text", "text": view["name"]+"; same clip-relative time zero"},
             {"type": "video", "path": view["path"], "sha256": view["sha256"], "fps": view["fps"]}])
@@ -130,6 +171,7 @@ def run(manifest_path, output, profile_path):
         "source_start_ms": packet["core_start_ms"], "source_end_ms": packet["core_end_ms"],
         "timestamp_policy": "APPROXIMATE_CLIP_RELATIVE_TIMES_NOT_EXACT_SOURCE_PROOF",
         "detail_source_crop_box": box, "reference_ids": ids, "request_audit": audit,
+        "spatial_reference_audit": spatial_audit,
         "encoded_views": [{k:v for k,v in view.items() if k != "path"} for view in views]}
     pilot.write_json(output/"result.json", result)
     response = transport.run_jobs([{"packet_id": "native_short_play", "items": items,
@@ -140,6 +182,7 @@ def run(manifest_path, output, profile_path):
         result["raw_native_observations"] = json.loads(response["raw_response"])
     result.update(analysis_seconds=round(time.monotonic()-started, 3), model_status=response["status"])
     pilot.write_json(output/"result.json", result)
+    return result
 
 
 if __name__ == "__main__":
@@ -147,5 +190,7 @@ if __name__ == "__main__":
     parser.add_argument("--prepared", required=True)
     parser.add_argument("--output", required=True)
     parser.add_argument("--resume-profile", required=True)
+    parser.add_argument("--spatial-references", action="store_true")
     args = parser.parse_args()
-    run(args.prepared, args.output, args.resume_profile)
+    result = run(args.prepared, args.output, args.resume_profile, spatial_references=args.spatial_references)
+    raise SystemExit(0 if result["model_status"] == "COMPLETED" else 3)

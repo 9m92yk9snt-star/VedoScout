@@ -17,7 +17,7 @@ jobs:
       github.event.pull_request.number == 39 &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.event.pull_request.head.ref == 'codex/sequence-pilot-foundation' &&
-      github.event.before == '0f19d2244dc269de891599e74b1417f2b0a102c1' &&
+      github.event.before == '233a2a5ef72086f535c985faa60a0a60e0739047' &&
       github.run_attempt == 1
     runs-on: ubuntu-latest
     timeout-minutes: 9
@@ -85,7 +85,7 @@ jobs:
       - name: Read complete plays with the actual model
         env:
           EMERGENT_LLM_KEY: ${{ secrets.EMERGENT_LLM_KEY }}
-        run: python backend/scripts/probe_native_play.py --prepared "$RUNNER_TEMP/sequence-pilot-prepared/manifest.json" --output "$RUNNER_TEMP/sequence-pilot-result" --resume-profile docs/examples/gpt6-focused-profile-receipt.json
+        run: python backend/scripts/probe_native_play.py --prepared "$RUNNER_TEMP/sequence-pilot-prepared/manifest.json" --output "$RUNNER_TEMP/sequence-pilot-result" --resume-profile docs/examples/gpt6-focused-profile-receipt.json --spatial-references
       - name: Evaluate returned observations separately and print actual receipts
         if: always()
         run: |
