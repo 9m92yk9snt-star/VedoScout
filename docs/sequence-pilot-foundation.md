@@ -140,3 +140,36 @@ Provider contracts used:
 - <https://ai.google.dev/gemini-api/docs/image-understanding>
 - <https://ai.google.dev/gemini-api/docs/video-understanding>
 - <https://help.emergent.sh/the-universal-llm-key>
+
+## Actual first model experiment and the next measured configuration
+
+On 2026-10-18, run 39138207424 used the owner-approved original video and taps.
+Preparation took 17.809 seconds and model execution took 175.529 seconds.
+Two of the three 30-second image requests hit their 90-second wall limits.
+The returned request used 71,313 input tokens and 9,409 completion tokens,
+including 7,024 reasoning tokens. It observed the goal but labelled its actor
+unselected, and returned no assists. None of the five reference cases matched.
+The attempt failed; its shorter elapsed time does not establish usable analysis.
+
+Review of the actual references found an ambiguous selection: the raw crop
+contains number 15 while the click and automatically produced mask isolate an
+adjacent player. Such a mask cannot serve as unquestionable selected identity.
+The optional `prepare --scene-packets` configuration now reads large image
+changes from the already sampled source, retains every original sampled instant,
+provides all original crops together for identity consensus, and omits automatic
+mask images from model requests. Original masks remain in preparation metadata.
+Reference pictures are explicitly separated from chronological action evidence.
+
+On this source, offline preparation took 12.161 seconds and created ten short
+packets with 704 overlapping frame appearances, versus 718 in the first setup.
+The 622 unique instants and 8-fps overview are preserved. The largest complete
+request is 7,162,703 bytes. Cuts are measured from source pixels, not reference
+action times. The offline receipt is
+`docs/examples/sequence-pilot-orman400-scene-v2-preparation.json`.
+
+The second experiment selects `--max-initial 12 --per-call-s 60 --reasoning-effort low`
+with the same two workers, 300-second overall analysis budget, and at most two
+targeted follow-ups. Google documents low reasoning as a 1,024-token thinking
+budget for Gemini 2.5; actual proxy usage must establish what was honoured.
+This configuration needs returned model observations and visual evaluation;
+offline checks cannot establish equal or improved quality.

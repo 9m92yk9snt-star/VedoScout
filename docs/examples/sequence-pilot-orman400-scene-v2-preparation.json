@@ -1,0 +1,153 @@
+{
+  "scope": "OFFLINE_INPUT_AUDIT_NOT_MODEL_PERCEPTION",
+  "source_video_sha256": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+  "preparation_seconds": 12.161,
+  "input_coverage": {
+    "complete": true,
+    "decoded_source_frames": 4606,
+    "unique_delivered_frames": 622,
+    "frame_appearances_with_overlap": 704,
+    "max_sample_gap_ms": 134,
+    "max_native_frame_gap_ms": 17,
+    "all_taps_preserved": true,
+    "time_authority": "ACTUAL_SOURCE_PTS"
+  },
+  "visual_packet_plan": {
+    "strategy": "SOURCE_IMAGE_CHANGES",
+    "changes": [
+      {
+        "media_ms": 7500,
+        "colour_distance": 0.33057,
+        "pixel_difference": 0.146071
+      },
+      {
+        "media_ms": 19266,
+        "colour_distance": 0.74182,
+        "pixel_difference": 0.205176
+      },
+      {
+        "media_ms": 25632,
+        "colour_distance": 0.486137,
+        "pixel_difference": 0.266834
+      },
+      {
+        "media_ms": 34132,
+        "colour_distance": 0.400841,
+        "pixel_difference": 0.191764
+      },
+      {
+        "media_ms": 38632,
+        "colour_distance": 0.328828,
+        "pixel_difference": 0.129837
+      },
+      {
+        "media_ms": 47265,
+        "colour_distance": 0.426707,
+        "pixel_difference": 0.20574
+      },
+      {
+        "media_ms": 53015,
+        "colour_distance": 0.555741,
+        "pixel_difference": 0.246829
+      },
+      {
+        "media_ms": 59014,
+        "colour_distance": 0.836443,
+        "pixel_difference": 0.214753
+      },
+      {
+        "media_ms": 65014,
+        "colour_distance": 0.428499,
+        "pixel_difference": 0.138414
+      }
+    ],
+    "seconds": 0.761
+  },
+  "reference_policy": "CONSENSUS_RAW",
+  "original_references_per_request": 10,
+  "automatic_mask_images_sent": 0,
+  "reasoning_effort_requested": "low",
+  "model_calls": 0,
+  "packets": [
+    {
+      "packet_id": "sequence_001",
+      "core_start_ms": 0,
+      "core_end_ms": 7500,
+      "frames": 66,
+      "images": 76,
+      "bytes": 3295536
+    },
+    {
+      "packet_id": "sequence_002",
+      "core_start_ms": 7500,
+      "core_end_ms": 19266,
+      "frames": 104,
+      "images": 114,
+      "bytes": 7162703
+    },
+    {
+      "packet_id": "sequence_003",
+      "core_start_ms": 19266,
+      "core_end_ms": 25632,
+      "frames": 61,
+      "images": 71,
+      "bytes": 4699782
+    },
+    {
+      "packet_id": "sequence_004",
+      "core_start_ms": 25632,
+      "core_end_ms": 34132,
+      "frames": 78,
+      "images": 88,
+      "bytes": 5851102
+    },
+    {
+      "packet_id": "sequence_005",
+      "core_start_ms": 34132,
+      "core_end_ms": 38632,
+      "frames": 46,
+      "images": 56,
+      "bytes": 3826966
+    },
+    {
+      "packet_id": "sequence_006",
+      "core_start_ms": 38632,
+      "core_end_ms": 47265,
+      "frames": 79,
+      "images": 89,
+      "bytes": 6409222
+    },
+    {
+      "packet_id": "sequence_007",
+      "core_start_ms": 47265,
+      "core_end_ms": 53015,
+      "frames": 55,
+      "images": 65,
+      "bytes": 4385518
+    },
+    {
+      "packet_id": "sequence_008",
+      "core_start_ms": 53015,
+      "core_end_ms": 59014,
+      "frames": 58,
+      "images": 68,
+      "bytes": 4090642
+    },
+    {
+      "packet_id": "sequence_009",
+      "core_start_ms": 59014,
+      "core_end_ms": 65014,
+      "frames": 58,
+      "images": 68,
+      "bytes": 3521486
+    },
+    {
+      "packet_id": "sequence_010",
+      "core_start_ms": 65014,
+      "core_end_ms": 76747,
+      "frames": 99,
+      "images": 109,
+      "bytes": 4977075
+    }
+  ]
+}

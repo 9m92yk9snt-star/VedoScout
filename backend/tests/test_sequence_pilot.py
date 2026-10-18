@@ -175,6 +175,48 @@ def test_original_taps_drop_derived_colours_and_legacy_target_labels():
     assert "jersey_name" not in taps[0] and "global_target_id" not in taps[0]
 
 
+def test_positive_reference_match_cannot_silently_deny_identity_in_consensus_mode():
+    manifest, packet, _ = fixture()
+    manifest["reference_policy"] = "CONSENSUS_RAW"
+    observation = shot("GOAL")
+    observation["plays"][0]["people"][0]["selected"] = False
+    result = p.resolve_response(observation, manifest, packet, {"origin": "SYNTHETIC_TEST_ONLY"})
+    assert result["events"][0]["selected_player"] is None
+    assert any(q["reason"] == "IDENTITY" for q in result["questions"])
+    assert not p.reconcile([result])["target_events"]
+
+
+def test_consensus_delivery_excludes_automatic_mask_images_but_keeps_original_crop():
+    manifest, packet, _ = fixture()
+    manifest["reference_policy"] = "CONSENSUS_RAW"
+    reference = {"reference_id": "r1", "media_ms": 0, "path": "original-human-crop.jpg", "sha256": "original",
+                 "box": {"x": .2, "y": .3, "w": .1, "h": .2}, "target_point": {"x": .25, "y": .4}}
+    manifest["references"] = [reference]
+    packet["frame_ids"] = []
+    reference["masked_view"] = {"path": "wrong-neighbour-mask.jpg", "sha256": "untrusted"}
+    items = p.packet_items(manifest, packet)
+    assert any(i.get("path") == reference["path"] for i in items)
+    assert not any(i.get("path") == "wrong-neighbour-mask.jpg" for i in items)
+
+
+def test_visual_packet_boundaries_follow_changed_pixels_and_cover_every_frame(tmp_path):
+    import cv2
+    import numpy as np
+    frames = []
+    for index in range(29):
+        path = tmp_path / f"{index}.jpg"
+        colour = (0, 0, 220) if index < 8 else (220, 0, 0) if index < 18 else (0, 220, 0)
+        assert cv2.imwrite(str(path), np.full((80, 60, 3), colour, dtype=np.uint8))
+        frames.append({"frame_id": f"f{index}", "media_ms": index * 500, "path": str(path)})
+    packets, audit = p.plan_visual_packets(frames, frames[-1]["media_ms"])
+    assert [c["media_ms"] for c in audit["changes"]] == [4000, 9000]
+    assert all(any(j["start_ms"] <= f["media_ms"] <= j["end_ms"] for j in packets) for f in frames)
+    for f in frames:
+        f["media_ms"] += 1000
+    _packets, shifted = p.plan_visual_packets(frames, frames[-1]["media_ms"])
+    assert [c["media_ms"] for c in shifted["changes"]] == [5000, 10000]
+
+
 def test_reference_matching_uses_buildup_without_changing_contact_time():
     r = p.reconcile([resolved()])
     case = {"case_id": "held_out", "reference_ms": 600, "expected_type": "ASSIST", "expected_outcome": "TEAMMATE_GOAL", "tolerance_ms": 0}

@@ -23,7 +23,7 @@ MAX_REQUEST_BYTES = 19_500_000
 MAX_RESPONSE_BYTES = 2_000_000
 
 
-def build_request(provider, model, items):
+def build_request(provider, model, items, *, reasoning_effort=None):
     if provider not in KEY_ENV or not re.fullmatch(r"[A-Za-z0-9_./-]+", model):
         raise ValueError("INVALID_MODEL_PROVIDER")
     parts, content, image_audit = [], [], []
@@ -49,6 +49,13 @@ def build_request(provider, model, items):
         wire_model = "gemini/" + model if model.startswith("gemini-") else model
         body = {"model": wire_model, "messages": [{"role": "user", "content": content}],
                 "temperature": 0, "response_format": {"type": "json_object"}, "max_tokens": 16384}
+    if reasoning_effort is not None:
+        if reasoning_effort != "low":
+            raise ValueError("INVALID_REASONING_EFFORT")
+        if provider == "emergent":
+            body["reasoning_effort"] = reasoning_effort
+        else:
+            body["generationConfig"]["thinkingConfig"] = {"thinkingBudget": 1024}
     payload = json.dumps(body, separators=(",", ":")).encode()
     if len(payload) > MAX_REQUEST_BYTES:
         raise ValueError("REQUEST_IMAGE_BUDGET_EXCEEDED")
@@ -85,7 +92,9 @@ def _worker(connection, job, provider, model, timeout_s):
         key = os.environ.get(KEY_ENV[provider])
         if not key:
             raise ValueError("MODEL_KEY_NOT_CONFIGURED")
-        url, payload, prepared = build_request(provider, model, job["items"])
+        url, payload, prepared = build_request(provider, model, job["items"],
+            reasoning_effort=job.get("reasoning_effort"))
+        audit["requested_reasoning_effort"] = job.get("reasoning_effort")
         audit.update(prepared)
         headers = {"Content-Type": "application/json"}
         headers.update({"x-goog-api-key": key} if provider == "gemini" else {"Authorization": "Bearer " + key})

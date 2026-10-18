@@ -144,8 +144,55 @@ def _save_image(path, pixels, max_edge, quality=75):
             "width": pixels.shape[1], "height": pixels.shape[0]}
 
 
+def plan_visual_packets(frames, last_ms):
+    """Find large image changes, not event times; preserve all sampled instants.
+
+    Camera movement alone is insufficient: both colour-distribution and pixel
+    changes must be large. Short flashes merge into one boundary. Half a second
+    on either side remains visible; unresolved actions can request wider context.
+    No detector, reference answer, target location or historical event is read.
+    """
+    import cv2
+    import numpy as np
+    started, changes, previous = time.monotonic(), [], None
+    for f in frames:
+        image = cv2.imread(f["path"])
+        if image is None:
+            raise ValueError("PREPARED_IMAGE_UNREADABLE")
+        image = cv2.resize(image, (96, 160))
+        hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+        hist = cv2.calcHist([hsv], [0, 1, 2], None, [12, 8, 8], [0, 180, 0, 256, 0, 256])
+        cv2.normalize(hist, hist)
+        if previous is not None:
+            colour = cv2.compareHist(previous[0], hist, cv2.HISTCMP_BHATTACHARYYA)
+            pixels = float(np.mean(np.abs(image.astype("float32") - previous[1].astype("float32"))) / 255)
+            if colour >= .30 and pixels >= .10 and 2500 <= f["media_ms"] <= last_ms - 2500:
+                change = {"media_ms": f["media_ms"], "colour_distance": round(colour, 6),
+                          "pixel_difference": round(pixels, 6)}
+                if changes and change["media_ms"] - changes[-1]["media_ms"] < 2500:
+                    if change["colour_distance"] > changes[-1]["colour_distance"]:
+                        changes[-1] = change
+                else:
+                    changes.append(change)
+        previous = hist, image
+    boundaries = [0] + [c["media_ms"] for c in changes] + [last_ms]
+    jobs = []
+    for left, right in zip(boundaries, boundaries[1:]):
+        pieces = max(1, math.ceil((right - left) / 20000))
+        for index in range(pieces):
+            core_start = round(left + (right - left) * index / pieces)
+            core_end = round(left + (right - left) * (index + 1) / pieces)
+            jobs.append({"packet_id": f"sequence_{len(jobs)+1:03}", "phase": "INITIAL",
+                "start_ms": max(0, core_start - 500), "end_ms": min(last_ms, core_end + 500),
+                "core_start_ms": core_start, "core_end_ms": core_end,
+                "visual_cut_candidates_ms": [c["media_ms"] for c in changes
+                    if core_start - 500 <= c["media_ms"] <= core_end + 500]})
+    return jobs, {"strategy": "SOURCE_IMAGE_CHANGES", "changes": changes,
+                  "seconds": round(time.monotonic() - started, 3)}
+
+
 def prepare(evidence_dir, output_dir, *, fps=8., max_edge=768, chunk_ms=30000,
-            overlap_ms=6000, timeout_s=60.):
+            overlap_ms=6000, timeout_s=60., scene_packets=False):
     """One sequential source decode; zero detector forwards and model calls."""
     import cv2
     if not _number(fps) or not 1 <= fps <= 30 or not 320 <= max_edge <= 1920:
@@ -218,13 +265,18 @@ def prepare(evidence_dir, output_dir, *, fps=8., max_edge=768, chunk_ms=30000,
             frames.append({"frame_id": f"s{previous_ms:09}", "media_ms": previous_ms, **image})
     finally:
         cap.release()
-    packets = plan_packets(previous_ms, chunk_ms, overlap_ms)
+    visual_plan = None
+    if scene_packets:
+        packets, visual_plan = plan_visual_packets(frames, previous_ms)
+    else:
+        packets = plan_packets(previous_ms, chunk_ms, overlap_ms)
     by_id = {f["frame_id"]: f for f in frames}
     for packet in packets:
         selected = [f for f in frames if packet["start_ms"] <= f["media_ms"] <= packet["end_ms"]]
         packet["frame_ids"] = [f["frame_id"] for f in selected]
-        nearby = sorted(references, key=lambda r: (not packet["start_ms"] <= r["media_ms"] <= packet["end_ms"],
-                        abs(r["media_ms"] - (packet["start_ms"] + packet["end_ms"]) / 2)))[:5]
+        nearby = (sorted(references, key=lambda r: r["media_ms"]) if scene_packets else
+            sorted(references, key=lambda r: (not packet["start_ms"] <= r["media_ms"] <= packet["end_ms"],
+                abs(r["media_ms"] - (packet["start_ms"] + packet["end_ms"]) / 2)))[:5])
         packet["reference_ids"] = [r["reference_id"] for r in nearby]
         packet["source_video_sha256"] = sums[video.relative_to(root).as_posix()]
     gaps = [b["media_ms"] - a["media_ms"] for a, b in zip(frames, frames[1:])]
@@ -233,7 +285,9 @@ def prepare(evidence_dir, output_dir, *, fps=8., max_edge=768, chunk_ms=30000,
         "source_video_sha256": digest(video), "original_taps_sha256": digest(root / "anchors.json"),
         "source_end_ms": previous_ms, "sampling_fps": fps, "max_edge": max_edge,
         "frames": frames, "references": sorted(references, key=lambda r: int(r["reference_id"][1:])),
-        "packets": packets, "input_coverage": {"complete": covered == set(by_id),
+        "packets": packets, "visual_packet_plan": visual_plan,
+        "reference_policy": "CONSENSUS_RAW" if scene_packets else "ORIGINAL_WITH_STORED_MASKS",
+        "input_coverage": {"complete": covered == set(by_id),
             "decoded_source_frames": decoded, "unique_delivered_frames": len(frames),
             "frame_appearances_with_overlap": sum(len(p["frame_ids"]) for p in packets),
             "max_sample_gap_ms": max(gaps, default=0), "max_native_frame_gap_ms": largest_native_gap,
@@ -250,16 +304,31 @@ def packet_items(manifest, packet):
     frames = {f["frame_id"]: f for f in manifest["frames"]}
     references = {r["reference_id"]: r for r in manifest["references"]}
     items = [{"type": "text", "text": PROMPT}]
+    consensus = manifest.get("reference_policy") == "CONSENSUS_RAW"
+    if consensus:
+        items.append({"type": "text", "text":
+            "REFERENCE SECTION: these are identity examples, NOT timeline frames or separate plays. "
+            "Infer the SAME physical player shared across the original human selection areas. "
+            "A broad box or isolated click may include a neighbouring player. Use the other references "
+            "to resolve that ambiguity. Automatically generated masks are deliberately not supplied. "
+            "reference_ids on a person must name POSITIVE visual matches, not comparison examples. "
+            "If a person matches those references, selected=true. For a different person, selected=false "
+            "and reference_ids=[]. If uncertain, use selected=null and ask IDENTITY. "
+            "Keep passer and receiver separate even when their kits match. Prioritize releases and their "
+            "outcomes; summarize receives/carries/dribbles in details instead of listing every touch."})
     for ref_id in packet["reference_ids"]:
         r = references[ref_id]
         items.extend([{"type": "text", "text": json.dumps({"selected_reference": ref_id,
             "source_ms": r["media_ms"], "source_box": r["box"], "original_positive_point": r["target_point"],
             "selection_hints": {k: v for k, v in r.get("selection_hints", {}).items() if k != "visible_mask"}})},
             {"type": "image", "path": r["path"], "sha256": r["sha256"]}])
-        if r.get("masked_view"):
+        if r.get("masked_view") and not consensus:
             masked = r["masked_view"]
             items.extend([{"type": "text", "text": f"{ref_id}: original stored visible-person mask, same source instant; grey pixels are excluded."},
                           {"type": "image", "path": masked["path"], "sha256": masked["sha256"]}])
+    items.append({"type": "text", "text": "REFERENCE SECTION ENDED. Only the following full-source "
+        "images are chronological action evidence. Observe the complete supplied interval: "
+        + json.dumps({k: packet[k] for k in ("start_ms", "end_ms", "core_start_ms", "core_end_ms", "visual_cut_candidates_ms") if k in packet})})
     if packet.get("question"):
         items.append({"type": "text", "text": "Inspect this missing connection in the whole supplied play: "
                       + json.dumps(packet["question"], separators=(",", ":"))})
@@ -311,6 +380,9 @@ def resolve_response(data, manifest, packet, receipt):
             ref_support = [v for v in p.get("reference_ids") or [] if isinstance(v, str) and v in refs]
             support = cited(p.get("evidence_frames"))
             selected = p.get("selected") if type(p.get("selected")) is bool else None
+            if (manifest.get("reference_policy") == "CONSENSUS_RAW" and selected is False
+                    and ref_support and support and p.get("kit_consistent") is True):
+                selected = None  # contradictory positive match needs clarification, never forced credit
             if selected is True and (not ref_support or not support or p.get("kit_consistent") is False):
                 selected = None
             people[pid] = {"selected": selected, "reference_ids": ref_support, "evidence_frames": support}
