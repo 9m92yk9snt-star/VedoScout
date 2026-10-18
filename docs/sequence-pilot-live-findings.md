@@ -556,3 +556,30 @@ isolate reasoning from model choice. One new call, at most 90 seconds, with a
 separate 120-second probe bound. Local preflight reproduced the full Gemini hash
 b260f2edf69c5b4e2e30c52f047438dbd75169e471874d69fc120abeb5bbc0c1.
 The 142 relevant local tests pass, including rejecting changed comparison input.
+
+Run 39155042754 reproduced the full baseline hash and returned in 67.982 seconds;
+the probe took 70.918 seconds plus 18.903 seconds separate source preparation.
+It tracks the original r2-marked person through reception, turn and release,
+describes a blue contact without established control, identifies the dark-haired
+forward teammate as the finishing attacker and sees the goal. It correctly keeps
+the blond player separate from that striking movement. It retains uncertainty
+about a possible defensive touch at the hidden foot/ball instant. Crucially,
+it assigns r2/r6 to the releasing actor and r7 to a different person; selected
+identity therefore remains UNRESOLVED. This is not an accepted assist.
+
+The next bounded comparison changes only the scope of identity reference images.
+When an original human selection exists inside this source play, use that local
+selection and its original full-source cyan mark as the identity anchor. Keep
+all source-play frames, detailed contact instants, model, reasoning, question and
+identity consistency gate unchanged. References from other plays remain in the
+original data and are not declared incorrect; they are unnecessary appearance
+comparisons for this local track. Missing a local selection causes explicit stop.
+This is a general local-context option, not a jersey-number or event-time rule.
+
+Before narrowing references, the prior GPT-6-astra request must reproduce hash
+bc0a51feeb11e15d910cee00a696f364a69547cf49e967d9ca39ab1949bd4b95.
+Then only the out-of-play r6/r7 identity picture/label pairs are omitted; the
+original in-play r2 selection stays. The baseline action reply is never supplied.
+Local preflight: 2.829 seconds, 17,245,280 bytes, all 70 overview and 94 native
+contact instants retained. All 143 relevant tests pass. One 90-second request,
+120-second probe bound; actual perception result remains pending.

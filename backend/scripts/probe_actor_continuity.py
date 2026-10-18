@@ -104,19 +104,31 @@ def viewing_band(rows, width, height):
 def verify_baseline(items, saved, source_hash):
     old = saved['receipt']
     if (saved['source_video_sha256'] != source_hash or old['origin'] != 'LIVE_MODEL_REQUEST' or
-            old['status'] != 'COMPLETED' or old['requested_model'] != 'gemini-3.8-flash' or
+            old['status'] != 'COMPLETED' or old['requested_model'] not in {'gemini-3.8-flash','gpt-6-astra'} or
             hashlib.sha256(old['raw_response'].encode()).hexdigest() != old['response_sha256']):
         raise ValueError('INVALID_COMPARISON_BASELINE')
-    _, _, before = t.build_request('emergent','gemini-3.8-flash',items,reasoning_effort='low',image_detail='high')
+    _, _, before = t.build_request('emergent',old['requested_model'],items,
+        reasoning_effort=old.get('requested_reasoning_effort','low'),image_detail='high')
     if before['payload_sha256'] != old['payload_sha256']:
         raise ValueError('COMPARISON_INPUT_NOT_IDENTICAL')
     return {'origin_run':saved['origin_run'],'baseline_payload_sha256':old['payload_sha256'],
             'messages_images_and_source_instants_unchanged':True,
-            'changed_settings':['model','reasoning_effort','provider_completion_budget_parameter']}
+            'changed_settings':[]}
+
+
+def reference_ids_for_play(manifest, local, scope):
+    if scope == 'local':
+        if not local:
+            raise ValueError('ORIGINAL_IN_PLAY_SELECTION_REQUIRED')
+        return [r['reference_id'] for r in local]
+    if scope != 'profile':
+        raise ValueError('INVALID_IDENTITY_SCOPE')
+    return list(dict.fromkeys(manifest['identity_profile']['canonical_reference_ids']+
+                              [r['reference_id'] for r in local]))
 
 
 def prepare(manifest_path, gap_path, profile_path, output, *, link_mode='finisher',
-            model='gemini-3.8-flash', reasoning='low', comparison_baseline=None):
+            model='gemini-3.8-flash', reasoning='low', comparison_baseline=None,identity_scope='profile'):
     import cv2
     from cv_detect import PersonDetector
     started, output = time.monotonic(), Path(output)
@@ -198,11 +210,15 @@ def prepare(manifest_path, gap_path, profile_path, output, *, link_mode='finishe
         '"evidence":["s..."],"uncertainty":"unresolved or empty"}}.'}]
     refs = {r['reference_id']:r for r in manifest['references']}
     local = [r for r in refs.values() if q['start_ms'] <= r['media_ms'] <= q['end_ms']]
-    ids = list(dict.fromkeys(manifest['identity_profile']['canonical_reference_ids']+[r['reference_id'] for r in local]))
-    for rid in ids:
-        r = refs[rid]
-        items.extend([{'type':'text','text':'Original identity example '+rid},
-                      {'type':'image','path':r['path'],'sha256':r['sha256']}])
+    profile_ids = reference_ids_for_play(manifest,local,'profile')
+    ids = reference_ids_for_play(manifest,local,identity_scope)
+    def reference_parts(ref_ids):
+        return [part for rid in ref_ids for part in
+            ({'type':'text','text':'Original identity example '+rid},
+             {'type':'image','path':refs[rid]['path'],'sha256':refs[rid]['sha256']})]
+    prefix = items[:]
+    items.extend(reference_parts(ids))
+    context_start = len(items)
     spatial, _ = spatial_reference_items(manifest, {'core_start_ms':q['start_ms']}, local, output/'spatial')
     items.extend(spatial)
     rows = []
@@ -219,11 +235,29 @@ def prepare(manifest_path, gap_path, profile_path, output, *, link_mode='finishe
     for ms, label, im in sorted(rows, key=lambda row:(row[0],row[1])):
         items.extend([{'type':'text','text':f"Source frame {im['frame_id']}; source_ms={ms}; {label}"},
                       {'type':'image','path':im['path'],'sha256':im['sha256']}])
-    comparison = verify_baseline(items,p.read_json(comparison_baseline),source_hash) if comparison_baseline else None
+    comparison = None
+    if comparison_baseline:
+        baseline = p.read_json(comparison_baseline)
+        # Reproduce the prior full input before removing any out-of-play references.
+        comparison_items = prefix+reference_parts(profile_ids)+items[context_start:]
+        comparison = verify_baseline(comparison_items,baseline,source_hash)
+        old = baseline['receipt']
+        changes = []
+        if model != old['requested_model']:
+            changes += ['model','provider_completion_budget_parameter']
+        if reasoning != old.get('requested_reasoning_effort','low'):
+            changes.append('reasoning_effort')
+        if ids != profile_ids:
+            changes.append('identity_reference_scope')
+        comparison.update(changed_settings=changes,
+            messages_images_and_source_instants_unchanged=ids==profile_ids,
+            source_play_images_and_timestamps_unchanged=True,
+            removed_out_of_play_reference_ids=[rid for rid in profile_ids if rid not in ids])
     _, _, audit = t.build_request('emergent', model, items, reasoning_effort=reasoning, image_detail='high')
     result = {'status':'PREPARED_ACTOR_CONTINUITY_PROBE','origin_run':gap['origin_run'],
         'link_mode':link_mode,
         'model':model,'reasoning_effort':reasoning,'comparison':comparison,
+        'identity_scope':identity_scope,
         'identity_reference_ids':ids,
         'prior_response_sha256':gap['receipt']['response_sha256'],'source_video_sha256':source_hash,
         'question':q, 'source_crop_box':box,'detector_source_sha256':detector.model_sha256,
@@ -245,9 +279,10 @@ if __name__ == '__main__':
     cli.add_argument('--model',choices=['gemini-3.8-flash','gpt-6-astra'],default='gemini-3.8-flash')
     cli.add_argument('--reasoning',choices=['low','medium'],default='low')
     cli.add_argument('--comparison-baseline')
+    cli.add_argument('--identity-scope',choices=['profile','local'],default='profile')
     a = cli.parse_args()
     result, job, started = prepare(a.prepared, a.gap_receipt, a.resume_profile, a.output,link_mode=a.link_mode,
-        model=a.model,reasoning=a.reasoning,comparison_baseline=a.comparison_baseline)
+        model=a.model,reasoning=a.reasoning,comparison_baseline=a.comparison_baseline,identity_scope=a.identity_scope)
     if not a.prepare_only:
         response = t.run_jobs([job],'emergent',a.model,deadline=started+(120 if a.model=='gpt-6-astra' else 90),
             per_call_s=90 if a.model=='gpt-6-astra' else 45,workers=1)[0]

@@ -1,0 +1,75 @@
+{
+  "origin_run": 39155042754,
+  "source_video_sha256": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+  "result": {
+    "question": {
+      "packet_id": "sequence_006",
+      "start_ms": 38632,
+      "end_ms": 47264,
+      "focus_ms": 44032,
+      "reason": "OBSERVED_PASS_RECEIVE_FINISH_LINK",
+      "question": "Inspect the selected player's release, any opponent touch versus controlled possession, and the recipient's next contact.",
+      "detail_start_ms": 43732,
+      "detail_end_ms": 46015,
+      "selection_policy": "PRIOR_SOURCE_CITED_PASS_AND_LATER_SHOT_NOT_REFERENCE_ANSWERS",
+      "detail_windows": [
+        {
+          "start_ms": 43732,
+          "end_ms": 44382,
+          "role": "release"
+        },
+        {
+          "start_ms": 45132,
+          "end_ms": 46015,
+          "role": "finish"
+        }
+      ]
+    },
+    "source_crop_box": [
+      0,
+      861,
+      1080,
+      1510
+    ],
+    "probe_seconds": 70.918,
+    "identity_review": {
+      "status": "UNRESOLVED",
+      "reasons": [
+        "CONFLICTING_POSITIVE_IDENTITY_MATCHES",
+        "SELECTED_PERSON_NOT_UNIQUE"
+      ],
+      "conflicting_person_ids": [
+        "p1",
+        "p3"
+      ],
+      "independent_visual_correctness_verified": false,
+      "target_events": []
+    }
+  },
+  "receipt": {
+    "packet_id": "unresolved_actor",
+    "status": "COMPLETED",
+    "origin": "LIVE_MODEL_REQUEST",
+    "requested_model": "gpt-6-astra",
+    "requested_reasoning_effort": "medium",
+    "payload_sha256": "bc0a51feeb11e15d910cee00a696f364a69547cf49e967d9ca39ab1949bd4b95",
+    "response_sha256": "d1c919714b1bae36e8f4c21a08f3b1020ac4c39963484a7f887b59882959a0e1",
+    "raw_response": "{\n  \"players\": [\n    {\n      \"person_id\": \"p1\",\n      \"selected\": null,\n      \"appearance\": \"Short light-brown-haired white player, white socks and dark boots. Continuously tracked from the original r2 selection at 41915 ms through the leftward dribble, turn and release. Matches r6 as well. Distinct from the longer, much blonder-haired p3; r7 appears to depict that other player, so the identity examples are not treated as a consistent single-person selection.\",\n      \"reference_ids\": [\"r2\", \"r6\"],\n      \"evidence_frames\": [\"s000041632\", \"s000041915\", \"s000043132\", \"s000043965\", \"s000044098\", \"s000044632\", \"s000045132\"]\n    },\n    {\n      \"person_id\": \"p2\",\n      \"selected\": false,\n      \"appearance\": \"Taller dark-skinned white player with short dark textured hair. Carries the ball at the beginning, remains on the right during p1's release, then stays behind the subsequent attack. Not the white player who shoots from farther forward.\",\n      \"reference_ids\": [],\n      \"evidence_frames\": [\"s000038632\", \"s000040765\", \"s000041382\", \"s000043732\", \"s000044382\", \"s000045382\"]\n    },\n    {\n      \"person_id\": \"p3\",\n      \"selected\": null,\n      \"appearance\": \"White player with conspicuous longer, fluffy blond hair, matching the appearance in r7 rather than the shorter-haired r2/r6 player. Challenges for the earlier leftward ball, subsequently runs on the right toward goal, and remains separate from both p1 and the central shooter. Selection remains unresolved because the supplied identity examples appear to span different people.\",\n      \"reference_ids\": [\"r7\"],\n      \"evidence_frames\": [\"s000040765\", \"s000041265\", \"s000041915\", \"s000044515\", \"s000045382\", \"s000045748\", \"s000046131\"]\n    },\n    {\n      \"person_id\": \"p4\",\n      \"selected\": false,\n      \"appearance\": \"Dark-haired white player farther upfield, initially visible near the goal-side group and later behind the blue defenders. Emerges centrally with the ball before the finish. Separate from p2, who is simultaneously visible nearer the camera, and from blond p3 on the right.\",\n      \"reference_ids\": [],\n      \"evidence_frames\": [\"s000040765\", \"s000041015\", \"s000044032\", \"s000045315\", \"s000045432\", \"s000045515\", \"s000045632\"]\n    },\n    {\n      \"person_id\": \"p5\",\n      \"selected\": false,\n      \"appearance\": \"Additional dark-haired white player partly visible at the far left during p1's turn. Kept separate from the forward white player p4; the supplied views do not establish a continuous connection between those tracks.\",\n      \"reference_ids\": [],\n      \"evidence_frames\": [\"s000042765\", \"s000042882\", \"s000043015\", \"s000043132\"]\n    },\n    {\n      \"person_id\": \"p6\",\n      \"selected\": false,\n      \"appearance\": \"Dark-haired blue player with white shorts and dark socks directly facing p1's release. Extends a boot toward the incoming ball, then bends and turns after it.\",\n      \"reference_ids\": [],\n      \"evidence_frames\": [\"s000043732\", \"s000044198\", \"s000044332\", \"s000044382\", \"s000044515\"]\n    },\n    {\n      \"person_id\": \"p7\",\n      \"selected\": false,\n      \"appearance\": \"Blue defender with blue socks and bright orange boots, running back on the right side of the central attack.\",\n      \"reference_ids\": [],\n      \"evidence_frames\": [\"s000045132\", \"s000045432\", \"s000045598\", \"s000045715\"]\n    },\n    {\n      \"person_id\": \"p8\",\n      \"selected\": false,\n      \"appearance\": \"Tall, short light-haired blue defender. Challenges p2 early and later retreats beside blond p3 toward the goal.\",\n      \"reference_ids\": [],\n      \"evidence_frames\": [\"s000039882\", \"s000040882\", \"s000045382\", \"s000045848\", \"s000046015\"]\n    },\n    {\n      \"person_id\": \"p9\",\n      \"selected\": false,\n      \"appearance\": \"Goalkeeper in red, initially upright in front of goal and later diving low across the ball's path.\",\n      \"reference_ids\": [],\n      \"evidence_frames\": [\"s000038632\", \"s000041132\", \"s000045298\", \"s000045798\", \"s000046015\"]\n    },\n    {\n      \"person_id\": \"p10\",\n      \"selected\": false,\n      \"appearance\": \"Short dark-haired blue pursuer approaching the eventual shooter from the left, with a leg extending into the shooting area. Kept separate from the orange-booted defender p7.\",\n      \"reference_ids\": [],\n      \"evidence_frames\": [\"s000045132\", \"s000045315\", \"s000045498\", \"s000045548\", \"s000045632\"]\n    }\n  ],\n  \"contact_chain\": [\n    {\n      \"actor\": \"p2\",\n      \"kind\": \"Carries the ball, then releases it leftward under pressure\",\n      \"before_frame\": \"s000040765\",\n      \"after_frame\": \"s000040882\",\n      \"recipient\": null,\n      \"visible_evidence\": \"The ball is immediately in front of p2 before his leg extends; afterward it is travelling left away from him while p8 stretches across the passing lane.\",\n      \"remaining_alternatives\": \"p2's release is supported by his leg motion and the departing ball. A small contact by the challenging blue defender is not resolved in these overview samples.\"\n    },\n    {\n      \"actor\": null,\n      \"kind\": \"Contested contact in the blond white player's area; ball continues left\",\n      \"before_frame\": \"s000041132\",\n      \"after_frame\": \"s000041382\",\n      \"recipient\": \"p1\",\n      \"visible_evidence\": \"The ball approaches p3 from the right. p3 and a blue opponent extend their legs in the same area at s000041265; afterward the ball is clear of them to the left, toward p1.\",\n      \"remaining_alternatives\": \"The exact touching foot is obscured by the overlapping challenge. p3, the blue challenger, or both remain possible; no clean possession by p3 is asserted.\"\n    },\n    {\n      \"actor\": \"p1\",\n      \"kind\": \"Collects the leftward ball and dribbles away before turning back inward\",\n      \"before_frame\": \"s000041515\",\n      \"after_frame\": \"s000043265\",\n      \"recipient\": null,\n      \"visible_evidence\": \"p1 approaches the rolling ball, brings it alongside his feet, carries it left through the original selection instant, then turns with the ball and accelerates right. p3 remains separately visible behind him.\",\n      \"remaining_alternatives\": \"\"\n    },\n    {\n      \"actor\": \"p1\",\n      \"kind\": \"Releases the active ball forward/right with a foot touch\",\n      \"before_frame\": \"s000043948\",\n      \"after_frame\": \"s000044115\",\n      \"recipient\": \"p6\",\n      \"visible_evidence\": \"Native detail shows p1 advancing his boot into the ball at s000043965–s000044082. By s000044098 and s000044115 the ball has separated from his extended foot and is moving toward the central blue defender. p2 stands farther right and does not make this release.\",\n      \"remaining_alternatives\": \"The releasing actor is uniquely determined as p1.\"\n    },\n    {\n      \"actor\": \"p6\",\n      \"kind\": \"Next contact: interception or deflection attempt\",\n      \"before_frame\": \"s000044248\",\n      \"after_frame\": \"s000044382\",\n      \"recipient\": null,\n      \"visible_evidence\": \"The released ball reaches p6's extended boot. Across s000044298–s000044365 it overlaps the boot area as he bends and turns; afterward he follows the ball away. Neither white p1 nor white p2 is within touching distance at this contact.\",\n      \"remaining_alternatives\": \"p6 is the uniquely supported next touching player. The blurred foot-ball overlap does not establish a clean trap or sustained possession, so neither is asserted.\"\n    },\n    {\n      \"actor\": \"p4\",\n      \"kind\": \"Appears with the ball in the forward central channel\",\n      \"before_frame\": \"s000045282\",\n      \"after_frame\": \"s000045432\",\n      \"recipient\": null,\n      \"visible_evidence\": \"The ball becomes visible immediately ahead of p4's feet as he advances between the retreating blue players. p1 trails on the left, p2 remains nearer the camera, and p3 runs separately on the right.\",\n      \"remaining_alternatives\": \"The transfer from p6's contact to this position is partly hidden. No intervening pass, possession sequence or additional touch is inferred.\"\n    },\n    {\n      \"actor\": \"p4\",\n      \"kind\": \"Finishing kick toward goal under a blue challenge\",\n      \"before_frame\": \"s000045432\",\n      \"after_frame\": \"s000045665\",\n      \"recipient\": null,\n      \"visible_evidence\": \"Before the action the ball is at p4's feet and his leg is preparing to swing. He extends through the ball area while p10 challenges across him. The ball then emerges to the right and travels low toward goal, leaving p4 behind. p3 is ahead and to the right, not the player making this kicking motion.\",\n      \"remaining_alternatives\": \"p4 is the supported finishing attacker, but the decisive foot-ball instant is obscured by p10's challenge. A defensive touch or deflection there cannot be excluded, so the final touching foot is not uniquely established.\"\n    },\n    {\n      \"actor\": null,\n      \"kind\": \"Ball passes the diving goalkeeper and retreating players\",\n      \"before_frame\": \"s000045698\",\n      \"after_frame\": \"s000045965\",\n      \"recipient\": null,\n      \"visible_evidence\": \"The ball continues rightward, briefly overlaps the area behind p3, reappears beyond him and the diving red goalkeeper, and travels past p8 toward the goal. No distinct new kick or clear change of trajectory is visible.\",\n      \"remaining_alternatives\": \"Brief overlap prevents absolute exclusion of a slight touch, but there is no positive evidence for adding a touch by p3, p8 or p9.\"\n    }\n  ],\n  \"outcome\": {\n    \"kind\": \"GOAL\",\n    \"last_touch_actor\": null,\n    \"evidence\": [\"s000045965\", \"s000046015\", \"s000046131\", \"s000046265\", \"s000046515\"],\n    \"uncertainty\": \"The ball visibly enters the goal and continues into the net area. p4 makes the finishing attacking action, not p1, p2 or blond p3. The exact last touch remains unresolved because of the overlapping defensive challenge at the shot and brief later occlusions. Selection identity also remains unresolved across the conflicting r2/r6 and r7 examples; the original r2-selected physical track itself is p1.\"\n  }\n}",
+    "elapsed_seconds": 67.982,
+    "usage": {
+      "completion_tokens": 3501,
+      "prompt_tokens": 113193,
+      "total_tokens": 116694,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": 0,
+        "audio_tokens": 0,
+        "reasoning_tokens": 1024,
+        "rejected_prediction_tokens": 0
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": 0,
+        "cached_tokens": 0
+      }
+    }
+  }
+}

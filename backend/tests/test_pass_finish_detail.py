@@ -10,6 +10,7 @@ import pytest
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from scripts.probe_actor_continuity import pass_finish_gap, validate_native_coverage
 from scripts.probe_actor_continuity import verify_baseline
+from scripts.probe_actor_continuity import reference_ids_for_play
 import sequence_pilot_transport as transport
 
 
@@ -69,3 +70,13 @@ def test_model_comparison_rejects_changed_input_before_new_request():
         verify_baseline([{'type':'text','text':'different context'}],saved,'source')
     with pytest.raises(ValueError,match='INVALID_COMPARISON_BASELINE'):
         verify_baseline(items,saved,'different source')
+
+
+def test_local_play_anchor_uses_original_in_play_selection_without_asserting_other_identities():
+    manifest = {'identity_profile':{'canonical_reference_ids':['elsewhere1','here','elsewhere2']}}
+    local = [{'reference_id':'here','media_ms':1200}]
+    assert reference_ids_for_play(manifest,local,'local') == ['here']
+    assert reference_ids_for_play(manifest,local,'profile') == ['elsewhere1','here','elsewhere2']
+    assert manifest['identity_profile']['canonical_reference_ids'] == ['elsewhere1','here','elsewhere2']
+    with pytest.raises(ValueError,match='ORIGINAL_IN_PLAY_SELECTION_REQUIRED'):
+        reference_ids_for_play(manifest,[],'local')

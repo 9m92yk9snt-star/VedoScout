@@ -17,7 +17,7 @@ jobs:
       github.event.pull_request.number == 39 &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.event.pull_request.head.ref == 'codex/sequence-pilot-foundation' &&
-      github.event.before == 'b00dec1f1251f1502176bf13eac94b454399d206' &&
+      github.event.before == '7fe790fdd797342e8bdc9c7d623e24ea910c7454' &&
       github.run_attempt == 1
     runs-on: ubuntu-latest
     timeout-minutes: 9
@@ -50,6 +50,7 @@ jobs:
             /docs/examples/native-full-source-observations.json
             /docs/examples/native-pass-finish-gap-receipt.json
             /docs/examples/native-pass-finish-flash-receipt.json
+            /docs/examples/native-pass-finish-astra-receipt.json
             /docs/examples/gpt6-missing-contact-receipt.json
             /docs/examples/gpt6-full-initial-receipts.json
             /docs/examples/gpt6-contact-review-low-receipt.json
@@ -95,7 +96,7 @@ jobs:
       - name: Read complete plays with the actual model
         env:
           EMERGENT_LLM_KEY: ${{ secrets.EMERGENT_LLM_KEY }}
-        run: python backend/scripts/probe_actor_continuity.py --prepared "$RUNNER_TEMP/sequence-pilot-prepared/manifest.json" --gap-receipt docs/examples/native-pass-finish-gap-receipt.json --resume-profile docs/examples/gpt6-focused-profile-receipt.json --output "$RUNNER_TEMP/sequence-pilot-result" --link-mode pass-finish --model gpt-6-astra --reasoning medium --comparison-baseline docs/examples/native-pass-finish-flash-receipt.json
+        run: python backend/scripts/probe_actor_continuity.py --prepared "$RUNNER_TEMP/sequence-pilot-prepared/manifest.json" --gap-receipt docs/examples/native-pass-finish-gap-receipt.json --resume-profile docs/examples/gpt6-focused-profile-receipt.json --output "$RUNNER_TEMP/sequence-pilot-result" --link-mode pass-finish --model gpt-6-astra --reasoning medium --comparison-baseline docs/examples/native-pass-finish-astra-receipt.json --identity-scope local
       - name: Evaluate returned observations separately and print actual receipts
         if: always()
         run: |
