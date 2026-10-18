@@ -317,12 +317,16 @@ def identity_items(manifest):
 
 def apply_identity_profile(manifest, data):
     """Reuse an observed profile, never invent a target or select action times."""
+    if isinstance(data, list) and len(data) == 1:
+        data = data[0]
+    if not isinstance(data, dict):
+        raise ValueError("IDENTITY_PROFILE_UNRESOLVED")
     valid = {r["reference_id"] for r in manifest["references"]}
     chosen = data.get("canonical_reference_ids")
     description = data.get("appearance")
     if (data.get("identity_clear") is not True or not isinstance(chosen, list)
-        or not 1 <= len(chosen) <= 3 or len(set(chosen)) != len(chosen)
-        or any(not isinstance(x, str) or x not in valid for x in chosen)
+        or not 1 <= len(chosen) <= 3
+        or any(not isinstance(x, str) or x not in valid for x in chosen) or len(set(chosen)) != len(chosen)
         or not isinstance(description, str) or not 1 <= len(description) <= 2000):
         raise ValueError("IDENTITY_PROFILE_UNRESOLVED")
     updated = deepcopy(manifest)

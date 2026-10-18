@@ -42,12 +42,15 @@ def test_shared_profile_cannot_invent_references_or_change_source_frames():
     profile = {"identity_clear": True, "appearance": "Visible white kit and light hair",
                "canonical_reference_ids": ["r1"]}
     reused = p.apply_identity_profile(manifest, profile)
+    assert p.apply_identity_profile(manifest, [profile]) == reused
     assert reused["frames"] == manifest["frames"]
     assert reused["packets"][0]["frame_ids"] == manifest["packets"][0]["frame_ids"]
     assert "identity_profile" not in manifest
     profile["canonical_reference_ids"] = ["invented"]
     with pytest.raises(ValueError, match="IDENTITY_PROFILE_UNRESOLVED"):
         p.apply_identity_profile(manifest, profile)
+    with pytest.raises(ValueError, match="IDENTITY_PROFILE_UNRESOLVED"):
+        p.apply_identity_profile(manifest, [profile, profile])
 
 
 def test_unclear_identity_profile_does_not_silently_choose_a_player():

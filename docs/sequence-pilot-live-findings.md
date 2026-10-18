@@ -91,5 +91,10 @@ Raw JSON observations are retained separately: approximate native video times
 must not be relabelled as exact-frame proof or silently passed through the
 still-image citation resolver. No reference event answers enter either request.
 
+Native run 39141841836 did not reach the video requests: Gemini 3.1 returned
+the reference profile inside a one-element JSON array. The profile reader now
+accepts that equivalent envelope while rejecting multiple profiles or unknown
+reference IDs. No video sampling or perception result exists for that failed run.
+
 The source video and original taps were published as test input with the
 owner's explicit permission. Credentials remain in GitHub Actions secrets.

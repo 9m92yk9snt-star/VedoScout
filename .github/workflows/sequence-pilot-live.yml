@@ -17,7 +17,7 @@ jobs:
       github.event.pull_request.number == 39 &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.event.pull_request.head.ref == 'codex/sequence-pilot-foundation' &&
-      github.event.before == '910003574f7a1d0c72a7f9584d29b7ec54d7afa5' &&
+      github.event.before == '91ee1bd99493e4c05f5652d6b4ce68f8eb8d89ac' &&
       github.run_attempt == 1
     runs-on: ubuntu-latest
     timeout-minutes: 9
