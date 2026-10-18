@@ -260,6 +260,19 @@ def image_item(tmp_path):
 
 
 @pytest.mark.parametrize("provider", ["gemini", "emergent"])
+def test_gemini3_uses_its_supported_reasoning_and_temperature_defaults(provider):
+    _, body, _ = t.build_request(provider, "gemini-3.1-pro-preview", [{"type": "text", "text": "observe"}], reasoning_effort="low")
+    body = json.loads(body)
+    config = body["generationConfig"] if provider == "gemini" else body
+    assert "temperature" not in config
+    if provider == "gemini":
+        assert config["thinkingConfig"] == {"thinkingLevel": "LOW"}
+    else:
+        assert body["model"] == "gemini/gemini-3.1-pro-preview"
+        assert body["reasoning_effort"] == "low"
+
+
+@pytest.mark.parametrize("provider", ["gemini", "emergent"])
 def test_model_detail_setting_is_distinct_from_source_image_bytes(tmp_path, provider):
     item = image_item(tmp_path)
     _, standard, a = t.build_request(provider, "gemini-2.5-pro", [item])

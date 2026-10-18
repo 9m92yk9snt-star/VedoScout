@@ -67,5 +67,15 @@ Provider documentation: https://docs.litellm.ai/docs/providers/gemini describes
 image_url.detail=high mapping to Gemini media resolution; this proxy's handling
 must be verified from actual responses, not assumed from that documentation.
 
+Focused run 39141150261 completed in 45.534 s plus 15-second-scale preparation.
+Both Gemini 2.5 replies used exactly 15,738 image tokens and 18,814 prompt tokens
+despite explicit high detail on one request. Both still assigned the selected
+player only a run and misattributed the assist. No detail improvement demonstrated.
+The authenticated normal model catalog returned gemini/gemini-3.1-pro-preview.
+The next paired probe uses that available model on the same tap-density-selected
+packet. Its temperature is left at the provider default, as Google recommends
+for Gemini 3 (https://ai.google.dev/gemini-api/docs/gemini-3).
+The profile request remains Gemini 2.5 for a consistent identity-only stage.
+
 The source video and original taps were published as test input with the
 owner's explicit permission. Credentials remain in GitHub Actions secrets.

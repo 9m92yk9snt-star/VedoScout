@@ -26,6 +26,7 @@ MAX_RESPONSE_BYTES = 2_000_000
 def build_request(provider, model, items, *, reasoning_effort=None, image_detail=None):
     if provider not in KEY_ENV or not re.fullmatch(r"[A-Za-z0-9_./-]+", model):
         raise ValueError("INVALID_MODEL_PROVIDER")
+    gemini3 = model.removeprefix("gemini/").startswith("gemini-3")
     if image_detail not in {None, "high"}:
         raise ValueError("INVALID_IMAGE_DETAIL")
     parts, content, image_audit = [], [], []
@@ -56,13 +57,17 @@ def build_request(provider, model, items, *, reasoning_effort=None, image_detail
         wire_model = "gemini/" + model if model.startswith("gemini-") else model
         body = {"model": wire_model, "messages": [{"role": "user", "content": content}],
                 "temperature": 0, "response_format": {"type": "json_object"}, "max_tokens": 16384}
+    if gemini3:
+        # Google recommends its default temperature for Gemini 3 reasoning.
+        (body["generationConfig"] if provider == "gemini" else body).pop("temperature", None)
     if reasoning_effort is not None:
         if reasoning_effort != "low":
             raise ValueError("INVALID_REASONING_EFFORT")
         if provider == "emergent":
             body["reasoning_effort"] = reasoning_effort
         else:
-            body["generationConfig"]["thinkingConfig"] = {"thinkingBudget": 1024}
+            body["generationConfig"]["thinkingConfig"] = (
+                {"thinkingLevel": "LOW"} if gemini3 else {"thinkingBudget": 1024})
     payload = json.dumps(body, separators=(",", ":")).encode()
     if len(payload) > MAX_REQUEST_BYTES:
         raise ValueError("REQUEST_IMAGE_BUDGET_EXCEEDED")

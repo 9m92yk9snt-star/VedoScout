@@ -40,7 +40,7 @@ def catalog():
         return {"status": "UNAVAILABLE"}
 
 
-def run(manifest_path, out):
+def run(manifest_path, out, model="gemini-2.5-pro"):
     started, out = time.monotonic(), Path(out)
     manifest = pilot.read_json(manifest_path)
     deadline = started + 180
@@ -48,7 +48,7 @@ def run(manifest_path, out):
               "expected_answers_used_as_input": False, "independent_visual_correctness_verified": False,
               "source_video_sha256": manifest["source_video_sha256"],
               "prior_preparation_seconds": manifest["preparation_seconds"], "target_events": [],
-              "model_catalog": catalog(), "comparisons": {}}
+              "model_catalog": catalog(), "comparisons": {}, "requested_model": model}
     pilot.write_json(out / "result.json", result)
     if result["model_catalog"].get("http_status") in {401, 403}:
         return
@@ -71,9 +71,9 @@ def run(manifest_path, out):
     jobs = [{"packet_id": name, "items": items, "reasoning_effort": "low", "image_detail": detail}
             for name, detail in [("detail_default", None), ("detail_high", "high")]]
     for job in jobs:
-        transport.build_request("emergent", "gemini-2.5-pro", items,
+        transport.build_request("emergent", model, items,
                                 reasoning_effort="low", image_detail=job["image_detail"])
-    for receipt in transport.run_jobs(jobs, "emergent", "gemini-2.5-pro", deadline=deadline, per_call_s=90):
+    for receipt in transport.run_jobs(jobs, "emergent", model, deadline=deadline, per_call_s=90):
         pilot.write_json(out / "responses" / (receipt["packet_id"] + ".json"), receipt)
         if receipt["status"] == "COMPLETED":
             observed = pilot.resolve_response(pilot.parse_response(receipt["raw_response"]), manifest, packet,
@@ -87,5 +87,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--prepared", required=True)
     parser.add_argument("--output", required=True)
+    parser.add_argument("--model", default="gemini-2.5-pro")
     args = parser.parse_args()
-    run(args.prepared, args.output)
+    run(args.prepared, args.output, args.model)

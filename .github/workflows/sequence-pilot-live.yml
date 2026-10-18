@@ -17,7 +17,7 @@ jobs:
       github.event.pull_request.number == 39 &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.event.pull_request.head.ref == 'codex/sequence-pilot-foundation' &&
-      github.event.before == '7437601b95d3978f06ba11ba651ffcc839f706ee' &&
+      github.event.before == '70a99fca421d3eac9827406f85a45b84133624e3' &&
       github.run_attempt == 1
     runs-on: ubuntu-latest
     timeout-minutes: 9
@@ -74,7 +74,7 @@ jobs:
       - name: Read complete plays with the actual model
         env:
           EMERGENT_LLM_KEY: ${{ secrets.EMERGENT_LLM_KEY }}
-        run: python backend/scripts/probe_sequence_detail.py --prepared "$RUNNER_TEMP/sequence-pilot-prepared/manifest.json" --output "$RUNNER_TEMP/sequence-pilot-result"
+        run: python backend/scripts/probe_sequence_detail.py --prepared "$RUNNER_TEMP/sequence-pilot-prepared/manifest.json" --output "$RUNNER_TEMP/sequence-pilot-result" --model gemini-3.1-pro-preview
       - name: Evaluate returned observations separately and print actual receipts
         if: always()
         run: |
