@@ -316,12 +316,13 @@ def image_item(tmp_path):
     return {"type": "image", "path": str(image), "sha256": hashlib.sha256(b"test-jpeg").hexdigest()}
 
 
-def test_openai_reasoning_model_uses_completion_budget_without_sampling_override():
-    _, body, _ = t.build_request("emergent", "gpt-6-sol", [{"type": "text", "text": "observe"}], reasoning_effort="low")
+@pytest.mark.parametrize("effort", ["low", "medium"])
+def test_openai_reasoning_model_uses_completion_budget_without_sampling_override(effort):
+    _, body, _ = t.build_request("emergent", "gpt-6-sol", [{"type": "text", "text": "observe"}], reasoning_effort=effort)
     body = json.loads(body)
     assert body["max_completion_tokens"] == 16384
     assert "max_tokens" not in body and "temperature" not in body
-    assert body["reasoning_effort"] == "low"
+    assert body["reasoning_effort"] == effort
 
 
 @pytest.mark.parametrize("provider", ["gemini", "emergent"])

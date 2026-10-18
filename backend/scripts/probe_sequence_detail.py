@@ -288,6 +288,55 @@ def run_contact_zoom(manifest_path, out, model, action_path, profile_path):
     pilot.write_json(out / "result.json", result)
 
 
+def run_reasoning_comparison(manifest_path, out, model, initial_path, profile_path, low_path):
+    """One controlled call: identical failed contact input, only reasoning changes."""
+    started, out = time.monotonic(), Path(out)
+    manifest = pilot.read_json(manifest_path)
+    saved, profile, low = (pilot.read_json(x) for x in (initial_path, profile_path, low_path))
+    for wrapper in (saved, profile, low):
+        if wrapper["source_video_sha256"] != manifest["source_video_sha256"]:
+            raise ValueError("COMPARISON_SOURCE_MISMATCH")
+    manifest = pilot.apply_identity_profile(manifest, json.loads(profile["receipt"]["raw_response"]))
+    by_id = {p["packet_id"]: p for p in manifest["packets"]}
+    observed = []
+    for r in saved["receipts"]:
+        if (r["status"] != "COMPLETED" or r["origin"] != "LIVE_MODEL_REQUEST"
+                or hashlib.sha256(r["raw_response"].encode()).hexdigest() != r["response_sha256"]):
+            raise ValueError("COMPARISON_RECEIPT_INVALID")
+        observed.append(pilot.resolve_response(pilot.parse_response(r["raw_response"]), manifest,
+            by_id[r["packet_id"]], {k: r[k] for k in ("packet_id", "payload_sha256", "response_sha256", "origin")}))
+    jobs = pilot.plan_contact_reviews(manifest, pilot.reconcile(observed,
+        sampling_gap_ms=manifest["input_coverage"]["max_sample_gap_ms"]), limit=6)
+    def density(job):
+        return sum(job["start_ms"] <= r["media_ms"] <= job["end_ms"] for r in manifest["references"]) / max(1, job["end_ms"]-job["start_ms"])
+    job = max(jobs, key=density)
+    detailed, jobs = pilot.prepare_contact_reviews(manifest, [job], out)
+    items = pilot.packet_items(detailed, job)
+    _, _, before = transport.build_request("emergent", model, items, reasoning_effort="low", image_detail="high")
+    previous = low["receipt"]
+    if (previous["packet_id"] != job["packet_id"] or previous["requested_model"] != model
+            or previous["payload_sha256"] != before["payload_sha256"]):
+        raise ValueError("COMPARISON_INPUT_NOT_IDENTICAL")
+    _, _, after = transport.build_request("emergent", model, items, reasoning_effort="medium", image_detail="high")
+    result = {"status": "CONTROLLED_REASONING_COMPARISON", "source_video_sha256": manifest["source_video_sha256"],
+        "production_pipeline_changed": False, "expected_answers_used_as_input": False,
+        "independent_visual_correctness_verified": False, "target_events": [],
+        "baseline_run": low["origin_run"], "baseline_payload_sha256": before["payload_sha256"],
+        "same_images_prompt_model_as_baseline": True, "changed_parameter": {"reasoning_effort": ["low", "medium"]},
+        "request_audit": after}
+    pilot.write_json(out / "result.json", result)
+    receipt = transport.run_jobs([{ "packet_id": job["packet_id"], "items": items,
+        "reasoning_effort": "medium", "image_detail": "high"}], "emergent", model,
+        deadline=started+150, per_call_s=120)[0]
+    pilot.write_json(out / "responses" / (job["packet_id"]+".json"), receipt)
+    if receipt["status"] == "COMPLETED":
+        reading = pilot.resolve_response(pilot.parse_response(receipt["raw_response"]), detailed, job,
+            {k: receipt[k] for k in ("packet_id", "payload_sha256", "response_sha256", "origin")})
+        result.update(pilot.reconcile([reading]))
+    result.update(analysis_seconds=round(time.monotonic()-started, 3), model_status=receipt["status"])
+    pilot.write_json(out / "result.json", result)
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--prepared", required=True)
@@ -298,8 +347,13 @@ if __name__ == "__main__":
     parser.add_argument("--resume-action")
     parser.add_argument("--resume-profile")
     parser.add_argument("--native-contact-zoom", action="store_true")
+    parser.add_argument("--compare-reasoning-low-receipt")
+    parser.add_argument("--initial-receipts")
     args = parser.parse_args()
-    if args.native_contact_zoom:
+    if args.compare_reasoning_low_receipt:
+        run_reasoning_comparison(args.prepared, args.output, args.model, args.initial_receipts,
+            args.resume_profile, args.compare_reasoning_low_receipt)
+    elif args.native_contact_zoom:
         run_contact_zoom(args.prepared, args.output, args.model, args.resume_action, args.resume_profile)
     elif args.resume_action and args.resume_profile:
         run_followup(args.prepared, args.output, args.model, args.resume_action, args.resume_profile)

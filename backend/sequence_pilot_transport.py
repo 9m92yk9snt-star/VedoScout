@@ -76,7 +76,8 @@ def build_request(provider, model, items, *, reasoning_effort=None, image_detail
         body.pop("temperature", None)
         body["max_completion_tokens"] = body.pop("max_tokens")
     if reasoning_effort is not None:
-        if reasoning_effort != "low":
+        if reasoning_effort not in {"low", "medium"} or (reasoning_effort == "medium" and
+                not (provider == "emergent" and model.startswith(("gpt-5", "gpt-6")))):
             raise ValueError("INVALID_REASONING_EFFORT")
         if provider == "emergent":
             body["reasoning_effort"] = reasoning_effort

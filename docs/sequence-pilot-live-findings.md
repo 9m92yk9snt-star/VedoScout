@@ -185,3 +185,20 @@ derived from original tap geometry; cited outcome instants receive native crops
 too. Source timestamps and crop hashes are recorded. This controls wire bytes
 without deleting contact instants. Model quality must still be verified against
 the real source. Cached-resume elapsed time is not fresh end-to-end analysis time.
+
+Run 39145583264 completed all six native reviews in 77.947 seconds, reusing
+all ten initial responses without new initial calls. All six wire payloads fit.
+None of the five reference cases was verified. The saved shot was labelled
+OFF_TARGET; goal outcome remained unknown; two earlier assists were lost to
+an alleged opponent recovery or an obscured release; the previously documented
+last assist was now an uncertain shot. Native detail alone is not a reliable fix.
+Do not replace this result with the earlier isolated success or remove uncertainty
+checks to improve apparent counts. At this commit 97 isolated GitHub code tests
+passed; those tests do not validate model perception.
+
+Next controlled probe uses the review with highest original-tap density, chosen
+without reference event answers. Reconstruct its exact low-reasoning wire payload
+and require its hash to match run 39145583264 before sending anything. Then change
+only reasoning_effort from low to medium: same model, images, ordering, timestamps,
+identity examples and question. One new call, 150-second overall bound, 120 seconds
+per call. Compare actual observation accuracy and latency; no full-source replay.
