@@ -186,6 +186,16 @@ def test_claimed_one_touch_finish_cannot_contradict_separate_receiving_and_strik
     assert mapped_review(data,context)['target_events']==[]
 
 
+@pytest.mark.parametrize('fact_key',['observation','fact'])
+def test_source_cited_goal_facts_are_accepted_without_inventing_missing_frame_ids(fact_key):
+    data,context=mapped_observation()
+    data['outcome']['evidence']=[{'frame':fid,fact_key:'The moving ball is inside the goal'}
+                                for fid in data['outcome']['evidence']]
+    assert mapped_review(data,context)['status']=='APPROVED'
+    data['outcome']['evidence'][0]['frame']='not_supplied'
+    assert mapped_review(data,context)['reasons']==['INVALID_GOAL_SOURCE_EVIDENCE']
+
+
 def test_another_actors_intervening_chain_action_prevents_direct_assist():
     data,context=mapped_observation()
     extra=deepcopy(data['contact_chain'][1]);extra.update(actor='opponent',before_frame='s000000200',after_frame='s000000300')

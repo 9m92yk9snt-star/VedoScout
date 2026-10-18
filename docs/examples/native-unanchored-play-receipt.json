@@ -1,0 +1,1133 @@
+{
+  "experiment": "unanchored-play-continuous-detail",
+  "workflow_run": 39168276199,
+  "job_id": 117795745387,
+  "code_commit": "04aa879eff29cd14dd75940a344258e0751d09b5",
+  "source_video_sha256": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+  "whole_source_preparation_seconds": 19.248,
+  "packet_id": "unanchored_play",
+  "provider": "emergent",
+  "requested_model": "gpt-6-astra",
+  "origin": "LIVE_MODEL_REQUEST",
+  "status": "COMPLETED",
+  "requested_reasoning_effort": "medium",
+  "payload_sha256": "fdbc8ea960312d9e90c7ac65d2e9d76415eb6d6c07eca781b93d88c9bea7ffe6",
+  "payload_bytes": 19038721,
+  "explicit_image_count": 208,
+  "frame_sampling_in_provider_metadata": false,
+  "videos": [],
+  "requested_image_detail": "high",
+  "model_version": "gpt-6-astra",
+  "response_id": "chatcmpl-EaSnGyhgzaCdjrUVNn4Oc3DF0tsjh",
+  "usage": {
+    "completion_tokens": 3185,
+    "prompt_tokens": 141585,
+    "total_tokens": 144770,
+    "completion_tokens_details": {
+      "accepted_prediction_tokens": 0,
+      "audio_tokens": 0,
+      "reasoning_tokens": 653,
+      "rejected_prediction_tokens": 0
+    },
+    "prompt_tokens_details": {
+      "audio_tokens": 0,
+      "cached_tokens": 0
+    }
+  },
+  "raw_response": "{\n  \"players\": [\n    {\n      \"person_id\": \"p1\",\n      \"selected\": true,\n      \"appearance\": \"Shorter, slim white-kit attacker with short light-brown hair, white socks and dark boots. Appearance matches the selected reference player; the central approach, reception and subsequent movement through the blue defenders remain continuous. Distinct from the dark-haired white number 7, the taller white number 13 and the deeper dark-haired white teammate.\",\n      \"reference_ids\": [\"r2\", \"r9\", \"r8\"],\n      \"evidence_frames\": [\"s000048881\", \"s000049215\", \"s000050581\", \"s000050798\"]\n    },\n    {\n      \"person_id\": \"p2\",\n      \"selected\": false,\n      \"appearance\": \"White-kit player with short dark hair, a clearly visible back number 7 and bright yellow-green boots. This is the initial ball carrier, not the shorter selected receiver.\",\n      \"reference_ids\": [],\n      \"evidence_frames\": [\"s000047515\", \"s000048631\", \"s000048881\"]\n    },\n    {\n      \"person_id\": \"p3\",\n      \"selected\": false,\n      \"appearance\": \"Blue-shirted defender with light-brown hair, white shorts, blue socks, orange boots and a visible back number 20. Closely challenges the initial carrier and then follows the receiver.\",\n      \"reference_ids\": [],\n      \"evidence_frames\": [\"s000048881\", \"s000049548\", \"s000050631\"]\n    },\n    {\n      \"person_id\": \"p4\",\n      \"selected\": false,\n      \"appearance\": \"Separate brown-haired blue defender, taller than the selected attacker, with white shorts and blue socks; an 8-shaped back marking is visible. Remains separate from the orange-booted number 20 during their overlap.\",\n      \"reference_ids\": [],\n      \"evidence_frames\": [\"s000048948\", \"s000049548\", \"s000050381\"]\n    },\n    {\n      \"person_id\": \"p5\",\n      \"selected\": false,\n      \"appearance\": \"Tall, short-blond-haired blue defender approaching from the receiver's right, white shorts and blue socks; back number 3 becomes visible as he turns.\",\n      \"reference_ids\": [],\n      \"evidence_frames\": [\"s000049165\", \"s000049748\", \"s000050148\"]\n    },\n    {\n      \"person_id\": \"p6\",\n      \"selected\": false,\n      \"appearance\": \"Brown-haired blue number 7 nearer the goal, white shorts and blue socks. Separate from the three defenders surrounding the receiver.\",\n      \"reference_ids\": [],\n      \"evidence_frames\": [\"s000049765\", \"s000050815\", \"s000051131\"]\n    },\n    {\n      \"person_id\": \"p7\",\n      \"selected\": false,\n      \"appearance\": \"Goalkeeper in a red shirt, red shorts and red socks, with gloves; crouches and then drops sideways across the incoming ball's path.\",\n      \"reference_ids\": [],\n      \"evidence_frames\": [\"s000050731\", \"s000050981\", \"s000051131\"]\n    },\n    {\n      \"person_id\": \"p8\",\n      \"selected\": false,\n      \"appearance\": \"Deeper white teammate with dark hair and a taller, more upright silhouette, behind the receiver in the native detail. Does not replace the receiver during the foreground occlusion.\",\n      \"reference_ids\": [],\n      \"evidence_frames\": [\"s000048881\", \"s000049431\", \"s000050215\"]\n    },\n    {\n      \"person_id\": \"p9\",\n      \"selected\": false,\n      \"appearance\": \"Taller brown-haired white number 13 entering the foreground toward the goal after the finishing movement. Not the selected shorter attacker.\",\n      \"reference_ids\": [],\n      \"evidence_frames\": [\"s000050965\", \"s000051465\", \"s000052765\"]\n    }\n  ],\n  \"contact_chain\": [\n    {\n      \"actor\": \"p2\",\n      \"kind\": \"Controlled dribble and shielding\",\n      \"before_frame\": \"s000047265\",\n      \"after_frame\": \"s000048631\",\n      \"recipient\": null,\n      \"visible_evidence\": \"The white number 7 turns over the active ball and moves left with it close to his feet while p3 presses alongside. He continues adjusting his feet and body around the ball rather than relinquishing it at the first challenge.\",\n      \"remaining_alternatives\": \"Individual small contacts are partly hidden by the challenging legs.\"\n    },\n    {\n      \"actor\": \"p2\",\n      \"kind\": \"Short ground pass\",\n      \"before_frame\": \"s000048631\",\n      \"after_frame\": \"s000048881\",\n      \"recipient\": \"p1\",\n      \"visible_evidence\": \"The ball leaves the number 7's immediate foot area toward the central white attacker. At the end of the bracket it is rolling clear to the right of the challenging blue players, while p2 remains left and p1 approaches its path. Subsequent native detail follows that same rolling ball toward p1.\",\n      \"remaining_alternatives\": \"The release contact is partly screened. A slight defensive brush in the challenge cannot be excluded, but no defensive control or deliberate intervening pass is shown.\"\n    },\n    {\n      \"actor\": \"p1\",\n      \"kind\": \"Reception and close control\",\n      \"before_frame\": \"s000049165\",\n      \"after_frame\": \"s000049431\",\n      \"recipient\": null,\n      \"visible_evidence\": \"The rolling ball reaches the shorter central white attacker's feet. He spreads his stance, brings a foot across the incoming ball and keeps it close while turning toward the right. The ball is still at his feet after this receiving movement, before he advances into the closing defenders.\",\n      \"remaining_alternatives\": \"The precise receiving-foot contact is blurred, but the receiver and subsequent close control are supported. This is not a first-time shot.\"\n    },\n    {\n      \"actor\": \"p1\",\n      \"kind\": \"Finishing shot through the defenders\",\n      \"before_frame\": \"s000050381\",\n      \"after_frame\": \"s000050698\",\n      \"recipient\": null,\n      \"visible_evidence\": \"The same shorter white attacker emerges from behind the blue players, leans into a forward leg movement and follows through toward the goal. The ball emerges from the crowded foot area ahead of p3, lifts off the grass and travels rapidly rightward. His short before/after movement distinguishes the attacking action from the deeper white teammate and the later-arriving number 13.\",\n      \"remaining_alternatives\": \"The exact striking pixel is screened by blue legs. A slight defensive deflection in the crowded release remains unresolved; no separate blue possession or deliberate pass is visible.\"\n    },\n    {\n      \"actor\": \"p6\",\n      \"kind\": \"Attempted block as the shot passes\",\n      \"before_frame\": \"s000050815\",\n      \"after_frame\": \"s000050915\",\n      \"recipient\": null,\n      \"visible_evidence\": \"The moving airborne ball approaches blue number 7, is briefly screened alongside his body and then reappears beyond him continuing toward the goalkeeper.\",\n      \"remaining_alternatives\": \"A slight brush is unresolved. Proximity and the brief overlap do not establish a touch or controlled possession.\"\n    },\n    {\n      \"actor\": \"p7\",\n      \"kind\": \"Unsuccessful save attempt\",\n      \"before_frame\": \"s000050948\",\n      \"after_frame\": \"s000051131\",\n      \"recipient\": null,\n      \"visible_evidence\": \"The goalkeeper drops and extends across the low incoming ball. It passes through the vicinity of his lower body, reappears beyond him, continues toward the near upright and then moves inside the goal while he falls onto the grass.\",\n      \"remaining_alternatives\": \"A slight goalkeeper touch is not clearly resolved. He does not stop or secure the ball.\"\n    }\n  ],\n  \"outcome\": {\n    \"kind\": \"GOAL\",\n    \"last_touch_actor\": null,\n    \"evidence\": [\n      {\n        \"frame\": \"s000050698\",\n        \"observation\": \"The active ball is airborne and moving away from the finishing attacker toward goal.\"\n      },\n      {\n        \"frame\": \"s000051031\",\n        \"observation\": \"The same moving ball is beyond the falling goalkeeper and still travelling toward the goal.\"\n      },\n      {\n        \"frame\": \"s000051131\",\n        \"observation\": \"The ball has passed the near upright and is visibly moving inside the goal.\"\n      },\n      {\n        \"frame\": \"s000051198\",\n        \"observation\": \"It continues farther into the netted goal area; this is the tracked moving ball, not a stationary spare.\"\n      }\n    ],\n    \"uncertainty\": \"The attacking finish and goal are supported. The final physical toucher remains unresolved because slight defensive or goalkeeper contact cannot be determined from the overlaps.\"\n  },\n  \"link_assessment\": {\n    \"releaser\": \"p2\",\n    \"receiver\": \"p1\",\n    \"finisher\": \"p1\",\n    \"same_ball_release_to_receiver\": {\n      \"status\": \"SUPPORTED\",\n      \"frames\": [\"s000048631\", \"s000048881\", \"s000049131\", \"s000049215\"],\n      \"observation\": \"The ball leaves p2's foot area, rolls clear of the challenging blue players and continues across the visible grass into p1's receiving stance. The native detail supplies affirmative ball-motion continuity, not merely an absence of intervening possession.\"\n    },\n    \"receiver_finishing_action\": {\n      \"status\": \"SUPPORTED\",\n      \"frames\": [\"s000049431\", \"s000049698\", \"s000050381\", \"s000050698\"],\n      \"observation\": \"P1 receives and keeps the ball close, moves into the three closing blue defenders, then emerges with a forward striking movement. The ball exits that foot area toward goal as he follows through. The deeper white teammate stays behind the action.\"\n    },\n    \"goal_from_that_finish\": {\n      \"status\": \"SUPPORTED\",\n      \"frames\": [\"s000050698\", \"s000050915\", \"s000051031\", \"s000051131\"],\n      \"observation\": \"The shot travels rightward past blue number 7 and the dropping goalkeeper. The moving ball then passes the near upright into the goal, with subsequent movement deeper into the netted area.\"\n    },\n    \"intervening_control\": {\n      \"status\": \"NOT_OBSERVED\",\n      \"frames\": [\"s000048881\", \"s000049215\", \"s000049698\", \"s000050698\"],\n      \"observation\": \"No third player is shown settling the released ball or making a deliberate intervening pass. The visible reception belongs to p1, who continues into the finishing movement. Blue reaching legs do not demonstrate control.\"\n    },\n    \"defensive_contact\": {\n      \"status\": \"UNCERTAIN\",\n      \"frames\": [\"s000049748\", \"s000050631\", \"s000050831\", \"s000050998\"],\n      \"observation\": \"The crowded attacking foot area, the shot's brief overlap with blue number 7 and its passage beside the goalkeeper obscure possible slight brushes. No specific defensive touch is established by a clear contact and corresponding ball change; none establishes an interruption by possession.\"\n    }\n  },\n  \"event_mapping\": {\n    \"pass_chain_index\": 1,\n    \"receive_chain_index\": 2,\n    \"finish_chain_index\": 3,\n    \"receiver_is_teammate\": true,\n    \"same_active_ball\": true,\n    \"continuous_play\": true,\n    \"pass_actor_unique\": true,\n    \"finishing_actor_unique\": true,\n    \"goal_frame\": \"s000051131\",\n    \"one_touch_finish\": false\n  }\n}",
+  "response_sha256": "cdf7f1122ecdbdede3024e8bf3d82d98769d10dc085cc1e6ae84aa51e08686fb",
+  "elapsed_seconds": 62.16,
+  "result": {
+    "status": "COMPLETED",
+    "source_video_sha256": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+    "original_taps_sha256": "95ec65ff36e5d3441a32fe053854f646f6bcbbfe14f88090e7aa98eebe550446",
+    "source_start_ms": 47265,
+    "source_end_ms": 53014,
+    "question": {
+      "packet_id": "sequence_007",
+      "start_ms": 47265,
+      "end_ms": 53014,
+      "focus_ms": 50565,
+      "reason": "FINAL_TOUCH_ACTOR_WITHOUT_LOCAL_IDENTITY_MARK",
+      "question": "Identify the physical player at the selected player's release and at the final touch. Determine whether they are the same person and whether another teammate touches the active ball before the outcome.",
+      "detail_start_ms": 48881,
+      "detail_end_ms": 51465,
+      "selection_policy": "PRIOR_SOURCE_CITED_BUILDUP_THROUGH_UNRESOLVED_CONTACT"
+    },
+    "navigation_response_sha256": "f58ff53a77372926c21a6e0d7bee1e2f4f8bb87faf0e4398e42a07b3046038c9",
+    "identity_reference_ids": [
+      "r2",
+      "r9",
+      "r8"
+    ],
+    "identity_policy": "IN_PLAY_OR_NEAREST_BRACKETING_RAW_SELECTIONS_WITH_500MS_NEIGHBOURS",
+    "in_play_original_selection_count": 0,
+    "identity_source_audit": [
+      {
+        "original_selection": "r2",
+        "source_ms": 41915,
+        "approximate_clip_s": -5.35,
+        "original_source_box": {
+          "x": 0.2287,
+          "y": 0.5403,
+          "w": 0.2055,
+          "h": 0.1511
+        },
+        "original_positive_point": {
+          "x": 0.26874435411020775,
+          "y": 0.6158536585365855
+        },
+        "annotation_policy": "ORIGINAL_HUMAN_SELECTION_ONLY_AT_THIS_SOURCE_INSTANT_NOT_A_PREDICTED_TRACK",
+        "annotated_image_sha256": "4f5d1194149e22108d97dbf22bd121387575ff4758345f7978271045a6bdae51"
+      },
+      {
+        "original_selection": "r9",
+        "source_ms": 55764,
+        "approximate_clip_s": 8.499,
+        "original_source_box": {
+          "x": 0.3971,
+          "y": 0.5461,
+          "w": 0.1217,
+          "h": 0.1027
+        },
+        "original_positive_point": {
+          "x": 0.4595959595959596,
+          "y": 0.6204545454545455
+        },
+        "annotation_policy": "ORIGINAL_HUMAN_SELECTION_ONLY_AT_THIS_SOURCE_INSTANT_NOT_A_PREDICTED_TRACK",
+        "annotated_image_sha256": "f2f37d9fa7f984c5bb8abecd31743f1052340569411a18b42663d5dc211ece89"
+      },
+      {
+        "original_selection": "r8",
+        "source_ms": 56064,
+        "approximate_clip_s": 8.799,
+        "original_source_box": {
+          "x": 0.3525,
+          "y": 0.5272,
+          "w": 0.1685,
+          "h": 0.1062
+        },
+        "original_positive_point": {
+          "x": 0.3925111170009129,
+          "y": 0.5770275642724623
+        },
+        "annotation_policy": "ORIGINAL_HUMAN_SELECTION_ONLY_AT_THIS_SOURCE_INSTANT_NOT_A_PREDICTED_TRACK",
+        "annotated_image_sha256": "bcaa2278f96a6519df6c31d050a06810b2b3ac44fe87b869c7a256b41467dc9b"
+      }
+    ],
+    "source_crop_box": [
+      0,
+      753,
+      1080,
+      1318
+    ],
+    "detector_samples": [
+      {
+        "media_ms": 48881,
+        "boxes_xywh_conf": [
+          [
+            0.5583333333333333,
+            0.4765625,
+            0.06944444444444445,
+            0.0875,
+            0.8130015134811401
+          ],
+          [
+            0.4722222222222222,
+            0.4890625,
+            0.08611111111111111,
+            0.090625,
+            0.8004508018493652
+          ],
+          [
+            0.7444444444444445,
+            0.4640625,
+            0.06666666666666667,
+            0.1203125,
+            0.736055850982666
+          ],
+          [
+            0.2722222222222222,
+            0.4890625,
+            0.09722222222222222,
+            0.1140625,
+            0.6922781467437744
+          ],
+          [
+            0.15555555555555556,
+            0.475,
+            0.125,
+            0.11875,
+            0.6349501609802246
+          ],
+          [
+            0.23055555555555557,
+            0.5234375,
+            0.05277777777777778,
+            0.06875,
+            0.32943838834762573
+          ]
+        ]
+      },
+      {
+        "media_ms": 49131,
+        "boxes_xywh_conf": [
+          [
+            0.12222222222222222,
+            0.478125,
+            0.10277777777777777,
+            0.11875,
+            0.8461097478866577
+          ],
+          [
+            0.7055555555555556,
+            0.475,
+            0.09166666666666666,
+            0.1140625,
+            0.7747980356216431
+          ],
+          [
+            0.48055555555555557,
+            0.4953125,
+            0.09722222222222222,
+            0.0890625,
+            0.7566009163856506
+          ],
+          [
+            0.21388888888888888,
+            0.4828125,
+            0.13055555555555556,
+            0.11875,
+            0.6721203327178955
+          ],
+          [
+            0.5583333333333333,
+            0.4796875,
+            0.06111111111111111,
+            0.0921875,
+            0.6511279940605164
+          ],
+          [
+            0.31666666666666665,
+            0.4890625,
+            0.08333333333333333,
+            0.10625,
+            0.5616546869277954
+          ],
+          [
+            0.9722222222222222,
+            0.4796875,
+            0.025,
+            0.1171875,
+            0.5260229110717773
+          ]
+        ]
+      },
+      {
+        "media_ms": 49381,
+        "boxes_xywh_conf": [
+          [
+            0.06388888888888888,
+            0.4765625,
+            0.07777777777777778,
+            0.1234375,
+            0.8552359342575073
+          ],
+          [
+            0.5555555555555556,
+            0.4796875,
+            0.06944444444444445,
+            0.09375,
+            0.7961307764053345
+          ],
+          [
+            0.6416666666666667,
+            0.471875,
+            0.10277777777777777,
+            0.1171875,
+            0.7125962972640991
+          ],
+          [
+            0.9333333333333333,
+            0.4828125,
+            0.06388888888888888,
+            0.1171875,
+            0.7037785649299622
+          ],
+          [
+            0.4361111111111111,
+            0.4953125,
+            0.09444444444444444,
+            0.09375,
+            0.7001782655715942
+          ],
+          [
+            0.3527777777777778,
+            0.4734375,
+            0.06666666666666667,
+            0.128125,
+            0.6877648830413818
+          ],
+          [
+            0.32222222222222224,
+            0.471875,
+            0.05,
+            0.0984375,
+            0.5413578152656555
+          ]
+        ]
+      },
+      {
+        "media_ms": 49631,
+        "boxes_xywh_conf": [
+          [
+            0.5083333333333333,
+            0.4765625,
+            0.1111111111111111,
+            0.1109375,
+            0.8420909643173218
+          ],
+          [
+            0,
+            0.4796875,
+            0.058333333333333334,
+            0.115625,
+            0.8416450619697571
+          ],
+          [
+            0.9222222222222223,
+            0.4828125,
+            0.07222222222222222,
+            0.109375,
+            0.8278011083602905
+          ],
+          [
+            0.325,
+            0.465625,
+            0.06111111111111111,
+            0.11875,
+            0.6587393879890442
+          ],
+          [
+            0.3638888888888889,
+            0.465625,
+            0.08055555555555556,
+            0.1296875,
+            0.5410669445991516
+          ]
+        ]
+      },
+      {
+        "media_ms": 49881,
+        "boxes_xywh_conf": [
+          [
+            0.8527777777777777,
+            0.475,
+            0.08611111111111111,
+            0.109375,
+            0.8037794828414917
+          ],
+          [
+            0.2916666666666667,
+            0.4578125,
+            0.08333333333333333,
+            0.1296875,
+            0.7897194623947144
+          ],
+          [
+            0.4861111111111111,
+            0.48125,
+            0.06944444444444445,
+            0.0828125,
+            0.6517711281776428
+          ],
+          [
+            0.41388888888888886,
+            0.4671875,
+            0.07777777777777778,
+            0.109375,
+            0.5045729875564575
+          ],
+          [
+            0.375,
+            0.465625,
+            0.06944444444444445,
+            0.1171875,
+            0.31398433446884155
+          ],
+          [
+            0.9277777777777778,
+            0.4734375,
+            0.05,
+            0.0578125,
+            0.31390416622161865
+          ]
+        ]
+      },
+      {
+        "media_ms": 50131,
+        "boxes_xywh_conf": [
+          [
+            0.7972222222222223,
+            0.465625,
+            0.075,
+            0.109375,
+            0.8298096656799316
+          ],
+          [
+            0.2388888888888889,
+            0.4609375,
+            0.08055555555555556,
+            0.121875,
+            0.7650432586669922
+          ],
+          [
+            0.41944444444444445,
+            0.4859375,
+            0.07777777777777778,
+            0.0734375,
+            0.7055209875106812
+          ],
+          [
+            0.3638888888888889,
+            0.459375,
+            0.06388888888888888,
+            0.1046875,
+            0.6115537881851196
+          ],
+          [
+            0.3111111111111111,
+            0.453125,
+            0.06111111111111111,
+            0.0984375,
+            0.5383825302124023
+          ],
+          [
+            0.35,
+            0.5359375,
+            0.05555555555555555,
+            0.046875,
+            0.29407835006713867
+          ]
+        ]
+      },
+      {
+        "media_ms": 50381,
+        "boxes_xywh_conf": [
+          [
+            0.7305555555555555,
+            0.465625,
+            0.06666666666666667,
+            0.1046875,
+            0.766505241394043
+          ],
+          [
+            0.175,
+            0.45625,
+            0.1,
+            0.1203125,
+            0.6776936054229736
+          ],
+          [
+            0.32222222222222224,
+            0.4625,
+            0.06666666666666667,
+            0.1109375,
+            0.5999497175216675
+          ],
+          [
+            0.37222222222222223,
+            0.4671875,
+            0.05277777777777778,
+            0.0875,
+            0.5261058807373047
+          ]
+        ]
+      },
+      {
+        "media_ms": 50631,
+        "boxes_xywh_conf": [
+          [
+            0.6305555555555555,
+            0.471875,
+            0.08333333333333333,
+            0.090625,
+            0.7425414323806763
+          ],
+          [
+            0.9444444444444444,
+            0.4796875,
+            0.05277777777777778,
+            0.0796875,
+            0.5575812458992004
+          ],
+          [
+            0,
+            0.46875,
+            0.019444444444444445,
+            0.1171875,
+            0.5462746620178223
+          ],
+          [
+            0.28888888888888886,
+            0.465625,
+            0.06111111111111111,
+            0.0859375,
+            0.5222030282020569
+          ],
+          [
+            0.13055555555555556,
+            0.4546875,
+            0.075,
+            0.0984375,
+            0.5193376541137695
+          ],
+          [
+            0.18333333333333332,
+            0.4859375,
+            0.08611111111111111,
+            0.0796875,
+            0.38837409019470215
+          ],
+          [
+            0.6111111111111112,
+            0.46875,
+            0.044444444444444446,
+            0.053125,
+            0.35796159505844116
+          ]
+        ]
+      },
+      {
+        "media_ms": 50881,
+        "boxes_xywh_conf": [
+          [
+            0.016666666666666666,
+            0.478125,
+            0.07222222222222222,
+            0.1359375,
+            0.750686526298523
+          ],
+          [
+            0.8111111111111111,
+            0.484375,
+            0.06388888888888888,
+            0.0734375,
+            0.7293074727058411
+          ],
+          [
+            0.15833333333333333,
+            0.4734375,
+            0.07777777777777778,
+            0.0890625,
+            0.7131738662719727
+          ],
+          [
+            0.2388888888888889,
+            0.4640625,
+            0.08333333333333333,
+            0.103125,
+            0.6205013990402222
+          ],
+          [
+            0.5527777777777778,
+            0.475,
+            0.06944444444444445,
+            0.0828125,
+            0.6092474460601807
+          ],
+          [
+            0.07777777777777778,
+            0.45625,
+            0.06666666666666667,
+            0.103125,
+            0.5678236484527588
+          ],
+          [
+            0.49166666666666664,
+            0.4671875,
+            0.06111111111111111,
+            0.0515625,
+            0.47223424911499023
+          ]
+        ]
+      },
+      {
+        "media_ms": 51131,
+        "boxes_xywh_conf": [
+          [
+            0.005555555555555556,
+            0.475,
+            0.1361111111111111,
+            0.1390625,
+            0.7569974064826965
+          ],
+          [
+            0.4444444444444444,
+            0.4671875,
+            0.05,
+            0.09375,
+            0.6439084410667419
+          ],
+          [
+            0.18888888888888888,
+            0.4625,
+            0.05277777777777778,
+            0.0984375,
+            0.578338623046875
+          ],
+          [
+            0.1388888888888889,
+            0.478125,
+            0.06111111111111111,
+            0.0875,
+            0.5118372440338135
+          ],
+          [
+            0.3861111111111111,
+            0.471875,
+            0.04722222222222222,
+            0.0484375,
+            0.44247061014175415
+          ],
+          [
+            0,
+            0.4640625,
+            0.05,
+            0.109375,
+            0.3901054263114929
+          ]
+        ]
+      },
+      {
+        "media_ms": 51381,
+        "boxes_xywh_conf": [
+          [
+            0,
+            0.465625,
+            0.1527777777777778,
+            0.146875,
+            0.8753320574760437
+          ],
+          [
+            0.3055555555555556,
+            0.471875,
+            0.041666666666666664,
+            0.0890625,
+            0.6952112913131714
+          ],
+          [
+            0.24722222222222223,
+            0.471875,
+            0.04722222222222222,
+            0.0484375,
+            0.48258042335510254
+          ]
+        ]
+      }
+    ],
+    "retained_overview_instants": [
+      47265,
+      47381,
+      47515,
+      47631,
+      47765,
+      47881,
+      48015,
+      48131,
+      48265,
+      48381,
+      48515,
+      48631,
+      48765,
+      48881,
+      49015,
+      49131,
+      49265,
+      49381,
+      49515,
+      49631,
+      49765,
+      49881,
+      50015,
+      50131,
+      50265,
+      50381,
+      50515,
+      50631,
+      50765,
+      50881,
+      51015,
+      51131,
+      51265,
+      51381,
+      51515,
+      51631,
+      51765,
+      51881,
+      52015,
+      52131,
+      52265,
+      52381,
+      52515,
+      52631,
+      52765,
+      52881
+    ],
+    "retained_native_instants": [
+      48881,
+      48898,
+      48915,
+      48931,
+      48948,
+      48965,
+      48981,
+      48998,
+      49015,
+      49031,
+      49048,
+      49065,
+      49081,
+      49098,
+      49115,
+      49131,
+      49148,
+      49165,
+      49181,
+      49198,
+      49215,
+      49231,
+      49248,
+      49265,
+      49281,
+      49298,
+      49315,
+      49331,
+      49348,
+      49365,
+      49381,
+      49398,
+      49415,
+      49431,
+      49448,
+      49465,
+      49481,
+      49498,
+      49515,
+      49531,
+      49548,
+      49565,
+      49581,
+      49598,
+      49615,
+      49631,
+      49648,
+      49665,
+      49681,
+      49698,
+      49715,
+      49731,
+      49748,
+      49765,
+      49781,
+      49798,
+      49815,
+      49831,
+      49848,
+      49865,
+      49881,
+      49898,
+      49915,
+      49931,
+      49948,
+      49965,
+      49981,
+      49998,
+      50015,
+      50031,
+      50048,
+      50065,
+      50081,
+      50098,
+      50115,
+      50131,
+      50148,
+      50165,
+      50181,
+      50198,
+      50215,
+      50231,
+      50248,
+      50265,
+      50281,
+      50298,
+      50315,
+      50331,
+      50348,
+      50365,
+      50381,
+      50398,
+      50415,
+      50431,
+      50448,
+      50465,
+      50481,
+      50498,
+      50515,
+      50531,
+      50548,
+      50565,
+      50581,
+      50598,
+      50615,
+      50631,
+      50648,
+      50665,
+      50681,
+      50698,
+      50715,
+      50731,
+      50748,
+      50765,
+      50781,
+      50798,
+      50815,
+      50831,
+      50848,
+      50865,
+      50881,
+      50898,
+      50915,
+      50931,
+      50948,
+      50965,
+      50981,
+      50998,
+      51015,
+      51031,
+      51048,
+      51065,
+      51081,
+      51098,
+      51115,
+      51131,
+      51148,
+      51165,
+      51181,
+      51198,
+      51215,
+      51231,
+      51248,
+      51265,
+      51281,
+      51298,
+      51315,
+      51331,
+      51348,
+      51365,
+      51381,
+      51398,
+      51415,
+      51431,
+      51448,
+      51465
+    ],
+    "new_bridge_instants": [],
+    "detail_jpeg_quality": 85,
+    "max_detail_gap_ms": 17,
+    "request_audit": {
+      "payload_sha256": "fdbc8ea960312d9e90c7ac65d2e9d76415eb6d6c07eca781b93d88c9bea7ffe6",
+      "payload_bytes": 19038721,
+      "explicit_image_count": 208,
+      "frame_sampling_in_provider_metadata": false,
+      "videos": [],
+      "requested_image_detail": "high"
+    },
+    "preparation_seconds": 3.916,
+    "production_pipeline_changed": false,
+    "expected_answers_used_as_input": false,
+    "historical_action_wording_sent": false,
+    "target_events": [],
+    "counts": {},
+    "independent_visual_correctness_verified": false,
+    "probe_seconds": 66.262,
+    "raw_observations": {
+      "players": [
+        {
+          "person_id": "p1",
+          "selected": true,
+          "appearance": "Shorter, slim white-kit attacker with short light-brown hair, white socks and dark boots. Appearance matches the selected reference player; the central approach, reception and subsequent movement through the blue defenders remain continuous. Distinct from the dark-haired white number 7, the taller white number 13 and the deeper dark-haired white teammate.",
+          "reference_ids": [
+            "r2",
+            "r9",
+            "r8"
+          ],
+          "evidence_frames": [
+            "s000048881",
+            "s000049215",
+            "s000050581",
+            "s000050798"
+          ]
+        },
+        {
+          "person_id": "p2",
+          "selected": false,
+          "appearance": "White-kit player with short dark hair, a clearly visible back number 7 and bright yellow-green boots. This is the initial ball carrier, not the shorter selected receiver.",
+          "reference_ids": [],
+          "evidence_frames": [
+            "s000047515",
+            "s000048631",
+            "s000048881"
+          ]
+        },
+        {
+          "person_id": "p3",
+          "selected": false,
+          "appearance": "Blue-shirted defender with light-brown hair, white shorts, blue socks, orange boots and a visible back number 20. Closely challenges the initial carrier and then follows the receiver.",
+          "reference_ids": [],
+          "evidence_frames": [
+            "s000048881",
+            "s000049548",
+            "s000050631"
+          ]
+        },
+        {
+          "person_id": "p4",
+          "selected": false,
+          "appearance": "Separate brown-haired blue defender, taller than the selected attacker, with white shorts and blue socks; an 8-shaped back marking is visible. Remains separate from the orange-booted number 20 during their overlap.",
+          "reference_ids": [],
+          "evidence_frames": [
+            "s000048948",
+            "s000049548",
+            "s000050381"
+          ]
+        },
+        {
+          "person_id": "p5",
+          "selected": false,
+          "appearance": "Tall, short-blond-haired blue defender approaching from the receiver's right, white shorts and blue socks; back number 3 becomes visible as he turns.",
+          "reference_ids": [],
+          "evidence_frames": [
+            "s000049165",
+            "s000049748",
+            "s000050148"
+          ]
+        },
+        {
+          "person_id": "p6",
+          "selected": false,
+          "appearance": "Brown-haired blue number 7 nearer the goal, white shorts and blue socks. Separate from the three defenders surrounding the receiver.",
+          "reference_ids": [],
+          "evidence_frames": [
+            "s000049765",
+            "s000050815",
+            "s000051131"
+          ]
+        },
+        {
+          "person_id": "p7",
+          "selected": false,
+          "appearance": "Goalkeeper in a red shirt, red shorts and red socks, with gloves; crouches and then drops sideways across the incoming ball's path.",
+          "reference_ids": [],
+          "evidence_frames": [
+            "s000050731",
+            "s000050981",
+            "s000051131"
+          ]
+        },
+        {
+          "person_id": "p8",
+          "selected": false,
+          "appearance": "Deeper white teammate with dark hair and a taller, more upright silhouette, behind the receiver in the native detail. Does not replace the receiver during the foreground occlusion.",
+          "reference_ids": [],
+          "evidence_frames": [
+            "s000048881",
+            "s000049431",
+            "s000050215"
+          ]
+        },
+        {
+          "person_id": "p9",
+          "selected": false,
+          "appearance": "Taller brown-haired white number 13 entering the foreground toward the goal after the finishing movement. Not the selected shorter attacker.",
+          "reference_ids": [],
+          "evidence_frames": [
+            "s000050965",
+            "s000051465",
+            "s000052765"
+          ]
+        }
+      ],
+      "contact_chain": [
+        {
+          "actor": "p2",
+          "kind": "Controlled dribble and shielding",
+          "before_frame": "s000047265",
+          "after_frame": "s000048631",
+          "recipient": null,
+          "visible_evidence": "The white number 7 turns over the active ball and moves left with it close to his feet while p3 presses alongside. He continues adjusting his feet and body around the ball rather than relinquishing it at the first challenge.",
+          "remaining_alternatives": "Individual small contacts are partly hidden by the challenging legs."
+        },
+        {
+          "actor": "p2",
+          "kind": "Short ground pass",
+          "before_frame": "s000048631",
+          "after_frame": "s000048881",
+          "recipient": "p1",
+          "visible_evidence": "The ball leaves the number 7's immediate foot area toward the central white attacker. At the end of the bracket it is rolling clear to the right of the challenging blue players, while p2 remains left and p1 approaches its path. Subsequent native detail follows that same rolling ball toward p1.",
+          "remaining_alternatives": "The release contact is partly screened. A slight defensive brush in the challenge cannot be excluded, but no defensive control or deliberate intervening pass is shown."
+        },
+        {
+          "actor": "p1",
+          "kind": "Reception and close control",
+          "before_frame": "s000049165",
+          "after_frame": "s000049431",
+          "recipient": null,
+          "visible_evidence": "The rolling ball reaches the shorter central white attacker's feet. He spreads his stance, brings a foot across the incoming ball and keeps it close while turning toward the right. The ball is still at his feet after this receiving movement, before he advances into the closing defenders.",
+          "remaining_alternatives": "The precise receiving-foot contact is blurred, but the receiver and subsequent close control are supported. This is not a first-time shot."
+        },
+        {
+          "actor": "p1",
+          "kind": "Finishing shot through the defenders",
+          "before_frame": "s000050381",
+          "after_frame": "s000050698",
+          "recipient": null,
+          "visible_evidence": "The same shorter white attacker emerges from behind the blue players, leans into a forward leg movement and follows through toward the goal. The ball emerges from the crowded foot area ahead of p3, lifts off the grass and travels rapidly rightward. His short before/after movement distinguishes the attacking action from the deeper white teammate and the later-arriving number 13.",
+          "remaining_alternatives": "The exact striking pixel is screened by blue legs. A slight defensive deflection in the crowded release remains unresolved; no separate blue possession or deliberate pass is visible."
+        },
+        {
+          "actor": "p6",
+          "kind": "Attempted block as the shot passes",
+          "before_frame": "s000050815",
+          "after_frame": "s000050915",
+          "recipient": null,
+          "visible_evidence": "The moving airborne ball approaches blue number 7, is briefly screened alongside his body and then reappears beyond him continuing toward the goalkeeper.",
+          "remaining_alternatives": "A slight brush is unresolved. Proximity and the brief overlap do not establish a touch or controlled possession."
+        },
+        {
+          "actor": "p7",
+          "kind": "Unsuccessful save attempt",
+          "before_frame": "s000050948",
+          "after_frame": "s000051131",
+          "recipient": null,
+          "visible_evidence": "The goalkeeper drops and extends across the low incoming ball. It passes through the vicinity of his lower body, reappears beyond him, continues toward the near upright and then moves inside the goal while he falls onto the grass.",
+          "remaining_alternatives": "A slight goalkeeper touch is not clearly resolved. He does not stop or secure the ball."
+        }
+      ],
+      "outcome": {
+        "kind": "GOAL",
+        "last_touch_actor": null,
+        "evidence": [
+          {
+            "frame": "s000050698",
+            "observation": "The active ball is airborne and moving away from the finishing attacker toward goal."
+          },
+          {
+            "frame": "s000051031",
+            "observation": "The same moving ball is beyond the falling goalkeeper and still travelling toward the goal."
+          },
+          {
+            "frame": "s000051131",
+            "observation": "The ball has passed the near upright and is visibly moving inside the goal."
+          },
+          {
+            "frame": "s000051198",
+            "observation": "It continues farther into the netted goal area; this is the tracked moving ball, not a stationary spare."
+          }
+        ],
+        "uncertainty": "The attacking finish and goal are supported. The final physical toucher remains unresolved because slight defensive or goalkeeper contact cannot be determined from the overlaps."
+      },
+      "link_assessment": {
+        "releaser": "p2",
+        "receiver": "p1",
+        "finisher": "p1",
+        "same_ball_release_to_receiver": {
+          "status": "SUPPORTED",
+          "frames": [
+            "s000048631",
+            "s000048881",
+            "s000049131",
+            "s000049215"
+          ],
+          "observation": "The ball leaves p2's foot area, rolls clear of the challenging blue players and continues across the visible grass into p1's receiving stance. The native detail supplies affirmative ball-motion continuity, not merely an absence of intervening possession."
+        },
+        "receiver_finishing_action": {
+          "status": "SUPPORTED",
+          "frames": [
+            "s000049431",
+            "s000049698",
+            "s000050381",
+            "s000050698"
+          ],
+          "observation": "P1 receives and keeps the ball close, moves into the three closing blue defenders, then emerges with a forward striking movement. The ball exits that foot area toward goal as he follows through. The deeper white teammate stays behind the action."
+        },
+        "goal_from_that_finish": {
+          "status": "SUPPORTED",
+          "frames": [
+            "s000050698",
+            "s000050915",
+            "s000051031",
+            "s000051131"
+          ],
+          "observation": "The shot travels rightward past blue number 7 and the dropping goalkeeper. The moving ball then passes the near upright into the goal, with subsequent movement deeper into the netted area."
+        },
+        "intervening_control": {
+          "status": "NOT_OBSERVED",
+          "frames": [
+            "s000048881",
+            "s000049215",
+            "s000049698",
+            "s000050698"
+          ],
+          "observation": "No third player is shown settling the released ball or making a deliberate intervening pass. The visible reception belongs to p1, who continues into the finishing movement. Blue reaching legs do not demonstrate control."
+        },
+        "defensive_contact": {
+          "status": "UNCERTAIN",
+          "frames": [
+            "s000049748",
+            "s000050631",
+            "s000050831",
+            "s000050998"
+          ],
+          "observation": "The crowded attacking foot area, the shot's brief overlap with blue number 7 and its passage beside the goalkeeper obscure possible slight brushes. No specific defensive touch is established by a clear contact and corresponding ball change; none establishes an interruption by possession."
+        }
+      },
+      "event_mapping": {
+        "pass_chain_index": 1,
+        "receive_chain_index": 2,
+        "finish_chain_index": 3,
+        "receiver_is_teammate": true,
+        "same_active_ball": true,
+        "continuous_play": true,
+        "pass_actor_unique": true,
+        "finishing_actor_unique": true,
+        "goal_frame": "s000051131",
+        "one_touch_finish": false
+      }
+    },
+    "automatic_approval": {
+      "status": "UNRESOLVED",
+      "reasons": [
+        "PHYSICAL_LINK_NOT_ESTABLISHED"
+      ],
+      "target_events": [],
+      "counts": {},
+      "independent_visual_correctness_verified": false,
+      "identity_review": {
+        "status": "STRUCTURALLY_CONSISTENT",
+        "reasons": [],
+        "conflicting_person_ids": [],
+        "independent_visual_correctness_verified": false,
+        "target_events": []
+      },
+      "link_review": {
+        "status": "UNRESOLVED",
+        "reasons": [
+          "PASSER_RECIPIENT_FINISHER_NOT_ESTABLISHED"
+        ],
+        "independent_visual_correctness_verified": false,
+        "target_events": []
+      }
+    }
+  }
+}

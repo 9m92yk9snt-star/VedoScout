@@ -10,7 +10,7 @@ import pytest
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 import sequence_pilot as p
-from scripts.probe_unanchored_play import temporal_references, source_question
+from scripts.probe_unanchored_play import temporal_references, source_question, contact_focus, geometry_cluster
 
 ROOT=Path(__file__).resolve().parents[2]
 
@@ -73,6 +73,27 @@ def test_unbounded_detail_interval_is_rejected_before_any_model_call():
     saved['receipt']['raw_response']=json.dumps(raw);rehash(saved)
     with pytest.raises(ValueError,match='CONTINUOUS_DETAIL_BUDGET_EXCEEDED'):
         source_question(saved)
+
+
+def test_actual_unapproved_reply_only_directs_focus_not_the_desired_actor_or_outcome():
+    saved=p.read_json(ROOT/'docs/examples/native-unanchored-play-receipt.json')
+    focus=contact_focus(saved,saved['source_video_sha256'])
+    assert focus=={'start_ms':50281,'end_ms':50798,'navigation_response_sha256':saved['response_sha256']}
+    raw=json.loads(saved['raw_response']);context=saved['result']
+    from scripts.probe_continuous_pass import resolve_assist
+    assert resolve_assist(raw,context,saved)==context['automatic_approval']
+    assert context['automatic_approval']['target_events']==[]
+
+
+def test_person_geometry_keeps_the_largest_cluster_and_records_source_coordinates():
+    samples=[{'boxes_xywh_conf':[[.25,.5,.1,.12,.9],[.36,.5,.1,.12,.9],[.85,.5,.06,.1,.9]]}]
+    box=geometry_cluster(samples,1080,1920,[0,700,1080,1300])
+    assert box[0] <= .25*1080 and box[2] >= .46*1080 and box[2] < .8*1080
+    # Top-left detector convention: preserve heads AND the bottom of the feet.
+    assert box[1] <= .5*1920 and box[3] >= .62*1920
+    assert 700 <= box[1] < box[3] <= 1300
+    with pytest.raises(ValueError,match='NO_SEPARATE_PERSON_CLUSTER'):
+        geometry_cluster([{'boxes_xywh_conf':[[.5,.5,.1,.1,.9]]}],1080,1920,[0,700,1080,1300])
 
 
 def test_previously_documented_later_assist_still_resolves_from_its_unchanged_actual_reply():

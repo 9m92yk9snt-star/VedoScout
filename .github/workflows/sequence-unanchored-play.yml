@@ -17,7 +17,7 @@ jobs:
       github.event.pull_request.number == 39 &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.event.pull_request.head.ref == 'codex/sequence-pilot-foundation' &&
-      github.event.before == '3d2ff59a6363468089d4b2a20a065c6c57dbf32a' &&
+      github.event.before == '04aa879eff29cd14dd75940a344258e0751d09b5' &&
       github.run_attempt == 1
     runs-on: ubuntu-latest
     timeout-minutes: 9
@@ -45,6 +45,7 @@ jobs:
             /backend/scripts/probe_continuous_pass.py
             /backend/scripts/probe_unanchored_play.py
             /docs/examples/native-unresolved-finisher-receipt.json
+            /docs/examples/native-unanchored-play-receipt.json
             /docs/examples/five_action_reference_cases.json
             /docs/examples/gpt6-focused-action-receipt.json
             /docs/examples/gpt6-focused-profile-receipt.json
@@ -100,7 +101,7 @@ jobs:
       - name: Read complete plays with the actual model
         env:
           EMERGENT_LLM_KEY: ${{ secrets.EMERGENT_LLM_KEY }}
-        run: python backend/scripts/probe_unanchored_play.py --prepared "$RUNNER_TEMP/sequence-pilot-prepared/manifest.json" --gap-receipt docs/examples/native-unresolved-finisher-receipt.json --output "$RUNNER_TEMP/sequence-pilot-result"
+        run: python backend/scripts/probe_unanchored_play.py --prepared "$RUNNER_TEMP/sequence-pilot-prepared/manifest.json" --gap-receipt docs/examples/native-unresolved-finisher-receipt.json --output "$RUNNER_TEMP/sequence-pilot-result" --focus-receipt docs/examples/native-unanchored-play-receipt.json
       - name: Check the automatic event decision
         run: |
           python - <<'PY'

@@ -784,3 +784,27 @@ are regression controls; replay verifies code behavior, not a fresh visual read.
 Local preflight uses quality 85 native-pixel crops, maximum 17ms detail gap and
 208 images total. One GPT-6-astra medium request gets a 90-second call bound and
 120-second probe bound. Actual observations and the automatic decision follow.
+
+Run 39168276199 completed the model call in 62.160 seconds; probe time was 66.262
+seconds including 3.916 seconds preparation. Whole-source preparation separately
+took 19.248 seconds. The original-r2/r9/r8 identity claims are structurally
+consistent, but the model says the selected receiver also finishes, with number
+7 as the initial passer and the deeper dark-haired white teammate staying behind.
+It does not describe a selected-player pass to a distinct finisher. Accordingly
+the assist mapper returns UNRESOLVED/PASSER_RECIPIENT_FINISHER_NOT_ESTABLISHED.
+No selected-player goal is automatically substituted for this disputed play.
+The actual receipt is retained in native-unanchored-play-receipt.json. Workflow
+execution reached the decision check, which correctly failed assist acceptance.
+The 210 isolated code tests passed, including the earlier two assist controls.
+
+Manual inspection shows overlapping foreground/deeper white players around the
+strike; the prior 39151281244 reading favored the deeper teammate but was explicitly
+uncertain. Do not resolve that disagreement by silently accepting either answer.
+One additional focused input uses the latest reply's source-cited finishing
+bracket solely as navigation, expanded 100ms on either side. Sparse person boxes
+choose the largest horizontal group, unioned with generous body-height margins;
+they assign no identity, touch or outcome. In that interval only, native detail
+uses a tighter source-pixel crop. All original source instants, whole-play
+overviews and original identity examples remain. A neutral instruction compares
+same-person continuity and a distinct teammate, without giving either old verdict.
+This is a changed-view physical-separation trial, not an unchanged-input vote.

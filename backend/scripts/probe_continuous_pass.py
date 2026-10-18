@@ -207,8 +207,18 @@ def resolve_assist(observed, context, receipt):
     outcome=observed['outcome']
     goal=mapping.get('goal_frame')
     goal_facts=link['goal_from_that_finish']
+    outcome_frames=[]
+    for fact in outcome.get('evidence',[]) if isinstance(outcome.get('evidence'),list) else [None]:
+        if isinstance(fact,str) and fact in frame_times:
+            outcome_frames.append(fact)
+        elif (isinstance(fact,dict) and isinstance(fact.get('frame'),str) and fact['frame'] in frame_times
+                and isinstance(fact.get('observation',fact.get('fact')),str)
+                and fact.get('observation',fact.get('fact')).strip()):
+            outcome_frames.append(fact['frame'])
+        else:
+            return stop('INVALID_GOAL_SOURCE_EVIDENCE')
     if (outcome.get('kind')!='GOAL' or not isinstance(goal,str) or goal not in frame_times or
-            not isinstance(outcome.get('evidence'),list) or goal not in outcome['evidence'] or
+            goal not in outcome_frames or
             goal not in goal_facts['frames'] or frame_times[goal] <= finish_i[1]):
         return stop('MOVING_BALL_GOAL_AFTER_FINISH_NOT_ESTABLISHED')
     packet_id=receipt.get('packet_id')

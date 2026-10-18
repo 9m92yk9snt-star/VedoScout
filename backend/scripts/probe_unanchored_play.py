@@ -7,6 +7,7 @@ resolver owns approval; a completed model request does not imply approval.
 import argparse
 import hashlib
 import json
+import math
 from pathlib import Path
 import re
 import sys
@@ -94,7 +95,54 @@ def source_question(saved):
     return question
 
 
-def prepare(manifest_path,gap_path,output):
+def contact_focus(saved,source_hash):
+    receipt=saved['receipt'] if 'receipt' in saved else saved
+    if (saved['source_video_sha256']!=source_hash or receipt.get('origin')!='LIVE_MODEL_REQUEST' or
+            receipt.get('status')!='COMPLETED' or
+            hashlib.sha256(receipt['raw_response'].encode()).hexdigest()!=receipt['response_sha256']):
+        raise ValueError('INVALID_FOCUS_RECEIPT')
+    raw=json.loads(receipt['raw_response']);index=(raw.get('event_mapping') or {}).get('finish_chain_index')
+    chain=raw.get('contact_chain',[])
+    if type(index) is not int or not 0 <= index < len(chain):
+        raise ValueError('SOURCE_CITED_FINISHING_BRACKET_REQUIRED')
+    ids=[chain[index].get(k) for k in ('before_frame','after_frame')]
+    if any(not isinstance(fid,str) or not re.fullmatch(r's\d{9}',fid) for fid in ids):
+        raise ValueError('SOURCE_CITED_FINISHING_BRACKET_REQUIRED')
+    lo,hi=[int(fid[1:]) for fid in ids]
+    if not 0 < hi-lo <= 1000: raise ValueError('INVALID_FOCUS_BRACKET')
+    return {'start_ms':lo-100,'end_ms':hi+100,'navigation_response_sha256':receipt['response_sha256']}
+
+
+def geometry_cluster(samples,width,height,band):
+    """Largest horizontal person cluster with generous margins, no identities."""
+    crops=[]
+    for sample in samples:
+        # PersonDetector returns normalized TOP-LEFT x/y/width/height.
+        boxes=sorted(sample['boxes_xywh_conf'],key=lambda b:b[0])
+        groups=[]
+        for b in boxes:
+            left=b[0]
+            if groups and (left-max(x[0]+x[2] for x in groups[-1]))*width <= .5*max(b[3],max(x[3] for x in groups[-1]))*height:
+                groups[-1].append(b)
+            else: groups.append([b])
+        groups=[g for g in groups if len(g)>=2]
+        if not groups: continue
+        group=max(groups,key=len);margin=max(b[3] for b in group)*height
+        crops.append([min(b[0] for b in group)*width-.75*margin,
+            min(b[1] for b in group)*height-.3*margin,
+            max(b[0]+b[2] for b in group)*width+.75*margin,
+            max(b[1]+b[3] for b in group)*height+.3*margin])
+    if not crops: raise ValueError('NO_SEPARATE_PERSON_CLUSTER_FOR_FOCUS')
+    box=[max(band[0],math.floor(min(b[0] for b in crops))),
+        max(band[1],math.floor(min(b[1] for b in crops))),
+        min(band[2],math.ceil(max(b[2] for b in crops))),
+        min(band[3],math.ceil(max(b[3] for b in crops)))]
+    if box[2]-box[0]<2 or box[3]-box[1]<2 or box==band:
+        raise ValueError('NO_NEW_SOURCE_FOCUS_VIEW')
+    return box
+
+
+def prepare(manifest_path,gap_path,output,*,focus_receipt=None):
     import cv2
     from cv_detect import PersonDetector
     started=time.monotonic();output=Path(output)
@@ -132,7 +180,17 @@ def prepare(manifest_path,gap_path,output):
     times=[ms for ms,_ in frames]
     validate_native_coverage(times,[{'start_ms':question['detail_start_ms'],'end_ms':question['detail_end_ms']}])
     box=viewing_band([s['boxes_xywh_conf'] for s in samples],width,height)
+    focus=None
+    if focus_receipt:
+        focus=contact_focus(p.read_json(focus_receipt),source_hash)
+        if not question['detail_start_ms'] <= focus['start_ms'] < focus['end_ms'] <= question['detail_end_ms']:
+            raise ValueError('FOCUS_OUTSIDE_PREPARED_SOURCE_DETAIL')
+        centre=(focus['start_ms']+focus['end_ms'])/2
+        nearby=[s for s in samples if abs(s['media_ms']-centre)<=300]
+        focus['source_crop_box']=geometry_cluster(nearby,width,height,box)
     prefix=[{'type':'text','text':PROMPT+'\n'+LINK_INSTRUCTION+'\n'+MAPPING_INSTRUCTION+'\n'+ONE_TOUCH_INSTRUCTION}]
+    if focus:
+        prefix[0]['text']+='\nSome contact images now use a tighter native-pixel viewing region containing the largest person cluster. Geometry chooses only the view, never an identity or action. The unchanged whole-play overview and surrounding full-width detail retain context. Compare each visible player\'s separate head, torso, limbs and body movement before and after overlap. Test both same-person continuity and a possible distinct teammate: do not assume either. A running/following motion alone is not a uniquely established strike. Keep the actor unresolved if another player remains a plausible finisher.'
     for ref in refs:
         prefix.extend([{'type':'text','text':'IDENTITY ONLY: original selection '+ref['reference_id']+
             ', source_ms='+str(ref['media_ms'])+'. It is outside this play unless its instant lies inside the play bounds.'},
@@ -146,8 +204,12 @@ def prepare(manifest_path,gap_path,output):
             overview.append((frame['media_ms'],'whole-play overview',image))
     chosen=None
     for quality in (85,80,75,70):
-        detail=[(ms,'native continuous detail',p._save_image(output/f'detail-q{quality}'/f's{ms:09}.jpg',
-            pixels[box[1]:box[3]],1280,quality)) for ms,pixels in frames]
+        detail=[]
+        for ms,pixels in frames:
+            crop=focus['source_crop_box'] if focus and focus['start_ms'] <= ms <= focus['end_ms'] else box
+            label='native continuous detail; source crop='+json.dumps(crop)
+            detail.append((ms,label,p._save_image(output/f'detail-q{quality}'/f's{ms:09}.jpg',
+                pixels[crop[1]:crop[3],crop[0]:crop[2]],1280,quality)))
         items=list(prefix)
         for ms,label,image in sorted(overview+detail,key=lambda r:(r[0],r[1])):
             items.extend([{'type':'text','text':f'Source frame s{ms:09}; source_ms={ms}; {label}'},
@@ -168,6 +230,7 @@ def prepare(manifest_path,gap_path,output):
         'identity_policy':'IN_PLAY_OR_NEAREST_BRACKETING_RAW_SELECTIONS_WITH_500MS_NEIGHBOURS',
         'in_play_original_selection_count':sum(question['start_ms'] <= r['media_ms'] <= question['end_ms'] for r in refs),
         'identity_source_audit':spatial_audit,'source_crop_box':box,'detector_samples':samples,
+        'contact_focus':focus,
         'retained_overview_instants':[ms for ms,_,_ in overview],'retained_native_instants':times,
         'new_bridge_instants':[],'detail_jpeg_quality':quality,'max_detail_gap_ms':max(b-a for a,b in zip(times,times[1:])),
         'request_audit':audit,'preparation_seconds':round(time.monotonic()-started,3),
@@ -182,7 +245,8 @@ if __name__=='__main__':
     cli=argparse.ArgumentParser(description=__doc__)
     for key in ('prepared','gap-receipt','output'):cli.add_argument('--'+key,required=True)
     cli.add_argument('--prepare-only',action='store_true')
-    args=cli.parse_args();result,job,started=prepare(args.prepared,args.gap_receipt,args.output)
+    cli.add_argument('--focus-receipt')
+    args=cli.parse_args();result,job,started=prepare(args.prepared,args.gap_receipt,args.output,focus_receipt=args.focus_receipt)
     if not args.prepare_only:
         receipt=t.run_jobs([job],'emergent','gpt-6-astra',deadline=started+120,per_call_s=90,workers=1)[0]
         p.write_json(Path(args.output)/'responses/unanchored_play.json',receipt)
