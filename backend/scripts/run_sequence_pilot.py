@@ -20,7 +20,7 @@ import sequence_pilot_transport as transport
 
 
 def run(manifest_path, output_dir, *, provider="gemini", model="gemini-2.5-pro", budget_s=300., max_initial=4,
-        max_followups=2, per_call_s=90., reasoning_effort=None, identity_profile=False):
+        max_followups=2, per_call_s=90., reasoning_effort=None, identity_profile=False, image_detail=None):
     started, out = time.monotonic(), Path(output_dir).resolve()
     if out.exists() and any(out.iterdir()):
         raise ValueError("OUTPUT_MUST_BE_NEW_OR_EMPTY")
@@ -61,7 +61,7 @@ def run(manifest_path, output_dir, *, provider="gemini", model="gemini-2.5-pro",
             # Validate the complete wire request before starting any paid job.
             try:
                 _url, _payload, request_audit = transport.build_request(provider, model, items,
-                    reasoning_effort=reasoning_effort)
+                    reasoning_effort=reasoning_effort, image_detail=image_detail)
             except ValueError as exc:
                 if str(exc) != "REQUEST_IMAGE_BUDGET_EXCEEDED":
                     raise
@@ -73,7 +73,8 @@ def run(manifest_path, output_dir, *, provider="gemini", model="gemini-2.5-pro",
             pilot.write_json(out / "requests" / (packet["packet_id"] + ".json"),
                 {**packet, "image_delivery": request_audit,
                  "prompt_sha256": hashlib.sha256("\n".join(x["text"] for x in items if x["type"] == "text").encode()).hexdigest()})
-            jobs.append({"packet_id": packet["packet_id"], "items": items, "reasoning_effort": reasoning_effort})
+            jobs.append({"packet_id": packet["packet_id"], "items": items,
+                         "reasoning_effort": reasoning_effort, "image_detail": image_detail})
         print(json.dumps({"phase": packets[0]["phase"] if packets else "NONE", "jobs": len(jobs),
                           "remaining_seconds": round(max(0, deadline - time.monotonic()), 1)}), flush=True)
         responses = transport.run_jobs(jobs, provider, model, deadline=deadline, per_call_s=per_call_s)
@@ -95,7 +96,7 @@ def run(manifest_path, output_dir, *, provider="gemini", model="gemini-2.5-pro",
     try:
         if identity_profile:
             profile_receipt = transport.run_jobs([{"packet_id": "identity_profile",
-                "items": pilot.identity_items(manifest), "reasoning_effort": reasoning_effort}],
+                "items": pilot.identity_items(manifest), "reasoning_effort": reasoning_effort, "image_detail": image_detail}],
                 provider, model, deadline=deadline, per_call_s=per_call_s)[0]
             pilot.write_json(out / "responses" / "identity_profile.json", profile_receipt)
             summary["identity_profile_receipt"] = {k: v for k, v in profile_receipt.items()
@@ -156,6 +157,7 @@ def main():
     model.add_argument("--max-initial", type=int, default=4)
     model.add_argument("--reasoning-effort", choices=["low"], default=None)
     model.add_argument("--identity-profile", action="store_true", help="Infer one shared identity from original crops before reading plays")
+    model.add_argument("--image-detail", choices=["high"], default=None, help="Request model-side high detail independently of JPEG size")
     evaluate = commands.add_parser("evaluate", help="Offline matching; never passes expected answers to a model")
     evaluate.add_argument("--result", type=Path, required=True)
     evaluate.add_argument("--cases", type=Path, required=True)
@@ -169,7 +171,7 @@ def main():
     elif args.command == "run":
         result = run(args.prepared, args.output, provider=args.provider, model=args.model, budget_s=args.budget_s,
                      per_call_s=args.per_call_s, max_followups=args.max_followups, max_initial=args.max_initial,
-                     reasoning_effort=args.reasoning_effort, identity_profile=args.identity_profile)
+                     reasoning_effort=args.reasoning_effort, identity_profile=args.identity_profile, image_detail=args.image_detail)
         print(json.dumps({k: result.get(k) for k in ("status", "analysis_seconds", "model_jobs_completed", "counts")}, indent=2))
         return 0 if result["status"] == "MODEL_OBSERVATIONS_RETURNED" else 3
     else:

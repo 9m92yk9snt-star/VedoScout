@@ -9,6 +9,7 @@ No merge or deployment is justified by the results so far.
 | 39138207424 | 17.809 s | 175.529 s | 0/5 | Two of three calls timed out; remaining response misattributed the goal. |
 | 39139382430 | 16.540 s | 184.007 s | 2/5 | All 12 calls returned; saved shot and goal matched. All three assists missing, with additional incorrect scoring events. |
 | 39140261843 | 12.051 s | 138.170 s | 1/5 | All ten initial calls returned; follow-up preflight stopped at the byte cap. Only goal matched; saved shot became a false goal. |
+| 39140714682 | 16.633 s | 186.506 s | 1/5 | Shared profile correctly inferred #15, but action attribution/outcomes still failed. Five unexpected scoring events; not accepted. |
 
 Run 2 uses source-image scene candidates, raw selection consensus, 8 fps and
 low reasoning effort. The evaluator's two time matches are not independent
@@ -52,6 +53,19 @@ at the run 2 baseline. The profile consumes the same overall 300-second budget.
 Also isolate byte-cap failures to their packet: preserve its NOT_SENT receipt
 and run other deliverable packets without dropping any source frames. A local
 regression verifies that oversized input cannot silently produce full success.
+
+The profile run does not demonstrate improved action correctness. The next probe
+is limited to one source packet, chosen by original tap density per source second,
+with identical inputs/profile compared at default versus explicit high model detail.
+It does not run or evaluate all five actions. Both previous resolution runs reported
+exactly 251,302 initial prompt tokens despite different JPEG bytes. This is a measured
+delivery ambiguity, not proof of a specific upstream resize. The probe also requests
+the normal read-only proxy model list, exporting only model IDs, with no redirect
+or alternate endpoint after an error. At most three model calls and 180 seconds.
+
+Provider documentation: https://docs.litellm.ai/docs/providers/gemini describes
+image_url.detail=high mapping to Gemini media resolution; this proxy's handling
+must be verified from actual responses, not assumed from that documentation.
 
 The source video and original taps were published as test input with the
 owner's explicit permission. Credentials remain in GitHub Actions secrets.

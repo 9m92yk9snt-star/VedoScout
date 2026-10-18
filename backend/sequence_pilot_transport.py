@@ -23,9 +23,11 @@ MAX_REQUEST_BYTES = 19_500_000
 MAX_RESPONSE_BYTES = 2_000_000
 
 
-def build_request(provider, model, items, *, reasoning_effort=None):
+def build_request(provider, model, items, *, reasoning_effort=None, image_detail=None):
     if provider not in KEY_ENV or not re.fullmatch(r"[A-Za-z0-9_./-]+", model):
         raise ValueError("INVALID_MODEL_PROVIDER")
+    if image_detail not in {None, "high"}:
+        raise ValueError("INVALID_IMAGE_DETAIL")
     parts, content, image_audit = [], [], []
     for item in items:
         if item["type"] == "text":
@@ -38,12 +40,17 @@ def build_request(provider, model, items, *, reasoning_effort=None):
                 raise ValueError("PREPARED_IMAGE_CHANGED")
             encoded = base64.b64encode(pixels).decode()
             parts.append({"inlineData": {"mimeType": "image/jpeg", "data": encoded}})
-            content.append({"type": "image_url", "image_url": {"url": "data:image/jpeg;base64," + encoded}})
+            image_url = {"url": "data:image/jpeg;base64," + encoded}
+            if image_detail:
+                image_url["detail"] = image_detail
+            content.append({"type": "image_url", "image_url": image_url})
             image_audit.append({"sha256": sha, "bytes": len(pixels)})
     if provider == "gemini":
         url = "https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent"
         body = {"contents": [{"role": "user", "parts": parts}], "generationConfig": {
             "temperature": 0, "responseMimeType": "application/json", "maxOutputTokens": 16384}}
+        if image_detail:
+            body["generationConfig"]["mediaResolution"] = "MEDIA_RESOLUTION_HIGH"
     else:
         url = "https://integrations.emergentagent.com/llm/chat/completions"
         wire_model = "gemini/" + model if model.startswith("gemini-") else model
@@ -61,7 +68,7 @@ def build_request(provider, model, items, *, reasoning_effort=None):
         raise ValueError("REQUEST_IMAGE_BUDGET_EXCEEDED")
     return url, payload, {"payload_sha256": hashlib.sha256(payload).hexdigest(), "payload_bytes": len(payload),
                           "explicit_image_count": len(image_audit), "images": image_audit,
-                          "frame_sampling_in_provider_metadata": False}
+                          "frame_sampling_in_provider_metadata": False, "requested_image_detail": image_detail}
 
 
 def extract_reply(provider, body):
@@ -93,7 +100,7 @@ def _worker(connection, job, provider, model, timeout_s):
         if not key:
             raise ValueError("MODEL_KEY_NOT_CONFIGURED")
         url, payload, prepared = build_request(provider, model, job["items"],
-            reasoning_effort=job.get("reasoning_effort"))
+            reasoning_effort=job.get("reasoning_effort"), image_detail=job.get("image_detail"))
         audit["requested_reasoning_effort"] = job.get("reasoning_effort")
         audit.update(prepared)
         headers = {"Content-Type": "application/json"}

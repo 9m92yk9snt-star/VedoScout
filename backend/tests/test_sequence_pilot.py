@@ -260,6 +260,22 @@ def image_item(tmp_path):
 
 
 @pytest.mark.parametrize("provider", ["gemini", "emergent"])
+def test_model_detail_setting_is_distinct_from_source_image_bytes(tmp_path, provider):
+    item = image_item(tmp_path)
+    _, standard, a = t.build_request(provider, "gemini-2.5-pro", [item])
+    _, detailed, b = t.build_request(provider, "gemini-2.5-pro", [item], image_detail="high")
+    assert a["images"] == b["images"]
+    assert a["requested_image_detail"] is None and b["requested_image_detail"] == "high"
+    body = json.loads(detailed)
+    if provider == "gemini":
+        assert body["generationConfig"]["mediaResolution"] == "MEDIA_RESOLUTION_HIGH"
+        assert "mediaResolution" not in json.loads(standard)["generationConfig"]
+    else:
+        assert body["messages"][0]["content"][0]["image_url"]["detail"] == "high"
+        assert "detail" not in json.loads(standard)["messages"][0]["content"][0]["image_url"]
+
+
+@pytest.mark.parametrize("provider", ["gemini", "emergent"])
 def test_both_adapters_deliver_all_images_as_explicit_ordered_parts(tmp_path, provider):
     item = image_item(tmp_path)
     _url, body, audit = t.build_request(provider, "gemini-2.5-pro", [{"type": "text", "text": "source time 125ms"}, item])

@@ -17,7 +17,7 @@ jobs:
       github.event.pull_request.number == 39 &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.event.pull_request.head.ref == 'codex/sequence-pilot-foundation' &&
-      github.event.before == '97c5e58daa51ea44b0bd7f2e090bd356ff99c425' &&
+      github.event.before == '7437601b95d3978f06ba11ba651ffcc839f706ee' &&
       github.run_attempt == 1
     runs-on: ubuntu-latest
     timeout-minutes: 9
@@ -35,6 +35,7 @@ jobs:
             /backend/sequence_pilot_transport.py
             /backend/player_selection.py
             /backend/scripts/run_sequence_pilot.py
+            /backend/scripts/probe_sequence_detail.py
             /docs/examples/five_action_reference_cases.json
             /testdata/sequence-pilot-orman400/
       - uses: actions/setup-python@v5
@@ -73,7 +74,7 @@ jobs:
       - name: Read complete plays with the actual model
         env:
           EMERGENT_LLM_KEY: ${{ secrets.EMERGENT_LLM_KEY }}
-        run: python backend/scripts/run_sequence_pilot.py run --prepared "$RUNNER_TEMP/sequence-pilot-prepared/manifest.json" --output "$RUNNER_TEMP/sequence-pilot-result" --provider emergent --model gemini-2.5-pro --budget-s 300 --per-call-s 60 --max-initial 12 --max-followups 2 --reasoning-effort low --identity-profile
+        run: python backend/scripts/probe_sequence_detail.py --prepared "$RUNNER_TEMP/sequence-pilot-prepared/manifest.json" --output "$RUNNER_TEMP/sequence-pilot-result"
       - name: Evaluate returned observations separately and print actual receipts
         if: always()
         run: |
