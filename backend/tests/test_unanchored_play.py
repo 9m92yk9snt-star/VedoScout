@@ -1,0 +1,96 @@
+"""Navigation/identity policy and preservation of the earlier actual assist reply."""
+from copy import deepcopy
+import hashlib
+import json
+from pathlib import Path
+import re
+import sys
+
+import pytest
+
+sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
+import sequence_pilot as p
+from scripts.probe_unanchored_play import temporal_references, source_question
+
+ROOT=Path(__file__).resolve().parents[2]
+
+
+def refs():
+    return [{'reference_id':str(ms),'media_ms':ms} for ms in (100,1000,1400,3000,3300,4100)]
+
+
+def test_original_in_play_selection_takes_precedence_without_inventing_a_mark():
+    original=refs();unchanged=deepcopy(original)
+    assert temporal_references(original,1300,2000)==[original[2]]
+    assert original==unchanged
+
+
+def test_unanchored_play_uses_nearest_before_after_and_only_their_temporal_neighbours():
+    original=refs()
+    assert temporal_references(original,1800,2600)==original[1:5]
+
+
+@pytest.mark.parametrize('bounds',[(0,50),(4200,4500)])
+def test_missing_bracketing_identity_cannot_silently_become_a_local_selection(bounds):
+    with pytest.raises(ValueError,match='BRACKETING_ORIGINAL_SELECTIONS_REQUIRED'):
+        temporal_references(refs(),*bounds)
+
+
+def saved_gap():
+    return p.read_json(ROOT/'docs/examples/native-unresolved-finisher-receipt.json')
+
+
+def rehash(saved):
+    saved['receipt']['response_sha256']=hashlib.sha256(saved['receipt']['raw_response'].encode()).hexdigest()
+
+
+def test_actual_navigation_extends_detail_back_to_the_observed_reception():
+    saved=saved_gap();unchanged=deepcopy(saved)
+    question=source_question(saved)
+    assert question['detail_start_ms']==48881 and question['detail_end_ms']==51465
+    assert question['start_ms']==47265 and question['end_ms']==53014
+    assert saved==unchanged
+
+
+def test_modified_old_response_cannot_choose_new_source_windows():
+    saved=saved_gap();saved['receipt']['raw_response']+=' '
+    with pytest.raises(ValueError,match='INVALID_PRIOR_OBSERVATION'):
+        source_question(saved)
+
+
+@pytest.mark.parametrize('frame',['unknown','s000047000','s000053999'])
+def test_invalid_or_out_of_play_observed_build_up_cannot_direct_source_sampling(frame):
+    saved=saved_gap();raw=json.loads(saved['receipt']['raw_response'])
+    raw['selected_player_actions'][0]['before_frame']=frame
+    saved['receipt']['raw_response']=json.dumps(raw);rehash(saved)
+    with pytest.raises(ValueError,match='SOURCE_CITED_BUILDUP_REQUIRED|BUILDUP_OUTSIDE_SOURCE_PLAY'):
+        source_question(saved)
+
+
+def test_unbounded_detail_interval_is_rejected_before_any_model_call():
+    saved=saved_gap();raw=json.loads(saved['receipt']['raw_response'])
+    raw['selected_player_actions'][0]['before_frame']='s000047300'
+    saved['receipt']['raw_response']=json.dumps(raw);rehash(saved)
+    with pytest.raises(ValueError,match='CONTINUOUS_DETAIL_BUDGET_EXCEEDED'):
+        source_question(saved)
+
+
+def test_previously_documented_later_assist_still_resolves_from_its_unchanged_actual_reply():
+    saved=p.read_json(ROOT/'docs/examples/gpt6-native-contact-receipt.json');receipt=saved['receipt']
+    assert receipt['origin']=='LIVE_MODEL_REQUEST' and receipt['status']=='COMPLETED'
+    assert hashlib.sha256(receipt['raw_response'].encode()).hexdigest()==receipt['response_sha256']
+    raw=p.parse_response(receipt['raw_response'])
+    # Structural regression using the immutable reply's source-ID time convention.
+    # This checks attribution logic, not source-image coverage or a fresh model read.
+    ids=sorted(set(re.findall(r's\d{9}',receipt['raw_response'])))
+    reference_ids=sorted({rid for play in raw['plays'] for person in play['people'] for rid in person['reference_ids']})
+    manifest={'source_video_sha256':saved['source_video_sha256'],
+        'frames':[{'frame_id':fid,'media_ms':int(fid[1:])} for fid in ids],
+        'identity_profile':{'canonical_reference_ids':reference_ids}}
+    packet={'packet_id':receipt['packet_id'],'frame_ids':ids,'reference_ids':reference_ids}
+    result=p.reconcile([p.resolve_response(raw,manifest,packet,
+        {k:receipt[k] for k in ('packet_id','origin','payload_sha256','response_sha256')})])
+    assert result['counts']=={'ASSIST':1} and not result['questions']
+    event=result['target_events'][0]
+    assert event['actor']!=event['receiver']==event['finisher']
+    assert event['reason']=='VISIBLE_DIRECT_ASSIST' and not event['model_requested_clarification']

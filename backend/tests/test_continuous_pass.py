@@ -165,6 +165,27 @@ def test_changed_reply_source_or_request_hash_cannot_reuse_a_live_receipt():
     assert resolve_assist(data,context,receipt)['reasons']==['OBSERVATIONS_DIFFER_FROM_RECEIPT']
 
 
+@pytest.mark.parametrize('one_touch',[True,False,None])
+def test_first_time_finish_needs_explicit_unique_receiving_strike_not_an_invented_extra_touch(one_touch):
+    data,context=mapped_observation()
+    data['contact_chain'].pop(1)
+    data['event_mapping'].update(receive_chain_index=1,finish_chain_index=1,one_touch_finish=one_touch)
+    data['link_assessment']['same_ball_release_to_receiver']['frames']=[f's{ms:09}' for ms in (100,200,500,600)]
+    result=mapped_review(data,context)
+    if one_touch is True:
+        assert result['status']=='APPROVED' and result['counts']=={'ASSIST':1}
+        event=result['target_events'][0]
+        assert event['one_touch_finish'] is True and event['receiver_interval_ms']==event['finishing_contact_interval_ms']
+        assert event['contact_ms'] is None
+    else:
+        assert result['target_events']==[] and result['reasons']==['FIRST_TOUCH_FINISH_NOT_ESTABLISHED']
+
+
+def test_claimed_one_touch_finish_cannot_contradict_separate_receiving_and_striking_rows():
+    data,context=mapped_observation();data['event_mapping']['one_touch_finish']=True
+    assert mapped_review(data,context)['target_events']==[]
+
+
 def test_another_actors_intervening_chain_action_prevents_direct_assist():
     data,context=mapped_observation()
     extra=deepcopy(data['contact_chain'][1]);extra.update(actor='opponent',before_frame='s000000200',after_frame='s000000300')

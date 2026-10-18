@@ -168,8 +168,11 @@ def resolve_assist(observed, context, receipt):
     indexes=[mapping.get(k) for k in ('pass_chain_index','receive_chain_index','finish_chain_index')]
     chain=observed.get('contact_chain')
     if (not isinstance(chain,list) or any(type(i) is not int or not 0 <= i < len(chain) for i in indexes)
-            or not indexes[0] < indexes[1] < indexes[2]):
+            or not indexes[0] < indexes[1] <= indexes[2]):
         return stop('INVALID_CONTACT_CHAIN_MAPPING')
+    one_touch=indexes[1]==indexes[2]
+    if one_touch != (mapping.get('one_touch_finish') is True):
+        return stop('FIRST_TOUCH_FINISH_NOT_ESTABLISHED')
     rows=[chain[i] for i in indexes]
     def interval(row):
         if not isinstance(row,dict) or not isinstance(row.get('visible_evidence'),str) or not row['visible_evidence'].strip():
@@ -188,7 +191,8 @@ def resolve_assist(observed, context, receipt):
             receiving.get('actor')!=receiver or receiving.get('recipient') is not None or
             finishing.get('actor')!=finisher or finishing.get('recipient') is not None):
         return stop('CONTACT_ROLES_CONTRADICT_MAPPING')
-    if not release_i[1] <= receive_i[0] < receive_i[1] <= finish_i[0]:
+    if (not release_i[1] <= receive_i[0] < receive_i[1] or
+            (not one_touch and receive_i[1] > finish_i[0])):
         return stop('INVALID_PASS_RECEIVE_FINISH_ORDER')
     for row in chain[indexes[0]+1:indexes[2]]:
         if (interval(row) is None or row.get('actor')!=receiver or row.get('recipient') is not None or
@@ -251,6 +255,8 @@ def resolve_assist(observed, context, receipt):
         intervening_control=deepcopy(link['intervening_control']),
         defensive_contact=deepcopy(link['defensive_contact']),
         last_touch_actor=outcome.get('last_touch_actor'))
+    if one_touch:
+        event['one_touch_finish']=True
     result.update(merged,status='APPROVED',reason=event['reason'])
     return result
 

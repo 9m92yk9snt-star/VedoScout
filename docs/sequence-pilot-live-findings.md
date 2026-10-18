@@ -751,3 +751,36 @@ exactly, checked against its actual workflow receipt; model and reasoning match.
 cases. The earlier separately documented later assist is preserved. This assist
 is now automatically approved in the standalone experiment's event path; applying
 that implementation to the live report remains a subsequent integration step.
+
+## Third play: continuous source detail and bracketing original identity selections
+
+The next scoped trial addresses the earlier unresolved middle play from the
+hash-checked sequence_007 reply in run 39151281244. Its 47.265–53.014s bounds
+and explicitly uncertain final actor are retained as navigation, never input
+answers. The source-cited selected player's first buildup bracket starts at
+49.131s, so native detail extends back to 48.881s (250ms margin) and continues
+through the prior 51.465s detail end. This covers reception, release and finish
+without the earlier sparse interval. All 156 native-rate instants and all 46
+whole-play overview instants are supplied. No event-reference file chooses them.
+
+This play has no original in-play selection. A time-only rule chooses the nearest
+original selection before and after the play, plus neighbours within 500ms of
+either: r2, r9 and r8. Their original crops and full source frames with the actual
+human box/positive point are identity-only. No new mark or predicted target is
+fabricated in the play. The failed r2/r6/r7 model identity assignments are not
+supplied as facts. Original taps and source input remain retained.
+
+Sparse detections union all people into a common viewing band [0,753,1080,1318],
+with no assigned identity/contact/outcome. Whole-frame overviews remain available
+throughout the complete play. A neutral prompt requests the same source-grounded
+players/contact_chain/link_assessment/event_mapping as the approved earlier play.
+It also permits an explicitly supported first-time finish to use one row for
+reception and shot, without inventing an extra touch or settled possession.
+Identical receiving/finishing indexes require one_touch_finish=true; separate rows
+must still preserve order. Existing source, identity, same-ball, opponent-control
+and goal requirements remain. Both previously documented actual assist replies
+are regression controls; replay verifies code behavior, not a fresh visual read.
+
+Local preflight uses quality 85 native-pixel crops, maximum 17ms detail gap and
+208 images total. One GPT-6-astra medium request gets a 90-second call bound and
+120-second probe bound. Actual observations and the automatic decision follow.
