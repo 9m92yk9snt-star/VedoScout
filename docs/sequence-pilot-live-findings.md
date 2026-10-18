@@ -345,3 +345,6 @@ No further identical-input votes are justified by this result. The next useful
 implementation must preserve source-grounded actor continuity and test the
 alleged intervening contact with actual before/after ball motion, while keeping
 uncertainty when the evidence does not resolve it. Production remains unchanged.
+
+
+The proxy catalog also lists gemini/gemini-3.8-flash. A final controlled model comparison changes only the model to this available video model. The previous spatial-reference request's full wire payload hash must reproduce exactly before any paid request is sent. The new request body must be identical apart from its model field; input bytes, order, video sampling, original selection geometry, profile and prompts remain fixed. The baseline action reply is checked for integrity and never inserted into the prompt. One call, 150 seconds overall and 120 seconds per call. This tests a different model, not another vote from the failed model.

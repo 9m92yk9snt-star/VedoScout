@@ -100,7 +100,9 @@ def spatial_reference_items(manifest, packet, local, output):
     return items, audit
 
 
-def run(manifest_path, output, profile_path, *, spatial_references=False):
+def run(manifest_path, output, profile_path, *, spatial_references=False, model="gemini-3.1-pro-preview", comparison_receipt=None):
+    if model not in {"gemini-3.1-pro-preview", "gemini-3.8-flash"}:
+        raise ValueError("UNREVIEWED_NATIVE_MODEL")
     started = time.monotonic(); output = Path(output)
     if output.exists() and any(output.iterdir()):
         raise ValueError("OUTPUT_MUST_BE_NEW_OR_EMPTY")
@@ -161,8 +163,27 @@ def run(manifest_path, output, profile_path, *, spatial_references=False):
     for view in views:
         items.extend([{"type": "text", "text": view["name"]+"; same clip-relative time zero"},
             {"type": "video", "path": view["path"], "sha256": view["sha256"], "fps": view["fps"]}])
-    model = "gemini-3.1-pro-preview"
     _, _, audit = transport.build_request("emergent", model, items, reasoning_effort="low", image_detail="high")
+    comparison = None
+    if comparison_receipt:
+        baseline = pilot.read_json(comparison_receipt); old = baseline["receipt"]
+        if (baseline["source_video_sha256"] != manifest["source_video_sha256"]
+                or old["status"] != "COMPLETED" or old["origin"] != "LIVE_MODEL_REQUEST"
+                or old["requested_model"] != "gemini-3.1-pro-preview"
+                or hashlib.sha256(old["raw_response"].encode()).hexdigest() != old["response_sha256"]):
+            raise ValueError("COMPARISON_RECEIPT_INVALID")
+        _, original_body, original_audit = transport.build_request("emergent", old["requested_model"], items,
+            reasoning_effort="low", image_detail="high")
+        if original_audit["payload_sha256"] != old["payload_sha256"]:
+            raise ValueError("COMPARISON_INPUT_NOT_IDENTICAL")
+        before = json.loads(original_body)
+        after = json.loads(transport.build_request("emergent", model, items,
+            reasoning_effort="low", image_detail="high")[1])
+        before.pop("model"); after.pop("model")
+        if before != after:
+            raise ValueError("COMPARISON_CHANGED_MORE_THAN_MODEL")
+        comparison = {"origin_run": baseline["origin_run"], "baseline_model": old["requested_model"],
+            "baseline_payload_sha256": old["payload_sha256"], "only_model_changed": True}
     result = {"status": "SHORT_SYNCHRONIZED_NATIVE_VIDEO_PROBE", "target_events": [],
         "production_pipeline_changed": False, "expected_answers_used_as_input": False,
         "independent_visual_correctness_verified": False,
@@ -172,6 +193,7 @@ def run(manifest_path, output, profile_path, *, spatial_references=False):
         "timestamp_policy": "APPROXIMATE_CLIP_RELATIVE_TIMES_NOT_EXACT_SOURCE_PROOF",
         "detail_source_crop_box": box, "reference_ids": ids, "request_audit": audit,
         "spatial_reference_audit": spatial_audit,
+        "model_comparison": comparison,
         "encoded_views": [{k:v for k,v in view.items() if k != "path"} for view in views]}
     pilot.write_json(output/"result.json", result)
     response = transport.run_jobs([{"packet_id": "native_short_play", "items": items,
@@ -191,6 +213,9 @@ if __name__ == "__main__":
     parser.add_argument("--output", required=True)
     parser.add_argument("--resume-profile", required=True)
     parser.add_argument("--spatial-references", action="store_true")
+    parser.add_argument("--model", choices=["gemini-3.1-pro-preview", "gemini-3.8-flash"], default="gemini-3.1-pro-preview")
+    parser.add_argument("--comparison-receipt")
     args = parser.parse_args()
-    result = run(args.prepared, args.output, args.resume_profile, spatial_references=args.spatial_references)
+    result = run(args.prepared, args.output, args.resume_profile,
+                 spatial_references=args.spatial_references, model=args.model, comparison_receipt=args.comparison_receipt)
     raise SystemExit(0 if result["model_status"] == "COMPLETED" else 3)
