@@ -536,3 +536,23 @@ check even when the passing window is complete. Four new regressions and all
 141 relevant local tests pass. One Gemini 3.8 Flash call has a 45-second request
 limit and a separate 90-second probe bound. This is not fresh full-video timing.
 Actual response and football correctness remain pending; production is unchanged.
+
+Run 39154736273 completed the two-contact Gemini 3.8 trial. Its call took
+23.879 seconds; probe preparation/model time was 26.679 seconds, plus separately
+measured whole-source preparation of 19.049 seconds. The selected identity is
+structurally consistent, and the reply separates selected 15 from the finisher.
+However, it credits the finishing action to blond white 12 at 45.765–45.815,
+omitting the earlier dark-haired white attacker's striking movement. Source
+inspection does not support accepting that finishing attribution. Structural
+consistency is not visual correctness or an assist approval.
+
+One controlled reader comparison now uses the exact same input messages/images
+with GPT-6-astra at medium reasoning, the reader that previously described the
+dark-haired finisher but lacked these native finishing images. The completed
+Gemini request's full wire hash must reproduce before any new model call. Its
+reply is integrity-checked but never supplied as instruction or evidence. Model,
+reasoning effort and provider completion-budget parameter change; this does not
+isolate reasoning from model choice. One new call, at most 90 seconds, with a
+separate 120-second probe bound. Local preflight reproduced the full Gemini hash
+b260f2edf69c5b4e2e30c52f047438dbd75169e471874d69fc120abeb5bbc0c1.
+The 142 relevant local tests pass, including rejecting changed comparison input.

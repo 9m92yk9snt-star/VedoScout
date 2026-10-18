@@ -9,6 +9,8 @@ import pytest
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from scripts.probe_actor_continuity import pass_finish_gap, validate_native_coverage
+from scripts.probe_actor_continuity import verify_baseline
+import sequence_pilot_transport as transport
 
 
 def saved_chain():
@@ -52,3 +54,18 @@ def test_actual_retained_response_produces_later_finishing_window():
     q = pass_finish_gap(saved)
     assert q['detail_windows'][-1]['start_ms'] > saved['question']['detail_end_ms']
     assert q['detail_windows'][-1]['end_ms'] < q['end_ms']
+
+
+def test_model_comparison_rejects_changed_input_before_new_request():
+    items = [{'type':'text','text':'source context only'}]
+    _, _, audit = transport.build_request('emergent','gemini-3.8-flash',items,reasoning_effort='low',image_detail='high')
+    raw = '{}'
+    saved = {'origin_run':123,'source_video_sha256':'source','receipt':{
+        'origin':'LIVE_MODEL_REQUEST','status':'COMPLETED','requested_model':'gemini-3.8-flash',
+        'raw_response':raw,'response_sha256':hashlib.sha256(raw.encode()).hexdigest(),
+        'payload_sha256':audit['payload_sha256']}}
+    assert verify_baseline(items,saved,'source')['messages_images_and_source_instants_unchanged']
+    with pytest.raises(ValueError,match='INPUT_NOT_IDENTICAL'):
+        verify_baseline([{'type':'text','text':'different context'}],saved,'source')
+    with pytest.raises(ValueError,match='INVALID_COMPARISON_BASELINE'):
+        verify_baseline(items,saved,'different source')

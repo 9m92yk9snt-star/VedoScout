@@ -1,0 +1,71 @@
+{
+  "origin_run": 39154736273,
+  "source_video_sha256": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+  "result": {
+    "question": {
+      "packet_id": "sequence_006",
+      "start_ms": 38632,
+      "end_ms": 47264,
+      "focus_ms": 44032,
+      "reason": "OBSERVED_PASS_RECEIVE_FINISH_LINK",
+      "question": "Inspect the selected player's release, any opponent touch versus controlled possession, and the recipient's next contact.",
+      "detail_start_ms": 43732,
+      "detail_end_ms": 46015,
+      "selection_policy": "PRIOR_SOURCE_CITED_PASS_AND_LATER_SHOT_NOT_REFERENCE_ANSWERS",
+      "detail_windows": [
+        {
+          "start_ms": 43732,
+          "end_ms": 44382,
+          "role": "release"
+        },
+        {
+          "start_ms": 45132,
+          "end_ms": 46015,
+          "role": "finish"
+        }
+      ]
+    },
+    "source_crop_box": [
+      0,
+      861,
+      1080,
+      1510
+    ],
+    "probe_seconds": 26.679,
+    "source_preparation_seconds": 2.621,
+    "request_audit": {
+      "payload_bytes": 17275044,
+      "payload_sha256": "b260f2edf69c5b4e2e30c52f047438dbd75169e471874d69fc120abeb5bbc0c1"
+    },
+    "identity_review": {
+      "status": "STRUCTURALLY_CONSISTENT",
+      "reasons": [],
+      "conflicting_person_ids": [],
+      "independent_visual_correctness_verified": false,
+      "target_events": []
+    }
+  },
+  "receipt": {
+    "packet_id": "unresolved_actor",
+    "status": "COMPLETED",
+    "origin": "LIVE_MODEL_REQUEST",
+    "requested_model": "gemini-3.8-flash",
+    "requested_reasoning_effort": "low",
+    "payload_sha256": "b260f2edf69c5b4e2e30c52f047438dbd75169e471874d69fc120abeb5bbc0c1",
+    "response_sha256": "6419cedaaa3e5b70957e53c1135fce1c555006adf9d2e4a0cc2d14ea8b31482c",
+    "raw_response": "{\n  \"players\": [\n    {\n      \"person_id\": \"p1\",\n      \"selected\": true,\n      \"appearance\": \"White jersey number 15, short fair hair, white shorts and socks; dribbles forward then passes/shoots towards goal\",\n      \"reference_ids\": [\"r2\", \"r6\", \"r7\"],\n      \"evidence_frames\": [\n        \"s000041882\",\n        \"s000041915\",\n        \"s000042015\",\n        \"s000042132\",\n        \"s000042265\",\n        \"s000042382\",\n        \"s000042515\",\n        \"s000042632\",\n        \"s000042765\",\n        \"s000042882\",\n        \"s000043015\",\n        \"s000043132\",\n        \"s000043265\",\n        \"s000043382\",\n        \"s000043515\",\n        \"s000043632\",\n        \"s000043732\",\n        \"s000043748\",\n        \"s000043765\",\n        \"s000043782\",\n        \"s000043798\",\n        \"s000043815\",\n        \"s000043832\",\n        \"s000043848\",\n        \"s000043865\",\n        \"s000043882\",\n        \"s000043898\",\n        \"s000043915\",\n        \"s000043932\",\n        \"s000043948\",\n        \"s000043965\",\n        \"s000043982\",\n        \"s000043998\",\n        \"s000044015\",\n        \"s000044032\",\n        \"s000044048\",\n        \"s000044065\",\n        \"s000044082\",\n        \"s000044098\",\n        \"s000044115\",\n        \"s000044132\",\n        \"s000044148\",\n        \"s000044165\",\n        \"s000044182\",\n        \"s000044198\",\n        \"s000044215\",\n        \"s000044232\",\n        \"s000044248\",\n        \"s000044265\",\n        \"s000044282\",\n        \"s000044298\",\n        \"s000044315\",\n        \"s000044332\",\n        \"s000044348\",\n        \"s000044365\",\n        \"s000044382\",\n        \"s000044515\",\n        \"s000044632\",\n        \"s000044765\",\n        \"s000044882\",\n        \"s000045015\",\n        \"s000045132\",\n        \"s000045148\",\n        \"s000045165\",\n        \"s000045182\",\n        \"s000045198\",\n        \"s000045215\",\n        \"s000045232\",\n        \"s000045248\",\n        \"s000045265\",\n        \"s000045282\",\n        \"s000045298\"\n      ]\n    },\n    {\n      \"person_id\": \"p2\",\n      \"selected\": false,\n      \"appearance\": \"Opponent in blue jersey and white shorts moving towards p1\",\n      \"reference_ids\": [],\n      \"evidence_frames\": [\n        \"s000043732\",\n        \"s000043882\",\n        \"s000044015\",\n        \"s000044182\",\n        \"s000044265\",\n        \"s000044348\",\n        \"s000044382\"\n      ]\n    },\n    {\n      \"person_id\": \"p3\",\n      \"selected\": false,\n      \"appearance\": \"Teammate in white kit number 12, blond hair, positioned near goal\",\n      \"reference_ids\": [],\n      \"evidence_frames\": [\n        \"s000045132\",\n        \"s000045382\",\n        \"s000045632\",\n        \"s000045765\",\n        \"s000045881\",\n        \"s000046015\",\n        \"s000046131\",\n        \"s000046265\",\n        \"s000046381\",\n        \"s000046515\"\n      ]\n    }\n  ],\n  \"contact_chain\": [\n    {\n      \"actor\": \"p1\",\n      \"kind\": \"kick\",\n      \"before_frame\": \"s000044065\",\n      \"after_frame\": \"s000044098\",\n      \"recipient\": null,\n      \"visible_evidence\": \"p1 swings right foot forward into the ball, sending it traveling rightward towards the penalty area\",\n      \"remaining_alternatives\": \"\"\n    },\n    {\n      \"actor\": \"p3\",\n      \"kind\": \"shot\",\n      \"before_frame\": \"s000045765\",\n      \"after_frame\": \"s000045815\",\n      \"recipient\": null,\n      \"visible_evidence\": \"p3 receives/meets the rolling ball inside the penalty area in front of goal and kicks it past the goalkeeper\",\n      \"remaining_alternatives\": \"\"\n    }\n  ],\n  \"outcome\": {\n    \"kind\": \"goal\",\n    \"last_touch_actor\": \"p3\",\n    \"evidence\": [\n      \"s000045815\",\n      \"s000045865\",\n      \"s000045931\",\n      \"s000046015\"\n    ],\n    \"uncertainty\": \"\"\n  }\n}",
+    "elapsed_seconds": 23.879,
+    "usage": {
+      "completion_tokens": 1800,
+      "prompt_tokens": 187351,
+      "total_tokens": 189151,
+      "completion_tokens_details": {
+        "text_tokens": 1800
+      },
+      "prompt_tokens_details": {
+        "text_tokens": 4954,
+        "image_tokens": 182397
+      }
+    }
+  }
+}

@@ -101,12 +101,31 @@ def viewing_band(rows, width, height):
     return [0, y0, width, y1]
 
 
-def prepare(manifest_path, gap_path, profile_path, output, *, link_mode='finisher'):
+def verify_baseline(items, saved, source_hash):
+    old = saved['receipt']
+    if (saved['source_video_sha256'] != source_hash or old['origin'] != 'LIVE_MODEL_REQUEST' or
+            old['status'] != 'COMPLETED' or old['requested_model'] != 'gemini-3.8-flash' or
+            hashlib.sha256(old['raw_response'].encode()).hexdigest() != old['response_sha256']):
+        raise ValueError('INVALID_COMPARISON_BASELINE')
+    _, _, before = t.build_request('emergent','gemini-3.8-flash',items,reasoning_effort='low',image_detail='high')
+    if before['payload_sha256'] != old['payload_sha256']:
+        raise ValueError('COMPARISON_INPUT_NOT_IDENTICAL')
+    return {'origin_run':saved['origin_run'],'baseline_payload_sha256':old['payload_sha256'],
+            'messages_images_and_source_instants_unchanged':True,
+            'changed_settings':['model','reasoning_effort','provider_completion_budget_parameter']}
+
+
+def prepare(manifest_path, gap_path, profile_path, output, *, link_mode='finisher',
+            model='gemini-3.8-flash', reasoning='low', comparison_baseline=None):
     import cv2
     from cv_detect import PersonDetector
     started, output = time.monotonic(), Path(output)
     if output.exists() and any(output.iterdir()):
         raise ValueError('OUTPUT_MUST_BE_NEW_OR_EMPTY')
+    if model not in {'gemini-3.8-flash','gpt-6-astra'} or reasoning not in {'low','medium'}:
+        raise ValueError('UNREVIEWED_PROBE_SETTINGS')
+    if model == 'gpt-6-astra' and comparison_baseline is None:
+        raise ValueError('ALTERNATE_MODEL_REQUIRES_MEASURED_BASELINE')
     manifest, gap, profile = (p.read_json(x) for x in (manifest_path, gap_path, profile_path))
     if link_mode not in {'finisher','pass-finish'}:
         raise ValueError('INVALID_LINK_MODE')
@@ -200,10 +219,11 @@ def prepare(manifest_path, gap_path, profile_path, output, *, link_mode='finishe
     for ms, label, im in sorted(rows, key=lambda row:(row[0],row[1])):
         items.extend([{'type':'text','text':f"Source frame {im['frame_id']}; source_ms={ms}; {label}"},
                       {'type':'image','path':im['path'],'sha256':im['sha256']}])
-    model = 'gemini-3.8-flash'
-    _, _, audit = t.build_request('emergent', model, items, reasoning_effort='low', image_detail='high')
+    comparison = verify_baseline(items,p.read_json(comparison_baseline),source_hash) if comparison_baseline else None
+    _, _, audit = t.build_request('emergent', model, items, reasoning_effort=reasoning, image_detail='high')
     result = {'status':'PREPARED_ACTOR_CONTINUITY_PROBE','origin_run':gap['origin_run'],
         'link_mode':link_mode,
+        'model':model,'reasoning_effort':reasoning,'comparison':comparison,
         'identity_reference_ids':ids,
         'prior_response_sha256':gap['receipt']['response_sha256'],'source_video_sha256':source_hash,
         'question':q, 'source_crop_box':box,'detector_source_sha256':detector.model_sha256,
@@ -213,7 +233,7 @@ def prepare(manifest_path, gap_path, profile_path, output, *, link_mode='finishe
         'production_pipeline_changed':False,'expected_answers_used_as_input':False,
         'independent_visual_correctness_verified':False,'target_events':[]}
     p.write_json(output/'result.json', result)
-    return result, {'packet_id':'unresolved_actor','items':items,'reasoning_effort':'low','image_detail':'high'}, started
+    return result, {'packet_id':'unresolved_actor','items':items,'reasoning_effort':reasoning,'image_detail':'high'}, started
 
 
 if __name__ == '__main__':
@@ -222,10 +242,15 @@ if __name__ == '__main__':
         cli.add_argument('--'+name, required=True)
     cli.add_argument('--prepare-only', action='store_true')
     cli.add_argument('--link-mode', choices=['finisher','pass-finish'], default='finisher')
+    cli.add_argument('--model',choices=['gemini-3.8-flash','gpt-6-astra'],default='gemini-3.8-flash')
+    cli.add_argument('--reasoning',choices=['low','medium'],default='low')
+    cli.add_argument('--comparison-baseline')
     a = cli.parse_args()
-    result, job, started = prepare(a.prepared, a.gap_receipt, a.resume_profile, a.output,link_mode=a.link_mode)
+    result, job, started = prepare(a.prepared, a.gap_receipt, a.resume_profile, a.output,link_mode=a.link_mode,
+        model=a.model,reasoning=a.reasoning,comparison_baseline=a.comparison_baseline)
     if not a.prepare_only:
-        response = t.run_jobs([job],'emergent','gemini-3.8-flash',deadline=started+90,per_call_s=45,workers=1)[0]
+        response = t.run_jobs([job],'emergent',a.model,deadline=started+(120 if a.model=='gpt-6-astra' else 90),
+            per_call_s=90 if a.model=='gpt-6-astra' else 45,workers=1)[0]
         p.write_json(Path(a.output)/'responses/unresolved_actor.json',response)
         result.update(status=response['status'],probe_seconds=round(time.monotonic()-started,3))
         if response['status'] == 'COMPLETED':
