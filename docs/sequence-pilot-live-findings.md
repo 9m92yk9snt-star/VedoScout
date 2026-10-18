@@ -448,3 +448,26 @@ seconds of the 300-second accounting bound. This remains a series with cached
 work, not measured fresh production latency. Correctness is still unproven for
 the hidden finishing connection. Code, source observations and explicit failed
 readings stay preserved; production remains unchanged.
+
+
+Cluster run 39152285766 passed cached image integrity and crop preparation, but
+its final model request exceeded the remaining 34.98-second accounting bound.
+It returned no observation, so the hidden finishing actor remains unresolved.
+
+A separate one-off workflow now tests a different bounded detail input without
+altering the existing refinement workflow. The only navigation is the saved,
+hash-checked response's explicitly unknown finishing actor. Eight sparse local
+person detections choose a common full-width viewing band, unioning every detected
+person with body-height margins. They assign no player identity, contact or event.
+All 46 whole-play overview instants remain, alongside every native source instant
+in the unresolved interval. No previous speculative action text or expected event
+answer is sent. This is a single-play delivery trial, not an isolated-model-effect
+comparison or a fresh full-video latency result. It has a separate 90-second probe
+bound and one request limited to 45 seconds; it must not be added to the previous
+300-second run and represented as within that original budget.
+
+Local preflight: 3.127 seconds, 8 detector forwards, 109 source contact instants,
+18,074,269 request bytes, original source and original selections hash-checked.
+122 isolated local tests passed before adding the two existing cluster tests.
+This preparation/test success is not evidence of perception success. Actual model
+response is pending. The production pipeline remains unchanged.

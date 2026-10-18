@@ -616,6 +616,37 @@ def test_restored_native_detail_changes_only_crop_delivery_not_timestamps_or_ove
         f["sha256"] for f in restored["frames"] if f["frame_id"] in initial]
 
 
+def test_actor_continuity_band_keeps_all_people_and_does_not_select_an_identity():
+    from scripts.probe_actor_continuity import viewing_band
+    box = viewing_band([[(.1, .4, .1, .1, .8)], [(.7, .45, .08, .2, .7)]], 1000, 2000)
+    assert box == [0, 700, 1000, 1500]
+    assert viewing_band([[(.1, 0, .1, .2, .8), (.7, .9, .1, .2, .8)]], 1000, 2000) == [0, 0, 1000, 2000]
+
+
+def test_actor_continuity_band_rejects_missing_or_invalid_geometry():
+    from scripts.probe_actor_continuity import viewing_band
+    for boxes in ([], [[(.1, float('nan'), .1, .2, .8)]], [[(.1, .5, .1, -.2, .8)]]):
+        with pytest.raises(ValueError):
+            viewing_band(boxes, 1000, 2000)
+
+
+def test_actor_review_requires_integrity_checked_explicit_unresolved_actor():
+    from scripts.probe_actor_continuity import unresolved_gap
+    raw = json.dumps({'outcome': {'last_touch_player': 'Unknown', 'uncertainty': 'Two players overlap'}})
+    saved = {'question': {'packet_id':'p','start_ms':100,'end_ms':900,
+                         'detail_start_ms':200,'detail_end_ms':800},
+             'receipt': {'status':'COMPLETED','origin':'LIVE_MODEL_REQUEST','packet_id':'p',
+                         'raw_response':raw,'response_sha256':hashlib.sha256(raw.encode()).hexdigest()}}
+    assert unresolved_gap(saved) == saved['question']
+    for changed in ({'response_sha256':'bad'}, {'status':'ERROR'}, {'packet_id':'different'}):
+        with pytest.raises(ValueError):
+            unresolved_gap({**saved, 'receipt':{**saved['receipt'], **changed}})
+    settled = json.dumps({'outcome':{'last_touch_player':'p1','uncertainty':''}})
+    with pytest.raises(ValueError, match='NO_UNRESOLVED_FINISHING_ACTOR'):
+        unresolved_gap({**saved,'receipt':{**saved['receipt'],'raw_response':settled,
+            'response_sha256':hashlib.sha256(settled.encode()).hexdigest()}})
+
+
 def test_native_play_views_keep_normal_duration_and_source_geometry(tmp_path):
     from scripts.probe_native_play import prepare_videos
     manifest = p.prepare(source_export(tmp_path), tmp_path / "prepared", fps=8, scene_packets=True)
