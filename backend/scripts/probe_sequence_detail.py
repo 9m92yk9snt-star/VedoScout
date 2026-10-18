@@ -208,6 +208,86 @@ def run_followup(manifest_path, out, model, action_path, profile_path):
     pilot.write_json(out / "result.json", result)
 
 
+def run_contact_zoom(manifest_path, out, model, action_path, profile_path):
+    """Native pixels/PTS around an explicitly unresolved model contact."""
+    import cv2
+    started, out = time.monotonic(), Path(out)
+    manifest = pilot.read_json(manifest_path)
+    saved, profile = pilot.read_json(action_path), pilot.read_json(profile_path)
+    assert saved["source_video_sha256"] == profile["source_video_sha256"] == manifest["source_video_sha256"]
+    r = saved["receipt"]
+    assert r["origin"] == "LIVE_MODEL_REQUEST" and r["status"] == "COMPLETED"
+    assert hashlib.sha256(r["raw_response"].encode()).hexdigest() == r["response_sha256"]
+    raw = pilot.parse_response(r["raw_response"])
+    unresolved = [(play, action, q) for play in raw["plays"] for q in play.get("questions", [])
+        for action in play.get("actions", []) if q.get("reason") == "CONTACT"
+        and q.get("action_id") == action.get("action_id") and re.fullmatch(r"s[0-9]{9}", action.get("contact_frame") or "")]
+    if not unresolved:
+        raise ValueError("NO_EXPLICIT_UNRESOLVED_CONTACT")
+    play, action, q = unresolved[0]
+    focus = int(action["contact_frame"][1:])  # navigation from actual prior model, never an answer
+    manifest = pilot.apply_identity_profile(manifest, json.loads(profile["receipt"]["raw_response"]))
+    packet = next(p for p in manifest["packets"] if p["core_start_ms"] <= focus < p["core_end_ms"])
+    lo, hi = packet["core_start_ms"], packet["core_end_ms"]
+    local = [x for x in manifest["references"] if lo <= x["media_ms"] < hi]
+    if not local:
+        raise ValueError("LOCAL_HUMAN_SELECTION_REQUIRED_FOR_ZOOM")
+    top = max(0, min(x["box"]["y"]-x["box"]["h"] for x in local))
+    bottom = min(1, max(x["box"]["y"]+2*x["box"]["h"] for x in local))
+    by_ms = {f["media_ms"]: dict(f) for f in manifest["frames"]}
+    cap = cv2.VideoCapture(manifest["source_video"])
+    width, height = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    box = [0, int(top*height), width, int(bottom*height)]
+    count = 0
+    try:
+        while True:
+            if time.monotonic()-started > 30:
+                raise TimeoutError("ZOOM_PREPARATION_BUDGET")
+            ok, pixels = cap.read()
+            if not ok:
+                break
+            ms = round(cap.get(cv2.CAP_PROP_POS_MSEC))
+            if ms > min(hi-1, focus+750):
+                break
+            if max(lo, focus-750) <= ms:
+                crop = pilot._save_image(out / "contact-zoom" / f"s{ms:09}.jpg",
+                    pixels[box[1]:box[3], :], 1280, 80)
+                crop["source_crop_box"] = box
+                if ms in by_ms:
+                    by_ms[ms]["zoom_view"] = crop
+                else:
+                    by_ms[ms] = {"frame_id": f"s{ms:09}", "media_ms": ms, **crop}
+                count += 1
+    finally:
+        cap.release()
+    manifest["frames"] = sorted(by_ms.values(), key=lambda f: f["media_ms"])
+    ids = list(dict.fromkeys(packet["reference_ids"]+[x["reference_id"] for x in local]))
+    job = {"packet_id": "native_contact_zoom", "phase": "FOLLOWUP", "start_ms": lo, "end_ms": hi-1,
+        "reference_ids": ids, "frame_ids": [f["frame_id"] for f in manifest["frames"] if lo <= f["media_ms"] < hi],
+        "question": {"reason": "CONTACT", "focus_ms": focus,
+            "instruction": "The previous reading explicitly could not see the final contact. Inspect the native pixel crops "
+            "and continuous ball motion: which person redirects the ball before the outcome? Preserve uncertainty if hidden. "
+            "Crops are the full source width and a vertical band derived from the original local player boxes; full views remain."}}
+    items = pilot.packet_items(manifest, job)
+    _, _, audit = transport.build_request("emergent", model, items, reasoning_effort="low", image_detail="high")
+    result = {"status": "NATIVE_CONTACT_ZOOM_PROBE", "source_video_sha256": manifest["source_video_sha256"],
+        "expected_answers_used_as_input": False, "production_pipeline_changed": False,
+        "independent_visual_correctness_verified": False, "target_events": [],
+        "source_response_sha256": r["response_sha256"], "question": job["question"],
+        "native_crop_count": count, "source_crop_box": box, "request_audit": audit}
+    pilot.write_json(out / "result.json", result)
+    receipt = transport.run_jobs([{"packet_id": job["packet_id"], "items": items, "reasoning_effort": "low", "image_detail": "high"}],
+        "emergent", model, deadline=started+180, per_call_s=120)[0]
+    pilot.write_json(out / "responses" / "native_contact_zoom.json", receipt)
+    if receipt["status"] == "COMPLETED":
+        reading = pilot.resolve_response(pilot.parse_response(receipt["raw_response"]), manifest, job,
+            {k: receipt[k] for k in ("packet_id", "payload_sha256", "response_sha256", "origin")})
+        result["reading"] = pilot.reconcile([reading])
+        result["target_events"] = result["reading"]["target_events"]
+    result["analysis_seconds"] = round(time.monotonic()-started, 3)
+    pilot.write_json(out / "result.json", result)
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--prepared", required=True)
@@ -217,8 +297,11 @@ if __name__ == "__main__":
     parser.add_argument("--single", action="store_true")
     parser.add_argument("--resume-action")
     parser.add_argument("--resume-profile")
+    parser.add_argument("--native-contact-zoom", action="store_true")
     args = parser.parse_args()
-    if args.resume_action and args.resume_profile:
+    if args.native_contact_zoom:
+        run_contact_zoom(args.prepared, args.output, args.model, args.resume_action, args.resume_profile)
+    elif args.resume_action and args.resume_profile:
         run_followup(args.prepared, args.output, args.model, args.resume_action, args.resume_profile)
     elif args.native_video:
         run_native(args.prepared, args.output, args.model)

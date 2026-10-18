@@ -127,5 +127,16 @@ had discarded in-play r8/r9 identity examples. Bound context to the source packe
 core to avoid unrelated adjacent plays. No reference action answers are read.
 This is one new model request, not a second approval of an already proven event.
 
+Run 39142837172 returned a selected-player assist at 56.264 s in 38.331 s
+(28.504 s model call), but the raw reply explicitly asks CONTACT for its inferred
+#13 finishing touch. The resolver's filled fields are not independent confirmation
+of that contact; do not report this as fully verified. The next request reuses
+that explicit unresolved contact as navigation, adds native source-rate crops
+around it, and retains the 8-fps whole-play overview. The crop spans the full
+source width; its vertical band is derived from the existing in-play human boxes,
+with one player-height margin. No detector coordinates or expected event times
+are used. This changes actual visible detail rather than asking for another vote
+on unchanged images. Each crop retains actual source PTS, bounds and checksum.
+
 The source video and original taps were published as test input with the
 owner's explicit permission. Credentials remain in GitHub Actions secrets.

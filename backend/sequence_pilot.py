@@ -377,8 +377,15 @@ def packet_items(manifest, packet):
                       + json.dumps(packet["question"], separators=(",", ":"))})
     for frame_id in packet["frame_ids"]:
         f = frames[frame_id]
-        items.extend([{"type": "text", "text": f"Source frame {frame_id}, media_ms={f['media_ms']}"},
+        label = f"Source frame {frame_id}, media_ms={f['media_ms']}"
+        if f.get("source_crop_box"):
+            label += ", native source pixel crop=" + json.dumps(f["source_crop_box"])
+        items.extend([{"type": "text", "text": label},
                       {"type": "image", "path": f["path"], "sha256": f["sha256"]}])
+        if f.get("zoom_view"):
+            z = f["zoom_view"]
+            items.extend([{"type": "text", "text": f"Same source instant {frame_id}, native pixel detail crop=" + json.dumps(z["source_crop_box"])},
+                          {"type": "image", "path": z["path"], "sha256": z["sha256"]}])
     return items
 
 
