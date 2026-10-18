@@ -96,5 +96,22 @@ the reference profile inside a one-element JSON array. The profile reader now
 accepts that equivalent envelope while rejecting multiple profiles or unknown
 reference IDs. No video sampling or perception result exists for that failed run.
 
+Native run 39142076608 completed: 14.062 s preparation plus 79.682 s including
+encoding, identity and both action calls. The identical file yielded 20,328 video
+tokens at requested 1 fps versus 162,096 at 8 fps. This supports effective sampling
+control through this proxy; a silent fixed 1-fps bridge is not the remaining
+explanation for this experiment. Perception still failed: 1 fps invented times
+past the 76.75-second video; 8 fps returned only one action and incorrectly called
+the outcome a crossbar hit. These are raw observations, not accepted events.
+
+Next bounded comparison: one GPT-6-sol still-image request on the same automatically
+selected short packet, using a shared identity-only profile. The normal authenticated
+catalog lists gpt-6-sol. No duplicate default/high call and no full-video rerun yet.
+Use the reasoning-model completion budget parameter and leave temperature unset.
+For this different vision model, use the already preflighted 1280-pixel source
+edge and explicit high detail. This is a best-input model trial, not a claim
+that model and resolution effects have been isolated. Source instants remain
+the same 8-fps observations; no event navigation answers enter the input.
+
 The source video and original taps were published as test input with the
 owner's explicit permission. Credentials remain in GitHub Actions secrets.

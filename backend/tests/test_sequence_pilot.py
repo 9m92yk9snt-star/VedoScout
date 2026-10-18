@@ -262,6 +262,14 @@ def image_item(tmp_path):
     return {"type": "image", "path": str(image), "sha256": hashlib.sha256(b"test-jpeg").hexdigest()}
 
 
+def test_openai_reasoning_model_uses_completion_budget_without_sampling_override():
+    _, body, _ = t.build_request("emergent", "gpt-6-sol", [{"type": "text", "text": "observe"}], reasoning_effort="low")
+    body = json.loads(body)
+    assert body["max_completion_tokens"] == 16384
+    assert "max_tokens" not in body and "temperature" not in body
+    assert body["reasoning_effort"] == "low"
+
+
 @pytest.mark.parametrize("provider", ["gemini", "emergent"])
 def test_native_video_keeps_exact_bytes_and_explicit_fps(tmp_path, provider):
     video = tmp_path / "source.mp4"; video.write_bytes(b"synthetic-video")

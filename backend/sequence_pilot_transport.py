@@ -72,6 +72,9 @@ def build_request(provider, model, items, *, reasoning_effort=None, image_detail
     if gemini3:
         # Google recommends its default temperature for Gemini 3 reasoning.
         (body["generationConfig"] if provider == "gemini" else body).pop("temperature", None)
+    if provider == "emergent" and model.startswith(("gpt-5", "gpt-6")):
+        body.pop("temperature", None)
+        body["max_completion_tokens"] = body.pop("max_tokens")
     if reasoning_effort is not None:
         if reasoning_effort != "low":
             raise ValueError("INVALID_REASONING_EFFORT")

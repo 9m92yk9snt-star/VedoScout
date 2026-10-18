@@ -41,7 +41,7 @@ def catalog():
         return {"status": "UNAVAILABLE"}
 
 
-def run(manifest_path, out, model="gemini-2.5-pro"):
+def run(manifest_path, out, model="gemini-2.5-pro", single=False):
     started, out = time.monotonic(), Path(out)
     manifest = pilot.read_json(manifest_path)
     deadline = started + 180
@@ -69,8 +69,9 @@ def run(manifest_path, out, model="gemini-2.5-pro"):
     items = pilot.packet_items(manifest, packet)
     result.update(identity_profile=manifest["identity_profile"], selected_packet=packet,
                   selection_strategy="ORIGINAL_TAP_DENSITY_PER_SOURCE_SECOND")
+    variants = [("detail_high", "high")] if single else [("detail_default", None), ("detail_high", "high")]
     jobs = [{"packet_id": name, "items": items, "reasoning_effort": "low", "image_detail": detail}
-            for name, detail in [("detail_default", None), ("detail_high", "high")]]
+            for name, detail in variants]
     for job in jobs:
         transport.build_request("emergent", model, items,
                                 reasoning_effort="low", image_detail=job["image_detail"])
@@ -158,5 +159,9 @@ if __name__ == "__main__":
     parser.add_argument("--output", required=True)
     parser.add_argument("--model", default="gemini-2.5-pro")
     parser.add_argument("--native-video", action="store_true")
+    parser.add_argument("--single", action="store_true")
     args = parser.parse_args()
-    (run_native if args.native_video else run)(args.prepared, args.output, args.model)
+    if args.native_video:
+        run_native(args.prepared, args.output, args.model)
+    else:
+        run(args.prepared, args.output, args.model, args.single)
