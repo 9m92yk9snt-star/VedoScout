@@ -471,3 +471,23 @@ Local preflight: 3.127 seconds, 8 detector forwards, 109 source contact instants
 122 isolated local tests passed before adding the two existing cluster tests.
 This preparation/test success is not evidence of perception success. Actual model
 response is pending. The production pipeline remains unchanged.
+
+Run 39152527031 completed that actor-continuity call in 16.652 seconds; the
+probe took 17.959 seconds including 1.191 seconds preparation. The separate
+whole-source preparation took 12.409 seconds. All 109 native contact instants
+and 46 overview instants were delivered in the measured 18,074,269-byte request.
+The eight sparse person detections produced the same [0,751,1080,1317] source
+band as local preflight. Runtime execution succeeded; perception did not.
+
+The response labels white number 13 as selected, while assigning canonical r2
+and r7 to a non-selected shooter and r6 to the claimed selected player. It omits
+the selected player's passing chain and reports a different actor's goal.
+This does not establish the unresolved assist or correct selected identity.
+The earlier source-inspected 15-to-10 ending is retained separately; it must not
+be substituted for this failed middle-attack result. Actual receipt and response
+hashes are retained in docs/examples/native-actor-continuity-receipt.json and the
+workflow evidence. 124 isolated local tests passed; GitHub's isolated suite also
+passed. No further identical-input vote, full-source replay, merge or deployment
+is justified by this result. The next useful experiment must resolve physical
+identity across local play context before treating another contact verdict as
+selected-player evidence. Detector-bounded native detail alone did not solve it.
