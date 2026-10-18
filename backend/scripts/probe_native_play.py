@@ -46,7 +46,7 @@ def prepare_videos(manifest, output):
     output = Path(output); output.mkdir(parents=True, exist_ok=True)
     views = []
     for name, fps, filters in (("overview", 8, "scale=720:1280"),
-            ("native_detail", 30, f"crop={width}:{crop_height}:0:{y}")):
+            ("native_detail", 24, f"crop={width}:{crop_height}:0:{y}")):
         path = output/(name+".mp4")
         subprocess.run(["ffmpeg", "-nostdin", "-y", "-v", "error", "-ss", str(start),
             "-i", manifest["source_video"], "-t", str(duration), "-map", "0:v:0", "-an",

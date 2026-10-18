@@ -380,6 +380,14 @@ def test_native_video_keeps_exact_bytes_and_explicit_fps(tmp_path, provider):
         assert part["file"]["video_metadata"] == {"fps": 8}
 
 
+@pytest.mark.parametrize("fps", [25, 30, 60, float("nan"), True])
+def test_native_video_rejects_unsupported_sampling_before_request(tmp_path, fps):
+    video = tmp_path / "source.mp4"; video.write_bytes(b"synthetic-video")
+    item = {"type": "video", "path": str(video), "sha256": p.digest(video), "fps": fps}
+    with pytest.raises(ValueError, match="INVALID_VIDEO_FPS"):
+        t.build_request("emergent", "gemini-3.1-pro-preview", [item])
+
+
 @pytest.mark.parametrize("provider", ["gemini", "emergent"])
 def test_gemini3_uses_its_supported_reasoning_and_temperature_defaults(provider):
     _, body, _ = t.build_request(provider, "gemini-3.1-pro-preview", [{"type": "text", "text": "observe"}], reasoning_effort="low")
@@ -621,7 +629,7 @@ def test_native_play_views_keep_normal_duration_and_source_geometry(tmp_path):
         assert .65 <= float(meta["format"]["duration"]) <= .90
         assert view["sha256"] == p.digest(view["path"])
     detail = views[1]["metadata"]["streams"][0]
-    assert (detail["width"], detail["height"], detail["r_frame_rate"]) == (96, 160, "30/1")
+    assert (detail["width"], detail["height"], detail["r_frame_rate"]) == (96, 160, "24/1")
 
 
 def test_runner_preserves_initial_observations_if_targeted_preparation_fails(tmp_path, monkeypatch):

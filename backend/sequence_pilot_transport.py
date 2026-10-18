@@ -42,7 +42,8 @@ def build_request(provider, model, items, *, reasoning_effort=None, image_detail
             encoded = base64.b64encode(pixels).decode()
             if item["type"] == "video":
                 fps = item.get("fps")
-                if isinstance(fps, bool) or not isinstance(fps, (int, float)) or not 1 <= fps <= 30:
+                # Gemini VideoMetadata.fps accepts at most 24, independently of source FPS.
+                if isinstance(fps, bool) or not isinstance(fps, (int, float)) or not 1 <= fps <= 24:
                     raise ValueError("INVALID_VIDEO_FPS")
                 parts.append({"inlineData": {"mimeType": "video/mp4", "data": encoded}, "videoMetadata": {"fps": fps}})
                 file = {"file_data": "data:video/mp4;base64," + encoded, "format": "video/mp4",

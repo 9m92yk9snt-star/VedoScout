@@ -269,3 +269,13 @@ the GitHub runner. It made zero native-video model calls. The local test passed
 with installed FFmpeg; the GitHub test exposed the missing workflow dependency.
 Both model and isolated-test workflows now explicitly install FFmpeg before
 any credential-bearing step. The same native-play experiment is retried once.
+
+
+Run 39148519061 encoded both views and received HTTP 400 in 1.193 seconds,
+without observation output. Overall probe time was 6.585 seconds. The new
+30-fps request exceeds Google's documented VideoMetadata.fps maximum of 24
+(https://ai.google.dev/api/generate-content#VideoMetadata). The transport now
+rejects sampling above 24 locally, and native detail encoding/sampling uses 24
+fps. The synchronized views, source interval, prompt, model and references
+remain the same. No claim about perception exists for this rejected request.
+109 isolated GitHub code tests passed at the preceding commit.
