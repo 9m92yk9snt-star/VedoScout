@@ -188,6 +188,88 @@ def test_presentation_writer_consumes_actual_reconciled_assessment(monkeypatch):
     assert result["report"]["overall_benchmark"]["tier"] is None
 
 
+def current_code_checkpoint():
+    # Unit scenario: a complete same-code checkpoint. Original published
+    # fixture provenance remains unchanged on disk.
+    doc = json.loads((ROOT / "docs/examples/sequence-report-source-checkpoint.json").read_text())
+    doc["sequence_audit"]["result"]["code_sha256"] = {p.name: runtime.pilot.digest(p) for p in (
+        ROOT / "backend/sequence_pilot.py", ROOT / "backend/sequence_pilot_transport.py",
+        ROOT / "backend/scripts/run_sequence_pilot.py", ROOT / "backend/player_selection.py")}
+    return doc
+
+
+@pytest.mark.parametrize("change", [
+    lambda d: d.update(analysis_engine="LEGACY"),
+    lambda d: d.update(full_report_status="ready"),
+    lambda d: d["sequence_audit"].update(source_video_sha256="changed"),
+    lambda d: d["sequence_audit"].update(original_selection_values_sha256="changed"),
+    lambda d: d["sequence_audit"]["result"]["code_sha256"].update({"sequence_pilot.py": "changed"}),
+    lambda d: d["sequence_audit"]["result"].update(identity_mode="INFERRED_PROFILE"),
+    lambda d: d["sequence_audit"]["result"].update(status="PARTIAL_MODEL_RUN"),
+])
+def test_changed_or_unfinished_checkpoint_cannot_resume(change):
+    doc = current_code_checkpoint()
+    source = doc["sequence_audit"]["source_video_sha256"]
+    selections = doc["sequence_audit"]["original_selection_values_sha256"]
+    change(doc)
+    assert runtime.retained_source(doc, source, selections) is None
+
+
+def test_corrupted_checkpoint_fails_before_writer_or_new_paid_discovery():
+    doc = current_code_checkpoint()
+    audit = doc["sequence_audit"]
+    audit["receipts"][0]["raw_response"] = "altered"
+    with pytest.raises(ValueError, match="RESPONSE_CHANGED"):
+        runtime.retained_source(doc, audit["source_video_sha256"], audit["original_selection_values_sha256"])
+
+
+def test_failed_report_resumes_source_with_zero_new_source_calls(tmp_path, monkeypatch):
+    doc = current_code_checkpoint()
+    video = tmp_path / "source.mp4"
+    digest = runtime.pilot.digest
+    monkeypatch.setattr(runtime.pilot, "digest", lambda p: doc["sequence_audit"]["source_video_sha256"]
+                        if Path(p) == video else digest(p))
+    async def forbidden(*args, **kwargs):
+        pytest.fail("Same-code complete source checkpoint must not start model/preparation workers")
+    monkeypatch.setattr(runtime, "owned_process", forbidden)
+    actual, _ = actual_section_reports()
+    async def writer(prompt):
+        prose = {}
+        for r in actual["writer_receipts"]:
+            prose.update(json.loads(r["raw_response"]))
+        return {"report": prose, "receipts": actual["writer_receipts"]}
+    ns, _, _, _ = server_harness(video, doc, tmp_path)
+    result = asyncio.run(runtime.generate(video, doc, template=ns["FULL_REPORT_PROMPT"], writer=writer))
+    assert result["sequence_timings"]["source_phase_reused"] is True
+    assert result["sequence_timings"]["retained_source_analysis_seconds"] == 518.498
+    assert len(result["sequence_audit"]["receipts"]) == 13
+    assert result["full_report"]["match_stats"]["observed_assists"] == 3
+
+
+def test_actual_server_retry_preserves_source_again_when_writer_fails(tmp_path, monkeypatch):
+    doc = current_code_checkpoint()
+    video = tmp_path / "source.mp4"
+    video.touch()
+    digest = runtime.pilot.digest
+    monkeypatch.setattr(runtime.pilot, "digest", lambda p: doc["sequence_audit"]["source_video_sha256"]
+                        if Path(p) == video else digest(p))
+    async def forbidden(*args, **kwargs):
+        pytest.fail("Server retry must not rediscover source or encode assets after writer failure")
+    async def writer(prompt):
+        raise runtime.ReportWriterFailure("SYNTHETIC_WRITER_FAILURE", [{"status": "ERROR"}])
+    async def generate(*args, **kwargs):
+        return await runtime.generate(*args, **kwargs, writer=writer)
+    monkeypatch.setattr(runtime, "owned_process", forbidden)
+    engine = SimpleNamespace(enabled=lambda: True, generate=generate, persist_assets=forbidden)
+    ns, store, _, _ = server_harness(video, doc, tmp_path, runtime=engine)
+    asyncio.run(ns["generate_full_report_task"](doc["id"]))
+    assert store.doc["full_report_status"] == "failed"
+    assert store.doc["sequence_audit"]["source_checkpoint_reused"] is True
+    assert store.doc["sequence_audit"]["original_source_analysis_seconds"] == 518.498
+    assert len(store.doc["sequence_audit"]["receipts"]) == 13
+    assert store.states == ["generating", "failed"]
+
+
 def test_writer_failure_keeps_paid_source_receipts_before_temp_cleanup(tmp_path, retained, monkeypatch):
     raw = json.loads((ROOT / "testdata/sequence-pilot-orman400/anchors.json").read_text())["raw_marker_anchors"]
     monkeypatch.setattr(runtime.pilot, "digest", lambda _: retained["source_video_sha256"])

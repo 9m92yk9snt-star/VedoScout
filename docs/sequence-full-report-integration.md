@@ -33,6 +33,17 @@ inferred from sequence labels. Assets must publish before the existing finalizer
 can write READY. Recovery re-renders retained proofs without new discovery.
 The evidence ZIP includes sequence receipts, timing, engine and analysis source.
 
+A failed sequence report with no body can resume its retained complete source
+phase only when video SHA, raw original-selection fingerprint and all four
+source-analysis code hashes still match. Receipt hashes and event role bindings
+are checked again. Legacy/partial analyses, inferred identity mode and changed
+inputs/code cannot resume; altered receipts fail before another paid call.
+Writer/assessment runs again with current player metadata and report schema.
+`source_phase_reused` and `retained_source_analysis_seconds` distinguish this
+retry's elapsed time from the original source analysis; a retry is not a fresh
+end-to-end benchmark. The original source checkpoint survives another writer
+failure. Original selections changing always require fresh source analysis.
+
 ## Existing complete-run baseline
 
 The user's latest uploaded evidence ZIP contains exactly the same source video

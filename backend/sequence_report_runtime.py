@@ -154,6 +154,33 @@ class ReportWriterFailure(RuntimeError):
         self.receipts = receipts
 
 
+def retained_source(doc, source, selection_sha):
+    """Resume only this failed report's complete, unchanged source checkpoint.
+
+    Never accept an inferred identity profile, a different selection or a
+    checkpoint interpreted by different source-analysis code.
+    """
+    if doc.get("analysis_engine") != adapter.ENGINE or doc.get("full_report_status") != "failed":
+        return None
+    audit = doc.get("sequence_audit") or {}
+    result = audit.get("result") or {}
+    root = Path(__file__).parent
+    code = {p.name: pilot.digest(p) for p in (
+        Path(pilot.__file__), Path(transport.__file__), root / "scripts/run_sequence_pilot.py",
+        root / "player_selection.py")}
+    if (audit.get("source_video_sha256") != source
+            or audit.get("original_selection_values_sha256") != selection_sha
+            or result.get("code_sha256") != code
+            or result.get("identity_mode") != "FRESH_ORIGINAL_SELECTIONS"
+            or result.get("status") != "MODEL_OBSERVATIONS_RETURNED"):
+        return None
+    manifest = {"source_video_sha256": source, "original_taps_sha256": audit.get("original_taps_sha256"),
+                "frames": audit.get("source_frames") or [], "references": audit.get("references") or []}
+    receipts = audit.get("receipts") or []
+    adapter.canonical_bundle(result, manifest, receipts)  # recheck all receipts and role bindings
+    return deepcopy(result), manifest, deepcopy(receipts)
+
+
 async def generate(video, doc, *, template, writer=write_facts, discovery=discover, checkpoint=None):
     started = time.monotonic()
     if writer is write_facts:
@@ -167,14 +194,17 @@ async def generate(video, doc, *, template, writer=write_facts, discovery=discov
     anchor_document = {"raw_marker_anchors": raw}
     pilot.original_taps(anchor_document)
     source = await asyncio.to_thread(pilot.digest, Path(video))
+    selection_sha = hashlib.sha256(json.dumps(anchor_document, sort_keys=True).encode()).hexdigest()
+    retained = retained_source(doc, source, selection_sha) if discovery is discover else None
     with tempfile.TemporaryDirectory(prefix="sequence-report-") as work:
-        result, manifest, receipts = await discovery(video, anchor_document, work)
+        result, manifest, receipts = retained or await discovery(video, anchor_document, work)
         # Persist paid observations before projection/writing can fail. A failed
         # writer must never discard nine minutes of source-reading receipts.
         audit = {"result": result, "receipts": receipts, "writer_receipts": [],
                  "source_video_sha256": source,
                  "original_taps_sha256": manifest.get("original_taps_sha256"),
-                 "original_selection_values_sha256": hashlib.sha256(json.dumps(anchor_document, sort_keys=True).encode()).hexdigest(),
+                 "original_selection_values_sha256": selection_sha,
+                 "source_checkpoint_reused": retained is not None,
                  "source_frames": [{"frame_id": f["frame_id"], "media_ms": f["media_ms"]} for f in manifest["frames"]],
                  "references": [{k: r[k] for k in ("reference_id", "media_ms", "sha256")} for r in manifest["references"]]}
         if len(json.dumps(audit).encode()) > 4_000_000:
@@ -185,13 +215,21 @@ async def generate(video, doc, *, template, writer=write_facts, discovery=discov
             raise ValueError("SEQUENCE_SOURCE_CHANGED")
         bundle = adapter.canonical_bundle(result, manifest, receipts)
         observed = time.monotonic()
+        if retained:
+            audit["original_source_analysis_seconds"] = (doc.get("sequence_audit") or {}).get(
+                "original_source_analysis_seconds", (doc.get("sequence_timings") or {}).get("source_analysis_seconds"))
+        else:
+            audit["original_source_analysis_seconds"] = round(observed-started, 3)
+        source_timings = {"source_analysis_seconds": round(observed-started, 3),
+                          "source_phase_reused": retained is not None,
+                          "retained_source_analysis_seconds": audit["original_source_analysis_seconds"] if retained else None}
         prompt = assessment_prompt(template, bundle, doc.get("player_details"),
                                    {"coverage_status": "PARTIAL", "engine": adapter.ENGINE,
                                     "anatomical_foot_side": "UNVERIFIED; do not grade weak foot or settle left/right"})
         audit["writer_prompt_sha256"] = hashlib.sha256(prompt.encode()).hexdigest()
         if checkpoint:
             await checkpoint({"canonical_events": bundle, "sequence_audit": audit,
-                              "sequence_timings": {"source_analysis_seconds": round(observed-started, 3)}})
+                              "sequence_timings": source_timings})
         try:
             operation = writer(prompt, canonical=bundle) if writer is write_facts else writer(prompt)
             written = await asyncio.wait_for(operation, timeout=420)
@@ -207,7 +245,7 @@ async def generate(video, doc, *, template, writer=write_facts, discovery=discov
             raise ValueError("SEQUENCE_AUDIT_TOO_LARGE")
         return {"analysis_engine": adapter.ENGINE, "canonical_events": bundle,
                 "sequence_audit": audit, "full_report": full,
-                "sequence_timings": {"source_analysis_seconds": round(observed-started, 3),
+                "sequence_timings": {**source_timings,
                                      "facts_writer_and_projection_seconds": round(time.monotonic()-observed, 3),
                                      "before_assets_seconds": round(time.monotonic()-started, 3)}}
 
