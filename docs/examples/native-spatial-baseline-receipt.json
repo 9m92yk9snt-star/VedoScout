@@ -1,0 +1,77 @@
+{
+  "origin_run": 39149235839,
+  "source_video_sha256": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+  "receipt": {
+    "packet_id": "native_short_play",
+    "provider": "emergent",
+    "requested_model": "gemini-3.1-pro-preview",
+    "origin": "LIVE_MODEL_REQUEST",
+    "status": "COMPLETED",
+    "requested_reasoning_effort": "low",
+    "payload_sha256": "4a88954e7837a79963311a4f40439791635458b01e0494a5effe229bcef121f4",
+    "payload_bytes": 8481194,
+    "explicit_image_count": 7,
+    "images": [
+      {
+        "sha256": "07ade3bd308f037c88df80c6263e6bb78dd40b79fd0b7e4e18e7d83d02f2c4a6",
+        "bytes": 11688
+      },
+      {
+        "sha256": "923cffbd1ee55df6ecf2f8b3fe3110c318a2606cc0500726d923a1832a891759",
+        "bytes": 8737
+      },
+      {
+        "sha256": "aaccfeb6493345ab3d27192569f96f2cc09782389e0d525a7afbbc7745d72454",
+        "bytes": 13380
+      },
+      {
+        "sha256": "872357c7749fdd2359f1fa303872c08d74fb97ba5bb33d23dd9851237e056c60",
+        "bytes": 6652
+      },
+      {
+        "sha256": "721c5dee7a3e8980b7585d745626cd8016b25912e7176308d2a47b746458d93f",
+        "bytes": 6238
+      },
+      {
+        "sha256": "bcaa2278f96a6519df6c31d050a06810b2b3ac44fe87b869c7a256b41467dc9b",
+        "bytes": 168292
+      },
+      {
+        "sha256": "f2f37d9fa7f984c5bb8abecd31743f1052340569411a18b42663d5dc211ece89",
+        "bytes": 184490
+      }
+    ],
+    "frame_sampling_in_provider_metadata": true,
+    "videos": [
+      {
+        "sha256": "df942e54769dbb63594f0d908b85efb75f5ec69bb5ffbcd371fb32cea5bef121",
+        "bytes": 3120074,
+        "requested_fps": 8
+      },
+      {
+        "sha256": "3a95db0b69551dbaba2e8358074a07f9a69943bc8a7e988f7ad98182ac6158ac",
+        "bytes": 2835083,
+        "requested_fps": 24
+      }
+    ],
+    "requested_image_detail": "high",
+    "model_version": "gemini/gemini-3.1-pro-preview",
+    "response_id": "bQDVapqQA5fH-sAPqPPQuQE",
+    "usage": {
+      "completion_tokens": 785,
+      "prompt_tokens": 58635,
+      "total_tokens": 59420,
+      "completion_tokens_details": {
+        "text_tokens": 785
+      },
+      "prompt_tokens_details": {
+        "text_tokens": 2063,
+        "image_tokens": 7612,
+        "video_tokens": 48960
+      }
+    },
+    "raw_response": "{\n  \"players\": [\n    {\n      \"id\": \"p1\",\n      \"kit\": \"white\",\n      \"visible_number\": \"10\",\n      \"selected\": null\n    },\n    {\n      \"id\": \"p2\",\n      \"kit\": \"blue\",\n      \"visible_number\": \"3\",\n      \"selected\": null\n    },\n    {\n      \"id\": \"p3\",\n      \"kit\": \"blue\",\n      \"visible_number\": \"11\",\n      \"selected\": null\n    },\n    {\n      \"id\": \"p4\",\n      \"kit\": \"white\",\n      \"visible_number\": \"13\",\n      \"selected\": null\n    },\n    {\n      \"id\": \"p5\",\n      \"kit\": \"white\",\n      \"visible_number\": \"15\",\n      \"selected\": true\n    },\n    {\n      \"id\": \"p6\",\n      \"kit\": \"red\",\n      \"visible_number\": null,\n      \"selected\": null\n    }\n  ],\n  \"ball_sequence\": [\n    {\n      \"clip_s\": 0.0,\n      \"actor\": \"p1\",\n      \"action\": \"pass\",\n      \"recipient\": \"p3\",\n      \"visible_evidence\": \"Passes through the defence.\",\n      \"uncertainty\": null\n    },\n    {\n      \"clip_s\": 0.458,\n      \"actor\": \"p3\",\n      \"action\": \"clearance\",\n      \"recipient\": \"p5\",\n      \"visible_evidence\": \"Pokes the ball backwards to clear it from p1.\",\n      \"uncertainty\": null\n    },\n    {\n      \"clip_s\": 2.292,\n      \"actor\": \"p5\",\n      \"action\": \"pass\",\n      \"recipient\": \"p4\",\n      \"visible_evidence\": \"Passes low to his left.\",\n      \"uncertainty\": null\n    },\n    {\n      \"clip_s\": 3.417,\n      \"actor\": \"p4\",\n      \"action\": \"shot\",\n      \"recipient\": \"p6\",\n      \"visible_evidence\": \"Strikes hard past the keeper.\",\n      \"uncertainty\": null\n    },\n    {\n      \"clip_s\": 4.125,\n      \"actor\": \"p6\",\n      \"action\": \"deflection\",\n      \"recipient\": \"p1\",\n      \"visible_evidence\": \"Saves onto the far post.\",\n      \"uncertainty\": null\n    },\n    {\n      \"clip_s\": 4.542,\n      \"actor\": \"p1\",\n      \"action\": \"shot\",\n      \"recipient\": null,\n      \"visible_evidence\": \"Rebounds straight to p1 who scores in the empty net.\",\n      \"uncertainty\": null\n    }\n  ],\n  \"outcome\": {\n    \"kind\": \"goal\",\n    \"last_touch_player\": \"p1\",\n    \"visible_evidence\": \"The ball rolls into the net and players pause.\",\n    \"uncertainty\": null\n  },\n  \"selected_player_summary\": \"p5 receives a loose ball around the halfway line and plays a through ball down the left channel for p4. p4's shot is saved onto the post, but p1 follows up to score the rebound.\"\n}",
+    "response_sha256": "d6dab2ae65e43909faef20c1014aac9d3821023556ba830a699cff74cd955757",
+    "elapsed_seconds": 14.219
+  }
+}

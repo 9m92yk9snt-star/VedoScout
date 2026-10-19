@@ -1,0 +1,484 @@
+{
+  "source_video_sha256": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+  "origin_run": 39142837172,
+  "receipt": {
+    "packet_id": "missing_link",
+    "provider": "emergent",
+    "requested_model": "gpt-6-sol",
+    "origin": "LIVE_MODEL_REQUEST",
+    "status": "COMPLETED",
+    "requested_reasoning_effort": "low",
+    "payload_sha256": "95d4849c64ceec9fb5acebdd2aef54f0962fa18a55981b0ddfeb95d495c1ea8f",
+    "payload_bytes": 15966385,
+    "explicit_image_count": 111,
+    "images": [
+      {
+        "sha256": "07ade3bd308f037c88df80c6263e6bb78dd40b79fd0b7e4e18e7d83d02f2c4a6",
+        "bytes": 11688
+      },
+      {
+        "sha256": "923cffbd1ee55df6ecf2f8b3fe3110c318a2606cc0500726d923a1832a891759",
+        "bytes": 8737
+      },
+      {
+        "sha256": "aaccfeb6493345ab3d27192569f96f2cc09782389e0d525a7afbbc7745d72454",
+        "bytes": 13380
+      },
+      {
+        "sha256": "872357c7749fdd2359f1fa303872c08d74fb97ba5bb33d23dd9851237e056c60",
+        "bytes": 6652
+      },
+      {
+        "sha256": "721c5dee7a3e8980b7585d745626cd8016b25912e7176308d2a47b746458d93f",
+        "bytes": 6238
+      },
+      {
+        "sha256": "32b702aaabca9248f3d4b6e249f2ad96d891d140241c7221918c575424b54aaa",
+        "bytes": 107918
+      },
+      {
+        "sha256": "a76fa632c63e75d62aa7b8de2cb4ed70a6df97c68630c827906a8f8d86637334",
+        "bytes": 104075
+      },
+      {
+        "sha256": "1ba08b24d8d8b8fa37a9b4d98a139092641dbca980621d4dc02c594d7e281dc0",
+        "bytes": 107071
+      },
+      {
+        "sha256": "c96b499f4b25553b41587a3e71f1aa6b93b93a4affe8184969b38b6b1641c58b",
+        "bytes": 110242
+      },
+      {
+        "sha256": "c071acdaeaea34174ab99ecc591e0c2f9360dff7c7dd67efeb5742c4df3173b4",
+        "bytes": 108635
+      },
+      {
+        "sha256": "1e75a236420e4ec57cfa01f97b39c4ad00b98f856482b5577a8de14b6eabf6ae",
+        "bytes": 112436
+      },
+      {
+        "sha256": "0a2abf5d6e71f2188567025b7a687797eacde5878dc469942f0d9dd99278ef56",
+        "bytes": 110947
+      },
+      {
+        "sha256": "1e0d0bb6209c6a4022fe3b307bd2e50cf5c3c0b56888034fa059854a4efebf91",
+        "bytes": 103609
+      },
+      {
+        "sha256": "0d90dc9da4c642c097e2cab72e347deee73f47104143d2737490e90c9f47b93f",
+        "bytes": 107875
+      },
+      {
+        "sha256": "7d6dfb1a32898e44732fde40bb040ea81191d5d75f3aa3b2d46bd9431a164aad",
+        "bytes": 101590
+      },
+      {
+        "sha256": "935d53d59a5c4cc1438d059d3b99a55caa8cc7dd85a5ae2480bbfc8362ac2368",
+        "bytes": 99022
+      },
+      {
+        "sha256": "952de8c75c7a6f1b633e2c7b11597c50e1503acc058e22738b02ec53a558bdf6",
+        "bytes": 99049
+      },
+      {
+        "sha256": "8902cd0427def68bb403051239f83743135229f25edb660df07e593e1b9a74d4",
+        "bytes": 99854
+      },
+      {
+        "sha256": "d449476cea99681584a1edf857332b11ab0c01de4e5af096b6913df449d2f57f",
+        "bytes": 103051
+      },
+      {
+        "sha256": "dcb50de44c309b95edcc0437bfdf9ac31515bffd857c6e392aaa349a7ac4794d",
+        "bytes": 102788
+      },
+      {
+        "sha256": "8c1befb67328c273caede4f534aedeac2ba4f310f6c1a34ee79ad3e85ccca9e8",
+        "bytes": 103339
+      },
+      {
+        "sha256": "c758d48264a483595421e5febcbb4065e8c4adc01b62b8b73a77cb0bdaa5ad8d",
+        "bytes": 106071
+      },
+      {
+        "sha256": "a8a72f68011ee8101c95fb9e9e1b37acd40de95279c1f684195c00436b12c57c",
+        "bytes": 115976
+      },
+      {
+        "sha256": "f6a766ad4f9771cf007fa51bef69151a3545ad919d2839e38c51b48ae3ba6e50",
+        "bytes": 121598
+      },
+      {
+        "sha256": "f01871be1bdfada2258acee0e3e6bca2b933e94b8807affe9792b4907564c55f",
+        "bytes": 103072
+      },
+      {
+        "sha256": "3da0e5a6d1666c063da891eae4f3e3d2daa8bb7d598fa55768fbb0cca85e4361",
+        "bytes": 121409
+      },
+      {
+        "sha256": "440f5963170df1779566d904226535684078572a4865d614c9da6b9c7be9aec5",
+        "bytes": 116763
+      },
+      {
+        "sha256": "25c69f92407192eac8ad31177ff6dca5a5574b1eb7b1a043933e2b7ee7908df9",
+        "bytes": 118422
+      },
+      {
+        "sha256": "ea3666ad56a00dff2aa25652e5d52bb2f46f7a526619f6b35cffc7ea4ecc6f74",
+        "bytes": 104804
+      },
+      {
+        "sha256": "37b6245bebdc33151c970df2428f8ba21e522b4f90fa01a9be03a38268314380",
+        "bytes": 122871
+      },
+      {
+        "sha256": "1dab71960771bbfd7947c2cbfd4ac1dedec4aebb6656bdaf5f4bb68c382828e7",
+        "bytes": 118593
+      },
+      {
+        "sha256": "a8c7c16e8287f7dfb79433bd067f737b51f5ee9ed401126d93d5c5ab88184680",
+        "bytes": 124627
+      },
+      {
+        "sha256": "7eb71f388924e8bd43fb490d4dbf23df857f20eef63e7d3763320287bcea322f",
+        "bytes": 106275
+      },
+      {
+        "sha256": "e38e44bfa9f5647bbf1a5ef9fc76372722cdb4b945a9f7de74fc3e073802a5b5",
+        "bytes": 124647
+      },
+      {
+        "sha256": "da3f329d1eb2a60888ba222cb5d12a237f6aed864907b97ba40759e0b2957ec6",
+        "bytes": 123859
+      },
+      {
+        "sha256": "fa878df03ec749f4c9f271ba0b18505567ab6d15c3b63eb1a9650fd441f88d3c",
+        "bytes": 119783
+      },
+      {
+        "sha256": "c1d32e198931faf99566d007f804117c49678910d4425643bc3d44f39e2ca765",
+        "bytes": 106025
+      },
+      {
+        "sha256": "29c220064eb81e839dad2a598e62d722c417abc4f85fb97ffdace33ddd36afa4",
+        "bytes": 125171
+      },
+      {
+        "sha256": "4af5b2883fc70f3bd075eec7c6abd0a34d98264b0e69fba5a6b159fd98d57b2f",
+        "bytes": 125362
+      },
+      {
+        "sha256": "82eae569999b3d347e74e8d812ea78803b7a74361d61414df968f0194abe78b9",
+        "bytes": 121319
+      },
+      {
+        "sha256": "4f4f15b6437c36470a3ffadb21aac9321076c4aa4fa38c40bfbf2c8b984ad74c",
+        "bytes": 111238
+      },
+      {
+        "sha256": "37fdf39d58761a1edfaece0f317c1129280fcc1817f9552ab2daac2cdf6533ea",
+        "bytes": 120074
+      },
+      {
+        "sha256": "2948b7089859808ea1831300b1f27d8abcdd48052a2fdb20fb28aebe4e79d231",
+        "bytes": 125466
+      },
+      {
+        "sha256": "74c8bb349e8ae2847c8ebf805eb5e5b8deafa72b7ab2bdfc633d5d224530391a",
+        "bytes": 125736
+      },
+      {
+        "sha256": "80a366ff7f4645ca3956bae11ab20048c37f75de541a716bb1568245d0256c86",
+        "bytes": 111583
+      },
+      {
+        "sha256": "f29649889101600d19ad68e2666ddf82d57d8fe6f916d91dc49e4d7778e17eed",
+        "bytes": 126131
+      },
+      {
+        "sha256": "605d95398b24ed5efb35454b526995851ed7dc0af24b90f2662e077b325a8c3c",
+        "bytes": 125144
+      },
+      {
+        "sha256": "23bad8ff90e7e0004e9603b497f8c3090a1ebd0d85201589ef0eb3fc69481a80",
+        "bytes": 118343
+      },
+      {
+        "sha256": "8dc622a997c8e9b7dd3f831ea15732b98432375015bc6afe90e6fcd8ce28d378",
+        "bytes": 109838
+      },
+      {
+        "sha256": "223f29fd6b92d124a69a167cf1d78f49a1093d1035c71c210ad5742cd3a3dfd6",
+        "bytes": 118334
+      },
+      {
+        "sha256": "52261740ac3f5d0274d63c610600e9a3e81a66c78b83adea115e5b65501ae62e",
+        "bytes": 123068
+      },
+      {
+        "sha256": "8245f015edaefeb734da320958b292fa95b90fe8488131ddc5a280ef35003d0c",
+        "bytes": 122434
+      },
+      {
+        "sha256": "692b57090d857e2d581d9e546d3540de563325c6e47b5b24fb6c6a29bd4ba333",
+        "bytes": 107578
+      },
+      {
+        "sha256": "0563e682e237489ca7e7d1447c10db0dc3caae0f2821aacb309bc0d804ee5f83",
+        "bytes": 116046
+      },
+      {
+        "sha256": "d96f8aeba82021b0f4a5cd5fb6c5d95aa25cbca95c4cbd9c3d22b536669e62b4",
+        "bytes": 114580
+      },
+      {
+        "sha256": "d51a423a9e08bca7c358fd2667f8bea78eb772c9156dc892e13ca5f9c34c51a8",
+        "bytes": 118627
+      },
+      {
+        "sha256": "1dbc48437912783f4d1be295d710d6a6104e179653c2edff3c5c931c1206affd",
+        "bytes": 99310
+      },
+      {
+        "sha256": "cbf94f45fdb539284e6952e94ca6b1539ba92f286056db24644c3d5801cdf357",
+        "bytes": 116681
+      },
+      {
+        "sha256": "e5f7dec88d9545aa07444f8e4c13ab3d560ed7f96b3044a7b3feecce8aecbe46",
+        "bytes": 109864
+      },
+      {
+        "sha256": "983f5acb25872f8deac9f349417fb592ac51be636cef825d3f0f831517e21251",
+        "bytes": 109918
+      },
+      {
+        "sha256": "352effd34a3a0eb74c6015577f8e087af9e6d55f8373385cdfd2a38fe838b655",
+        "bytes": 100017
+      },
+      {
+        "sha256": "e7f5412c539ff964e44c43f0a72582724701d4c146eb062d4847d240f36a5077",
+        "bytes": 108353
+      },
+      {
+        "sha256": "65e5caee7f4549c3991b8c2a555a079dbbee44f9a5db8db36587916bb1fb52f4",
+        "bytes": 111551
+      },
+      {
+        "sha256": "0d6ed0f055062740c2d0cebe1b6dd72e0ea6cea73898ed5d9053aff45be6c75c",
+        "bytes": 109913
+      },
+      {
+        "sha256": "73207e7f0c4dd3591da3ca282e4523461d3eb6047227a0e69d4e8faa7db23bf2",
+        "bytes": 93444
+      },
+      {
+        "sha256": "a72c813d941937612c6aab0dc121ba7312a6fedffa79eef71c671b2f8e5056de",
+        "bytes": 109073
+      },
+      {
+        "sha256": "0180b9aa04aaf2d8bc8ad08f2f655f62040a92d1fc49486eab11d75ce65b3d1d",
+        "bytes": 108007
+      },
+      {
+        "sha256": "40f824cc28fa59be44005c782f1298c63194431f645adc1d05f2ace34b8e4cbe",
+        "bytes": 107700
+      },
+      {
+        "sha256": "d6ddcd08f76b5ffb34a3eb9555b3b5c0980e3780dce257d586523caf1fe3413f",
+        "bytes": 92952
+      },
+      {
+        "sha256": "68146dac6a2fd10a7ea16c328105cdbfeb1b7eeb2151af8179f4745552a2dc41",
+        "bytes": 108161
+      },
+      {
+        "sha256": "533f37f97061d542ee0d81880a80262ea3cdecb8b76440f336bcd9ce15016a59",
+        "bytes": 108798
+      },
+      {
+        "sha256": "b60943884545eae74dbd416c1f2d4ed4731ddcf62d6b56d29f91c2c0d4f83549",
+        "bytes": 107234
+      },
+      {
+        "sha256": "9cbb6c0d13d451785a343bb7175faaf64a28431f292fb9b060570b9aeef35085",
+        "bytes": 97575
+      },
+      {
+        "sha256": "e806b8acd907e3e060610c4865abec2f9c7c74668e69b0c269bfdf9a4357adde",
+        "bytes": 111257
+      },
+      {
+        "sha256": "64db2652604b9cdb6877fd282af70e46419e8a775e1243b0387c644ddc121930",
+        "bytes": 109601
+      },
+      {
+        "sha256": "146de5a2ab013b98f5d9052441448814a4eb09a4919134ceb39033926e25ae52",
+        "bytes": 111557
+      },
+      {
+        "sha256": "818bac1941465458423ddf18f8fe181de998f6856f28345bc4431c709ba6f1ce",
+        "bytes": 98792
+      },
+      {
+        "sha256": "ea0a113b77e92316a99119a3a5cc7c59e1b9fcfbd5e76c0e6d2233911cc3889b",
+        "bytes": 114355
+      },
+      {
+        "sha256": "63f64a1bd6a4343c57f5e88d1ce14b0eec537265c427668fce2fa296d5385a40",
+        "bytes": 115332
+      },
+      {
+        "sha256": "8bc9c80c1dd7f2fe654a3b61c728fe7ff7b837d0c4818d54f0be3565d3c51c26",
+        "bytes": 115133
+      },
+      {
+        "sha256": "dacf25486943ebc5a66b0fd6382a0b5ee9e920ea529ac6cfeef1749b07574524",
+        "bytes": 104024
+      },
+      {
+        "sha256": "61fd40d3a611bbf1b42a9a933978a7b0f4b879a46431ad49af84c2fa3501c598",
+        "bytes": 115331
+      },
+      {
+        "sha256": "b54d58de821694244fdf7adb720fc5f211e2511504470116d8f12a83e5e6c61f",
+        "bytes": 119103
+      },
+      {
+        "sha256": "b480198ff54b54f5679e7f271c1a9880f5f398e0c1df6ba9cc3e8d886e0f63e3",
+        "bytes": 119827
+      },
+      {
+        "sha256": "871266bc0ad7e44b206072d8d57a054079e707c18538e1580943c3f9612dd921",
+        "bytes": 107094
+      },
+      {
+        "sha256": "50e92cb1e88e76148977eb3c3c927ae2adbb1004ccbb3ecbfb9b99e68de3177f",
+        "bytes": 118564
+      },
+      {
+        "sha256": "60cbde434c15eacfc43d86e48ff4e647835b0ba520c57ae54d4981d19ad4a064",
+        "bytes": 120142
+      },
+      {
+        "sha256": "ea6e89cc81235da114c64a77ece28f1b7b767ac784e99266105e516b1ccc3ab7",
+        "bytes": 125951
+      },
+      {
+        "sha256": "80b8b123cae4966f50fb51483f6132d18175fa13137666938106f898c87d5fbc",
+        "bytes": 109677
+      },
+      {
+        "sha256": "89852eaf3fa8d411274f7c54bc0c7c06eb208ad4f9d9b78b96f7c7b46d9b9709",
+        "bytes": 125885
+      },
+      {
+        "sha256": "1a154bb1885540a658e16923afdb97caaf8c24f0005cafa3248010b4a6dcfc76",
+        "bytes": 121541
+      },
+      {
+        "sha256": "f8407862e5dc4514896eec7460a565eeaf8bf60e5212e24d41c7710d29033b60",
+        "bytes": 121221
+      },
+      {
+        "sha256": "730a69ffaac6ec19b942a995b1480e73cb0e96cfd6fc2138d27bf55cc223d3d1",
+        "bytes": 106387
+      },
+      {
+        "sha256": "80b1240ffdac61b1a72024d16472c0f3fdb4486f0e0e93059adf2018216e6d8d",
+        "bytes": 123085
+      },
+      {
+        "sha256": "bbdac82b650afd16dfa3d48aa1bc30b45e80fe0d2c06f44787465242904fc7ea",
+        "bytes": 125627
+      },
+      {
+        "sha256": "765c9ec6bb61abaf8a1d0602afc914ca1ff2801eafe4198e34e66bc71b8956f2",
+        "bytes": 119094
+      },
+      {
+        "sha256": "0f6f4de3177b90910ca59868b0c55f60db1c30863f9e28bb55af45eb4f4cce4c",
+        "bytes": 111553
+      },
+      {
+        "sha256": "ee9f8ff4155b8436ea54f3622abe74515094b7ab0de5188df938c12041f529ff",
+        "bytes": 120917
+      },
+      {
+        "sha256": "faa83127de69fad162588422fe027e116376402a0c1aacc0235ef480e2296476",
+        "bytes": 126097
+      },
+      {
+        "sha256": "a627524f97a28a6a8751291972e11f87ea545c320f83680af9e0500b684e135d",
+        "bytes": 106915
+      },
+      {
+        "sha256": "e1c01557b2f8f60d9557462c36cce2542d63637b9af05654a0fffb87de379e15",
+        "bytes": 112062
+      },
+      {
+        "sha256": "491e7a953dbcfa5099e31a9931eba346e4b336584c83cbeef4b14c220fb10d5c",
+        "bytes": 112335
+      },
+      {
+        "sha256": "a8c6728e6f940c47b2927a6ddd14668cd0e067fa8876f8b639616493a2e24270",
+        "bytes": 112379
+      },
+      {
+        "sha256": "17280a787d168b3cd078802d601a04b3bacc96c248ceda8ae8e77583f95ea22c",
+        "bytes": 109475
+      },
+      {
+        "sha256": "30b688807a2c195b575c6c4add28df064cc4fc4c8b5255dcd1f414a5303d79c4",
+        "bytes": 108634
+      },
+      {
+        "sha256": "2e0ef6846795ed43dfaa4c2deca4309f4b42e2471b435b4c77b14f450046a6d3",
+        "bytes": 110951
+      },
+      {
+        "sha256": "147881d82737b709f8ab6289b5a846185d00034c1fc6575c25c0a0e43cdee451",
+        "bytes": 107328
+      },
+      {
+        "sha256": "bfa3714ae470a28bb135f6b356095f3e23eaf0efacd4c4ee261727e74feeac8a",
+        "bytes": 104331
+      },
+      {
+        "sha256": "70940929741fd88ad299bdc5d3f39c5167dd4c8d09709c89145523023703930b",
+        "bytes": 101594
+      },
+      {
+        "sha256": "dc35ea1530564a1e5a5ef3f4157bdca1901a085aa96aa8062b1ecd3d16f1ca51",
+        "bytes": 102815
+      },
+      {
+        "sha256": "67b6ceccb70a1f00388dc59c0288ba838425297dce9374b1ca22e0f8be088ccf",
+        "bytes": 103143
+      }
+    ],
+    "frame_sampling_in_provider_metadata": false,
+    "videos": [],
+    "requested_image_detail": "high",
+    "model_version": "gpt-6-sol",
+    "response_id": "chatcmpl-EaNZaOQvPqruyIsTwRcRBgrS40ZLD",
+    "usage": {
+      "completion_tokens": 1887,
+      "prompt_tokens": 120473,
+      "total_tokens": 122360,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": 0,
+        "audio_tokens": 0,
+        "reasoning_tokens": 766,
+        "rejected_prediction_tokens": 0
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": 0,
+        "cached_tokens": 0
+      }
+    },
+    "raw_response": "{\"plays\":[{\"start_frame\":\"s000053015\",\"end_frame\":\"s000058881\",\"people\":[{\"person_id\":\"p1\",\"selected\":true,\"kit_consistent\":true,\"reference_ids\":[\"r2\",\"r6\",\"r7\"],\"evidence_frames\":[\"s000055948\",\"s000056264\",\"s000056448\"],\"appearance\":\"Slim, fair-skinned, short light-brown-haired player in white, running down the left side of the attack; his number is not readable in these frames.\"},{\"person_id\":\"p2\",\"selected\":false,\"kit_consistent\":true,\"reference_ids\":[],\"evidence_frames\":[\"s000056231\",\"s000056514\",\"s000056731\",\"s000057014\"],\"appearance\":\"White-kit player with number 13 on his back, running centrally.\"},{\"person_id\":\"p3\",\"selected\":false,\"kit_consistent\":true,\"reference_ids\":[],\"evidence_frames\":[\"s000056731\",\"s000057114\",\"s000057264\"],\"appearance\":\"Dark-skinned white-kit player with number 10 on his back, running toward the goal.\"},{\"person_id\":\"p4\",\"selected\":false,\"kit_consistent\":true,\"reference_ids\":[],\"evidence_frames\":[\"s000053765\",\"s000054264\"],\"appearance\":\"Blue-kit player carrying the ball through midfield.\"},{\"person_id\":\"p5\",\"selected\":false,\"kit_consistent\":true,\"reference_ids\":[],\"evidence_frames\":[\"s000056398\",\"s000056981\"],\"appearance\":\"Player in red positioned in front of goal.\"}],\"actions\":[{\"action_id\":\"a1\",\"kind\":\"CARRY\",\"actor\":\"p4\",\"start_frame\":\"s000053765\",\"contact_frame\":null,\"end_frame\":\"s000054264\",\"actor_evidence_frames\":[\"s000053765\",\"s000054015\",\"s000054264\"],\"ball_id\":\"b1\",\"outcome\":\"UNKNOWN\",\"receiver\":null,\"receiver_frame\":null,\"receiver_is_teammate\":null,\"finisher\":null,\"shot_frame\":null,\"outcome_frame\":null,\"same_active_ball\":true,\"continuous_play\":true,\"outcome_evidence\":[{\"frame\":\"s000053881\",\"fact\":\"The ball is at the blue player's feet as he advances rightward.\"},{\"frame\":\"s000054264\",\"fact\":\"He remains beside the ball under pressure from white players.\"}],\"details\":\"The blue player carries through midfield. The ensuing change of possession is not clearly visible.\"},{\"action_id\":\"a2\",\"kind\":\"PASS\",\"actor\":\"p1\",\"start_frame\":\"s000055948\",\"contact_frame\":\"s000056264\",\"end_frame\":\"s000056514\",\"actor_evidence_frames\":[\"s000056198\",\"s000056264\",\"s000056448\"],\"ball_id\":\"b1\",\"outcome\":\"TEAMMATE_GOAL\",\"receiver\":\"p2\",\"receiver_frame\":\"s000056514\",\"receiver_is_teammate\":true,\"finisher\":\"p2\",\"shot_frame\":\"s000056648\",\"outcome_frame\":\"s000057264\",\"same_active_ball\":true,\"continuous_play\":true,\"outcome_evidence\":[{\"frame\":\"s000056264\",\"fact\":\"The selected white player stretches toward the ball on the left while number 13 runs into the middle.\"},{\"frame\":\"s000056514\",\"fact\":\"The ball has moved back toward the approaching number 13.\"},{\"frame\":\"s000056731\",\"fact\":\"The ball is rolling rightward away from number 13, toward goal.\"},{\"frame\":\"s000057264\",\"fact\":\"The ball is visible on the ground inside the goal frame; number 10 is nearby but no touch by him is visible.\"}],\"details\":\"The selected player plays the ball back from the left toward number 13. Number 13 redirects it goalward. The exact foot-to-ball instant for number 13 is partly obscured; number 10 follows the ball at the goal but is not visibly the finisher.\"},{\"action_id\":\"a3\",\"kind\":\"SHOT\",\"actor\":\"p2\",\"start_frame\":\"s000056514\",\"contact_frame\":\"s000056648\",\"end_frame\":\"s000057264\",\"actor_evidence_frames\":[\"s000056514\",\"s000056648\",\"s000056731\"],\"ball_id\":\"b1\",\"outcome\":\"GOAL\",\"receiver\":null,\"receiver_frame\":null,\"receiver_is_teammate\":null,\"finisher\":\"p2\",\"shot_frame\":\"s000056648\",\"outcome_frame\":\"s000057264\",\"same_active_ball\":true,\"continuous_play\":true,\"outcome_evidence\":[{\"frame\":\"s000056514\",\"fact\":\"The ball arrives near number 13's feet.\"},{\"frame\":\"s000056731\",\"fact\":\"It is rolling away from him toward the goal while the red-clad player moves across.\"},{\"frame\":\"s000057014\",\"fact\":\"The ball continues across the goalmouth beyond the red-clad player.\"},{\"frame\":\"s000057264\",\"fact\":\"The ball is on the ground inside the goal frame.\"}],\"details\":\"Number 13 appears to turn the pass toward goal. His precise contact is obscured, but the ball's subsequent ground path is visible; the red-clad player's movement does not stop it.\"}],\"questions\":[{\"reason\":\"CONTACT\",\"action_id\":\"a3\"}]}]}",
+    "response_sha256": "e954cb49831b4f466ad50767d32530996fa47dde35eb7459e042738d939b1640",
+    "elapsed_seconds": 28.504
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "scope": "ACTUAL_OFFLINE_INPUT_PREPARATION_NOT_MODEL_PERCEPTION",
+  "source_video_sha256": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+  "source_end_ms": 76747,
+  "settings": {"sampling_fps": 8, "max_edge": 768, "jpeg_quality": 75, "chunk_ms": 30000, "overlap_ms": 6000},
+  "preparation_seconds": 11.229,
+  "decoded_source_frames": 4606,
+  "unique_sampled_instants": 622,
+  "frame_appearances_with_overlap": 718,
+  "max_sample_gap_ms": 134,
+  "max_native_frame_gap_ms": 17,
+  "original_taps_retained": 10,
+  "original_masks_retained": 3,
+  "detector_forwards": 0,
+  "model_calls": 0,
+  "historical_model_results_used": false,
+  "expected_answers_used_as_input": false,
+  "packets": [
+    {"packet_id": "sequence_001", "start_ms": 0, "end_ms": 30000, "frames": 243, "images_with_references": 251,
+     "gemini_request_bytes": 15808023, "gemini_request_sha256": "93a48866a870b3c06868ffcab791bc085f3ef3fa2dd72df64c7489ed8c4b3d07",
+     "emergent_request_bytes": 15815571},
+    {"packet_id": "sequence_002", "start_ms": 24000, "end_ms": 54000, "frames": 242, "images_with_references": 249,
+     "gemini_request_bytes": 18711329, "gemini_request_sha256": "7428a01f5dd9247fc0bf52c45914b43602867719d0473fee48f351995f2b8107",
+     "emergent_request_bytes": 18718817},
+    {"packet_id": "sequence_003", "start_ms": 48000, "end_ms": 76747, "frames": 233, "images_with_references": 238,
+     "gemini_request_bytes": 14033820, "gemini_request_sha256": "7ba453ad48e740e30020b97703a35d32eeddc906e344f5f187d26f01a09b8017",
+     "emergent_request_bytes": 14040978}
+  ],
+  "model_preflight_status": "MODEL_KEY_NOT_CONFIGURED",
+  "five_reference_actions_automatically_verified": false,
+  "end_to_end_analysis_seconds": null
+}

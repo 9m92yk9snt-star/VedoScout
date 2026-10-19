@@ -1,0 +1,142 @@
+name: Cold whole-source discovery with automatic terminal reviews
+
+on:
+  pull_request:
+    types: [synchronize]
+    paths:
+      - '.github/workflows/sequence-pilot-live.yml'
+      - 'testdata/sequence-pilot-orman400/**'
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  actual_video_experiment:
+    if: >-
+      github.repository == '9m92yk9snt-star/VedoScout' &&
+      github.event.pull_request.number == 39 &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.head.ref == 'codex/sequence-pilot-foundation' &&
+      github.event.before == 'e2313e34f36cded525f9bc4fb45244b76964989c' &&
+      github.run_attempt == 1
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      PYTHONPATH: backend
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /backend/sequence_pilot.py
+            /backend/sequence_pilot_transport.py
+            /backend/player_selection.py
+            /backend/cv_detect.py
+            /backend/scripts/run_sequence_pilot.py
+            /backend/scripts/probe_native_play.py
+            /docs/examples/five_action_reference_cases.json
+            /testdata/sequence-pilot-orman400/
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install native video tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg
+          ffprobe -version
+      - name: Install source image preparation dependencies
+        run: python -m pip install 'numpy<3' 'opencv-python-headless<5' 'Pillow>=10,<15' 'pytest>=8,<10'
+      - name: Reassemble and verify exact original source and taps
+        run: |
+          python - <<'PY'
+          import hashlib, json, os, shutil
+          from pathlib import Path
+          source = Path('testdata/sequence-pilot-orman400')
+          target = Path(os.environ['RUNNER_TEMP']) / 'sequence-pilot-input'
+          (target / 'video').mkdir(parents=True)
+          parts = sorted((source / 'video-parts').glob('*.bin'))
+          assert [p.name for p in parts] == [f'{i:03}.bin' for i in range(43)], 'SOURCE_PARTS_INCOMPLETE'
+          video = target / 'video' / 'source.mp4'
+          with video.open('wb') as output:
+              for part in parts:
+                  with part.open('rb') as stream:
+                      shutil.copyfileobj(stream, output)
+          for name in ('anchors.json', 'SHA256SUMS'):
+              shutil.copyfile(source / name, target / name)
+          for line in (target / 'SHA256SUMS').read_text().splitlines():
+              expected, name = line.split(None, 1)
+              with (target / name).open('rb') as stream:
+                  actual = hashlib.file_digest(stream, 'sha256').hexdigest()
+              assert actual == expected, 'SOURCE_INPUT_CHECKSUM_MISMATCH'
+          assert video.stat().st_size == 31896745, 'SOURCE_SIZE_CHANGED'
+          print(json.dumps({'source_video_bytes':video.stat().st_size, 'source_checksums_verified':True,
+                            'historical_model_results_loaded':False}))
+          PY
+      - name: Prepare fresh source images and original selections
+        run: |
+          python - <<'PYTHON'
+          import os,time
+          from pathlib import Path
+          (Path(os.environ['RUNNER_TEMP'])/'source-processing-start.txt').write_text(str(time.monotonic()))
+          PYTHON
+          python backend/scripts/run_sequence_pilot.py prepare --evidence-dir "$RUNNER_TEMP/sequence-pilot-input" --output "$RUNNER_TEMP/sequence-pilot-prepared" --scene-packets --max-edge 1280
+      - name: Discover all plays afresh and automatically resolve terminal questions
+        env:
+          EMERGENT_LLM_KEY: ${{ secrets.EMERGENT_LLM_KEY }}
+        run: |
+          source_budget_s="$(python - <<'PY'
+          import os,time
+          from pathlib import Path
+          start=float((Path(os.environ['RUNNER_TEMP'])/'source-processing-start.txt').read_text())
+          print(max(1,900-(time.monotonic()-start)))
+          PY
+          )"
+          python -u backend/scripts/run_sequence_pilot.py run --prepared "$RUNNER_TEMP/sequence-pilot-prepared/manifest.json" --output "$RUNNER_TEMP/sequence-pilot-result" --provider emergent --model gpt-6-astra --reasoning-effort medium --budget-s "$source_budget_s" --per-call-s 120 --max-initial 12 --max-followups 6 --fresh-originals --contact-reviews --automatic-outcomes --image-detail high
+      - name: Evaluate returned observations separately and print actual receipts
+        if: always()
+        run: |
+          python - <<'PY'
+          import json, os, time
+          from pathlib import Path
+          import sequence_pilot as pilot
+          root = Path(os.environ['RUNNER_TEMP'])
+          result = root / 'sequence-pilot-result' / 'result.json'
+          if not result.is_file():
+              print('NO_MODEL_RESULT_FILE')
+              raise SystemExit(0)
+          returned = pilot.read_json(result)
+          clock = root / 'source-processing-start.txt'
+          if clock.is_file():
+              returned['source_processing_seconds'] = round(time.monotonic()-float(clock.read_text()),3)
+              returned['timing_scope'] = 'Cold original-source preparation, all fresh model discovery calls and automatic source-derived terminal reviews; excludes workflow setup'
+              pilot.write_json(result,returned)
+          evaluation = pilot.assess_reference_cases(pilot.read_json('docs/examples/five_action_reference_cases.json'), returned)
+          evaluation['fresh_run_complete'] = returned.get('status') == 'MODEL_OBSERVATIONS_RETURNED' and returned.get('fresh_end_to_end_run') is True and returned.get('historical_action_results_used') is False
+          evaluation['experiment_pass'] = bool(evaluation['fresh_run_complete'] and evaluation['all_reference_cases_matched'] and not evaluation['unexpected_scoring_event_ids'] and not returned.get('conflicts'))
+          evaluation['scope'] = 'One cold whole-source execution; reference cases loaded only after all model calls'
+          pilot.write_json(root / 'sequence-pilot-result' / 'evaluation.json', evaluation)
+          print('BEGIN_ACTUAL_MODEL_RESULT')
+          print(json.dumps(returned, ensure_ascii=False))
+          print('END_ACTUAL_MODEL_RESULT')
+          print('BEGIN_REFERENCE_EVALUATION_ONLY')
+          print(json.dumps(evaluation, ensure_ascii=False))
+          print('END_REFERENCE_EVALUATION_ONLY')
+          for receipt in sorted((root / 'sequence-pilot-result' / 'responses').glob('*.json')):
+              print('BEGIN_ACTUAL_RECEIPT ' + receipt.name)
+              print(receipt.read_text())
+              print('END_ACTUAL_RECEIPT ' + receipt.name)
+          PY
+      - name: Preserve returned model evidence and timing
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sequence-pilot-orman400-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/sequence-pilot-result/
+            ${{ runner.temp }}/sequence-pilot-prepared/manifest.json
+          if-no-files-found: warn
+          retention-days: 14

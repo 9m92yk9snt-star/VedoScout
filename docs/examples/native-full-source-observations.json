@@ -1,0 +1,2035 @@
+{
+  "status": "ALL_NATIVE_PLAY_RESPONSES_RETURNED",
+  "target_events": [],
+  "production_pipeline_changed": false,
+  "expected_answers_used_as_input": false,
+  "independent_visual_correctness_verified": false,
+  "source_video_sha256": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+  "source_end_ms": 76747,
+  "source_preparation_seconds": 12.129,
+  "wall_budget_seconds": 300,
+  "timestamp_policy": "APPROXIMATE_NATIVE_VIDEO_OBSERVATIONS_NOT_EXACT_SOURCE_PROOF",
+  "planned_plays": 10,
+  "new_model_calls": 9,
+  "reused_model_calls": 1,
+  "plays": [
+    {
+      "status": "SHORT_SYNCHRONIZED_NATIVE_VIDEO_PROBE",
+      "target_events": [],
+      "production_pipeline_changed": false,
+      "expected_answers_used_as_input": false,
+      "independent_visual_correctness_verified": false,
+      "source_video_sha256": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+      "selected_packet": "sequence_001",
+      "selection_strategy": "SOURCE_PACKET_PLAN",
+      "source_start_ms": 0,
+      "source_end_ms": 7500,
+      "timestamp_policy": "APPROXIMATE_CLIP_RELATIVE_TIMES_NOT_EXACT_SOURCE_PROOF",
+      "detail_source_crop_box": [
+        0,
+        742,
+        1080,
+        1392
+      ],
+      "reference_ids": [
+        "r2",
+        "r6",
+        "r7",
+        "r1"
+      ],
+      "request_audit": {
+        "payload_sha256": "a84e26ec9ab847145057f0d1586267f2a21a2a56fcaeaf35e09686cb9f3a2a47",
+        "payload_bytes": 7385944,
+        "explicit_image_count": 5,
+        "images": [
+          {
+            "sha256": "07ade3bd308f037c88df80c6263e6bb78dd40b79fd0b7e4e18e7d83d02f2c4a6",
+            "bytes": 11688
+          },
+          {
+            "sha256": "923cffbd1ee55df6ecf2f8b3fe3110c318a2606cc0500726d923a1832a891759",
+            "bytes": 8737
+          },
+          {
+            "sha256": "aaccfeb6493345ab3d27192569f96f2cc09782389e0d525a7afbbc7745d72454",
+            "bytes": 13380
+          },
+          {
+            "sha256": "3a1c5a1dd42221c8bc7a92eb59105c36a2a0f148d80f6a55f7442e0188289217",
+            "bytes": 5465
+          },
+          {
+            "sha256": "bfe6e9301c8023021da805660035e69448d2213c5729d3109c5a24f7c29c5f3d",
+            "bytes": 119061
+          }
+        ],
+        "frame_sampling_in_provider_metadata": true,
+        "videos": [
+          {
+            "sha256": "fd0aa2ab292fd62b1e59d11733272a5cc049184d0d84c0b4e0eed0f6d90ddb6c",
+            "bytes": 2853000,
+            "requested_fps": 8
+          },
+          {
+            "sha256": "8cba5b45aa1834221715ed6dce816d2d0a0833638855df75b7643a7678ec77f0",
+            "bytes": 2523074,
+            "requested_fps": 24
+          }
+        ],
+        "requested_image_detail": "high"
+      },
+      "spatial_reference_audit": [
+        {
+          "original_selection": "r1",
+          "source_ms": 3083,
+          "approximate_clip_s": 3.083,
+          "original_source_box": {
+            "x": 0.4098,
+            "y": 0.5002,
+            "w": 0.1467,
+            "h": 0.1127
+          },
+          "original_positive_point": {
+            "x": 0.4449678749970295,
+            "y": 0.5506545696050069
+          },
+          "annotation_policy": "ORIGINAL_HUMAN_SELECTION_ONLY_AT_THIS_SOURCE_INSTANT_NOT_A_PREDICTED_TRACK",
+          "annotated_image_sha256": "bfe6e9301c8023021da805660035e69448d2213c5729d3109c5a24f7c29c5f3d"
+        }
+      ],
+      "model_comparison": null,
+      "encoded_video_bytes_reused": false,
+      "encoded_views": [
+        {
+          "name": "overview",
+          "fps": 8,
+          "sha256": "fd0aa2ab292fd62b1e59d11733272a5cc049184d0d84c0b4e0eed0f6d90ddb6c",
+          "metadata": {
+            "programs": [],
+            "streams": [
+              {
+                "width": 720,
+                "height": 1280,
+                "r_frame_rate": "8/1",
+                "nb_frames": "60"
+              }
+            ],
+            "format": {
+              "duration": "7.500000",
+              "size": "2853000"
+            }
+          }
+        },
+        {
+          "name": "native_detail",
+          "fps": 24,
+          "sha256": "8cba5b45aa1834221715ed6dce816d2d0a0833638855df75b7643a7678ec77f0",
+          "metadata": {
+            "programs": [],
+            "streams": [
+              {
+                "width": 1080,
+                "height": 650,
+                "r_frame_rate": "24/1",
+                "nb_frames": "180"
+              }
+            ],
+            "format": {
+              "duration": "7.500000",
+              "size": "2523074"
+            }
+          }
+        }
+      ],
+      "model_status": "COMPLETED",
+      "raw_native_observations": {
+        "players": [
+          {
+            "id": "p1",
+            "kit": "all-white",
+            "visible_number": 15,
+            "selected": true
+          },
+          {
+            "id": "p2",
+            "kit": "blue shirt, white shorts",
+            "visible_number": null,
+            "selected": false
+          },
+          {
+            "id": "p3",
+            "kit": "blue shirt, white shorts",
+            "visible_number": null,
+            "selected": false
+          },
+          {
+            "id": "p4",
+            "kit": "all-white",
+            "visible_number": 12,
+            "selected": false
+          },
+          {
+            "id": "p5",
+            "kit": "all-white",
+            "visible_number": null,
+            "selected": false
+          }
+        ],
+        "ball_sequence": [
+          {
+            "clip_s": 0,
+            "actor": "p5",
+            "action": "pass",
+            "recipient": "p1",
+            "visible_evidence": "The player in white near the far left passes the ball towards the right wing.",
+            "uncertainty": ""
+          },
+          {
+            "clip_s": 1.5,
+            "actor": "p1",
+            "action": "dribble",
+            "recipient": null,
+            "visible_evidence": "Player p1 receives the ball along the right sideline and dribbles forward towards the camera.",
+            "uncertainty": ""
+          },
+          {
+            "clip_s": 5.2,
+            "actor": "p1",
+            "action": "tackled",
+            "recipient": null,
+            "visible_evidence": "Defenders in blue (p2 and p3) challenge p1, poking/deflecting the ball loose towards the center of the field.",
+            "uncertainty": "Exact final contact between p1 and the challenging blue defenders p2/p3 is contested."
+          }
+        ],
+        "outcome": {
+          "kind": "tackle",
+          "last_touch_player": "p2",
+          "visible_evidence": "The ball rolls out into open space towards the center of the pitch as the defenders converge on p1.",
+          "uncertainty": "Could be p3 or p1 with the deflection."
+        },
+        "selected_player_summary": "Player 15 (p1) receives a pass along the right flank around 1.5s, carries the ball forward under pressure, and is dispossessed in a multi-player challenge around 5.2s."
+      }
+    },
+    {
+      "status": "SHORT_SYNCHRONIZED_NATIVE_VIDEO_PROBE",
+      "target_events": [],
+      "production_pipeline_changed": false,
+      "expected_answers_used_as_input": false,
+      "independent_visual_correctness_verified": false,
+      "source_video_sha256": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+      "selected_packet": "sequence_002",
+      "selection_strategy": "SOURCE_PACKET_PLAN",
+      "source_start_ms": 7500,
+      "source_end_ms": 19266,
+      "timestamp_policy": "APPROXIMATE_CLIP_RELATIVE_TIMES_NOT_EXACT_SOURCE_PROOF",
+      "detail_source_crop_box": [
+        0,
+        556,
+        1080,
+        1540
+      ],
+      "reference_ids": [
+        "r2",
+        "r6",
+        "r7",
+        "r4"
+      ],
+      "request_audit": {
+        "payload_sha256": "ac62e6605071310180d87e14aa924ed1a2c7f9bed6652cf84ca44f33d8437e94",
+        "payload_bytes": 16777652,
+        "explicit_image_count": 5,
+        "images": [
+          {
+            "sha256": "07ade3bd308f037c88df80c6263e6bb78dd40b79fd0b7e4e18e7d83d02f2c4a6",
+            "bytes": 11688
+          },
+          {
+            "sha256": "923cffbd1ee55df6ecf2f8b3fe3110c318a2606cc0500726d923a1832a891759",
+            "bytes": 8737
+          },
+          {
+            "sha256": "aaccfeb6493345ab3d27192569f96f2cc09782389e0d525a7afbbc7745d72454",
+            "bytes": 13380
+          },
+          {
+            "sha256": "bfa6f5aeaf67b977349ce4ce9d80282cc1595e61cf177ae8288817735066fa89",
+            "bytes": 10406
+          },
+          {
+            "sha256": "fb5b53cb5b47b78f401da04342fc184bf5c31d4a1da504c1036f889e275797e8",
+            "bytes": 176580
+          }
+        ],
+        "frame_sampling_in_provider_metadata": true,
+        "videos": [
+          {
+            "sha256": "c2145bb367562077dc8e31d717d55e3843ccfc1c49b8e2bea0cfacb0835737da",
+            "bytes": 5477465,
+            "requested_fps": 8
+          },
+          {
+            "sha256": "a090698b4892adf7b1dfc4cec2002675833c83f0840faa6dddfd969f82e85c8b",
+            "bytes": 6879926,
+            "requested_fps": 24
+          }
+        ],
+        "requested_image_detail": "high"
+      },
+      "spatial_reference_audit": [
+        {
+          "original_selection": "r4",
+          "source_ms": 15366,
+          "approximate_clip_s": 7.866,
+          "original_source_box": {
+            "x": 0.3469,
+            "y": 0.4608,
+            "w": 0.1582,
+            "h": 0.1707
+          },
+          "original_positive_point": {
+            "x": 0.38686868686868686,
+            "y": 0.5363636363636364
+          },
+          "annotation_policy": "ORIGINAL_HUMAN_SELECTION_ONLY_AT_THIS_SOURCE_INSTANT_NOT_A_PREDICTED_TRACK",
+          "annotated_image_sha256": "fb5b53cb5b47b78f401da04342fc184bf5c31d4a1da504c1036f889e275797e8"
+        }
+      ],
+      "model_comparison": null,
+      "encoded_video_bytes_reused": false,
+      "encoded_views": [
+        {
+          "name": "overview",
+          "fps": 8,
+          "sha256": "c2145bb367562077dc8e31d717d55e3843ccfc1c49b8e2bea0cfacb0835737da",
+          "metadata": {
+            "programs": [],
+            "streams": [
+              {
+                "width": 720,
+                "height": 1280,
+                "r_frame_rate": "8/1",
+                "nb_frames": "94"
+              }
+            ],
+            "format": {
+              "duration": "11.750000",
+              "size": "5477465"
+            }
+          }
+        },
+        {
+          "name": "native_detail",
+          "fps": 24,
+          "sha256": "a090698b4892adf7b1dfc4cec2002675833c83f0840faa6dddfd969f82e85c8b",
+          "metadata": {
+            "programs": [],
+            "streams": [
+              {
+                "width": 1080,
+                "height": 984,
+                "r_frame_rate": "24/1",
+                "nb_frames": "282"
+              }
+            ],
+            "format": {
+              "duration": "11.750000",
+              "size": "6879926"
+            }
+          }
+        }
+      ],
+      "model_status": "COMPLETED",
+      "raw_native_observations": {
+        "players": [
+          {
+            "id": "p1",
+            "kit": "white shirt, white shorts, white socks",
+            "visible_number": 15,
+            "selected": true
+          },
+          {
+            "id": "p2",
+            "kit": "blue shirt, white shorts, blue socks",
+            "visible_number": 9,
+            "selected": false
+          },
+          {
+            "id": "p3",
+            "kit": "blue shirt, white shorts, blue socks",
+            "visible_number": 20,
+            "selected": false
+          },
+          {
+            "id": "p4",
+            "kit": "white shirt, white shorts, white socks",
+            "visible_number": 12,
+            "selected": false
+          }
+        ],
+        "ball_sequence": [
+          {
+            "clip_s": 0,
+            "actor": "p1",
+            "action": "dribble",
+            "recipient": null,
+            "visible_evidence": "p1 carries the ball forward with short touches until contested around 1.3s.",
+            "uncertainty": ""
+          },
+          {
+            "clip_s": 1.4,
+            "actor": "p2",
+            "action": "tackle",
+            "recipient": null,
+            "visible_evidence": "p2 engages and tangles with p1, causing a scramble where p1 goes down and the ball breaks loose.",
+            "uncertainty": ""
+          },
+          {
+            "clip_s": 4.5,
+            "actor": "p3",
+            "action": "takeover",
+            "recipient": null,
+            "visible_evidence": "p3 takes possession of the loose ball and starts dribbling downfield.",
+            "uncertainty": ""
+          },
+          {
+            "clip_s": 6.8,
+            "actor": "p3",
+            "action": "dribble",
+            "recipient": null,
+            "visible_evidence": "p3 dribbles the ball forward toward the right flank under pressure from p1.",
+            "uncertainty": ""
+          },
+          {
+            "clip_s": 9.6,
+            "actor": "p3",
+            "action": "kick",
+            "recipient": null,
+            "visible_evidence": "p3 plays the ball ahead towards the corner / off screen.",
+            "uncertainty": ""
+          }
+        ],
+        "outcome": {
+          "kind": "play continues",
+          "last_touch_player": "p3",
+          "visible_evidence": "p3 pushes the ball forward near the corner flag as play moves past the frame.",
+          "uncertainty": ""
+        },
+        "selected_player_summary": "The selected player (p1, wearing white number 15) dribbles forward, gets tackled and brought to the ground around 2-4s, recovers to chase down p3, and pushes/challenges p3 as p3 carries the ball towards the corner."
+      }
+    },
+    {
+      "status": "SHORT_SYNCHRONIZED_NATIVE_VIDEO_PROBE",
+      "target_events": [],
+      "production_pipeline_changed": false,
+      "expected_answers_used_as_input": false,
+      "independent_visual_correctness_verified": false,
+      "source_video_sha256": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+      "selected_packet": "sequence_003",
+      "selection_strategy": "SOURCE_PACKET_PLAN",
+      "source_start_ms": 19266,
+      "source_end_ms": 25632,
+      "timestamp_policy": "APPROXIMATE_CLIP_RELATIVE_TIMES_NOT_EXACT_SOURCE_PROOF",
+      "detail_source_crop_box": [
+        0,
+        604,
+        1080,
+        1196
+      ],
+      "reference_ids": [
+        "r2",
+        "r6",
+        "r7",
+        "r5"
+      ],
+      "request_audit": {
+        "payload_sha256": "6040ef5c3926977cd3a8812741f171f204e9cf9c2c6211e6ddcd9e2aa05ca521",
+        "payload_bytes": 8734128,
+        "explicit_image_count": 5,
+        "images": [
+          {
+            "sha256": "07ade3bd308f037c88df80c6263e6bb78dd40b79fd0b7e4e18e7d83d02f2c4a6",
+            "bytes": 11688
+          },
+          {
+            "sha256": "923cffbd1ee55df6ecf2f8b3fe3110c318a2606cc0500726d923a1832a891759",
+            "bytes": 8737
+          },
+          {
+            "sha256": "aaccfeb6493345ab3d27192569f96f2cc09782389e0d525a7afbbc7745d72454",
+            "bytes": 13380
+          },
+          {
+            "sha256": "701f00516cd66001007c7d83ac856293599c11135ae1113c511c0822fb0473b6",
+            "bytes": 5118
+          },
+          {
+            "sha256": "95605afd43b58d53d59ef0e096116311b20bd6a027d8bcb42ce1dc799ad44359",
+            "bytes": 188495
+          }
+        ],
+        "frame_sampling_in_provider_metadata": true,
+        "videos": [
+          {
+            "sha256": "65249cdb4a66ace06c78fe612400b25db484b7405b3d2a0a72130d4c80dcb3e4",
+            "bytes": 3556175,
+            "requested_fps": 8
+          },
+          {
+            "sha256": "0171cd9dd80f6003a6b196eed3d11feca5945bbacd4e85f775a6703b9c5f86b3",
+            "bytes": 2761946,
+            "requested_fps": 24
+          }
+        ],
+        "requested_image_detail": "high"
+      },
+      "spatial_reference_audit": [
+        {
+          "original_selection": "r5",
+          "source_ms": 21482,
+          "approximate_clip_s": 2.216,
+          "original_source_box": {
+            "x": 0.5639,
+            "y": 0.4182,
+            "w": 0.0852,
+            "h": 0.1026
+          },
+          "original_positive_point": {
+            "x": 0.5898194775745796,
+            "y": 0.45775907765703683
+          },
+          "annotation_policy": "ORIGINAL_HUMAN_SELECTION_ONLY_AT_THIS_SOURCE_INSTANT_NOT_A_PREDICTED_TRACK",
+          "annotated_image_sha256": "95605afd43b58d53d59ef0e096116311b20bd6a027d8bcb42ce1dc799ad44359"
+        }
+      ],
+      "model_comparison": null,
+      "encoded_video_bytes_reused": false,
+      "encoded_views": [
+        {
+          "name": "overview",
+          "fps": 8,
+          "sha256": "65249cdb4a66ace06c78fe612400b25db484b7405b3d2a0a72130d4c80dcb3e4",
+          "metadata": {
+            "programs": [],
+            "streams": [
+              {
+                "width": 720,
+                "height": 1280,
+                "r_frame_rate": "8/1",
+                "nb_frames": "51"
+              }
+            ],
+            "format": {
+              "duration": "6.375000",
+              "size": "3556175"
+            }
+          }
+        },
+        {
+          "name": "native_detail",
+          "fps": 24,
+          "sha256": "0171cd9dd80f6003a6b196eed3d11feca5945bbacd4e85f775a6703b9c5f86b3",
+          "metadata": {
+            "programs": [],
+            "streams": [
+              {
+                "width": 1080,
+                "height": 592,
+                "r_frame_rate": "24/1",
+                "nb_frames": "153"
+              }
+            ],
+            "format": {
+              "duration": "6.375000",
+              "size": "2761946"
+            }
+          }
+        }
+      ],
+      "model_status": "COMPLETED",
+      "raw_native_observations": {
+        "players": [
+          {
+            "id": "p1",
+            "kit": "white shirt, white shorts, white socks",
+            "visible_number": 15,
+            "selected": true
+          },
+          {
+            "id": "p2",
+            "kit": "red goalkeeper kit",
+            "visible_number": null,
+            "selected": false
+          }
+        ],
+        "ball_sequence": [
+          {
+            "clip_s": 0.4,
+            "actor": "p1",
+            "action": "dribble",
+            "recipient": "p1",
+            "visible_evidence": "p1 touches the ball forward while running towards the opposition half",
+            "uncertainty": ""
+          },
+          {
+            "clip_s": 1.4,
+            "actor": "p1",
+            "action": "dribble",
+            "recipient": "p1",
+            "visible_evidence": "p1 cuts and maintains control through traffic under pressure",
+            "uncertainty": ""
+          },
+          {
+            "clip_s": 2.2,
+            "actor": "p1",
+            "action": "dribble",
+            "recipient": "p1",
+            "visible_evidence": "p1 touches the ball ahead while evading a tackle",
+            "uncertainty": ""
+          },
+          {
+            "clip_s": 4.5,
+            "actor": "p1",
+            "action": "shot",
+            "recipient": null,
+            "visible_evidence": "p1 strikes the ball with his right foot towards the goal from long range",
+            "uncertainty": ""
+          }
+        ],
+        "outcome": {
+          "kind": "miss",
+          "last_touch_player": "p1",
+          "visible_evidence": "The shot flies towards the left side of the goal; goalkeeper p2 dives at around 5.2s but does not touch it, and the ball bounces wide past the left post outside the frame of the goal at 5.7s-6.2s",
+          "uncertainty": ""
+        },
+        "selected_player_summary": "p1 dribbles forward past multiple defenders and takes a long-range shot with his right foot that goes wide past the left post for a goal kick."
+      }
+    },
+    {
+      "status": "SHORT_SYNCHRONIZED_NATIVE_VIDEO_PROBE",
+      "target_events": [],
+      "production_pipeline_changed": false,
+      "expected_answers_used_as_input": false,
+      "independent_visual_correctness_verified": false,
+      "source_video_sha256": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+      "selected_packet": "sequence_004",
+      "selection_strategy": "SOURCE_PACKET_PLAN",
+      "source_start_ms": 25632,
+      "source_end_ms": 34132,
+      "timestamp_policy": "APPROXIMATE_CLIP_RELATIVE_TIMES_NOT_EXACT_SOURCE_PROOF",
+      "detail_source_crop_box": [
+        0,
+        464,
+        1080,
+        1712
+      ],
+      "reference_ids": [
+        "r2",
+        "r6",
+        "r7"
+      ],
+      "request_audit": {
+        "payload_sha256": "87565cf4d48c3cae65f886d65246d07dec594eee6756e60ec742af0ee917af9c",
+        "payload_bytes": 15262008,
+        "explicit_image_count": 5,
+        "images": [
+          {
+            "sha256": "07ade3bd308f037c88df80c6263e6bb78dd40b79fd0b7e4e18e7d83d02f2c4a6",
+            "bytes": 11688
+          },
+          {
+            "sha256": "923cffbd1ee55df6ecf2f8b3fe3110c318a2606cc0500726d923a1832a891759",
+            "bytes": 8737
+          },
+          {
+            "sha256": "aaccfeb6493345ab3d27192569f96f2cc09782389e0d525a7afbbc7745d72454",
+            "bytes": 13380
+          },
+          {
+            "sha256": "c86f8d154dbc95272f4922f21646d7b6b19469c092eb832882f7e1a7a8f7c77d",
+            "bytes": 185508
+          },
+          {
+            "sha256": "5fe27185475fc2efb0603be42237dd08199ea15bb3a78517ef00574acfb88d61",
+            "bytes": 223526
+          }
+        ],
+        "frame_sampling_in_provider_metadata": true,
+        "videos": [
+          {
+            "sha256": "ef5769670b8af11e83cb5877b2c5a2dcdcb7e986d817da71df1b58e323a59550",
+            "bytes": 4229019,
+            "requested_fps": 8
+          },
+          {
+            "sha256": "f5f56f4a05de8dc2c4eadc483251f7910caa50f6347738f70047cced7c974340",
+            "bytes": 6769605,
+            "requested_fps": 24
+          }
+        ],
+        "requested_image_detail": "high"
+      },
+      "spatial_reference_audit": [
+        {
+          "original_selection": "r6",
+          "source_ms": 27632,
+          "approximate_clip_s": 2,
+          "original_source_box": {
+            "x": 0.4065,
+            "y": 0.5484,
+            "w": 0.1083,
+            "h": 0.1719
+          },
+          "original_positive_point": {
+            "x": 0.4196042053184911,
+            "y": 0.6171150278293135
+          },
+          "annotation_policy": "ORIGINAL_HUMAN_SELECTION_ONLY_AT_THIS_SOURCE_INSTANT_NOT_A_PREDICTED_TRACK",
+          "annotated_image_sha256": "c86f8d154dbc95272f4922f21646d7b6b19469c092eb832882f7e1a7a8f7c77d"
+        },
+        {
+          "original_selection": "r7",
+          "source_ms": 33782,
+          "approximate_clip_s": 8.15,
+          "original_source_box": {
+            "x": 0.4657,
+            "y": 0.4266,
+            "w": 0.1657,
+            "h": 0.1849
+          },
+          "original_positive_point": {
+            "x": 0.5061842918985776,
+            "y": 0.5023191094619666
+          },
+          "annotation_policy": "ORIGINAL_HUMAN_SELECTION_ONLY_AT_THIS_SOURCE_INSTANT_NOT_A_PREDICTED_TRACK",
+          "annotated_image_sha256": "5fe27185475fc2efb0603be42237dd08199ea15bb3a78517ef00574acfb88d61"
+        }
+      ],
+      "model_comparison": null,
+      "encoded_video_bytes_reused": false,
+      "encoded_views": [
+        {
+          "name": "overview",
+          "fps": 8,
+          "sha256": "ef5769670b8af11e83cb5877b2c5a2dcdcb7e986d817da71df1b58e323a59550",
+          "metadata": {
+            "programs": [],
+            "streams": [
+              {
+                "width": 720,
+                "height": 1280,
+                "r_frame_rate": "8/1",
+                "nb_frames": "68"
+              }
+            ],
+            "format": {
+              "duration": "8.500000",
+              "size": "4229019"
+            }
+          }
+        },
+        {
+          "name": "native_detail",
+          "fps": 24,
+          "sha256": "f5f56f4a05de8dc2c4eadc483251f7910caa50f6347738f70047cced7c974340",
+          "metadata": {
+            "programs": [],
+            "streams": [
+              {
+                "width": 1080,
+                "height": 1248,
+                "r_frame_rate": "24/1",
+                "nb_frames": "204"
+              }
+            ],
+            "format": {
+              "duration": "8.500000",
+              "size": "6769605"
+            }
+          }
+        }
+      ],
+      "model_status": "COMPLETED",
+      "raw_native_observations": {
+        "players": [
+          {
+            "id": "p1",
+            "kit": "white",
+            "visible_number": 15,
+            "selected": true
+          },
+          {
+            "id": "p2",
+            "kit": "white",
+            "visible_number": null,
+            "selected": false
+          },
+          {
+            "id": "p3",
+            "kit": "red",
+            "visible_number": null,
+            "selected": false
+          }
+        ],
+        "ball_sequence": [
+          {
+            "clip_s": 2,
+            "actor": "p2",
+            "action": "pass",
+            "recipient": "p1",
+            "visible_evidence": "Player in white on the left plays a through pass forward towards player #15.",
+            "uncertainty": ""
+          },
+          {
+            "clip_s": 2.7,
+            "actor": "p1",
+            "action": "dribble",
+            "recipient": "p1",
+            "visible_evidence": "Player #15 takes control of the moving ball and drives forward towards the goal.",
+            "uncertainty": ""
+          },
+          {
+            "clip_s": 5.3,
+            "actor": "p1",
+            "action": "shot",
+            "recipient": null,
+            "visible_evidence": "Player #15 strikes the ball with his right foot towards the goal under challenge.",
+            "uncertainty": ""
+          }
+        ],
+        "outcome": {
+          "kind": "goal",
+          "last_touch_player": "p1",
+          "visible_evidence": "The ball flies past the goalkeeper into the back of the net at about 5.6-5.8 seconds, after which player #15 turns away celebrating.",
+          "uncertainty": ""
+        },
+        "selected_player_summary": "Player #15 receives a through pass around 2.7s, dribbles into the penalty area, and shoots at 5.3s to score a goal."
+      }
+    },
+    {
+      "status": "SHORT_SYNCHRONIZED_NATIVE_VIDEO_PROBE",
+      "target_events": [],
+      "production_pipeline_changed": false,
+      "expected_answers_used_as_input": false,
+      "independent_visual_correctness_verified": false,
+      "source_video_sha256": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+      "selected_packet": "sequence_005",
+      "selection_strategy": "SOURCE_PACKET_PLAN",
+      "source_start_ms": 34132,
+      "source_end_ms": 38632,
+      "timestamp_policy": "APPROXIMATE_CLIP_RELATIVE_TIMES_NOT_EXACT_SOURCE_PROOF",
+      "detail_source_crop_box": [
+        0,
+        464,
+        1080,
+        1616
+      ],
+      "reference_ids": [
+        "r2",
+        "r6",
+        "r7"
+      ],
+      "request_audit": {
+        "payload_sha256": "482e8173d4a0cd66e9416fcb94ea8eb91cda3f05d4dbd79207cf63ef0f155c2e",
+        "payload_bytes": 8391172,
+        "explicit_image_count": 3,
+        "images": [
+          {
+            "sha256": "07ade3bd308f037c88df80c6263e6bb78dd40b79fd0b7e4e18e7d83d02f2c4a6",
+            "bytes": 11688
+          },
+          {
+            "sha256": "923cffbd1ee55df6ecf2f8b3fe3110c318a2606cc0500726d923a1832a891759",
+            "bytes": 8737
+          },
+          {
+            "sha256": "aaccfeb6493345ab3d27192569f96f2cc09782389e0d525a7afbbc7745d72454",
+            "bytes": 13380
+          }
+        ],
+        "frame_sampling_in_provider_metadata": true,
+        "videos": [
+          {
+            "sha256": "2fe60505e3f7f380e1dc6da7347253a3a7fc13abe9688e48c793f500e9c11c5a",
+            "bytes": 2504939,
+            "requested_fps": 8
+          },
+          {
+            "sha256": "da8590dce6510822ed4d2b83e502fbdae377bd847189721fb9811095a0633764",
+            "bytes": 3750775,
+            "requested_fps": 24
+          }
+        ],
+        "requested_image_detail": "high"
+      },
+      "spatial_reference_audit": [],
+      "model_comparison": null,
+      "encoded_video_bytes_reused": false,
+      "encoded_views": [
+        {
+          "name": "overview",
+          "fps": 8,
+          "sha256": "2fe60505e3f7f380e1dc6da7347253a3a7fc13abe9688e48c793f500e9c11c5a",
+          "metadata": {
+            "programs": [],
+            "streams": [
+              {
+                "width": 720,
+                "height": 1280,
+                "r_frame_rate": "8/1",
+                "nb_frames": "36"
+              }
+            ],
+            "format": {
+              "duration": "4.500000",
+              "size": "2504939"
+            }
+          }
+        },
+        {
+          "name": "native_detail",
+          "fps": 24,
+          "sha256": "da8590dce6510822ed4d2b83e502fbdae377bd847189721fb9811095a0633764",
+          "metadata": {
+            "programs": [],
+            "streams": [
+              {
+                "width": 1080,
+                "height": 1152,
+                "r_frame_rate": "24/1",
+                "nb_frames": "108"
+              }
+            ],
+            "format": {
+              "duration": "4.500000",
+              "size": "3750775"
+            }
+          }
+        }
+      ],
+      "model_status": "COMPLETED",
+      "raw_native_observations": {
+        "players": [
+          {
+            "id": "p1",
+            "kit": "white",
+            "visible_number": 15,
+            "selected": true
+          },
+          {
+            "id": "p2",
+            "kit": "white",
+            "visible_number": null,
+            "selected": false
+          },
+          {
+            "id": "p3",
+            "kit": "white",
+            "visible_number": 7,
+            "selected": false
+          },
+          {
+            "id": "p4",
+            "kit": "blue",
+            "visible_number": null,
+            "selected": false
+          },
+          {
+            "id": "p5",
+            "kit": "red",
+            "visible_number": null,
+            "selected": false
+          }
+        ],
+        "ball_sequence": [
+          {
+            "clip_s": 0,
+            "actor": "p2",
+            "action": "pass",
+            "recipient": "p1",
+            "visible_evidence": "White player on the left passes the ball forward towards player 15.",
+            "uncertainty": ""
+          },
+          {
+            "clip_s": 1.1,
+            "actor": "p1",
+            "action": "pass",
+            "recipient": "p3",
+            "visible_evidence": "Player 15 receives and strikes a through ball with his right foot into the space on the right.",
+            "uncertainty": ""
+          },
+          {
+            "clip_s": 2.2,
+            "actor": "p3",
+            "action": "dribble",
+            "recipient": null,
+            "visible_evidence": "Player 7 in white runs onto the through ball and dribbles forward toward the goal.",
+            "uncertainty": ""
+          },
+          {
+            "clip_s": 3.5,
+            "actor": "p3",
+            "action": "shot",
+            "recipient": null,
+            "visible_evidence": "Player 7 strikes the ball with his right foot towards the goal.",
+            "uncertainty": ""
+          }
+        ],
+        "outcome": {
+          "kind": "UNKNOWN",
+          "last_touch_player": "p3",
+          "visible_evidence": "Player 7 takes a shot towards the goal; the clip ends as the ball moves towards the goalkeeper/net.",
+          "uncertainty": "The ball's final resting place or entry into the goal is not definitively confirmed before the clip ends."
+        },
+        "selected_player_summary": "Player 15 receives a forward pass from a teammate around 00:01.0 and plays a through ball into open space for player 7 around 00:01.2."
+      }
+    },
+    {
+      "status": "SHORT_SYNCHRONIZED_NATIVE_VIDEO_PROBE",
+      "target_events": [],
+      "production_pipeline_changed": false,
+      "expected_answers_used_as_input": false,
+      "independent_visual_correctness_verified": false,
+      "source_video_sha256": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+      "selected_packet": "sequence_006",
+      "selection_strategy": "SOURCE_PACKET_PLAN",
+      "source_start_ms": 38632,
+      "source_end_ms": 47265,
+      "timestamp_policy": "APPROXIMATE_CLIP_RELATIVE_TIMES_NOT_EXACT_SOURCE_PROOF",
+      "detail_source_crop_box": [
+        0,
+        746,
+        1080,
+        1616
+      ],
+      "reference_ids": [
+        "r2",
+        "r6",
+        "r7"
+      ],
+      "request_audit": {
+        "payload_sha256": "c2cdbf956fb84afe162b36c937522e1754c811ffc3a2844e1e801e5bb1da243c",
+        "payload_bytes": 13459574,
+        "explicit_image_count": 4,
+        "images": [
+          {
+            "sha256": "07ade3bd308f037c88df80c6263e6bb78dd40b79fd0b7e4e18e7d83d02f2c4a6",
+            "bytes": 11688
+          },
+          {
+            "sha256": "923cffbd1ee55df6ecf2f8b3fe3110c318a2606cc0500726d923a1832a891759",
+            "bytes": 8737
+          },
+          {
+            "sha256": "aaccfeb6493345ab3d27192569f96f2cc09782389e0d525a7afbbc7745d72454",
+            "bytes": 13380
+          },
+          {
+            "sha256": "4f5d1194149e22108d97dbf22bd121387575ff4758345f7978271045a6bdae51",
+            "bytes": 190982
+          }
+        ],
+        "frame_sampling_in_provider_metadata": true,
+        "videos": [
+          {
+            "sha256": "8a58771d7e86fad794169a4a1f973761b4a5f0d0200558c87b560a3b3c34712f",
+            "bytes": 4648408,
+            "requested_fps": 8
+          },
+          {
+            "sha256": "22ced6fcf5839af9bd75c86858a4507d8b589732b5206e30d9d1b060e9d3ec3d",
+            "bytes": 5217029,
+            "requested_fps": 24
+          }
+        ],
+        "requested_image_detail": "high"
+      },
+      "spatial_reference_audit": [
+        {
+          "original_selection": "r2",
+          "source_ms": 41915,
+          "approximate_clip_s": 3.283,
+          "original_source_box": {
+            "x": 0.2287,
+            "y": 0.5403,
+            "w": 0.2055,
+            "h": 0.1511
+          },
+          "original_positive_point": {
+            "x": 0.26874435411020775,
+            "y": 0.6158536585365855
+          },
+          "annotation_policy": "ORIGINAL_HUMAN_SELECTION_ONLY_AT_THIS_SOURCE_INSTANT_NOT_A_PREDICTED_TRACK",
+          "annotated_image_sha256": "4f5d1194149e22108d97dbf22bd121387575ff4758345f7978271045a6bdae51"
+        }
+      ],
+      "model_comparison": null,
+      "encoded_video_bytes_reused": false,
+      "encoded_views": [
+        {
+          "name": "overview",
+          "fps": 8,
+          "sha256": "8a58771d7e86fad794169a4a1f973761b4a5f0d0200558c87b560a3b3c34712f",
+          "metadata": {
+            "programs": [],
+            "streams": [
+              {
+                "width": 720,
+                "height": 1280,
+                "r_frame_rate": "8/1",
+                "nb_frames": "69"
+              }
+            ],
+            "format": {
+              "duration": "8.625000",
+              "size": "4648408"
+            }
+          }
+        },
+        {
+          "name": "native_detail",
+          "fps": 24,
+          "sha256": "22ced6fcf5839af9bd75c86858a4507d8b589732b5206e30d9d1b060e9d3ec3d",
+          "metadata": {
+            "programs": [],
+            "streams": [
+              {
+                "width": 1080,
+                "height": 870,
+                "r_frame_rate": "24/1",
+                "nb_frames": "207"
+              }
+            ],
+            "format": {
+              "duration": "8.625000",
+              "size": "5217029"
+            }
+          }
+        }
+      ],
+      "model_status": "COMPLETED",
+      "raw_native_observations": {
+        "players": [
+          {
+            "id": "p1",
+            "kit": "all-white kit",
+            "visible_number": 17,
+            "selected": false
+          },
+          {
+            "id": "p2",
+            "kit": "blue shirt, white shorts",
+            "visible_number": 3,
+            "selected": false
+          },
+          {
+            "id": "p3",
+            "kit": "red kit",
+            "visible_number": null,
+            "selected": false
+          },
+          {
+            "id": "p4",
+            "kit": "all-white kit",
+            "visible_number": 15,
+            "selected": true
+          },
+          {
+            "id": "p5",
+            "kit": "blue shirt, white shorts",
+            "visible_number": null,
+            "selected": false
+          },
+          {
+            "id": "p6",
+            "kit": "all-white kit",
+            "visible_number": null,
+            "selected": false
+          }
+        ],
+        "ball_sequence": [
+          {
+            "clip_s": 0,
+            "actor": "p1",
+            "action": "dribble",
+            "recipient": null,
+            "visible_evidence": "Player #17 in white controls the ball running towards the goal.",
+            "uncertainty": ""
+          },
+          {
+            "clip_s": 1,
+            "actor": "p1",
+            "action": "cutback",
+            "recipient": null,
+            "visible_evidence": "Player #17 turns back away from goal with the ball.",
+            "uncertainty": ""
+          },
+          {
+            "clip_s": 2.2,
+            "actor": "p1",
+            "action": "pass",
+            "recipient": "p4",
+            "visible_evidence": "Player #17 passes the ball across to the left towards player #15.",
+            "uncertainty": ""
+          },
+          {
+            "clip_s": 3.2,
+            "actor": "p4",
+            "action": "take-on",
+            "recipient": null,
+            "visible_evidence": "Player #15 receives the ball, dribbles forward in possession.",
+            "uncertainty": ""
+          },
+          {
+            "clip_s": 5.4,
+            "actor": "p4",
+            "action": "pass",
+            "recipient": "p5",
+            "visible_evidence": "Player #15 passes the ball forward towards the penalty area.",
+            "uncertainty": "Deflected by defender p5 or intended for teammate."
+          },
+          {
+            "clip_s": 5.8,
+            "actor": "p5",
+            "action": "deflection",
+            "recipient": "p6",
+            "visible_evidence": "Defender p5 attempts to intervene/control and the ball runs towards the right side through on goal.",
+            "uncertainty": "Precise deflection by defender or touched past by attacker."
+          },
+          {
+            "clip_s": 7,
+            "actor": "p6",
+            "action": "shot",
+            "recipient": null,
+            "visible_evidence": "Teammate p6 runs onto the ball and shoots into the bottom right corner of the goal.",
+            "uncertainty": ""
+          }
+        ],
+        "outcome": {
+          "kind": "GOAL",
+          "last_touch_player": "p6",
+          "visible_evidence": "The ball rolls into the net inside the right post at around 7.5s - 8.0s.",
+          "uncertainty": ""
+        },
+        "selected_player_summary": "The selected player (#15 in white) receives a pass around 3.2s, carries the ball forward, and passes/crosses forward into the attacking area around 5.4s before a teammate eventually scores."
+      }
+    },
+    {
+      "status": "SHORT_SYNCHRONIZED_NATIVE_VIDEO_PROBE",
+      "target_events": [],
+      "production_pipeline_changed": false,
+      "expected_answers_used_as_input": false,
+      "independent_visual_correctness_verified": false,
+      "source_video_sha256": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+      "selected_packet": "sequence_007",
+      "selection_strategy": "SOURCE_PACKET_PLAN",
+      "source_start_ms": 47265,
+      "source_end_ms": 53015,
+      "timestamp_policy": "APPROXIMATE_CLIP_RELATIVE_TIMES_NOT_EXACT_SOURCE_PROOF",
+      "detail_source_crop_box": [
+        0,
+        808,
+        1080,
+        1442
+      ],
+      "reference_ids": [
+        "r2",
+        "r6",
+        "r7"
+      ],
+      "request_audit": {
+        "payload_sha256": "5262646a6739e3d00b030305b5df30847fc458a0159068b2ada15e4d495cc5df",
+        "payload_bytes": 7697772,
+        "explicit_image_count": 3,
+        "images": [
+          {
+            "sha256": "07ade3bd308f037c88df80c6263e6bb78dd40b79fd0b7e4e18e7d83d02f2c4a6",
+            "bytes": 11688
+          },
+          {
+            "sha256": "923cffbd1ee55df6ecf2f8b3fe3110c318a2606cc0500726d923a1832a891759",
+            "bytes": 8737
+          },
+          {
+            "sha256": "aaccfeb6493345ab3d27192569f96f2cc09782389e0d525a7afbbc7745d72454",
+            "bytes": 13380
+          }
+        ],
+        "frame_sampling_in_provider_metadata": true,
+        "videos": [
+          {
+            "sha256": "73fa74297d870659ffa6bd0052a112f2d3ee1ee0dea3683f3be3ae57263972e6",
+            "bytes": 3258361,
+            "requested_fps": 8
+          },
+          {
+            "sha256": "f02ed4c717e59b300774269b43811ab79ed2f5cb82588c24725d81004607937f",
+            "bytes": 2477303,
+            "requested_fps": 24
+          }
+        ],
+        "requested_image_detail": "high"
+      },
+      "spatial_reference_audit": [],
+      "model_comparison": null,
+      "encoded_video_bytes_reused": false,
+      "encoded_views": [
+        {
+          "name": "overview",
+          "fps": 8,
+          "sha256": "73fa74297d870659ffa6bd0052a112f2d3ee1ee0dea3683f3be3ae57263972e6",
+          "metadata": {
+            "programs": [],
+            "streams": [
+              {
+                "width": 720,
+                "height": 1280,
+                "r_frame_rate": "8/1",
+                "nb_frames": "46"
+              }
+            ],
+            "format": {
+              "duration": "5.750000",
+              "size": "3258361"
+            }
+          }
+        },
+        {
+          "name": "native_detail",
+          "fps": 24,
+          "sha256": "f02ed4c717e59b300774269b43811ab79ed2f5cb82588c24725d81004607937f",
+          "metadata": {
+            "programs": [],
+            "streams": [
+              {
+                "width": 1080,
+                "height": 634,
+                "r_frame_rate": "24/1",
+                "nb_frames": "138"
+              }
+            ],
+            "format": {
+              "duration": "5.750000",
+              "size": "2477303"
+            }
+          }
+        }
+      ],
+      "model_status": "COMPLETED",
+      "raw_native_observations": {
+        "players": [
+          {
+            "id": "p1",
+            "kit": "white",
+            "visible_number": 7,
+            "selected": false
+          },
+          {
+            "id": "p2",
+            "kit": "blue",
+            "visible_number": 20,
+            "selected": false
+          },
+          {
+            "id": "p3",
+            "kit": "white",
+            "visible_number": 15,
+            "selected": true
+          },
+          {
+            "id": "p4",
+            "kit": "red",
+            "visible_number": null,
+            "selected": false
+          }
+        ],
+        "ball_sequence": [
+          {
+            "clip_s": 0,
+            "actor": "p1",
+            "action": "dribble",
+            "recipient": null,
+            "visible_evidence": "p1 controls the ball on the grass while under challenge from p2.",
+            "uncertainty": ""
+          },
+          {
+            "clip_s": 1.5,
+            "actor": "p1",
+            "action": "pass",
+            "recipient": "p3",
+            "visible_evidence": "p1 plays the ball forward towards the center towards oncoming teammate p3.",
+            "uncertainty": ""
+          },
+          {
+            "clip_s": 2,
+            "actor": "p3",
+            "action": "dribble",
+            "recipient": null,
+            "visible_evidence": "p3 receives the pass with his foot, controlling and shifting it past a blue defender.",
+            "uncertainty": ""
+          },
+          {
+            "clip_s": 3.3,
+            "actor": "p3",
+            "action": "shot",
+            "recipient": null,
+            "visible_evidence": "p3 takes a right-footed shot towards the right goal corner.",
+            "uncertainty": ""
+          }
+        ],
+        "outcome": {
+          "kind": "goal",
+          "last_touch_player": "p3",
+          "visible_evidence": "The ball travels into the bottom corner of the net past the diving goalkeeper (p4) at ~04.8s.",
+          "uncertainty": ""
+        },
+        "selected_player_summary": "p3 (wearing white #15) receives a pass from p1, touches the ball around defending players, and shoots into the bottom corner of the net to score a goal."
+      }
+    },
+    {
+      "status": "SHORT_SYNCHRONIZED_NATIVE_VIDEO_PROBE",
+      "target_events": [],
+      "production_pipeline_changed": false,
+      "expected_answers_used_as_input": false,
+      "independent_visual_correctness_verified": false,
+      "source_video_sha256": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+      "selected_packet": "sequence_008",
+      "selection_strategy": "SOURCE_PACKET_PLAN",
+      "source_start_ms": 53015,
+      "source_end_ms": 59014,
+      "timestamp_policy": "APPROXIMATE_CLIP_RELATIVE_TIMES_NOT_EXACT_SOURCE_PROOF",
+      "detail_source_crop_box": [
+        0,
+        808,
+        1080,
+        1442
+      ],
+      "reference_ids": [
+        "r2",
+        "r6",
+        "r7",
+        "r8",
+        "r9"
+      ],
+      "request_audit": {
+        "payload_sha256": "92f8083f86be8be4133833095317b74c49fd9115cfcf48e5a5eac28d0891cd40",
+        "payload_bytes": 8481188,
+        "explicit_image_count": 7,
+        "images": [
+          {
+            "sha256": "07ade3bd308f037c88df80c6263e6bb78dd40b79fd0b7e4e18e7d83d02f2c4a6",
+            "bytes": 11688
+          },
+          {
+            "sha256": "923cffbd1ee55df6ecf2f8b3fe3110c318a2606cc0500726d923a1832a891759",
+            "bytes": 8737
+          },
+          {
+            "sha256": "aaccfeb6493345ab3d27192569f96f2cc09782389e0d525a7afbbc7745d72454",
+            "bytes": 13380
+          },
+          {
+            "sha256": "872357c7749fdd2359f1fa303872c08d74fb97ba5bb33d23dd9851237e056c60",
+            "bytes": 6652
+          },
+          {
+            "sha256": "721c5dee7a3e8980b7585d745626cd8016b25912e7176308d2a47b746458d93f",
+            "bytes": 6238
+          },
+          {
+            "sha256": "bcaa2278f96a6519df6c31d050a06810b2b3ac44fe87b869c7a256b41467dc9b",
+            "bytes": 168292
+          },
+          {
+            "sha256": "f2f37d9fa7f984c5bb8abecd31743f1052340569411a18b42663d5dc211ece89",
+            "bytes": 184490
+          }
+        ],
+        "frame_sampling_in_provider_metadata": true,
+        "videos": [
+          {
+            "sha256": "df942e54769dbb63594f0d908b85efb75f5ec69bb5ffbcd371fb32cea5bef121",
+            "bytes": 3120074,
+            "requested_fps": 8
+          },
+          {
+            "sha256": "3a95db0b69551dbaba2e8358074a07f9a69943bc8a7e988f7ad98182ac6158ac",
+            "bytes": 2835083,
+            "requested_fps": 24
+          }
+        ],
+        "requested_image_detail": "high"
+      },
+      "spatial_reference_audit": [
+        {
+          "original_selection": "r8",
+          "source_ms": 56064,
+          "approximate_clip_s": 3.049,
+          "original_source_box": {
+            "x": 0.3525,
+            "y": 0.5272,
+            "w": 0.1685,
+            "h": 0.1062
+          },
+          "original_positive_point": {
+            "x": 0.3925111170009129,
+            "y": 0.5770275642724623
+          },
+          "annotation_policy": "ORIGINAL_HUMAN_SELECTION_ONLY_AT_THIS_SOURCE_INSTANT_NOT_A_PREDICTED_TRACK",
+          "annotated_image_sha256": "bcaa2278f96a6519df6c31d050a06810b2b3ac44fe87b869c7a256b41467dc9b"
+        },
+        {
+          "original_selection": "r9",
+          "source_ms": 55764,
+          "approximate_clip_s": 2.749,
+          "original_source_box": {
+            "x": 0.3971,
+            "y": 0.5461,
+            "w": 0.1217,
+            "h": 0.1027
+          },
+          "original_positive_point": {
+            "x": 0.4595959595959596,
+            "y": 0.6204545454545455
+          },
+          "annotation_policy": "ORIGINAL_HUMAN_SELECTION_ONLY_AT_THIS_SOURCE_INSTANT_NOT_A_PREDICTED_TRACK",
+          "annotated_image_sha256": "f2f37d9fa7f984c5bb8abecd31743f1052340569411a18b42663d5dc211ece89"
+        }
+      ],
+      "model_comparison": {
+        "origin_run": 39149235839,
+        "baseline_model": "gemini-3.1-pro-preview",
+        "baseline_payload_sha256": "4a88954e7837a79963311a4f40439791635458b01e0494a5effe229bcef121f4",
+        "only_model_changed": true
+      },
+      "encoded_video_bytes_reused": true,
+      "encoded_views": [
+        {
+          "name": "overview",
+          "fps": 8,
+          "sha256": "df942e54769dbb63594f0d908b85efb75f5ec69bb5ffbcd371fb32cea5bef121",
+          "metadata": {
+            "programs": [],
+            "streams": [
+              {
+                "width": 720,
+                "height": 1280,
+                "r_frame_rate": "8/1",
+                "nb_frames": "48"
+              }
+            ],
+            "format": {
+              "duration": "6.000000",
+              "size": "3120074"
+            }
+          }
+        },
+        {
+          "name": "native_detail",
+          "fps": 24,
+          "sha256": "3a95db0b69551dbaba2e8358074a07f9a69943bc8a7e988f7ad98182ac6158ac",
+          "metadata": {
+            "programs": [],
+            "streams": [
+              {
+                "width": 1080,
+                "height": 634,
+                "r_frame_rate": "24/1",
+                "nb_frames": "144"
+              }
+            ],
+            "format": {
+              "duration": "6.000000",
+              "size": "2835083"
+            }
+          }
+        }
+      ],
+      "model_status": "COMPLETED_REUSED",
+      "raw_native_observations": {
+        "players": [
+          {
+            "id": "p1",
+            "kit": "white",
+            "visible_number": 15,
+            "selected": true
+          },
+          {
+            "id": "p2",
+            "kit": "white",
+            "visible_number": 10,
+            "selected": false
+          },
+          {
+            "id": "p3",
+            "kit": "white",
+            "visible_number": 13,
+            "selected": false
+          },
+          {
+            "id": "p4",
+            "kit": "blue",
+            "visible_number": 8,
+            "selected": false
+          },
+          {
+            "id": "p5",
+            "kit": "red",
+            "visible_number": null,
+            "selected": false
+          }
+        ],
+        "ball_sequence": [
+          {
+            "clip_s": 0,
+            "actor": "p4",
+            "action": "dribble",
+            "recipient": null,
+            "visible_evidence": "Player in blue #8 has possession in midfield moving forward.",
+            "uncertainty": ""
+          },
+          {
+            "clip_s": 0.8,
+            "actor": "p4",
+            "action": "through ball",
+            "recipient": "p1",
+            "visible_evidence": "Player #8 slides a through ball forward into space ahead of the white-shirted attackers.",
+            "uncertainty": ""
+          },
+          {
+            "clip_s": 2.5,
+            "actor": "p1",
+            "action": "shot",
+            "recipient": null,
+            "visible_evidence": "p1 runs onto the rolling through ball and strikes it toward the goal past the rushing goalkeeper.",
+            "uncertainty": ""
+          },
+          {
+            "clip_s": 4.1,
+            "actor": "p2",
+            "action": "tap-in",
+            "recipient": null,
+            "visible_evidence": "The rolling ball approaches the open goal line where player #10 taps it into the net.",
+            "uncertainty": ""
+          }
+        ],
+        "outcome": {
+          "kind": "goal",
+          "last_touch_player": "p2",
+          "visible_evidence": "The ball crosses the goal line and settles into the net as players turn back.",
+          "uncertainty": ""
+        },
+        "selected_player_summary": "The selected player (p1, wearing #15 in white) chases a through pass played into the final third around 2.5s and takes a low shot/pass toward goal past the oncoming goalkeeper, which teammate #10 follows up on and finishes into the open goal."
+      },
+      "reused_origin_run": 39149857306
+    },
+    {
+      "status": "SHORT_SYNCHRONIZED_NATIVE_VIDEO_PROBE",
+      "target_events": [],
+      "production_pipeline_changed": false,
+      "expected_answers_used_as_input": false,
+      "independent_visual_correctness_verified": false,
+      "source_video_sha256": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+      "selected_packet": "sequence_009",
+      "selection_strategy": "SOURCE_PACKET_PLAN",
+      "source_start_ms": 59014,
+      "source_end_ms": 65014,
+      "timestamp_policy": "APPROXIMATE_CLIP_RELATIVE_TIMES_NOT_EXACT_SOURCE_PROOF",
+      "detail_source_crop_box": [
+        0,
+        844,
+        1080,
+        1480
+      ],
+      "reference_ids": [
+        "r2",
+        "r6",
+        "r7",
+        "r10"
+      ],
+      "request_audit": {
+        "payload_sha256": "8645b89f05ab81f715492b4877aca47ab9af335385ee1cf0453585d7bd8f8d54",
+        "payload_bytes": 6427768,
+        "explicit_image_count": 5,
+        "images": [
+          {
+            "sha256": "07ade3bd308f037c88df80c6263e6bb78dd40b79fd0b7e4e18e7d83d02f2c4a6",
+            "bytes": 11688
+          },
+          {
+            "sha256": "923cffbd1ee55df6ecf2f8b3fe3110c318a2606cc0500726d923a1832a891759",
+            "bytes": 8737
+          },
+          {
+            "sha256": "aaccfeb6493345ab3d27192569f96f2cc09782389e0d525a7afbbc7745d72454",
+            "bytes": 13380
+          },
+          {
+            "sha256": "a399aa3c7a6191dbc52db2acb94cb7c7a1c7dbbaaa9e85350bb353b9921bcc08",
+            "bytes": 5769
+          },
+          {
+            "sha256": "9c8b586818a0e1e50123cfd3f58be6c828b2761a9a92b805d004eac44ba5bfb2",
+            "bytes": 153410
+          }
+        ],
+        "frame_sampling_in_provider_metadata": true,
+        "videos": [
+          {
+            "sha256": "80a2a46455ea795cd87b3fcc1a87fc142266f9d19cefe321187eb97172bacc26",
+            "bytes": 2495732,
+            "requested_fps": 8
+          },
+          {
+            "sha256": "d3caed3fc17f1e557bf11c985207472825d1e913507b4fe3639cf36524c0f9e4",
+            "bytes": 2127056,
+            "requested_fps": 24
+          }
+        ],
+        "requested_image_detail": "high"
+      },
+      "spatial_reference_audit": [
+        {
+          "original_selection": "r10",
+          "source_ms": 64314,
+          "approximate_clip_s": 5.3,
+          "original_source_box": {
+            "x": 0.4476,
+            "y": 0.5508,
+            "w": 0.1482,
+            "h": 0.1104
+          },
+          "original_positive_point": {
+            "x": 0.4823305945754925,
+            "y": 0.5969056453750331
+          },
+          "annotation_policy": "ORIGINAL_HUMAN_SELECTION_ONLY_AT_THIS_SOURCE_INSTANT_NOT_A_PREDICTED_TRACK",
+          "annotated_image_sha256": "9c8b586818a0e1e50123cfd3f58be6c828b2761a9a92b805d004eac44ba5bfb2"
+        }
+      ],
+      "model_comparison": null,
+      "encoded_video_bytes_reused": false,
+      "encoded_views": [
+        {
+          "name": "overview",
+          "fps": 8,
+          "sha256": "80a2a46455ea795cd87b3fcc1a87fc142266f9d19cefe321187eb97172bacc26",
+          "metadata": {
+            "programs": [],
+            "streams": [
+              {
+                "width": 720,
+                "height": 1280,
+                "r_frame_rate": "8/1",
+                "nb_frames": "48"
+              }
+            ],
+            "format": {
+              "duration": "6.000000",
+              "size": "2495732"
+            }
+          }
+        },
+        {
+          "name": "native_detail",
+          "fps": 24,
+          "sha256": "d3caed3fc17f1e557bf11c985207472825d1e913507b4fe3639cf36524c0f9e4",
+          "metadata": {
+            "programs": [],
+            "streams": [
+              {
+                "width": 1080,
+                "height": 636,
+                "r_frame_rate": "24/1",
+                "nb_frames": "144"
+              }
+            ],
+            "format": {
+              "duration": "6.000000",
+              "size": "2127056"
+            }
+          }
+        }
+      ],
+      "model_status": "COMPLETED",
+      "raw_native_observations": {
+        "players": [
+          {
+            "id": "p1",
+            "kit": "white",
+            "visible_number": 15,
+            "selected": true
+          },
+          {
+            "id": "p2",
+            "kit": "blue",
+            "visible_number": null,
+            "selected": false
+          },
+          {
+            "id": "p3",
+            "kit": "white",
+            "visible_number": 12,
+            "selected": false
+          }
+        ],
+        "ball_sequence": [
+          {
+            "clip_s": 0.8,
+            "actor": "p1",
+            "action": "tackle",
+            "recipient": "p1",
+            "visible_evidence": "p1 contests the ball with opponents, pushing it forward into open space",
+            "uncertainty": ""
+          },
+          {
+            "clip_s": 1.2,
+            "actor": "p1",
+            "action": "dribble",
+            "recipient": "p1",
+            "visible_evidence": "p1 pursues the loose ball ahead into the attacking half",
+            "uncertainty": ""
+          },
+          {
+            "clip_s": 3.4,
+            "actor": "p1",
+            "action": "touch",
+            "recipient": "p1",
+            "visible_evidence": "p1 reaches the ball, shields and touches it while challenged by p2",
+            "uncertainty": ""
+          },
+          {
+            "clip_s": 4.5,
+            "actor": "p1",
+            "action": "dribble",
+            "recipient": null,
+            "visible_evidence": "p1 turns past p2, keeping the ball ahead toward the penalty arc",
+            "uncertainty": ""
+          }
+        ],
+        "outcome": {
+          "kind": "UNKNOWN",
+          "last_touch_player": "p1",
+          "visible_evidence": "p1 retains the ball while moving towards the penalty box as the video cuts out",
+          "uncertainty": "The play continues past the end of the clip."
+        },
+        "selected_player_summary": "The selected player (p1, #15) wins the ball in midfield around 0.8s, dribbles into space, fends off a challenge from a blue defender around 3.5s-4.5s, and retains possession as the clip ends."
+      }
+    },
+    {
+      "status": "SHORT_SYNCHRONIZED_NATIVE_VIDEO_PROBE",
+      "target_events": [],
+      "production_pipeline_changed": false,
+      "expected_answers_used_as_input": false,
+      "independent_visual_correctness_verified": false,
+      "source_video_sha256": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+      "selected_packet": "sequence_010",
+      "selection_strategy": "SOURCE_PACKET_PLAN",
+      "source_start_ms": 65014,
+      "source_end_ms": 76747,
+      "timestamp_policy": "APPROXIMATE_CLIP_RELATIVE_TIMES_NOT_EXACT_SOURCE_PROOF",
+      "detail_source_crop_box": [
+        0,
+        726,
+        1080,
+        1474
+      ],
+      "reference_ids": [
+        "r2",
+        "r6",
+        "r7",
+        "r3"
+      ],
+      "request_audit": {
+        "payload_sha256": "6ea29f532c69d6d6f607d06dc5ea2b69299d66b766826d8d7aa98bf3174cc62c",
+        "payload_bytes": 12515902,
+        "explicit_image_count": 5,
+        "images": [
+          {
+            "sha256": "07ade3bd308f037c88df80c6263e6bb78dd40b79fd0b7e4e18e7d83d02f2c4a6",
+            "bytes": 11688
+          },
+          {
+            "sha256": "923cffbd1ee55df6ecf2f8b3fe3110c318a2606cc0500726d923a1832a891759",
+            "bytes": 8737
+          },
+          {
+            "sha256": "aaccfeb6493345ab3d27192569f96f2cc09782389e0d525a7afbbc7745d72454",
+            "bytes": 13380
+          },
+          {
+            "sha256": "b27c75fac95669fa30f3cdc8e27901a7eb102c880ff61ee4a9539da31f255dec",
+            "bytes": 6347
+          },
+          {
+            "sha256": "06e9d44953d88145dcb02357e1bad481337757beb295db9a63639f5b987bdeed",
+            "bytes": 119010
+          }
+        ],
+        "frame_sampling_in_provider_metadata": true,
+        "videos": [
+          {
+            "sha256": "4d0bfe56553568271b33ff953306b68a8718c355ad1cda1ee18440d606a99698",
+            "bytes": 4603971,
+            "requested_fps": 8
+          },
+          {
+            "sha256": "68a0ccd47921ecd87124bc30336597969efc347e87b6cc6e9ceb2da14f3f117c",
+            "bytes": 4618742,
+            "requested_fps": 24
+          }
+        ],
+        "requested_image_detail": "high"
+      },
+      "spatial_reference_audit": [
+        {
+          "original_selection": "r3",
+          "source_ms": 71014,
+          "approximate_clip_s": 6,
+          "original_source_box": {
+            "x": 0.5271,
+            "y": 0.5086,
+            "w": 0.1745,
+            "h": 0.1298
+          },
+          "original_positive_point": {
+            "x": 0.5618908035533222,
+            "y": 0.5555535803171444
+          },
+          "annotation_policy": "ORIGINAL_HUMAN_SELECTION_ONLY_AT_THIS_SOURCE_INSTANT_NOT_A_PREDICTED_TRACK",
+          "annotated_image_sha256": "06e9d44953d88145dcb02357e1bad481337757beb295db9a63639f5b987bdeed"
+        }
+      ],
+      "model_comparison": null,
+      "encoded_video_bytes_reused": false,
+      "encoded_views": [
+        {
+          "name": "overview",
+          "fps": 8,
+          "sha256": "4d0bfe56553568271b33ff953306b68a8718c355ad1cda1ee18440d606a99698",
+          "metadata": {
+            "programs": [],
+            "streams": [
+              {
+                "width": 720,
+                "height": 1280,
+                "r_frame_rate": "8/1",
+                "nb_frames": "94"
+              }
+            ],
+            "format": {
+              "duration": "11.750000",
+              "size": "4603971"
+            }
+          }
+        },
+        {
+          "name": "native_detail",
+          "fps": 24,
+          "sha256": "68a0ccd47921ecd87124bc30336597969efc347e87b6cc6e9ceb2da14f3f117c",
+          "metadata": {
+            "programs": [],
+            "streams": [
+              {
+                "width": 1080,
+                "height": 748,
+                "r_frame_rate": "24/1",
+                "nb_frames": "282"
+              }
+            ],
+            "format": {
+              "duration": "11.750000",
+              "size": "4618742"
+            }
+          }
+        }
+      ],
+      "model_status": "COMPLETED",
+      "raw_native_observations": {
+        "players": [
+          {
+            "id": "p1",
+            "kit": "white",
+            "visible_number": 15,
+            "selected": false
+          },
+          {
+            "id": "p2",
+            "kit": "white",
+            "visible_number": null,
+            "selected": true
+          },
+          {
+            "id": "p3",
+            "kit": "white",
+            "visible_number": 12,
+            "selected": false
+          },
+          {
+            "id": "p4",
+            "kit": "blue",
+            "visible_number": null,
+            "selected": false
+          },
+          {
+            "id": "p5",
+            "kit": "pink/red",
+            "visible_number": 16,
+            "selected": false
+          }
+        ],
+        "ball_sequence": [
+          {
+            "clip_s": 0,
+            "actor": "p2",
+            "action": "dribble",
+            "recipient": null,
+            "visible_evidence": "The player in white, matched by reference r3, controls the rolling ball on the right wing.",
+            "uncertainty": ""
+          },
+          {
+            "clip_s": 2.1,
+            "actor": "p2",
+            "action": "pass",
+            "recipient": "p1",
+            "visible_evidence": "Player p2 kicks the ball high toward the center field.",
+            "uncertainty": ""
+          },
+          {
+            "clip_s": 3.1,
+            "actor": "p1",
+            "action": "header",
+            "recipient": "p2",
+            "visible_evidence": "Player p1 (fair-haired player in white kit, matching r2/r6/r7 profile) jumps and heads the ball back forward down the wing.",
+            "uncertainty": ""
+          },
+          {
+            "clip_s": 6.1,
+            "actor": "p2",
+            "action": "pass",
+            "recipient": "p3",
+            "visible_evidence": "Player p2 volleys/lobs the dropping ball forward over the midfield toward the attacking penalty area.",
+            "uncertainty": ""
+          },
+          {
+            "clip_s": 11.2,
+            "actor": "p3",
+            "action": "trap",
+            "recipient": null,
+            "visible_evidence": "Player p3 (wearing white shirt #12) reaches the bouncing ball near the corner of the penalty area and controls it with their foot.",
+            "uncertainty": ""
+          }
+        ],
+        "outcome": {
+          "kind": "retained possession",
+          "last_touch_player": "p3",
+          "visible_evidence": "p3 gathers and maintains control of the ball on the grass near the goal box.",
+          "uncertainty": ""
+        },
+        "selected_player_summary": "The selected player (p2, tagged at ~6.0s in reference r3) receives a header, volleys the ball high forward down the right side to teammate p3, who controls possession."
+      }
+    }
+  ],
+  "failed_preparations": [],
+  "request_preparation_seconds": 48.176,
+  "analysis_seconds": 108.837
+}

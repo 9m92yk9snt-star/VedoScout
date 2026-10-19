@@ -1,0 +1,137 @@
+name: One-off continuous pass connection probe
+
+on:
+  pull_request:
+    types: [synchronize]
+    paths:
+      - '.github/workflows/sequence-continuous-pass.yml'
+      - 'testdata/sequence-pilot-orman400/**'
+
+permissions:
+  contents: read
+
+jobs:
+  actual_video_experiment:
+    if: >-
+      github.repository == '9m92yk9snt-star/VedoScout' &&
+      github.event.pull_request.number == 39 &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.head.ref == 'codex/sequence-pilot-foundation' &&
+      github.event.before == '69e2919f1097be4777bd78ba03baf6d72b5acad3' &&
+      github.run_attempt == 1
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    env:
+      PYTHONPATH: backend
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /backend/sequence_pilot.py
+            /backend/sequence_pilot_transport.py
+            /backend/player_selection.py
+            /backend/cv_detect.py
+            /backend/models/yolov8n.onnx
+            /backend/scripts/run_sequence_pilot.py
+            /backend/scripts/probe_sequence_detail.py
+            /backend/scripts/probe_native_play.py
+            /backend/scripts/run_native_batch.py
+            /backend/scripts/probe_native_gaps.py
+            /backend/scripts/probe_actor_continuity.py
+            /backend/scripts/probe_continuous_pass.py
+            /docs/examples/five_action_reference_cases.json
+            /docs/examples/gpt6-focused-action-receipt.json
+            /docs/examples/gpt6-focused-profile-receipt.json
+            /docs/examples/native-spatial-baseline-receipt.json
+            /docs/examples/native-flash-known-play-receipt.json
+            /docs/examples/native-full-source-observations.json
+            /docs/examples/native-pass-finish-gap-receipt.json
+            /docs/examples/native-pass-finish-flash-receipt.json
+            /docs/examples/native-pass-finish-astra-receipt.json
+            /docs/examples/native-pass-finish-local-receipt.json
+            /docs/examples/gpt6-missing-contact-receipt.json
+            /docs/examples/gpt6-full-initial-receipts.json
+            /docs/examples/gpt6-contact-review-low-receipt.json
+            /testdata/sequence-pilot-orman400/
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install native video tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg
+          ffprobe -version
+      - name: Install source image preparation dependencies
+        run: python -m pip install 'numpy<3' 'opencv-python-headless<5' 'Pillow>=10,<15'
+      - name: Reassemble and verify exact original source and taps
+        run: |
+          python - <<'PY'
+          import hashlib, json, os, shutil
+          from pathlib import Path
+          source = Path('testdata/sequence-pilot-orman400')
+          target = Path(os.environ['RUNNER_TEMP']) / 'sequence-pilot-input'
+          (target / 'video').mkdir(parents=True)
+          parts = sorted((source / 'video-parts').glob('*.bin'))
+          assert [p.name for p in parts] == [f'{i:03}.bin' for i in range(43)], 'SOURCE_PARTS_INCOMPLETE'
+          video = target / 'video' / 'source.mp4'
+          with video.open('wb') as output:
+              for part in parts:
+                  with part.open('rb') as stream:
+                      shutil.copyfileobj(stream, output)
+          for name in ('anchors.json', 'SHA256SUMS'):
+              shutil.copyfile(source / name, target / name)
+          for line in (target / 'SHA256SUMS').read_text().splitlines():
+              expected, name = line.split(None, 1)
+              with (target / name).open('rb') as stream:
+                  actual = hashlib.file_digest(stream, 'sha256').hexdigest()
+              assert actual == expected, 'SOURCE_INPUT_CHECKSUM_MISMATCH'
+          assert video.stat().st_size == 31896745, 'SOURCE_SIZE_CHANGED'
+          print(json.dumps({'source_video_bytes':video.stat().st_size, 'source_checksums_verified':True,
+                            'historical_model_results_loaded':False}))
+          PY
+      - name: Prepare actual source images and original selections once
+        run: python backend/scripts/run_sequence_pilot.py prepare --evidence-dir "$RUNNER_TEMP/sequence-pilot-input" --output "$RUNNER_TEMP/sequence-pilot-prepared" --scene-packets --max-edge 1280
+      - name: Read complete plays with the actual model
+        env:
+          EMERGENT_LLM_KEY: ${{ secrets.EMERGENT_LLM_KEY }}
+        run: python backend/scripts/probe_continuous_pass.py --prepared "$RUNNER_TEMP/sequence-pilot-prepared/manifest.json" --gap-receipt docs/examples/native-pass-finish-gap-receipt.json --resume-profile docs/examples/gpt6-focused-profile-receipt.json --profile-baseline docs/examples/native-pass-finish-astra-receipt.json --local-baseline docs/examples/native-pass-finish-local-receipt.json --output "$RUNNER_TEMP/sequence-pilot-result"
+      - name: Evaluate returned observations separately and print actual receipts
+        if: always()
+        run: |
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          import sequence_pilot as pilot
+          root = Path(os.environ['RUNNER_TEMP'])
+          result = root / 'sequence-pilot-result' / 'result.json'
+          if not result.is_file():
+              print('NO_MODEL_RESULT_FILE')
+              raise SystemExit(0)
+          returned = pilot.read_json(result)
+          evaluation = pilot.assess_reference_cases(pilot.read_json('docs/examples/five_action_reference_cases.json'), returned)
+          pilot.write_json(root / 'sequence-pilot-result' / 'evaluation.json', evaluation)
+          print('BEGIN_ACTUAL_MODEL_RESULT')
+          print(json.dumps(returned, ensure_ascii=False))
+          print('END_ACTUAL_MODEL_RESULT')
+          print('BEGIN_REFERENCE_EVALUATION_ONLY')
+          print(json.dumps(evaluation, ensure_ascii=False))
+          print('END_REFERENCE_EVALUATION_ONLY')
+          for receipt in sorted((root / 'sequence-pilot-result' / 'responses').glob('*.json')):
+              print('BEGIN_ACTUAL_RECEIPT ' + receipt.name)
+              print(receipt.read_text())
+              print('END_ACTUAL_RECEIPT ' + receipt.name)
+          PY
+      - name: Preserve returned model evidence and timing
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sequence-pilot-orman400-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/sequence-pilot-result/
+            ${{ runner.temp }}/sequence-pilot-prepared/manifest.json
+          if-no-files-found: warn
+          retention-days: 14

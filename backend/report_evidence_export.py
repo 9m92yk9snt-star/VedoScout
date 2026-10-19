@@ -29,12 +29,14 @@ MAX_TRACES = 200
 MAX_MODEL_CALLS = 2000
 MAX_AUDIT_BYTES = 64 * 1024 * 1024
 CHUNK = 1024 * 1024
-CONFIG_KEYS = ("IDENTITY_TIMELINE_ENABLED", "IDENTITY_TIMELINE_HZ",
+CONFIG_KEYS = ("FULL_REPORT_ENGINE", "IDENTITY_TIMELINE_ENABLED", "IDENTITY_TIMELINE_HZ",
                "FIX10A_SUPPORT_VISION_ENABLED", "CV_SHADOW_ENABLED", "FIX13_MAX_ACTION_REVIEWS", "FIX13_MAX_FEEDBACK_REVIEWS",
                "FIX10A_MAX_GOAL_REVIEWS_PER_REPORT", "FIX10A_MAX_GOAL_CLARIFICATIONS_PER_REPORT",
                "FIX10A_SUPPORT_VISION_MODEL", "FIX10A_MAX_JERSEY_READS", "FIX10A_MAX_ROLE_TRACKS",
                "FIX10A_MAX_ROLE_FRAMES", "FIX10A_MAX_GOAL_FRAMES", "FIX15_MAX_DENSE_GOAL_FRAMES")
 SOURCE_MODULES = (
+    "sequence_report_adapter.py", "sequence_report_runtime.py", "sequence_pilot.py", "sequence_pilot_transport.py",
+    "scripts/run_sequence_pilot.py",
     "source_frame_cache.py", "analysis_jobs.py", "ordered_vision_reviews.py",
     "sequence_observation_context.py", "saved_shot_sequence.py", "scripts/review_source_window.py", "attack_sequence_search.py",
     "ball_motion_evidence.py", "cv_shadow.py", "dense_track_refinement.py", "event_ledger.py",
@@ -296,7 +298,12 @@ def build_export(doc, output, *, upload_dir, source_root, environment="unspecifi
                 "anchor_time_offset": cleaned.get("anchor_time_offset"),
                 "coordinate_note": "Original fields retained. t is seconds; box x/y/w/h is normalized in upload contract. No retapping or time conversion."})
             add_json("canonical.json", {key: cleaned.get(key) for key in (
-                "canonical_events", "event_ledger", "unified_scoring_scan", "full_report", "preview")})
+                "analysis_engine", "canonical_events", "event_ledger", "unified_scoring_scan", "full_report", "preview")})
+            if doc.get("analysis_engine") == "SEQUENCE_V1":
+                add_json("sequence/audit.json", cleaned.get("sequence_audit"))
+                add_json("sequence/timings.json", cleaned.get("sequence_timings"))
+                if not doc.get("sequence_audit"):
+                    absent("sequence/audit.json", "not_stored; no replayable sequence receipts")
             for key in ("anchors", "canonical_events", "football_sequence_analysis", "fix10a_trace_manifest"):
                 if not doc.get(key):
                     absent(key, "not_stored_or_empty_in_report")
@@ -486,7 +493,7 @@ def build_export(doc, output, *, upload_dir, source_root, environment="unspecifi
                         absent("source/server_analysis_functions", "source_size_limit")
             add_json("runtime.json", {"at_export": current_runtime(source_root, environment, deployment_id),
                 "stored_analysis_provenance": {k: cleaned[k] for k in cleaned
-                    if k in {"analysis_commit", "analysis_deployment_id", "analysis_config", "pipeline_trace"}
+                    if k in {"analysis_commit", "analysis_deployment_id", "analysis_config", "pipeline_trace", "analysis_engine", "sequence_timings"}
                     or k.startswith(("fix10a_", "fix10b_", "unified_analysis_"))},
                 "trace_integrity": trace_integrity})
             add_json("video_metadata.json", {"references": videos,

@@ -778,6 +778,10 @@ def test_TC_normal_run_corrective_failure_then_corrective_only_recovery(monkeypa
     corrective threshold, corrective full-retry raises pre-persist → the run
     must FAIL (never ready). SECOND invocation: corrective-only recovery
     succeeds WITHOUT calling standard full-{id} again."""
+    # Historical legacy-engine regression only. New reports select sequences
+    # unconditionally; test_sequence_report exercises that production default
+    # and its failure boundaries without enabling legacy reconstruction.
+    monkeypatch.setattr(server.sequence_report_runtime, "enabled", lambda: False)
     doc = {"id": "n1", "is_paid": True, "paid_at": None,
            "player_details": {"player_name": "Test Player", "age": 12},
            "content_gate": {"content_type": "match"},

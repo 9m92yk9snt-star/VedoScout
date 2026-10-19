@@ -1,0 +1,78 @@
+{
+  "origin_run": 39149857306,
+  "source_video_sha256": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+  "selected_packet": "sequence_008",
+  "receipt": {
+    "packet_id": "native_short_play",
+    "provider": "emergent",
+    "requested_model": "gemini-3.8-flash",
+    "origin": "LIVE_MODEL_REQUEST",
+    "status": "COMPLETED",
+    "requested_reasoning_effort": "low",
+    "payload_sha256": "92f8083f86be8be4133833095317b74c49fd9115cfcf48e5a5eac28d0891cd40",
+    "payload_bytes": 8481188,
+    "explicit_image_count": 7,
+    "images": [
+      {
+        "sha256": "07ade3bd308f037c88df80c6263e6bb78dd40b79fd0b7e4e18e7d83d02f2c4a6",
+        "bytes": 11688
+      },
+      {
+        "sha256": "923cffbd1ee55df6ecf2f8b3fe3110c318a2606cc0500726d923a1832a891759",
+        "bytes": 8737
+      },
+      {
+        "sha256": "aaccfeb6493345ab3d27192569f96f2cc09782389e0d525a7afbbc7745d72454",
+        "bytes": 13380
+      },
+      {
+        "sha256": "872357c7749fdd2359f1fa303872c08d74fb97ba5bb33d23dd9851237e056c60",
+        "bytes": 6652
+      },
+      {
+        "sha256": "721c5dee7a3e8980b7585d745626cd8016b25912e7176308d2a47b746458d93f",
+        "bytes": 6238
+      },
+      {
+        "sha256": "bcaa2278f96a6519df6c31d050a06810b2b3ac44fe87b869c7a256b41467dc9b",
+        "bytes": 168292
+      },
+      {
+        "sha256": "f2f37d9fa7f984c5bb8abecd31743f1052340569411a18b42663d5dc211ece89",
+        "bytes": 184490
+      }
+    ],
+    "frame_sampling_in_provider_metadata": true,
+    "videos": [
+      {
+        "sha256": "df942e54769dbb63594f0d908b85efb75f5ec69bb5ffbcd371fb32cea5bef121",
+        "bytes": 3120074,
+        "requested_fps": 8
+      },
+      {
+        "sha256": "3a95db0b69551dbaba2e8358074a07f9a69943bc8a7e988f7ad98182ac6158ac",
+        "bytes": 2835083,
+        "requested_fps": 24
+      }
+    ],
+    "requested_image_detail": "high",
+    "model_version": "gemini/gemini-3.8-flash",
+    "response_id": "VQLVasXsMZ_3-8YPn9SU-QM",
+    "usage": {
+      "completion_tokens": 412,
+      "prompt_tokens": 58635,
+      "total_tokens": 59047,
+      "completion_tokens_details": {
+        "text_tokens": 412
+      },
+      "prompt_tokens_details": {
+        "text_tokens": 2063,
+        "image_tokens": 7612,
+        "video_tokens": 48960
+      }
+    },
+    "raw_response": "{\"players\":[{\"id\":\"p1\",\"kit\":\"white\",\"visible_number\":15,\"selected\":true},{\"id\":\"p2\",\"kit\":\"white\",\"visible_number\":10,\"selected\":false},{\"id\":\"p3\",\"kit\":\"white\",\"visible_number\":13,\"selected\":false},{\"id\":\"p4\",\"kit\":\"blue\",\"visible_number\":8,\"selected\":false},{\"id\":\"p5\",\"kit\":\"red\",\"visible_number\":null,\"selected\":false}],\"ball_sequence\":[{\"clip_s\":0.0,\"actor\":\"p4\",\"action\":\"dribble\",\"recipient\":null,\"visible_evidence\":\"Player in blue #8 has possession in midfield moving forward.\",\"uncertainty\":\"\"},{\"clip_s\":0.8,\"actor\":\"p4\",\"action\":\"through ball\",\"recipient\":\"p1\",\"visible_evidence\":\"Player #8 slides a through ball forward into space ahead of the white-shirted attackers.\",\"uncertainty\":\"\"},{\"clip_s\":2.5,\"actor\":\"p1\",\"action\":\"shot\",\"recipient\":null,\"visible_evidence\":\"p1 runs onto the rolling through ball and strikes it toward the goal past the rushing goalkeeper.\",\"uncertainty\":\"\"},{\"clip_s\":4.1,\"actor\":\"p2\",\"action\":\"tap-in\",\"recipient\":null,\"visible_evidence\":\"The rolling ball approaches the open goal line where player #10 taps it into the net.\",\"uncertainty\":\"\"}],\"outcome\":{\"kind\":\"goal\",\"last_touch_player\":\"p2\",\"visible_evidence\":\"The ball crosses the goal line and settles into the net as players turn back.\",\"uncertainty\":\"\"},\"selected_player_summary\":\"The selected player (p1, wearing #15 in white) chases a through pass played into the final third around 2.5s and takes a low shot/pass toward goal past the oncoming goalkeeper, which teammate #10 follows up on and finishes into the open goal.\"}",
+    "response_sha256": "4b9bc6b0df75ef0f9ab7ddb425923fc422988c71c5c1dc912fd2528653bf638e",
+    "elapsed_seconds": 8.198
+  }
+}

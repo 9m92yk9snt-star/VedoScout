@@ -1,0 +1,120 @@
+name: Sequence full-report integration
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_model_probe:
+        description: 'Send exactly one model request; false runs offline preflight only'
+        type: boolean
+        default: false
+      focus_ms:
+        description: 'User-located source instant in milliseconds'
+        type: string
+        default: '23680'
+  pull_request:
+    paths:
+      - 'backend/sequence_report_*.py'
+      - 'backend/scripts/run_sequence_report_trial.py'
+      - 'backend/scripts/probe_question_scope.py'
+      - 'backend/tests/test_sequence_report.py'
+      - 'backend/evidence_authority.py'
+      - 'backend/server.py'
+      - '.github/workflows/sequence-report.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  offline_report_contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      PYTHONPATH: backend
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install 'numpy<3' 'opencv-python-headless<5' 'Pillow>=10,<15' 'pytest>=8,<10' 'python-dotenv>=1,<2'
+      - run: python -m pytest backend/tests/test_sequence_report.py -q
+
+  question_scope_probe:
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      github.repository == '9m92yk9snt-star/VedoScout' &&
+      github.ref == 'refs/heads/codex/sequence-pilot-foundation' &&
+      github.run_attempt == 1
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      PYTHONPATH: backend
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg
+          python -m pip install 'numpy<3' 'opencv-python-headless<5' 'Pillow>=10,<15'
+      - name: Reassemble verified original video and selections
+        run: |
+          python - <<'PY'
+          import hashlib, os, shutil
+          from pathlib import Path
+          source = Path('testdata/sequence-pilot-orman400')
+          target = Path(os.environ['RUNNER_TEMP']) / 'report-source'
+          (target / 'video').mkdir(parents=True)
+          parts = sorted((source / 'video-parts').glob('*.bin'))
+          assert [p.name for p in parts] == [f'{i:03}.bin' for i in range(43)]
+          with (target / 'video/source.mp4').open('wb') as output:
+              for part in parts:
+                  with part.open('rb') as stream:
+                      shutil.copyfileobj(stream, output)
+          for name in ('anchors.json', 'SHA256SUMS'):
+              shutil.copyfile(source / name, target / name)
+          for line in (target / 'SHA256SUMS').read_text().splitlines():
+              expected, name = line.split(None, 1)
+              with (target / name).open('rb') as stream:
+                  assert hashlib.file_digest(stream, 'sha256').hexdigest() == expected
+          print('Original source and taps verified; no historical report or model observations supplied.')
+          PY
+      - name: Offline preflight unless a model request is explicitly selected
+        env:
+          EMERGENT_LLM_KEY: ${{ inputs.run_model_probe && secrets.EMERGENT_LLM_KEY || '' }}
+          RUN_MODEL_PROBE: ${{ inputs.run_model_probe }}
+          FOCUS_MS: ${{ inputs.focus_ms }}
+        run: |
+          args=(--evidence-dir "$RUNNER_TEMP/report-source"
+                --output "$RUNNER_TEMP/question-scope-trial" --focus-ms "$FOCUS_MS")
+          if [ "$RUN_MODEL_PROBE" = "true" ]; then
+            args+=(--run-model)
+          fi
+          python -u backend/scripts/probe_question_scope.py "${args[@]}"
+      - name: Preserve bounded probe receipt
+        if: always()
+        run: |
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          root = Path(os.environ['RUNNER_TEMP']) / 'question-scope-trial'
+          path = root / 'result.json'
+          if not path.is_file():
+              raise SystemExit('No returned scope-probe result')
+          doc = json.loads(path.read_text())
+          print('BEGIN_SCOPE_PROBE_RESULT')
+          print(json.dumps(doc))
+          print('END_SCOPE_PROBE_RESULT')
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sequence-question-scope-${{ github.run_id }}
+          path: ${{ runner.temp }}/question-scope-trial/
+          retention-days: 14
+          if-no-files-found: warn

@@ -1,0 +1,284 @@
+{
+  "source_video_sha256": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+  "origin_run": 39142443248,
+  "receipt": {
+    "packet_id": "detail_high",
+    "provider": "emergent",
+    "requested_model": "gpt-6-sol",
+    "origin": "LIVE_MODEL_REQUEST",
+    "status": "COMPLETED",
+    "requested_reasoning_effort": "low",
+    "payload_sha256": "9b8c163b8775ee3312557da8629b3f4b6fa5caa595a2ab877403fdb12b0bfbfc",
+    "payload_bytes": 8211931,
+    "explicit_image_count": 61,
+    "images": [
+      {
+        "sha256": "07ade3bd308f037c88df80c6263e6bb78dd40b79fd0b7e4e18e7d83d02f2c4a6",
+        "bytes": 11688
+      },
+      {
+        "sha256": "923cffbd1ee55df6ecf2f8b3fe3110c318a2606cc0500726d923a1832a891759",
+        "bytes": 8737
+      },
+      {
+        "sha256": "aaccfeb6493345ab3d27192569f96f2cc09782389e0d525a7afbbc7745d72454",
+        "bytes": 13380
+      },
+      {
+        "sha256": "406f1da781b4e13ee279c69495f132510ce2b75f2f3334722f382d142e3437d4",
+        "bytes": 125869
+      },
+      {
+        "sha256": "e33902bb1995b694109883098c176f2f02265ea11d0b4a772da37641d600c281",
+        "bytes": 123600
+      },
+      {
+        "sha256": "582e0ab80c45b81442fc1fadd5867509947ad4887d8e7e9827e4398a42fd527a",
+        "bytes": 125202
+      },
+      {
+        "sha256": "d99a2d37861f517fa39f47197a7dea95510e76cc2e1bbbced503c29b18152194",
+        "bytes": 122935
+      },
+      {
+        "sha256": "32b702aaabca9248f3d4b6e249f2ad96d891d140241c7221918c575424b54aaa",
+        "bytes": 107918
+      },
+      {
+        "sha256": "a76fa632c63e75d62aa7b8de2cb4ed70a6df97c68630c827906a8f8d86637334",
+        "bytes": 104075
+      },
+      {
+        "sha256": "1ba08b24d8d8b8fa37a9b4d98a139092641dbca980621d4dc02c594d7e281dc0",
+        "bytes": 107071
+      },
+      {
+        "sha256": "c96b499f4b25553b41587a3e71f1aa6b93b93a4affe8184969b38b6b1641c58b",
+        "bytes": 110242
+      },
+      {
+        "sha256": "c071acdaeaea34174ab99ecc591e0c2f9360dff7c7dd67efeb5742c4df3173b4",
+        "bytes": 108635
+      },
+      {
+        "sha256": "1e75a236420e4ec57cfa01f97b39c4ad00b98f856482b5577a8de14b6eabf6ae",
+        "bytes": 112436
+      },
+      {
+        "sha256": "0a2abf5d6e71f2188567025b7a687797eacde5878dc469942f0d9dd99278ef56",
+        "bytes": 110947
+      },
+      {
+        "sha256": "1e0d0bb6209c6a4022fe3b307bd2e50cf5c3c0b56888034fa059854a4efebf91",
+        "bytes": 103609
+      },
+      {
+        "sha256": "0d90dc9da4c642c097e2cab72e347deee73f47104143d2737490e90c9f47b93f",
+        "bytes": 107875
+      },
+      {
+        "sha256": "7d6dfb1a32898e44732fde40bb040ea81191d5d75f3aa3b2d46bd9431a164aad",
+        "bytes": 101590
+      },
+      {
+        "sha256": "935d53d59a5c4cc1438d059d3b99a55caa8cc7dd85a5ae2480bbfc8362ac2368",
+        "bytes": 99022
+      },
+      {
+        "sha256": "952de8c75c7a6f1b633e2c7b11597c50e1503acc058e22738b02ec53a558bdf6",
+        "bytes": 99049
+      },
+      {
+        "sha256": "8902cd0427def68bb403051239f83743135229f25edb660df07e593e1b9a74d4",
+        "bytes": 99854
+      },
+      {
+        "sha256": "d449476cea99681584a1edf857332b11ab0c01de4e5af096b6913df449d2f57f",
+        "bytes": 103051
+      },
+      {
+        "sha256": "dcb50de44c309b95edcc0437bfdf9ac31515bffd857c6e392aaa349a7ac4794d",
+        "bytes": 102788
+      },
+      {
+        "sha256": "8c1befb67328c273caede4f534aedeac2ba4f310f6c1a34ee79ad3e85ccca9e8",
+        "bytes": 103339
+      },
+      {
+        "sha256": "c758d48264a483595421e5febcbb4065e8c4adc01b62b8b73a77cb0bdaa5ad8d",
+        "bytes": 106071
+      },
+      {
+        "sha256": "f01871be1bdfada2258acee0e3e6bca2b933e94b8807affe9792b4907564c55f",
+        "bytes": 103072
+      },
+      {
+        "sha256": "ea3666ad56a00dff2aa25652e5d52bb2f46f7a526619f6b35cffc7ea4ecc6f74",
+        "bytes": 104804
+      },
+      {
+        "sha256": "7eb71f388924e8bd43fb490d4dbf23df857f20eef63e7d3763320287bcea322f",
+        "bytes": 106275
+      },
+      {
+        "sha256": "c1d32e198931faf99566d007f804117c49678910d4425643bc3d44f39e2ca765",
+        "bytes": 106025
+      },
+      {
+        "sha256": "4f4f15b6437c36470a3ffadb21aac9321076c4aa4fa38c40bfbf2c8b984ad74c",
+        "bytes": 111238
+      },
+      {
+        "sha256": "80a366ff7f4645ca3956bae11ab20048c37f75de541a716bb1568245d0256c86",
+        "bytes": 111583
+      },
+      {
+        "sha256": "8dc622a997c8e9b7dd3f831ea15732b98432375015bc6afe90e6fcd8ce28d378",
+        "bytes": 109838
+      },
+      {
+        "sha256": "692b57090d857e2d581d9e546d3540de563325c6e47b5b24fb6c6a29bd4ba333",
+        "bytes": 107578
+      },
+      {
+        "sha256": "bbc4962ff32748a83c2861a276b70f6ac5a3eb4141f1ca1fbd98a7234ee05025",
+        "bytes": 101257
+      },
+      {
+        "sha256": "1dbc48437912783f4d1be295d710d6a6104e179653c2edff3c5c931c1206affd",
+        "bytes": 99310
+      },
+      {
+        "sha256": "352effd34a3a0eb74c6015577f8e087af9e6d55f8373385cdfd2a38fe838b655",
+        "bytes": 100017
+      },
+      {
+        "sha256": "73207e7f0c4dd3591da3ca282e4523461d3eb6047227a0e69d4e8faa7db23bf2",
+        "bytes": 93444
+      },
+      {
+        "sha256": "d6ddcd08f76b5ffb34a3eb9555b3b5c0980e3780dce257d586523caf1fe3413f",
+        "bytes": 92952
+      },
+      {
+        "sha256": "9cbb6c0d13d451785a343bb7175faaf64a28431f292fb9b060570b9aeef35085",
+        "bytes": 97575
+      },
+      {
+        "sha256": "818bac1941465458423ddf18f8fe181de998f6856f28345bc4431c709ba6f1ce",
+        "bytes": 98792
+      },
+      {
+        "sha256": "dacf25486943ebc5a66b0fd6382a0b5ee9e920ea529ac6cfeef1749b07574524",
+        "bytes": 104024
+      },
+      {
+        "sha256": "871266bc0ad7e44b206072d8d57a054079e707c18538e1580943c3f9612dd921",
+        "bytes": 107094
+      },
+      {
+        "sha256": "80b8b123cae4966f50fb51483f6132d18175fa13137666938106f898c87d5fbc",
+        "bytes": 109677
+      },
+      {
+        "sha256": "730a69ffaac6ec19b942a995b1480e73cb0e96cfd6fc2138d27bf55cc223d3d1",
+        "bytes": 106387
+      },
+      {
+        "sha256": "0f6f4de3177b90910ca59868b0c55f60db1c30863f9e28bb55af45eb4f4cce4c",
+        "bytes": 111553
+      },
+      {
+        "sha256": "a627524f97a28a6a8751291972e11f87ea545c320f83680af9e0500b684e135d",
+        "bytes": 106915
+      },
+      {
+        "sha256": "e1c01557b2f8f60d9557462c36cce2542d63637b9af05654a0fffb87de379e15",
+        "bytes": 112062
+      },
+      {
+        "sha256": "491e7a953dbcfa5099e31a9931eba346e4b336584c83cbeef4b14c220fb10d5c",
+        "bytes": 112335
+      },
+      {
+        "sha256": "a8c6728e6f940c47b2927a6ddd14668cd0e067fa8876f8b639616493a2e24270",
+        "bytes": 112379
+      },
+      {
+        "sha256": "17280a787d168b3cd078802d601a04b3bacc96c248ceda8ae8e77583f95ea22c",
+        "bytes": 109475
+      },
+      {
+        "sha256": "30b688807a2c195b575c6c4add28df064cc4fc4c8b5255dcd1f414a5303d79c4",
+        "bytes": 108634
+      },
+      {
+        "sha256": "2e0ef6846795ed43dfaa4c2deca4309f4b42e2471b435b4c77b14f450046a6d3",
+        "bytes": 110951
+      },
+      {
+        "sha256": "147881d82737b709f8ab6289b5a846185d00034c1fc6575c25c0a0e43cdee451",
+        "bytes": 107328
+      },
+      {
+        "sha256": "bfa3714ae470a28bb135f6b356095f3e23eaf0efacd4c4ee261727e74feeac8a",
+        "bytes": 104331
+      },
+      {
+        "sha256": "70940929741fd88ad299bdc5d3f39c5167dd4c8d09709c89145523023703930b",
+        "bytes": 101594
+      },
+      {
+        "sha256": "dc35ea1530564a1e5a5ef3f4157bdca1901a085aa96aa8062b1ecd3d16f1ca51",
+        "bytes": 102815
+      },
+      {
+        "sha256": "67b6ceccb70a1f00388dc59c0288ba838425297dce9374b1ca22e0f8be088ccf",
+        "bytes": 103143
+      },
+      {
+        "sha256": "db2bfcea24b8c4e69498ef6fddd1d246c421cc5b1173634836247b014a0a1e32",
+        "bytes": 87398
+      },
+      {
+        "sha256": "07c648fab46b8bcbbab4e52630081ec4dc2e7007b39b5b76ff61db755d91df65",
+        "bytes": 92776
+      },
+      {
+        "sha256": "8b38d2d3c2799fa5cf0ee6c5aa21895de7e56b288731a6e696b69f0c8b9ae13b",
+        "bytes": 93289
+      },
+      {
+        "sha256": "44188b0cb95fd546953018e3fe988e162bd7876042684b3251fe8c4458f4fc95",
+        "bytes": 90908
+      },
+      {
+        "sha256": "b999957066be047c9392c9c0cc8c1a99683f949090db7dbc2bf139dc79f8571c",
+        "bytes": 89413
+      }
+    ],
+    "frame_sampling_in_provider_metadata": false,
+    "videos": [],
+    "requested_image_detail": "high",
+    "model_version": "gpt-6-sol",
+    "response_id": "chatcmpl-EaNUG3WAy8CeKPS76J5B2Fu2TK7Gl",
+    "usage": {
+      "completion_tokens": 2022,
+      "prompt_tokens": 66489,
+      "total_tokens": 68511,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": 0,
+        "audio_tokens": 0,
+        "reasoning_tokens": 736,
+        "rejected_prediction_tokens": 0
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": 0,
+        "cached_tokens": 0
+      }
+    },
+    "raw_response": "{\"plays\":[{\"start_frame\":\"s000052515\",\"end_frame\":\"s000052881\",\"people\":[{\"person_id\":\"p1\",\"selected\":false,\"kit_consistent\":true,\"reference_ids\":[],\"evidence_frames\":[\"s000052515\",\"s000052881\"],\"appearance\":\"White kit with number 13 on the back.\"},{\"person_id\":\"p2\",\"selected\":false,\"kit_consistent\":false,\"reference_ids\":[],\"evidence_frames\":[\"s000052515\"],\"appearance\":\"Red-clad player on the ground left of the goal.\"}],\"actions\":[],\"questions\":[]},{\"start_frame\":\"s000053015\",\"end_frame\":\"s000058881\",\"people\":[{\"person_id\":\"p1\",\"selected\":false,\"kit_consistent\":false,\"reference_ids\":[],\"evidence_frames\":[\"s000053765\",\"s000054264\"],\"appearance\":\"Blue kit; carries the ball through the left-centre of the pictured play.\"},{\"person_id\":\"p2\",\"selected\":false,\"kit_consistent\":true,\"reference_ids\":[],\"evidence_frames\":[\"s000054514\",\"s000056881\"],\"appearance\":\"White kit with number 13 on the back; light hair.\"},{\"person_id\":\"p3\",\"selected\":false,\"kit_consistent\":true,\"reference_ids\":[],\"evidence_frames\":[\"s000056014\",\"s000058014\"],\"appearance\":\"White kit with number 10 on the back; darker skin and hair.\"},{\"person_id\":\"p4\",\"selected\":null,\"kit_consistent\":null,\"reference_ids\":[],\"evidence_frames\":[\"s000055881\",\"s000056264\",\"s000056631\"],\"appearance\":\"White-clad runner ahead of numbers 13 and 10; back number is not reliably readable.\"},{\"person_id\":\"p5\",\"selected\":false,\"kit_consistent\":false,\"reference_ids\":[],\"evidence_frames\":[\"s000056381\",\"s000057131\"],\"appearance\":\"Red-clad goalkeeper.\"}],\"actions\":[{\"action_id\":\"a1\",\"kind\":\"CARRY\",\"actor\":\"p1\",\"start_frame\":\"s000053765\",\"contact_frame\":null,\"end_frame\":\"s000054264\",\"actor_evidence_frames\":[\"s000053765\",\"s000054015\",\"s000054264\"],\"ball_id\":\"b1\",\"outcome\":\"UNKNOWN\",\"receiver\":null,\"receiver_frame\":null,\"receiver_is_teammate\":null,\"finisher\":null,\"shot_frame\":null,\"outcome_frame\":null,\"same_active_ball\":true,\"continuous_play\":true,\"outcome_evidence\":[{\"frame\":\"s000053765\",\"fact\":\"The ball is ahead of the blue player's feet as white players close in.\"},{\"frame\":\"s000054264\",\"fact\":\"He is still moving with the ball on the left of the pictured attack.\"}],\"details\":\"The blue player advances under pressure. The subsequent change of possession is not clear enough to assign a particular touch.\"},{\"action_id\":\"a2\",\"kind\":\"SHOT\",\"actor\":\"p4\",\"start_frame\":\"s000056131\",\"contact_frame\":\"s000056264\",\"end_frame\":\"s000057381\",\"actor_evidence_frames\":[\"s000056131\",\"s000056264\",\"s000056631\"],\"ball_id\":\"b1\",\"outcome\":\"GOAL\",\"receiver\":null,\"receiver_frame\":null,\"receiver_is_teammate\":null,\"finisher\":\"p4\",\"shot_frame\":\"s000056264\",\"outcome_frame\":\"s000057381\",\"same_active_ball\":true,\"continuous_play\":true,\"outcome_evidence\":[{\"frame\":\"s000056264\",\"fact\":\"The forward white runner stretches his leg toward the ball, which is just ahead of him.\"},{\"frame\":\"s000056881\",\"fact\":\"The ball continues across the goalmouth while the red goalkeeper is down and white numbers 13 and 10 pursue it.\"},{\"frame\":\"s000057264\",\"fact\":\"The ball is visible inside the goal opening near white number 10.\"},{\"frame\":\"s000057381\",\"fact\":\"The ball appears farther behind the goal line, to the right of number 10.\"}],\"details\":\"The forward runner sends the ball toward goal. The goalkeeper's challenge does not establish a save: the ball remains visible moving across the goalmouth and then inside the goal. Number 10 is very close to it at the line, so an additional touch there cannot be excluded.\"}],\"questions\":[{\"reason\":\"IDENTITY\",\"action_id\":\"a2\"},{\"reason\":\"CONTACT\",\"action_id\":\"a2\"}]},{\"start_frame\":\"s000059014\",\"end_frame\":\"s000059514\",\"people\":[{\"person_id\":\"p1\",\"selected\":null,\"kit_consistent\":null,\"reference_ids\":[],\"evidence_frames\":[\"s000059264\",\"s000059514\"],\"appearance\":\"One of several distant white-clad players contesting the ball; numbers and individual identities are not readable.\"}],\"actions\":[{\"action_id\":\"a1\",\"kind\":\"DUEL\",\"actor\":\"p1\",\"start_frame\":\"s000059014\",\"contact_frame\":null,\"end_frame\":\"s000059514\",\"actor_evidence_frames\":[\"s000059264\",\"s000059514\"],\"ball_id\":\"b1\",\"outcome\":\"UNKNOWN\",\"receiver\":null,\"receiver_frame\":null,\"receiver_is_teammate\":null,\"finisher\":null,\"shot_frame\":null,\"outcome_frame\":null,\"same_active_ball\":true,\"continuous_play\":true,\"outcome_evidence\":[{\"frame\":\"s000059264\",\"fact\":\"The active ball is among the clustered white and blue players outside the goal area.\"},{\"frame\":\"s000059514\",\"fact\":\"The ball rolls into open space ahead of the group as a blue player approaches; the packet ends.\"}],\"details\":\"A distant contest develops into a loose ball. The images do not establish which white player last touched it or what happens next. A separate stationary ball lies in the near foreground and is not this active ball.\"}],\"questions\":[{\"reason\":\"IDENTITY\",\"action_id\":\"a1\"},{\"reason\":\"CONTACT\",\"action_id\":\"a1\"},{\"reason\":\"OUTCOME\",\"action_id\":\"a1\"}]}]}",
+    "response_sha256": "a4cc87ffee4d6c48fa59218012ddfb625e89d5daded4b209fa57f31368931a38",
+    "elapsed_seconds": 24.456
+  }
+}

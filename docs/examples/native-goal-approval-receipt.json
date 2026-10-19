@@ -1,0 +1,3227 @@
+{
+  "origin_run": 39178048465,
+  "source_video_sha256": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+  "acceptance_assessment": {
+    "status": "APPROVED_IN_STANDALONE_MODEL_EXPERIMENT",
+    "event_type": "GOAL",
+    "selected_player": true,
+    "goal_specific_questions": [],
+    "other_questions_preserved": true,
+    "invalid_recovery_row_rejected": true,
+    "production_integration_verified": false
+  },
+  "receipt": {
+    "packet_id": "sequence_004",
+    "provider": "emergent",
+    "requested_model": "gpt-6-astra",
+    "origin": "LIVE_MODEL_REQUEST",
+    "status": "COMPLETED",
+    "requested_reasoning_effort": "medium",
+    "payload_sha256": "06abdea3d41fd63dad4212d5a27d92e94241ab26eae4533076213a195bf2aa50",
+    "payload_bytes": 16220155,
+    "explicit_image_count": 190,
+    "images": [
+      {
+        "sha256": "3a1c5a1dd42221c8bc7a92eb59105c36a2a0f148d80f6a55f7442e0188289217",
+        "bytes": 5465
+      },
+      {
+        "sha256": "07ade3bd308f037c88df80c6263e6bb78dd40b79fd0b7e4e18e7d83d02f2c4a6",
+        "bytes": 11688
+      },
+      {
+        "sha256": "b27c75fac95669fa30f3cdc8e27901a7eb102c880ff61ee4a9539da31f255dec",
+        "bytes": 6347
+      },
+      {
+        "sha256": "bfa6f5aeaf67b977349ce4ce9d80282cc1595e61cf177ae8288817735066fa89",
+        "bytes": 10406
+      },
+      {
+        "sha256": "701f00516cd66001007c7d83ac856293599c11135ae1113c511c0822fb0473b6",
+        "bytes": 5118
+      },
+      {
+        "sha256": "923cffbd1ee55df6ecf2f8b3fe3110c318a2606cc0500726d923a1832a891759",
+        "bytes": 8737
+      },
+      {
+        "sha256": "aaccfeb6493345ab3d27192569f96f2cc09782389e0d525a7afbbc7745d72454",
+        "bytes": 13380
+      },
+      {
+        "sha256": "872357c7749fdd2359f1fa303872c08d74fb97ba5bb33d23dd9851237e056c60",
+        "bytes": 6652
+      },
+      {
+        "sha256": "721c5dee7a3e8980b7585d745626cd8016b25912e7176308d2a47b746458d93f",
+        "bytes": 6238
+      },
+      {
+        "sha256": "a399aa3c7a6191dbc52db2acb94cb7c7a1c7dbbaaa9e85350bb353b9921bcc08",
+        "bytes": 5769
+      },
+      {
+        "sha256": "c86f8d154dbc95272f4922f21646d7b6b19469c092eb832882f7e1a7a8f7c77d",
+        "bytes": 185508
+      },
+      {
+        "sha256": "5fe27185475fc2efb0603be42237dd08199ea15bb3a78517ef00574acfb88d61",
+        "bytes": 223526
+      },
+      {
+        "sha256": "a8fe8fee94a7653a4fd3ba8e6a31b850c687307361599b6ddfad48ee8360a9f2",
+        "bytes": 44972
+      },
+      {
+        "sha256": "dd3bf1c4fb14ef0a28685a817a8f9e8d4b6cdeceed671da28351ad60b6e88a48",
+        "bytes": 45700
+      },
+      {
+        "sha256": "2a50020c72841e23416e8e85846d052652c8f185c322073dd77dbf777144d43f",
+        "bytes": 48160
+      },
+      {
+        "sha256": "cd6b3c96f140d87d65bc2bd09f0fd64b97b959df072ece3cc0fccac3fea4209b",
+        "bytes": 48492
+      },
+      {
+        "sha256": "19d73e7d6961bad93849bd3f33410e3a2c268f9f10fdb3c823850aa008a6faa2",
+        "bytes": 46996
+      },
+      {
+        "sha256": "98e5ed5d42a6689a34a9ccf42d09bb95030d0ddcf1c91d939f37ff83b3f12f36",
+        "bytes": 47036
+      },
+      {
+        "sha256": "5181ad3b0775ec398667dd9ebbc55f7a17f0e0763080f80a2992ce558e5f078e",
+        "bytes": 48964
+      },
+      {
+        "sha256": "9a1dff04d0567335be928a8a3147c96bdd4829a6163873809ccee7e2a7349210",
+        "bytes": 48386
+      },
+      {
+        "sha256": "c226714d559da542ebc0656c21a308f1af79c6ea582d56609ded99e538a10f3f",
+        "bytes": 46864
+      },
+      {
+        "sha256": "a8670983f6c374716fe7fab7442b7dba00656007cab3543e37a93ca3a1851feb",
+        "bytes": 46837
+      },
+      {
+        "sha256": "e719c3008df244587865daa0fd9bbeb860c2792601554a1295351c17aa9b4267",
+        "bytes": 48547
+      },
+      {
+        "sha256": "f6827fc398b340ed2a261605872d112f17167078b053dfa1a45d6e2c68e6e274",
+        "bytes": 48793
+      },
+      {
+        "sha256": "53ea5599f61c908829a620969c2532a06b597509b3ff1310b12b3a38f1e18f4d",
+        "bytes": 46818
+      },
+      {
+        "sha256": "b272676ba27159cec9e77537ab2c6de344900814b7387719d12d1ea89ed87510",
+        "bytes": 47264
+      },
+      {
+        "sha256": "b4a218ae2ec31f90141adb575400c34c144506ce7e51ff47ed72ce3c3b880b4e",
+        "bytes": 47768
+      },
+      {
+        "sha256": "0c7c62cc0e43c3d873dc5d29f399bf61b67cf4462ea6a7a1e462986bda95074d",
+        "bytes": 47290
+      },
+      {
+        "sha256": "83c11500cfa6e47d38cac33c4f508f84db94d88dd9d2462d62db7251a61595fe",
+        "bytes": 46894
+      },
+      {
+        "sha256": "dcdfb36fa387220c9d94d4fdcf64c0ff87a4db9bfc2528fff30346b4b4c04d6b",
+        "bytes": 46730
+      },
+      {
+        "sha256": "33e6a5d14ceda998817ed01fab25c1b17b47191890fa2d706eb1bfeef9ca5d42",
+        "bytes": 47756
+      },
+      {
+        "sha256": "8a69e1350ab15beacc6adcd31d6f24a4a9a27141f201af00e68209bf9f770723",
+        "bytes": 47120
+      },
+      {
+        "sha256": "15d435216da37af40550108f3bb685012b8ff66a0fec4bc6907a09a4cc7b8f05",
+        "bytes": 45285
+      },
+      {
+        "sha256": "f97bc2f3b1179a52c693a25f02a6183139963943e26144fb1a02861a6a833c0d",
+        "bytes": 44921
+      },
+      {
+        "sha256": "2549827d4084676d067db13900a10a6514d26cff483d66666a6ae45b1bdd5db7",
+        "bytes": 45251
+      },
+      {
+        "sha256": "1a440e66ddfa48c3ac30018e7ee0a712de3d72ddc7be17f06eb547d5e190cb3e",
+        "bytes": 45165
+      },
+      {
+        "sha256": "e5608f6203f86ef1777adc73355eb37196450e1934d7183b7bb84559b79f5415",
+        "bytes": 45206
+      },
+      {
+        "sha256": "ee84162e6e25342d7c74afc489f0c391841d96405840427992b0d3e2f2e2b2dc",
+        "bytes": 45025
+      },
+      {
+        "sha256": "82956f341f59647a80569275c16c8a21f4b6e718ed794d28aa104d848b137b4e",
+        "bytes": 45089
+      },
+      {
+        "sha256": "c9fb11067c41ea5eca935c280182a540b3045b3e53fdff4b34d14f4bb8ead156",
+        "bytes": 44505
+      },
+      {
+        "sha256": "33e30c63fbf07af12661456cdcd140c62760817bc07c83ecbefe4ecee8fe7100",
+        "bytes": 44475
+      },
+      {
+        "sha256": "46d74b23b99a34f9d1f4d4214db0e3ddea9e78801d49a21db73d1a59d733f9dd",
+        "bytes": 44058
+      },
+      {
+        "sha256": "646b9ed0f211cf80eb0f80a14e032605f0eecf6bb00bb0f2b081a26bef4fc7f7",
+        "bytes": 43190
+      },
+      {
+        "sha256": "735b8fcba7ca2e07513d6fef19765eea74c8d37ef8f0b4ac4df5667df6894fe3",
+        "bytes": 43160
+      },
+      {
+        "sha256": "3973d4756b0dcc81a88ee5a7d8e9d6250693053b3818dc130aa6479d67a5b2b4",
+        "bytes": 44040
+      },
+      {
+        "sha256": "23540e9ae2f54c70c528140d61ea21cc011d420a4ca2c87f0dc85eec804b24fa",
+        "bytes": 42607
+      },
+      {
+        "sha256": "c6c0585e08314bd8c79da169c7de8fd2de18809c3e495cf3072f89f707ef6e26",
+        "bytes": 43735
+      },
+      {
+        "sha256": "e701d5cef6a113213a17a9edda0a786d499307b63f9e1f33e2198b5451acbb55",
+        "bytes": 43914
+      },
+      {
+        "sha256": "9ca1ecfcfa42a9483d7f85774b8a86f68d5aac2da7989becbf0d31599c8f2837",
+        "bytes": 43227
+      },
+      {
+        "sha256": "6295e9d70f66106b1fb36dc84ff9f728e86d01ed1bbecbf53a64a3bef99bb03d",
+        "bytes": 45122
+      },
+      {
+        "sha256": "33f22921b013aa40c56a69fce47d322054e95814990c61e181e74aadddefab83",
+        "bytes": 74704
+      },
+      {
+        "sha256": "8fa0a8290fe6ea913f64ab258dce510900a9b4b99827062b93c7a5ee37be795d",
+        "bytes": 72787
+      },
+      {
+        "sha256": "ba1dd65d205ce74c5c521b4d3261ce6a1771bbf28fff1aa7c4a8d4c503f031f1",
+        "bytes": 74745
+      },
+      {
+        "sha256": "50791131f802113c3b075df4dd18fc772e6a8b3305e8b900ae7547c03d649dff",
+        "bytes": 72886
+      },
+      {
+        "sha256": "1c170c62f351d6800db1672453cfb54ba001cfb6dd306f8fa9b139c30829a237",
+        "bytes": 74628
+      },
+      {
+        "sha256": "187bf52210a5bf610e7ee6078b1323844d010bc974dd03123612defaec4fccf6",
+        "bytes": 74719
+      },
+      {
+        "sha256": "1c5d6b82566777e999695d4511468aadf456ff370273df8d168fcd132e5c3f1c",
+        "bytes": 72129
+      },
+      {
+        "sha256": "bba82e38386204485a3f7d73e0afcc42d5a90edb843b6c4663af74d36fd02a10",
+        "bytes": 44623
+      },
+      {
+        "sha256": "bbc5223071c94ac537b82460b86bf10f5529c6ce8aa0c1a0f510ceffed648471",
+        "bytes": 74215
+      },
+      {
+        "sha256": "a9aeb6f725c6b09ea444155750e3aaa7f5f914c8a4d6e74c29865ddd042e5ec0",
+        "bytes": 72848
+      },
+      {
+        "sha256": "c3711d9b5a961e9b7544cfdf1d4beed25584e45ee8c139325372aae047d20c9b",
+        "bytes": 74193
+      },
+      {
+        "sha256": "7dbe431cfb3ba23b23017ffcac68c25386be1722f1f6c5c63f2ac85fbc09a69b",
+        "bytes": 72044
+      },
+      {
+        "sha256": "9231965eab4b712d347f41d1262d91ea875c8dc00ae0dff999aef0b9d397909f",
+        "bytes": 74344
+      },
+      {
+        "sha256": "91f6078af0297b32cbfac57eca42e188c13c8d7b27e91815768b7e8dc024a5bd",
+        "bytes": 72755
+      },
+      {
+        "sha256": "96981aa30bff8bd425886d7d68573aaf9532ddfe87863254d950f6e06d398900",
+        "bytes": 71632
+      },
+      {
+        "sha256": "3baad640fa6929a00b8939c91cefade8f1ccdb00d70d1b846a383ba3e85e1ea7",
+        "bytes": 74686
+      },
+      {
+        "sha256": "d9aa1c74dde13addbd587986c15925b4d925c0d457788a4332bbfd9980baf997",
+        "bytes": 46704
+      },
+      {
+        "sha256": "0c79585a28203e426f89ca959ac8e5526156e2cfccd266a128d3d0779052da69",
+        "bytes": 72818
+      },
+      {
+        "sha256": "d24d7a601c6eb26d813290a85050e3d46a879c4322460195daaad1bdd4dc88cc",
+        "bytes": 72311
+      },
+      {
+        "sha256": "fe2133dbf48696b88959ed3b54c40f2d8643688e298fb4df6c2c0e0c9a455df7",
+        "bytes": 74927
+      },
+      {
+        "sha256": "5bf9b98598044397f8b3969bcf0d348a3a71cbe231504658ebf635ed95353a7d",
+        "bytes": 73055
+      },
+      {
+        "sha256": "8d23a8dad4c2844dbcd998006d15a6a24be9a70d9dfff4477ead825fe4b26ebc",
+        "bytes": 74694
+      },
+      {
+        "sha256": "69476727ca52de1e9c58460a7fdc6529456fb9f239b1cd060f532adf6784248a",
+        "bytes": 72633
+      },
+      {
+        "sha256": "4071f0084f534e817c0463fd14412a9ee2904d9aa44aa1348b4eaf608403ec76",
+        "bytes": 74735
+      },
+      {
+        "sha256": "4bf23718b4f8ee6874715b504129a0be78f415bee844a094acdc668fc85bcafa",
+        "bytes": 47540
+      },
+      {
+        "sha256": "53200e4be0140e74189589e0a192ca740804a56b3b38d5e263bc6f1369dddd70",
+        "bytes": 73230
+      },
+      {
+        "sha256": "0027e209600ed47e0db102b36bc17c613c5008b85ec1b414ee5db379faf46ea4",
+        "bytes": 75006
+      },
+      {
+        "sha256": "2838dd93a426bf22b5a36d7780e476a483476ec505da99a5766ed19d27468f89",
+        "bytes": 72220
+      },
+      {
+        "sha256": "4e821e59649ccad4ecf7aea73a30b4b299537ead68eb86b805d873bb0117448c",
+        "bytes": 73187
+      },
+      {
+        "sha256": "3065d16ebb604c5b05a6e1a6dfcd4209016afbfcf1146585947d14b0fad01796",
+        "bytes": 73155
+      },
+      {
+        "sha256": "78ed13924ba2159760ac7ad96306674e35da77e73259f96eb7f6915c8c0b786f",
+        "bytes": 76028
+      },
+      {
+        "sha256": "aa34505dd025e255878761ab05f70295bdabae9a2ca2bce118819af5b318430f",
+        "bytes": 73948
+      },
+      {
+        "sha256": "3759c45c2c65dd867c7ee85c451cb40badfd7e2d33845414997e11ee4acd28d7",
+        "bytes": 76204
+      },
+      {
+        "sha256": "915547943d6831da27d4fbc5439f973251a89e0be6c56b1031283b1132ea12e5",
+        "bytes": 48580
+      },
+      {
+        "sha256": "5a1099214e22625e0c2780f1abebfd98de41b26acff5229d69268f29e63e2f99",
+        "bytes": 73843
+      },
+      {
+        "sha256": "a48e79f37a3e48f69df0583c3bc70296ceb0422d6472576df01d14c8ce898386",
+        "bytes": 76788
+      },
+      {
+        "sha256": "751db414fbe2a50f6e49658dc75badc08fe1baabae66572798ec65c3a8101026",
+        "bytes": 73865
+      },
+      {
+        "sha256": "52c707e476754da1aafbe302c6447df41eb6b52958896feed757967a10d44604",
+        "bytes": 74814
+      },
+      {
+        "sha256": "c5608924bb71419d633ed0c81b949425b66d30a7727d63557ad913c632d3a515",
+        "bytes": 73772
+      },
+      {
+        "sha256": "32d2a3efd3d0b0cc4a203306f33d301a6ef34cf58bec93b8a1720b10acce97e0",
+        "bytes": 76479
+      },
+      {
+        "sha256": "78d24417317f521c93ccacb896ceaf6d49e6dcef4f65d849a25868a58eccab19",
+        "bytes": 73686
+      },
+      {
+        "sha256": "71b1adbbdc9d12e0be267110997a1719f1309799aacf9fc1b2fdc7f8f89af2e7",
+        "bytes": 47631
+      },
+      {
+        "sha256": "627eef253633ee02387aae44831ea05d6b7a3f813a9b84e29bb02140638ec903",
+        "bytes": 74369
+      },
+      {
+        "sha256": "2ac795ae1170b684c2c1a4af7d6e924059643078aec720c97edd2106cbb042d7",
+        "bytes": 73394
+      },
+      {
+        "sha256": "00e4795e1686a63a4c9fc7bb571ba50fd66309559023f07941b7051bbf59c2f8",
+        "bytes": 76489
+      },
+      {
+        "sha256": "4af3aa979acca0dd7f45713421e46f552f099be36cc98ef5d3c67495ef01ce4d",
+        "bytes": 73390
+      },
+      {
+        "sha256": "7ca5b144b080ec4ec6e0496b9deca8b53794116959645b56c7a3161158028ade",
+        "bytes": 74496
+      },
+      {
+        "sha256": "30ca6d34bb794b043bef68822fe4d3b17bd77946f95f80ade9a0b2f2111ecac5",
+        "bytes": 72742
+      },
+      {
+        "sha256": "0c9a34d6668f34187189ec47adc2f59d833228f111f7e909c44ba526d10cc82d",
+        "bytes": 76394
+      },
+      {
+        "sha256": "fb98502f93aceb4e462d7859b0d86575ba22886c4d9bf048fa9cf4753d7d651d",
+        "bytes": 74322
+      },
+      {
+        "sha256": "7e4189ce79466e02ee5a51395a24aeaa28983eead6ad37b47a61ff25b5eca97c",
+        "bytes": 48112
+      },
+      {
+        "sha256": "f7afaa9a01b8fd389bcca1cb63497401c197adc75f353a8a5330e17578f807c6",
+        "bytes": 74707
+      },
+      {
+        "sha256": "7d4b40536b0c4f76a2e612a016ba2234d3a1c32a7770a9b2ff9d9992f399af6a",
+        "bytes": 74325
+      },
+      {
+        "sha256": "4c08569f75b0e557f6818515eeb297330171ba656d502c95c56b7dd1f2ba2173",
+        "bytes": 76657
+      },
+      {
+        "sha256": "a60fbdff312267d01e98999d83493950e048cc30207b846940bb45114c70d219",
+        "bytes": 73941
+      },
+      {
+        "sha256": "e9338c3e543e77237b1f993262e4236e280b132901a9a3de5cc8fea2a088ddab",
+        "bytes": 75250
+      },
+      {
+        "sha256": "647797153f9e70ce174ffa1fd7ae96f637e14513286673ccbad33c90da1f96c0",
+        "bytes": 74488
+      },
+      {
+        "sha256": "753d8efd1b2092800e7c471c158e54acbafe99884318e4a70ef4af3adcc899a6",
+        "bytes": 77169
+      },
+      {
+        "sha256": "7ab650a602d1a0c8f45db2ecd6fd01feabc8b89bc5f5100e57a32899a09f01d7",
+        "bytes": 49574
+      },
+      {
+        "sha256": "cc2029d91986dcf3833ef3a5716ac3f77f4e49dece81df5d1bbd7fa8298a01e5",
+        "bytes": 75445
+      },
+      {
+        "sha256": "47298db7b75ae1bfa889c790edc799cd1faee92d789a442145d982bbea3b57f1",
+        "bytes": 76244
+      },
+      {
+        "sha256": "dc585c0dcd65ded0a33afdfd7e7ed5e4a7696119c41eaf109290e841a1cdc264",
+        "bytes": 74961
+      },
+      {
+        "sha256": "9506d9bf1ac741db905f558532b09d3eeb7ce664f90cd30d637875ce2134652a",
+        "bytes": 77923
+      },
+      {
+        "sha256": "730ef7e9308f834888c6be1674da8eb973d3f762c8d71ef246dd1a90850261b3",
+        "bytes": 75871
+      },
+      {
+        "sha256": "f43f112d9cbaa46e18048995f58b14015361762d4501f682a8835ef8ac59094d",
+        "bytes": 76559
+      },
+      {
+        "sha256": "22059ba9151233c85ac2dddbdb5d2165836af87eb7525bce7ea9806732443091",
+        "bytes": 75678
+      },
+      {
+        "sha256": "13fc6fc95767268fd95824ddef419552fd0f5aca865bba522a128c432a6c84c5",
+        "bytes": 78339
+      },
+      {
+        "sha256": "c3ee8c68d1748634e6d990c674761bc767b650dcf74fba6e47d8bcc71cd7d131",
+        "bytes": 50141
+      },
+      {
+        "sha256": "170728a38e9fd2c7677f7b9d3e01bb6dbc83bd710721768295d1d079dfc56a1b",
+        "bytes": 75945
+      },
+      {
+        "sha256": "39bd7509c56289f9d1a6aac63dc168b4a3fe1db437c21a958b78b03a49f58877",
+        "bytes": 76865
+      },
+      {
+        "sha256": "8ef5da2313d3db31185253c4fe39b0af676775ce318c771da4e36ae20dcffcb7",
+        "bytes": 76446
+      },
+      {
+        "sha256": "37b8c66c61c8f1c8c70d9f8dc2096236ac5684607c0d4e6d005592ff49c638c3",
+        "bytes": 78704
+      },
+      {
+        "sha256": "31d57ec5e8c30d8c45f7e34cffee830a8d092034fae7b8213a02142f5c90daf4",
+        "bytes": 75741
+      },
+      {
+        "sha256": "930022eada48ba425f95cfde0f99875542f008a108d6cf6ca60cee423cd42316",
+        "bytes": 77247
+      },
+      {
+        "sha256": "637bb74f0f8a5f8652c63c7e75f8f8c26b83d754694d5d8b7074818c28cb17c7",
+        "bytes": 74915
+      },
+      {
+        "sha256": "fbe30369ed28c1b8bdab3fda829d24c58497153dec881db2ba8143aad03ac1cd",
+        "bytes": 48613
+      },
+      {
+        "sha256": "d0299f86e6b1ec56fc36fc904edd5bef2021b38fb9281c2ce626eec41027a907",
+        "bytes": 79055
+      },
+      {
+        "sha256": "39ac4a4237127184795efc07e45dffe38029db93770110189d56ad2d5434d73c",
+        "bytes": 75755
+      },
+      {
+        "sha256": "5c102d7832aa0f49eeabffacad2b08e1b3f0a9e7169de8fb3c36da72a255d865",
+        "bytes": 78008
+      },
+      {
+        "sha256": "afb68c781fe093c12aa166f4d866a94013d8d37d333f1895864124d203999959",
+        "bytes": 77583
+      },
+      {
+        "sha256": "ca565785a4a9119c05a11318d93d22b206dab4220b9987dc54a96a306e240563",
+        "bytes": 79415
+      },
+      {
+        "sha256": "6a9827ad628de3590075849401e46fc6ba918ba594a86992ba4ae6eec5ccca00",
+        "bytes": 74938
+      },
+      {
+        "sha256": "137dfe1070490b7668a92032cc8665f707858772a0da6a5e360fffbb0b9b667b",
+        "bytes": 77963
+      },
+      {
+        "sha256": "93e951dc00bddc9d82b6f512f8f12950d5053d24a4bbce11f03f6a9ff4ab72e4",
+        "bytes": 75903
+      },
+      {
+        "sha256": "2a933d1be017d733aab888608c558afdd161ec7046beef5b5a1baf9d9cca00a3",
+        "bytes": 49442
+      },
+      {
+        "sha256": "c45636c5c48412c24e771c675d343964668609bb34650a3ff78d136c73da7b91",
+        "bytes": 79475
+      },
+      {
+        "sha256": "691b14f832bc9a44c34a8c72c27bce47dc591f82fdd01d7267fcd07868f0a716",
+        "bytes": 76556
+      },
+      {
+        "sha256": "a0e417acfb59b2f0b83eea6be5defefa94d0baa7be8494a797ac4f75641bda71",
+        "bytes": 76845
+      },
+      {
+        "sha256": "e1ebe9031b27084e491e194e1fd88b34d1b4b4b17a19c47c0c5f13633237a1f4",
+        "bytes": 76812
+      },
+      {
+        "sha256": "72f430efbfb1cabb6fadb9a5c029a925fb8446735d2247495331f7bd0b76d95d",
+        "bytes": 79747
+      },
+      {
+        "sha256": "3a028383bf6862475794cb692605edf1578cdfe56f3700f64aa2e21e39b43bd2",
+        "bytes": 78668
+      },
+      {
+        "sha256": "5d328e684233ba082e277d02eb6fb4852651ee1042c3174bd897c5019226fb9c",
+        "bytes": 78403
+      },
+      {
+        "sha256": "3f38cc5c8d516369071aeb8ffa8d34c5cb60bbd944281ab62df35864dd01ad0e",
+        "bytes": 50640
+      },
+      {
+        "sha256": "daf5851b86aeff87705da648d88d6e73d473ed3fdabec9cf890accce117ce67f",
+        "bytes": 78590
+      },
+      {
+        "sha256": "e310b37066d0520a29e8da2a1cd73349f0020e9c7202183b9c8237ff64374682",
+        "bytes": 79982
+      },
+      {
+        "sha256": "aff8fe1661b48328af2cf325ad819d5e360fc46ecc1a936987c63a40c212b04e",
+        "bytes": 78853
+      },
+      {
+        "sha256": "9108af6b520691a7a886c98c48d7fabd3857efd8464d2773f37adced8222d44e",
+        "bytes": 78703
+      },
+      {
+        "sha256": "024ef4b6621bbaea2838030acab03c73b4f77d7416eb675695edb8981c4cfb6d",
+        "bytes": 79101
+      },
+      {
+        "sha256": "7e719f3bb52ad2b739c5e92742fcf625021a231aa2cb6f0bd4a795728bbe87f1",
+        "bytes": 80359
+      },
+      {
+        "sha256": "01d63a8ff32c6b474c03a22bb39bb31738009f44d881eeb5a14fddd6a6fd75f5",
+        "bytes": 78643
+      },
+      {
+        "sha256": "4028e3f61f0c866cd37af4dd774367e99e3a522b100d92e520236edf231e5342",
+        "bytes": 80687
+      },
+      {
+        "sha256": "0deb3b851fd1ff149c994caa42b11744925f450a1e5b909c0f2cfbdcf4051c4b",
+        "bytes": 51374
+      },
+      {
+        "sha256": "c31b858ac9330228b98ff56332000b6ff2db9675b66cab95a8a47c177adda8d0",
+        "bytes": 76196
+      },
+      {
+        "sha256": "6b0f5b9b134ef660bfc047625bb551a5fd50f5e8542bdc71cdfec5a915b8c12e",
+        "bytes": 79704
+      },
+      {
+        "sha256": "09d7b7589cf844b2a4f57fc81eb48e127813c0b01d215041b13d33a214a3c164",
+        "bytes": 76618
+      },
+      {
+        "sha256": "edbd1313aeb19ffe737a29f4d46d8e21a4fb4366c98f513e492575cb6c8cb656",
+        "bytes": 80787
+      },
+      {
+        "sha256": "100223ce880823174a9aaa0cebfadc419c7dc8e4db5ccbb2d3157ba18f77ca18",
+        "bytes": 76414
+      },
+      {
+        "sha256": "2fbcf240ddd2094a058c47f070991f71102f6a793becd5b5865e42406c8571a6",
+        "bytes": 79289
+      },
+      {
+        "sha256": "377fe9165f3c2deb3828bf23aaccbf923457ec656dbb6dd1f757eca193841d83",
+        "bytes": 75203
+      },
+      {
+        "sha256": "13f01b6ce0b7ad797c79760ff81ff4f7e260d758f2ad9420ed3b76aed804e02c",
+        "bytes": 49003
+      },
+      {
+        "sha256": "da9f992db5a31e6779d20b32f76e17177f4ece41596208c4021db869ca1a4683",
+        "bytes": 80835
+      },
+      {
+        "sha256": "0d29d058101977c1692c746eb0d59df2a2aa8c495d48af1e0dda0e1822c8ad4e",
+        "bytes": 74639
+      },
+      {
+        "sha256": "0a15b10b7cc20edf14f1068b4c59c93aece197ca29a167a0303a87d0078438a9",
+        "bytes": 78661
+      },
+      {
+        "sha256": "930f5d57227ca93e2f45ff3f728429f5980f395a2f4658380d22c60cc388cb79",
+        "bytes": 77977
+      },
+      {
+        "sha256": "adef3754fec99c2400979f5def93aff227ca8b96080c11b5a0102fcaedc7fcf6",
+        "bytes": 80195
+      },
+      {
+        "sha256": "9cc9c1d5fd76fba01dab495999f0a05bc348805903b208ffb3ef97864b284b89",
+        "bytes": 74683
+      },
+      {
+        "sha256": "9b347a9c35b8f1c71bc19b7f2c48472e9827c4ab9d40aca5521f49d20467df06",
+        "bytes": 79014
+      },
+      {
+        "sha256": "15cccc434c21a0cdf88d04377a2324fa193a2f9c42a45f27c7059b94c456bc73",
+        "bytes": 75931
+      },
+      {
+        "sha256": "e5e80cb5d0b281e4765241ad77fd0ed344d78eb237b36402669ad4ddd0859cbe",
+        "bytes": 49183
+      },
+      {
+        "sha256": "f550d6c9d1bec6f4adad878535fe10336dca131808405c1447bd428585dabfa3",
+        "bytes": 80361
+      },
+      {
+        "sha256": "8c64200c4024f214dd3a25d186450857c4e9a2dc8ec8f13a5c7829380c53705a",
+        "bytes": 74905
+      },
+      {
+        "sha256": "9a1de4f7c0a241efe78e653364e81d681528213caa8ffe138961b516424e22f2",
+        "bytes": 78287
+      },
+      {
+        "sha256": "d52ee8341b3ea0bed0816a64696aec0dac898aff64c9c24e87c8abfe5b093eb1",
+        "bytes": 77415
+      },
+      {
+        "sha256": "44570f2ef22a2488b3ce1aecab241c43f0c69fd02f2ff3fe9e54142c4e3abfb5",
+        "bytes": 50699
+      },
+      {
+        "sha256": "bf4eb328c3592574eceda453b4d92da320ca750e45e12c2b2d9b44cce618dbda",
+        "bytes": 50790
+      },
+      {
+        "sha256": "2653db5b8f9796839035573b1ca0b47d89a953e36b6216dabecd388688cc2cfc",
+        "bytes": 50866
+      },
+      {
+        "sha256": "dbc45c3f590f42605027e32618a4d12a5044caa2160f9679f8fceeb49ddcf9b9",
+        "bytes": 51232
+      },
+      {
+        "sha256": "a416635ea777bc531e20f33726a227acc68951ae69532c09dce8ad78d74afd54",
+        "bytes": 53362
+      },
+      {
+        "sha256": "1e73f274aa35de9220d23f95a4c007996d0a0f4e22b667af6add92381587faa2",
+        "bytes": 53977
+      },
+      {
+        "sha256": "0ecec2aeb08447c55158b239d3b30f8ee6efdb245f287afdd19dc4bb1d20e0c0",
+        "bytes": 54198
+      },
+      {
+        "sha256": "211fc4702b5f16d0c3b29606760e89eb64be75809797cb6ef8059529749b8789",
+        "bytes": 55577
+      },
+      {
+        "sha256": "4c1eba8fd572cb61cc52261f44dc72b4141fdb6d584ac629062b11cfe8670c29",
+        "bytes": 55011
+      },
+      {
+        "sha256": "ce780fceedf763a3dc038ee48fa0ced420eda4be10155ff1618695c55a160caf",
+        "bytes": 56634
+      },
+      {
+        "sha256": "ff1308ec6a5359bc67d1ef05fe764cfd8bccef971dc5e4306b317ccead601224",
+        "bytes": 57196
+      },
+      {
+        "sha256": "d137d85addf6679f63880f29e7841953ca24a8984a7e22aa34dea379e22a9c33",
+        "bytes": 57265
+      },
+      {
+        "sha256": "e315bdd1dce1e229da2609c48524d3286522c758adf8676383235922c8f48dca",
+        "bytes": 57008
+      },
+      {
+        "sha256": "47e4ebe868340f9bc0a6b22aefc3058e08b1fda8b89981cfceb89102ace6f131",
+        "bytes": 57171
+      },
+      {
+        "sha256": "6c3da152de3ea287bfde0c9a78ba8f0f68c87fc1bd81febcbe2647f6f6cfe0ac",
+        "bytes": 57365
+      },
+      {
+        "sha256": "c67aa509bcc140e4d1f1bc11ce8de3ae18ed50a9d511606f951b74a6ada83486",
+        "bytes": 57996
+      },
+      {
+        "sha256": "ebf29e0e772a029809c0ee2b85f4d665f59713820d78ac15396adb2f87935dd7",
+        "bytes": 57335
+      }
+    ],
+    "frame_sampling_in_provider_metadata": false,
+    "videos": [],
+    "requested_image_detail": "high",
+    "model_version": "gpt-6-astra",
+    "response_id": "chatcmpl-EaUvDKSPtF90nsIsciwoWxXxdAU5C",
+    "usage": {
+      "completion_tokens": 3087,
+      "prompt_tokens": 167126,
+      "total_tokens": 170213,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": 0,
+        "audio_tokens": 0,
+        "reasoning_tokens": 339,
+        "rejected_prediction_tokens": 0
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": 0,
+        "cached_tokens": 0
+      }
+    },
+    "raw_response": "{\n  \"plays\": [\n    {\n      \"start_frame\": \"s000025632\",\n      \"end_frame\": \"s000034015\",\n      \"people\": [\n        {\n          \"person_id\": \"p1\",\n          \"selected\": true,\n          \"kit_consistent\": true,\n          \"reference_ids\": [\"r6\", \"r7\", \"r2\"],\n          \"evidence_frames\": [\"s000027632\", \"s000030332\", \"s000031132\", \"s000033782\"],\n          \"appearance\": \"Short light-brown hair, slim build, white shirt and shorts, long white socks and dark boots; number 15 readable on the back. Continuous movement connects the two local selections.\"\n        },\n        {\n          \"person_id\": \"p2\",\n          \"selected\": false,\n          \"kit_consistent\": true,\n          \"reference_ids\": [],\n          \"evidence_frames\": [\"s000027016\", \"s000027266\", \"s000027632\"],\n          \"appearance\": \"White-kit player contesting the ball at the left edge, subsequently on the ground; distinct from the standing number 15.\"\n        },\n        {\n          \"person_id\": \"p3\",\n          \"selected\": false,\n          \"kit_consistent\": true,\n          \"reference_ids\": [],\n          \"evidence_frames\": [\"s000027266\", \"s000028516\", \"s000030332\", \"s000031132\"],\n          \"appearance\": \"Blue shirt, white shorts, blue socks and pale turquoise boots; pursues from the left and subsequently slides behind the shooter.\"\n        },\n        {\n          \"person_id\": \"p4\",\n          \"selected\": false,\n          \"kit_consistent\": true,\n          \"reference_ids\": [],\n          \"evidence_frames\": [\"s000027132\", \"s000027516\", \"s000027632\"],\n          \"appearance\": \"Blue-shirted player with white shorts and orange-red boots, alongside the initial left-side contest.\"\n        },\n        {\n          \"person_id\": \"p5\",\n          \"selected\": false,\n          \"kit_consistent\": true,\n          \"reference_ids\": [],\n          \"evidence_frames\": [\"s000029132\", \"s000029382\", \"s000030332\", \"s000031132\"],\n          \"appearance\": \"Blue shirt with readable number 5 in the later views, white shorts, dark sock tops and light boots; taller than the selected player.\"\n        },\n        {\n          \"person_id\": \"p6\",\n          \"selected\": false,\n          \"kit_consistent\": true,\n          \"reference_ids\": [],\n          \"evidence_frames\": [\"s000030665\", \"s000031265\", \"s000033782\"],\n          \"appearance\": \"Goalkeeper in a red kit, initially set inside the goal.\"\n        }\n      ],\n      \"actions\": [\n        {\n          \"action_id\": \"a1\",\n          \"kind\": \"DUEL\",\n          \"actor\": \"p2\",\n          \"start_frame\": \"s000025632\",\n          \"contact_frame\": null,\n          \"end_frame\": \"s000027766\",\n          \"actor_evidence_frames\": [\"s000027016\", \"s000027266\", \"s000027632\"],\n          \"ball_id\": \"b1\",\n          \"outcome\": \"UNKNOWN\",\n          \"receiver\": null,\n          \"receiver_frame\": null,\n          \"receiver_is_teammate\": null,\n          \"finisher\": null,\n          \"shot_frame\": null,\n          \"outcome_frame\": \"s000027766\",\n          \"same_active_ball\": true,\n          \"continuous_play\": true,\n          \"outcome_evidence\": [\n            {\n              \"frame\": \"s000027266\",\n              \"fact\": \"The white player and blue challenger contest the ball at their feet on the left.\"\n            },\n            {\n              \"frame\": \"s000027632\",\n              \"fact\": \"The white player is down; the active ball has emerged to the right of the contest.\"\n            },\n            {\n              \"frame\": \"s000027766\",\n              \"fact\": \"The ball continues across open grass toward number 15.\"\n            }\n          ],\n          \"details\": \"The interval begins with a crowded left-side contest involving p2, p3 and nearby p4. P2 falls while the ball escapes centrally. The final releasing touch is obscured; this is not established as a deliberate pass.\"\n        },\n        {\n          \"action_id\": \"a2\",\n          \"kind\": \"RECOVERY\",\n          \"actor\": \"p1\",\n          \"start_frame\": \"s000027766\",\n          \"contact_frame\": null,\n          \"contact_before_frame\": \"s000028266\",\n          \"contact_after_frame\": \"s000028516\",\n          \"contact_actor_unique\": true,\n          \"contact_evidence\": [\n            {\n              \"frame\": \"s000028266\",\n              \"fact\": \"The rolling ball reaches number 15's feet as he turns toward the right.\"\n            },\n            {\n              \"frame\": \"s000028516\",\n              \"fact\": \"Number 15 has brought the ball along with his turn and begins advancing with it.\"\n            }\n          ],\n          \"end_frame\": \"s000028516\",\n          \"actor_evidence_frames\": [\"s000027632\", \"s000028266\", \"s000028516\"],\n          \"ball_id\": \"b1\",\n          \"outcome\": \"COMPLETED\",\n          \"receiver\": null,\n          \"receiver_frame\": null,\n          \"receiver_is_teammate\": null,\n          \"finisher\": null,\n          \"shot_frame\": null,\n          \"outcome_frame\": \"s000028516\",\n          \"same_active_ball\": true,\n          \"continuous_play\": true,\n          \"outcome_evidence\": [\n            {\n              \"frame\": \"s000028882\",\n              \"fact\": \"Number 15 advances rightward with the ball directly ahead of his boot.\"\n            }\n          ],\n          \"details\": \"P1 steps toward the loose ball and takes possession. A white teammate is nearby behind him, but no separate intervening pass is established.\"\n        },\n        {\n          \"action_id\": \"a3\",\n          \"kind\": \"DRIBBLE\",\n          \"actor\": \"p1\",\n          \"start_frame\": \"s000028516\",\n          \"contact_frame\": null,\n          \"end_frame\": \"s000030882\",\n          \"actor_evidence_frames\": [\"s000028882\", \"s000029265\", \"s000029765\", \"s000030332\"],\n          \"ball_id\": \"b1\",\n          \"outcome\": \"COMPLETED\",\n          \"receiver\": null,\n          \"receiver_frame\": null,\n          \"receiver_is_teammate\": null,\n          \"finisher\": null,\n          \"shot_frame\": null,\n          \"outcome_frame\": \"s000030882\",\n          \"same_active_ball\": true,\n          \"continuous_play\": true,\n          \"outcome_evidence\": [\n            {\n              \"frame\": \"s000029382\",\n              \"fact\": \"P1 and the blue defender are shoulder-to-shoulder with the ball briefly hidden between their legs.\"\n            },\n            {\n              \"frame\": \"s000029515\",\n              \"fact\": \"The ball emerges forward to the right, and p1 accelerates after it.\"\n            },\n            {\n              \"frame\": \"s000030332\",\n              \"fact\": \"Number 15 leads the pursuit of the same rolling ball, with the blue players behind.\"\n            },\n            {\n              \"frame\": \"s000030882\",\n              \"fact\": \"P1 reaches the ball in front of goal and prepares his strike.\"\n            }\n          ],\n          \"details\": \"P1 carries rightward, takes on p5 and runs onto the ball beyond him. The brief leg-level occlusion does not establish an opponent's controlled possession or another player's pass. P3 and p5 pursue.\"\n        },\n        {\n          \"action_id\": \"a4\",\n          \"kind\": \"SHOT\",\n          \"actor\": \"p1\",\n          \"start_frame\": \"s000030765\",\n          \"contact_frame\": \"s000030915\",\n          \"end_frame\": \"s000032082\",\n          \"actor_evidence_frames\": [\"s000030799\", \"s000030915\", \"s000030949\", \"s000031132\"],\n          \"ball_id\": \"b1\",\n          \"outcome\": \"GOAL\",\n          \"receiver\": null,\n          \"receiver_frame\": null,\n          \"receiver_is_teammate\": null,\n          \"finisher\": \"p1\",\n          \"shot_frame\": \"s000030915\",\n          \"outcome_frame\": \"s000031982\",\n          \"same_active_ball\": true,\n          \"continuous_play\": true,\n          \"outcome_evidence\": [\n            {\n              \"frame\": \"s000030915\",\n              \"fact\": \"P1's extended striking boot meets the active ball; the blue defenders are behind him.\"\n            },\n            {\n              \"frame\": \"s000030982\",\n              \"fact\": \"The ball has lifted away from p1's boot toward goal.\"\n            },\n            {\n              \"frame\": \"s000031199\",\n              \"fact\": \"The airborne active ball approaches the near-post area; a separate ball remains stationary on the ground farther right inside the goal.\"\n            },\n            {\n              \"frame\": \"s000031265\",\n              \"fact\": \"The active ball reaches the post-and-player overlap as the goalkeeper reaches across; subsequent contact is obscured.\"\n            },\n            {\n              \"frame\": \"s000031982\",\n              \"fact\": \"A second, moving ball is visible on the ground inside the goal, to the left of the pre-existing stationary spare.\"\n            },\n            {\n              \"frame\": \"s000032015\",\n              \"fact\": \"The arriving ball continues rightward along the goal floor beside the spare.\"\n            }\n          ],\n          \"details\": \"Number 15 is the shooter, not a different white receiver. His strike lifts the ball toward goal while p3 slides behind him and p5 follows. The ball is briefly hidden around the near post, goalkeeper and standing players. No intervening touch can be confirmed during that overlap, and the hidden trajectory is not reconstructed. Its subsequent appearance and motion inside the goal, separately from the stationary spare, establish the goal; the goalkeeper's reaching movement is not counted as a save.\"\n        },\n        {\n          \"action_id\": \"a5\",\n          \"kind\": \"DUEL\",\n          \"actor\": \"p3\",\n          \"start_frame\": \"s000030765\",\n          \"contact_frame\": null,\n          \"end_frame\": \"s000031382\",\n          \"actor_evidence_frames\": [\"s000030765\", \"s000031015\", \"s000031132\"],\n          \"ball_id\": \"b1\",\n          \"outcome\": \"INCOMPLETE\",\n          \"receiver\": null,\n          \"receiver_frame\": null,\n          \"receiver_is_teammate\": null,\n          \"finisher\": null,\n          \"shot_frame\": null,\n          \"outcome_frame\": \"s000031132\",\n          \"same_active_ball\": true,\n          \"continuous_play\": true,\n          \"outcome_evidence\": [\n            {\n              \"frame\": \"s000031015\",\n              \"fact\": \"The ball is already airborne ahead of the shooter while the pursuing blue player goes to ground.\"\n            },\n            {\n              \"frame\": \"s000031132\",\n              \"fact\": \"The blue player is stretched out on the grass behind the departing ball.\"\n            }\n          ],\n          \"details\": \"A sliding challenge from behind does not visibly stop the shot. No ball contact by the sliding player is established.\"\n        },\n        {\n          \"action_id\": \"a6\",\n          \"kind\": \"RUN\",\n          \"actor\": \"p1\",\n          \"start_frame\": \"s000032632\",\n          \"contact_frame\": null,\n          \"end_frame\": \"s000034015\",\n          \"actor_evidence_frames\": [\"s000032882\", \"s000033382\", \"s000033782\", \"s000034015\"],\n          \"ball_id\": \"b1\",\n          \"outcome\": \"COMPLETED\",\n          \"receiver\": null,\n          \"receiver_frame\": null,\n          \"receiver_is_teammate\": null,\n          \"finisher\": null,\n          \"shot_frame\": null,\n          \"outcome_frame\": \"s000034015\",\n          \"same_active_ball\": true,\n          \"continuous_play\": true,\n          \"outcome_evidence\": [\n            {\n              \"frame\": \"s000033782\",\n              \"fact\": \"The selected player runs leftward away from goal while the goalkeeper and a blue player remain low near the goalmouth.\"\n            }\n          ],\n          \"details\": \"P1 turns and runs away from goal without another ball touch. His movement connects the shooter to the r7 selection; this aftermath is not used as goal evidence.\"\n        }\n      ],\n      \"questions\": [\n        {\n          \"reason\": \"CONTACT\",\n          \"action_id\": \"a1\"\n        }\n      ]\n    }\n  ]\n}",
+    "response_sha256": "8bedff4094afcba1a3a6cfd26c7cdda080150a25b2c74eb108e766758438ad46",
+    "elapsed_seconds": 59.907
+  },
+  "result": {
+    "status": "COMPLETED",
+    "source_video_sha256": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+    "native_navigation_sha256": "7b5302571fd391508dd90804db58539f6b80c3b95fbb5343b745236b3519858c",
+    "question": {
+      "packet_id": "sequence_004",
+      "start_ms": 25632,
+      "end_ms": 34131,
+      "focus_ms": 30932,
+      "detail_start_ms": 30282,
+      "detail_end_ms": 32082,
+      "reason": "VERIFY_OBSERVED_TERMINAL_ATTEMPT",
+      "question": "Follow the active ball before and after the terminal attempt. Establish the physical actor, any intervening touch, and the visible outcome. Preserve uncertainty through occlusion; distinguish the moving ball from spares.",
+      "selection_policy": "PRIOR_NATIVE_ATTEMPT_TIMING_ONLY_NO_OUTCOME_ANSWER"
+    },
+    "expected_answers_used_as_input": false,
+    "production_pipeline_changed": false,
+    "independent_visual_correctness_verified": false,
+    "target_events": [
+      {
+        "event_id": "f5fd73d91277a41bedba",
+        "source_packet_ids": [
+          "sequence_004"
+        ],
+        "source_action_keys": [
+          "sequence_004:0:a3"
+        ],
+        "source_video_sha256": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+        "kind": "DRIBBLE",
+        "event_type": "DRIBBLE",
+        "outcome": "COMPLETED",
+        "start_ms": 28516,
+        "end_ms": 30882,
+        "contact_ms": null,
+        "contact_interval_ms": null,
+        "contact_basis": "UNRESOLVED",
+        "contact_evidence": [],
+        "outcome_ms": 30882,
+        "selected_player": true,
+        "actor": "p1",
+        "actor_scope": "sequence_004:0",
+        "actor_evidence_frames": [
+          "s000028882",
+          "s000029265",
+          "s000029765",
+          "s000030332"
+        ],
+        "reference_ids": [
+          "r6",
+          "r7",
+          "r2"
+        ],
+        "outcome_evidence": [
+          {
+            "frame": "s000029382",
+            "fact": "P1 and the blue defender are shoulder-to-shoulder with the ball briefly hidden between their legs."
+          },
+          {
+            "frame": "s000029515",
+            "fact": "The ball emerges forward to the right, and p1 accelerates after it."
+          },
+          {
+            "frame": "s000030332",
+            "fact": "Number 15 leads the pursuit of the same rolling ball, with the blue players behind."
+          },
+          {
+            "frame": "s000030882",
+            "fact": "P1 reaches the ball in front of goal and prepares his strike."
+          }
+        ],
+        "receiver": null,
+        "finisher": null,
+        "reason": "VISIBLE_ACTION",
+        "details": "P1 carries rightward, takes on p5 and runs onto the ball beyond him. The brief leg-level occlusion does not establish an opponent's controlled possession or another player's pass. P3 and p5 pursue.",
+        "receipts": [
+          {
+            "packet_id": "sequence_004",
+            "payload_sha256": "06abdea3d41fd63dad4212d5a27d92e94241ab26eae4533076213a195bf2aa50",
+            "response_sha256": "8bedff4094afcba1a3a6cfd26c7cdda080150a25b2c74eb108e766758438ad46",
+            "origin": "LIVE_MODEL_REQUEST"
+          }
+        ],
+        "review_phase": "INITIAL",
+        "proof_eligible": true,
+        "model_requested_clarification": false,
+        "answers_source_action_keys": []
+      },
+      {
+        "event_id": "574b72a63b116a12b3f5",
+        "source_packet_ids": [
+          "sequence_004"
+        ],
+        "source_action_keys": [
+          "sequence_004:0:a4"
+        ],
+        "source_video_sha256": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+        "kind": "SHOT",
+        "event_type": "GOAL",
+        "outcome": "GOAL",
+        "start_ms": 30765,
+        "end_ms": 32082,
+        "contact_ms": 30915,
+        "contact_interval_ms": [
+          30915,
+          30915
+        ],
+        "contact_basis": "VISIBLE_FRAME",
+        "contact_evidence": [],
+        "outcome_ms": 31982,
+        "selected_player": true,
+        "actor": "p1",
+        "actor_scope": "sequence_004:0",
+        "actor_evidence_frames": [
+          "s000030799",
+          "s000030915",
+          "s000030949",
+          "s000031132"
+        ],
+        "reference_ids": [
+          "r6",
+          "r7",
+          "r2"
+        ],
+        "outcome_evidence": [
+          {
+            "frame": "s000030915",
+            "fact": "P1's extended striking boot meets the active ball; the blue defenders are behind him."
+          },
+          {
+            "frame": "s000030982",
+            "fact": "The ball has lifted away from p1's boot toward goal."
+          },
+          {
+            "frame": "s000031199",
+            "fact": "The airborne active ball approaches the near-post area; a separate ball remains stationary on the ground farther right inside the goal."
+          },
+          {
+            "frame": "s000031265",
+            "fact": "The active ball reaches the post-and-player overlap as the goalkeeper reaches across; subsequent contact is obscured."
+          },
+          {
+            "frame": "s000031982",
+            "fact": "A second, moving ball is visible on the ground inside the goal, to the left of the pre-existing stationary spare."
+          },
+          {
+            "frame": "s000032015",
+            "fact": "The arriving ball continues rightward along the goal floor beside the spare."
+          }
+        ],
+        "receiver": null,
+        "finisher": "p1",
+        "reason": "VISIBLE_SHOT_OUTCOME",
+        "details": "Number 15 is the shooter, not a different white receiver. His strike lifts the ball toward goal while p3 slides behind him and p5 follows. The ball is briefly hidden around the near post, goalkeeper and standing players. No intervening touch can be confirmed during that overlap, and the hidden trajectory is not reconstructed. Its subsequent appearance and motion inside the goal, separately from the stationary spare, establish the goal; the goalkeeper's reaching movement is not counted as a save.",
+        "receipts": [
+          {
+            "packet_id": "sequence_004",
+            "payload_sha256": "06abdea3d41fd63dad4212d5a27d92e94241ab26eae4533076213a195bf2aa50",
+            "response_sha256": "8bedff4094afcba1a3a6cfd26c7cdda080150a25b2c74eb108e766758438ad46",
+            "origin": "LIVE_MODEL_REQUEST"
+          }
+        ],
+        "review_phase": "INITIAL",
+        "proof_eligible": true,
+        "model_requested_clarification": false,
+        "answers_source_action_keys": []
+      },
+      {
+        "event_id": "f5bfe1b7adab52f20152",
+        "source_packet_ids": [
+          "sequence_004"
+        ],
+        "source_action_keys": [
+          "sequence_004:0:a6"
+        ],
+        "source_video_sha256": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+        "kind": "RUN",
+        "event_type": "RUN",
+        "outcome": "COMPLETED",
+        "start_ms": 32632,
+        "end_ms": 34015,
+        "contact_ms": null,
+        "contact_interval_ms": null,
+        "contact_basis": "UNRESOLVED",
+        "contact_evidence": [],
+        "outcome_ms": 34015,
+        "selected_player": true,
+        "actor": "p1",
+        "actor_scope": "sequence_004:0",
+        "actor_evidence_frames": [
+          "s000032882",
+          "s000033382",
+          "s000033782",
+          "s000034015"
+        ],
+        "reference_ids": [
+          "r6",
+          "r7",
+          "r2"
+        ],
+        "outcome_evidence": [
+          {
+            "frame": "s000033782",
+            "fact": "The selected player runs leftward away from goal while the goalkeeper and a blue player remain low near the goalmouth."
+          }
+        ],
+        "receiver": null,
+        "finisher": null,
+        "reason": "VISIBLE_ACTION",
+        "details": "P1 turns and runs away from goal without another ball touch. His movement connects the shooter to the r7 selection; this aftermath is not used as goal evidence.",
+        "receipts": [
+          {
+            "packet_id": "sequence_004",
+            "payload_sha256": "06abdea3d41fd63dad4212d5a27d92e94241ab26eae4533076213a195bf2aa50",
+            "response_sha256": "8bedff4094afcba1a3a6cfd26c7cdda080150a25b2c74eb108e766758438ad46",
+            "origin": "LIVE_MODEL_REQUEST"
+          }
+        ],
+        "review_phase": "INITIAL",
+        "proof_eligible": true,
+        "model_requested_clarification": false,
+        "answers_source_action_keys": []
+      }
+    ],
+    "overview_instants": 69,
+    "native_instants": 109,
+    "native_first_ms": 30282,
+    "native_last_ms": 32082,
+    "source_crop_box": [
+      0,
+      641,
+      1080,
+      1560
+    ],
+    "spatial_reference_audit": [
+      {
+        "original_selection": "r6",
+        "source_ms": 27632,
+        "approximate_clip_s": 2,
+        "original_source_box": {
+          "x": 0.4065,
+          "y": 0.5484,
+          "w": 0.1083,
+          "h": 0.1719
+        },
+        "original_positive_point": {
+          "x": 0.4196042053184911,
+          "y": 0.6171150278293135
+        },
+        "annotation_policy": "ORIGINAL_HUMAN_SELECTION_ONLY_AT_THIS_SOURCE_INSTANT_NOT_A_PREDICTED_TRACK",
+        "annotated_image_sha256": "c86f8d154dbc95272f4922f21646d7b6b19469c092eb832882f7e1a7a8f7c77d"
+      },
+      {
+        "original_selection": "r7",
+        "source_ms": 33782,
+        "approximate_clip_s": 8.15,
+        "original_source_box": {
+          "x": 0.4657,
+          "y": 0.4266,
+          "w": 0.1657,
+          "h": 0.1849
+        },
+        "original_positive_point": {
+          "x": 0.5061842918985776,
+          "y": 0.5023191094619666
+        },
+        "annotation_policy": "ORIGINAL_HUMAN_SELECTION_ONLY_AT_THIS_SOURCE_INSTANT_NOT_A_PREDICTED_TRACK",
+        "annotated_image_sha256": "5fe27185475fc2efb0603be42237dd08199ea15bb3a78517ef00574acfb88d61"
+      }
+    ],
+    "detail_jpeg_quality": 50,
+    "overview_jpeg_quality": 70,
+    "detail_band_policy": "LOCAL_ORIGINAL_UNION_HALF_PLAYER_MARGIN",
+    "identity_mode": "FRESH_ORIGINAL_SELECTIONS",
+    "previous_identity_response_sha256": "a42f4780f49b77cdaafcfd7503be2b9bf3cce274a0ca332fb33fb1b4eefd7250",
+    "previous_identity_claims_supplied": false,
+    "source_preparation_seconds": 6.532,
+    "request_audit": {
+      "payload_sha256": "06abdea3d41fd63dad4212d5a27d92e94241ab26eae4533076213a195bf2aa50",
+      "payload_bytes": 16220155,
+      "explicit_image_count": 190,
+      "images": [
+        {
+          "sha256": "3a1c5a1dd42221c8bc7a92eb59105c36a2a0f148d80f6a55f7442e0188289217",
+          "bytes": 5465
+        },
+        {
+          "sha256": "07ade3bd308f037c88df80c6263e6bb78dd40b79fd0b7e4e18e7d83d02f2c4a6",
+          "bytes": 11688
+        },
+        {
+          "sha256": "b27c75fac95669fa30f3cdc8e27901a7eb102c880ff61ee4a9539da31f255dec",
+          "bytes": 6347
+        },
+        {
+          "sha256": "bfa6f5aeaf67b977349ce4ce9d80282cc1595e61cf177ae8288817735066fa89",
+          "bytes": 10406
+        },
+        {
+          "sha256": "701f00516cd66001007c7d83ac856293599c11135ae1113c511c0822fb0473b6",
+          "bytes": 5118
+        },
+        {
+          "sha256": "923cffbd1ee55df6ecf2f8b3fe3110c318a2606cc0500726d923a1832a891759",
+          "bytes": 8737
+        },
+        {
+          "sha256": "aaccfeb6493345ab3d27192569f96f2cc09782389e0d525a7afbbc7745d72454",
+          "bytes": 13380
+        },
+        {
+          "sha256": "872357c7749fdd2359f1fa303872c08d74fb97ba5bb33d23dd9851237e056c60",
+          "bytes": 6652
+        },
+        {
+          "sha256": "721c5dee7a3e8980b7585d745626cd8016b25912e7176308d2a47b746458d93f",
+          "bytes": 6238
+        },
+        {
+          "sha256": "a399aa3c7a6191dbc52db2acb94cb7c7a1c7dbbaaa9e85350bb353b9921bcc08",
+          "bytes": 5769
+        },
+        {
+          "sha256": "c86f8d154dbc95272f4922f21646d7b6b19469c092eb832882f7e1a7a8f7c77d",
+          "bytes": 185508
+        },
+        {
+          "sha256": "5fe27185475fc2efb0603be42237dd08199ea15bb3a78517ef00574acfb88d61",
+          "bytes": 223526
+        },
+        {
+          "sha256": "a8fe8fee94a7653a4fd3ba8e6a31b850c687307361599b6ddfad48ee8360a9f2",
+          "bytes": 44972
+        },
+        {
+          "sha256": "dd3bf1c4fb14ef0a28685a817a8f9e8d4b6cdeceed671da28351ad60b6e88a48",
+          "bytes": 45700
+        },
+        {
+          "sha256": "2a50020c72841e23416e8e85846d052652c8f185c322073dd77dbf777144d43f",
+          "bytes": 48160
+        },
+        {
+          "sha256": "cd6b3c96f140d87d65bc2bd09f0fd64b97b959df072ece3cc0fccac3fea4209b",
+          "bytes": 48492
+        },
+        {
+          "sha256": "19d73e7d6961bad93849bd3f33410e3a2c268f9f10fdb3c823850aa008a6faa2",
+          "bytes": 46996
+        },
+        {
+          "sha256": "98e5ed5d42a6689a34a9ccf42d09bb95030d0ddcf1c91d939f37ff83b3f12f36",
+          "bytes": 47036
+        },
+        {
+          "sha256": "5181ad3b0775ec398667dd9ebbc55f7a17f0e0763080f80a2992ce558e5f078e",
+          "bytes": 48964
+        },
+        {
+          "sha256": "9a1dff04d0567335be928a8a3147c96bdd4829a6163873809ccee7e2a7349210",
+          "bytes": 48386
+        },
+        {
+          "sha256": "c226714d559da542ebc0656c21a308f1af79c6ea582d56609ded99e538a10f3f",
+          "bytes": 46864
+        },
+        {
+          "sha256": "a8670983f6c374716fe7fab7442b7dba00656007cab3543e37a93ca3a1851feb",
+          "bytes": 46837
+        },
+        {
+          "sha256": "e719c3008df244587865daa0fd9bbeb860c2792601554a1295351c17aa9b4267",
+          "bytes": 48547
+        },
+        {
+          "sha256": "f6827fc398b340ed2a261605872d112f17167078b053dfa1a45d6e2c68e6e274",
+          "bytes": 48793
+        },
+        {
+          "sha256": "53ea5599f61c908829a620969c2532a06b597509b3ff1310b12b3a38f1e18f4d",
+          "bytes": 46818
+        },
+        {
+          "sha256": "b272676ba27159cec9e77537ab2c6de344900814b7387719d12d1ea89ed87510",
+          "bytes": 47264
+        },
+        {
+          "sha256": "b4a218ae2ec31f90141adb575400c34c144506ce7e51ff47ed72ce3c3b880b4e",
+          "bytes": 47768
+        },
+        {
+          "sha256": "0c7c62cc0e43c3d873dc5d29f399bf61b67cf4462ea6a7a1e462986bda95074d",
+          "bytes": 47290
+        },
+        {
+          "sha256": "83c11500cfa6e47d38cac33c4f508f84db94d88dd9d2462d62db7251a61595fe",
+          "bytes": 46894
+        },
+        {
+          "sha256": "dcdfb36fa387220c9d94d4fdcf64c0ff87a4db9bfc2528fff30346b4b4c04d6b",
+          "bytes": 46730
+        },
+        {
+          "sha256": "33e6a5d14ceda998817ed01fab25c1b17b47191890fa2d706eb1bfeef9ca5d42",
+          "bytes": 47756
+        },
+        {
+          "sha256": "8a69e1350ab15beacc6adcd31d6f24a4a9a27141f201af00e68209bf9f770723",
+          "bytes": 47120
+        },
+        {
+          "sha256": "15d435216da37af40550108f3bb685012b8ff66a0fec4bc6907a09a4cc7b8f05",
+          "bytes": 45285
+        },
+        {
+          "sha256": "f97bc2f3b1179a52c693a25f02a6183139963943e26144fb1a02861a6a833c0d",
+          "bytes": 44921
+        },
+        {
+          "sha256": "2549827d4084676d067db13900a10a6514d26cff483d66666a6ae45b1bdd5db7",
+          "bytes": 45251
+        },
+        {
+          "sha256": "1a440e66ddfa48c3ac30018e7ee0a712de3d72ddc7be17f06eb547d5e190cb3e",
+          "bytes": 45165
+        },
+        {
+          "sha256": "e5608f6203f86ef1777adc73355eb37196450e1934d7183b7bb84559b79f5415",
+          "bytes": 45206
+        },
+        {
+          "sha256": "ee84162e6e25342d7c74afc489f0c391841d96405840427992b0d3e2f2e2b2dc",
+          "bytes": 45025
+        },
+        {
+          "sha256": "82956f341f59647a80569275c16c8a21f4b6e718ed794d28aa104d848b137b4e",
+          "bytes": 45089
+        },
+        {
+          "sha256": "c9fb11067c41ea5eca935c280182a540b3045b3e53fdff4b34d14f4bb8ead156",
+          "bytes": 44505
+        },
+        {
+          "sha256": "33e30c63fbf07af12661456cdcd140c62760817bc07c83ecbefe4ecee8fe7100",
+          "bytes": 44475
+        },
+        {
+          "sha256": "46d74b23b99a34f9d1f4d4214db0e3ddea9e78801d49a21db73d1a59d733f9dd",
+          "bytes": 44058
+        },
+        {
+          "sha256": "646b9ed0f211cf80eb0f80a14e032605f0eecf6bb00bb0f2b081a26bef4fc7f7",
+          "bytes": 43190
+        },
+        {
+          "sha256": "735b8fcba7ca2e07513d6fef19765eea74c8d37ef8f0b4ac4df5667df6894fe3",
+          "bytes": 43160
+        },
+        {
+          "sha256": "3973d4756b0dcc81a88ee5a7d8e9d6250693053b3818dc130aa6479d67a5b2b4",
+          "bytes": 44040
+        },
+        {
+          "sha256": "23540e9ae2f54c70c528140d61ea21cc011d420a4ca2c87f0dc85eec804b24fa",
+          "bytes": 42607
+        },
+        {
+          "sha256": "c6c0585e08314bd8c79da169c7de8fd2de18809c3e495cf3072f89f707ef6e26",
+          "bytes": 43735
+        },
+        {
+          "sha256": "e701d5cef6a113213a17a9edda0a786d499307b63f9e1f33e2198b5451acbb55",
+          "bytes": 43914
+        },
+        {
+          "sha256": "9ca1ecfcfa42a9483d7f85774b8a86f68d5aac2da7989becbf0d31599c8f2837",
+          "bytes": 43227
+        },
+        {
+          "sha256": "6295e9d70f66106b1fb36dc84ff9f728e86d01ed1bbecbf53a64a3bef99bb03d",
+          "bytes": 45122
+        },
+        {
+          "sha256": "33f22921b013aa40c56a69fce47d322054e95814990c61e181e74aadddefab83",
+          "bytes": 74704
+        },
+        {
+          "sha256": "8fa0a8290fe6ea913f64ab258dce510900a9b4b99827062b93c7a5ee37be795d",
+          "bytes": 72787
+        },
+        {
+          "sha256": "ba1dd65d205ce74c5c521b4d3261ce6a1771bbf28fff1aa7c4a8d4c503f031f1",
+          "bytes": 74745
+        },
+        {
+          "sha256": "50791131f802113c3b075df4dd18fc772e6a8b3305e8b900ae7547c03d649dff",
+          "bytes": 72886
+        },
+        {
+          "sha256": "1c170c62f351d6800db1672453cfb54ba001cfb6dd306f8fa9b139c30829a237",
+          "bytes": 74628
+        },
+        {
+          "sha256": "187bf52210a5bf610e7ee6078b1323844d010bc974dd03123612defaec4fccf6",
+          "bytes": 74719
+        },
+        {
+          "sha256": "1c5d6b82566777e999695d4511468aadf456ff370273df8d168fcd132e5c3f1c",
+          "bytes": 72129
+        },
+        {
+          "sha256": "bba82e38386204485a3f7d73e0afcc42d5a90edb843b6c4663af74d36fd02a10",
+          "bytes": 44623
+        },
+        {
+          "sha256": "bbc5223071c94ac537b82460b86bf10f5529c6ce8aa0c1a0f510ceffed648471",
+          "bytes": 74215
+        },
+        {
+          "sha256": "a9aeb6f725c6b09ea444155750e3aaa7f5f914c8a4d6e74c29865ddd042e5ec0",
+          "bytes": 72848
+        },
+        {
+          "sha256": "c3711d9b5a961e9b7544cfdf1d4beed25584e45ee8c139325372aae047d20c9b",
+          "bytes": 74193
+        },
+        {
+          "sha256": "7dbe431cfb3ba23b23017ffcac68c25386be1722f1f6c5c63f2ac85fbc09a69b",
+          "bytes": 72044
+        },
+        {
+          "sha256": "9231965eab4b712d347f41d1262d91ea875c8dc00ae0dff999aef0b9d397909f",
+          "bytes": 74344
+        },
+        {
+          "sha256": "91f6078af0297b32cbfac57eca42e188c13c8d7b27e91815768b7e8dc024a5bd",
+          "bytes": 72755
+        },
+        {
+          "sha256": "96981aa30bff8bd425886d7d68573aaf9532ddfe87863254d950f6e06d398900",
+          "bytes": 71632
+        },
+        {
+          "sha256": "3baad640fa6929a00b8939c91cefade8f1ccdb00d70d1b846a383ba3e85e1ea7",
+          "bytes": 74686
+        },
+        {
+          "sha256": "d9aa1c74dde13addbd587986c15925b4d925c0d457788a4332bbfd9980baf997",
+          "bytes": 46704
+        },
+        {
+          "sha256": "0c79585a28203e426f89ca959ac8e5526156e2cfccd266a128d3d0779052da69",
+          "bytes": 72818
+        },
+        {
+          "sha256": "d24d7a601c6eb26d813290a85050e3d46a879c4322460195daaad1bdd4dc88cc",
+          "bytes": 72311
+        },
+        {
+          "sha256": "fe2133dbf48696b88959ed3b54c40f2d8643688e298fb4df6c2c0e0c9a455df7",
+          "bytes": 74927
+        },
+        {
+          "sha256": "5bf9b98598044397f8b3969bcf0d348a3a71cbe231504658ebf635ed95353a7d",
+          "bytes": 73055
+        },
+        {
+          "sha256": "8d23a8dad4c2844dbcd998006d15a6a24be9a70d9dfff4477ead825fe4b26ebc",
+          "bytes": 74694
+        },
+        {
+          "sha256": "69476727ca52de1e9c58460a7fdc6529456fb9f239b1cd060f532adf6784248a",
+          "bytes": 72633
+        },
+        {
+          "sha256": "4071f0084f534e817c0463fd14412a9ee2904d9aa44aa1348b4eaf608403ec76",
+          "bytes": 74735
+        },
+        {
+          "sha256": "4bf23718b4f8ee6874715b504129a0be78f415bee844a094acdc668fc85bcafa",
+          "bytes": 47540
+        },
+        {
+          "sha256": "53200e4be0140e74189589e0a192ca740804a56b3b38d5e263bc6f1369dddd70",
+          "bytes": 73230
+        },
+        {
+          "sha256": "0027e209600ed47e0db102b36bc17c613c5008b85ec1b414ee5db379faf46ea4",
+          "bytes": 75006
+        },
+        {
+          "sha256": "2838dd93a426bf22b5a36d7780e476a483476ec505da99a5766ed19d27468f89",
+          "bytes": 72220
+        },
+        {
+          "sha256": "4e821e59649ccad4ecf7aea73a30b4b299537ead68eb86b805d873bb0117448c",
+          "bytes": 73187
+        },
+        {
+          "sha256": "3065d16ebb604c5b05a6e1a6dfcd4209016afbfcf1146585947d14b0fad01796",
+          "bytes": 73155
+        },
+        {
+          "sha256": "78ed13924ba2159760ac7ad96306674e35da77e73259f96eb7f6915c8c0b786f",
+          "bytes": 76028
+        },
+        {
+          "sha256": "aa34505dd025e255878761ab05f70295bdabae9a2ca2bce118819af5b318430f",
+          "bytes": 73948
+        },
+        {
+          "sha256": "3759c45c2c65dd867c7ee85c451cb40badfd7e2d33845414997e11ee4acd28d7",
+          "bytes": 76204
+        },
+        {
+          "sha256": "915547943d6831da27d4fbc5439f973251a89e0be6c56b1031283b1132ea12e5",
+          "bytes": 48580
+        },
+        {
+          "sha256": "5a1099214e22625e0c2780f1abebfd98de41b26acff5229d69268f29e63e2f99",
+          "bytes": 73843
+        },
+        {
+          "sha256": "a48e79f37a3e48f69df0583c3bc70296ceb0422d6472576df01d14c8ce898386",
+          "bytes": 76788
+        },
+        {
+          "sha256": "751db414fbe2a50f6e49658dc75badc08fe1baabae66572798ec65c3a8101026",
+          "bytes": 73865
+        },
+        {
+          "sha256": "52c707e476754da1aafbe302c6447df41eb6b52958896feed757967a10d44604",
+          "bytes": 74814
+        },
+        {
+          "sha256": "c5608924bb71419d633ed0c81b949425b66d30a7727d63557ad913c632d3a515",
+          "bytes": 73772
+        },
+        {
+          "sha256": "32d2a3efd3d0b0cc4a203306f33d301a6ef34cf58bec93b8a1720b10acce97e0",
+          "bytes": 76479
+        },
+        {
+          "sha256": "78d24417317f521c93ccacb896ceaf6d49e6dcef4f65d849a25868a58eccab19",
+          "bytes": 73686
+        },
+        {
+          "sha256": "71b1adbbdc9d12e0be267110997a1719f1309799aacf9fc1b2fdc7f8f89af2e7",
+          "bytes": 47631
+        },
+        {
+          "sha256": "627eef253633ee02387aae44831ea05d6b7a3f813a9b84e29bb02140638ec903",
+          "bytes": 74369
+        },
+        {
+          "sha256": "2ac795ae1170b684c2c1a4af7d6e924059643078aec720c97edd2106cbb042d7",
+          "bytes": 73394
+        },
+        {
+          "sha256": "00e4795e1686a63a4c9fc7bb571ba50fd66309559023f07941b7051bbf59c2f8",
+          "bytes": 76489
+        },
+        {
+          "sha256": "4af3aa979acca0dd7f45713421e46f552f099be36cc98ef5d3c67495ef01ce4d",
+          "bytes": 73390
+        },
+        {
+          "sha256": "7ca5b144b080ec4ec6e0496b9deca8b53794116959645b56c7a3161158028ade",
+          "bytes": 74496
+        },
+        {
+          "sha256": "30ca6d34bb794b043bef68822fe4d3b17bd77946f95f80ade9a0b2f2111ecac5",
+          "bytes": 72742
+        },
+        {
+          "sha256": "0c9a34d6668f34187189ec47adc2f59d833228f111f7e909c44ba526d10cc82d",
+          "bytes": 76394
+        },
+        {
+          "sha256": "fb98502f93aceb4e462d7859b0d86575ba22886c4d9bf048fa9cf4753d7d651d",
+          "bytes": 74322
+        },
+        {
+          "sha256": "7e4189ce79466e02ee5a51395a24aeaa28983eead6ad37b47a61ff25b5eca97c",
+          "bytes": 48112
+        },
+        {
+          "sha256": "f7afaa9a01b8fd389bcca1cb63497401c197adc75f353a8a5330e17578f807c6",
+          "bytes": 74707
+        },
+        {
+          "sha256": "7d4b40536b0c4f76a2e612a016ba2234d3a1c32a7770a9b2ff9d9992f399af6a",
+          "bytes": 74325
+        },
+        {
+          "sha256": "4c08569f75b0e557f6818515eeb297330171ba656d502c95c56b7dd1f2ba2173",
+          "bytes": 76657
+        },
+        {
+          "sha256": "a60fbdff312267d01e98999d83493950e048cc30207b846940bb45114c70d219",
+          "bytes": 73941
+        },
+        {
+          "sha256": "e9338c3e543e77237b1f993262e4236e280b132901a9a3de5cc8fea2a088ddab",
+          "bytes": 75250
+        },
+        {
+          "sha256": "647797153f9e70ce174ffa1fd7ae96f637e14513286673ccbad33c90da1f96c0",
+          "bytes": 74488
+        },
+        {
+          "sha256": "753d8efd1b2092800e7c471c158e54acbafe99884318e4a70ef4af3adcc899a6",
+          "bytes": 77169
+        },
+        {
+          "sha256": "7ab650a602d1a0c8f45db2ecd6fd01feabc8b89bc5f5100e57a32899a09f01d7",
+          "bytes": 49574
+        },
+        {
+          "sha256": "cc2029d91986dcf3833ef3a5716ac3f77f4e49dece81df5d1bbd7fa8298a01e5",
+          "bytes": 75445
+        },
+        {
+          "sha256": "47298db7b75ae1bfa889c790edc799cd1faee92d789a442145d982bbea3b57f1",
+          "bytes": 76244
+        },
+        {
+          "sha256": "dc585c0dcd65ded0a33afdfd7e7ed5e4a7696119c41eaf109290e841a1cdc264",
+          "bytes": 74961
+        },
+        {
+          "sha256": "9506d9bf1ac741db905f558532b09d3eeb7ce664f90cd30d637875ce2134652a",
+          "bytes": 77923
+        },
+        {
+          "sha256": "730ef7e9308f834888c6be1674da8eb973d3f762c8d71ef246dd1a90850261b3",
+          "bytes": 75871
+        },
+        {
+          "sha256": "f43f112d9cbaa46e18048995f58b14015361762d4501f682a8835ef8ac59094d",
+          "bytes": 76559
+        },
+        {
+          "sha256": "22059ba9151233c85ac2dddbdb5d2165836af87eb7525bce7ea9806732443091",
+          "bytes": 75678
+        },
+        {
+          "sha256": "13fc6fc95767268fd95824ddef419552fd0f5aca865bba522a128c432a6c84c5",
+          "bytes": 78339
+        },
+        {
+          "sha256": "c3ee8c68d1748634e6d990c674761bc767b650dcf74fba6e47d8bcc71cd7d131",
+          "bytes": 50141
+        },
+        {
+          "sha256": "170728a38e9fd2c7677f7b9d3e01bb6dbc83bd710721768295d1d079dfc56a1b",
+          "bytes": 75945
+        },
+        {
+          "sha256": "39bd7509c56289f9d1a6aac63dc168b4a3fe1db437c21a958b78b03a49f58877",
+          "bytes": 76865
+        },
+        {
+          "sha256": "8ef5da2313d3db31185253c4fe39b0af676775ce318c771da4e36ae20dcffcb7",
+          "bytes": 76446
+        },
+        {
+          "sha256": "37b8c66c61c8f1c8c70d9f8dc2096236ac5684607c0d4e6d005592ff49c638c3",
+          "bytes": 78704
+        },
+        {
+          "sha256": "31d57ec5e8c30d8c45f7e34cffee830a8d092034fae7b8213a02142f5c90daf4",
+          "bytes": 75741
+        },
+        {
+          "sha256": "930022eada48ba425f95cfde0f99875542f008a108d6cf6ca60cee423cd42316",
+          "bytes": 77247
+        },
+        {
+          "sha256": "637bb74f0f8a5f8652c63c7e75f8f8c26b83d754694d5d8b7074818c28cb17c7",
+          "bytes": 74915
+        },
+        {
+          "sha256": "fbe30369ed28c1b8bdab3fda829d24c58497153dec881db2ba8143aad03ac1cd",
+          "bytes": 48613
+        },
+        {
+          "sha256": "d0299f86e6b1ec56fc36fc904edd5bef2021b38fb9281c2ce626eec41027a907",
+          "bytes": 79055
+        },
+        {
+          "sha256": "39ac4a4237127184795efc07e45dffe38029db93770110189d56ad2d5434d73c",
+          "bytes": 75755
+        },
+        {
+          "sha256": "5c102d7832aa0f49eeabffacad2b08e1b3f0a9e7169de8fb3c36da72a255d865",
+          "bytes": 78008
+        },
+        {
+          "sha256": "afb68c781fe093c12aa166f4d866a94013d8d37d333f1895864124d203999959",
+          "bytes": 77583
+        },
+        {
+          "sha256": "ca565785a4a9119c05a11318d93d22b206dab4220b9987dc54a96a306e240563",
+          "bytes": 79415
+        },
+        {
+          "sha256": "6a9827ad628de3590075849401e46fc6ba918ba594a86992ba4ae6eec5ccca00",
+          "bytes": 74938
+        },
+        {
+          "sha256": "137dfe1070490b7668a92032cc8665f707858772a0da6a5e360fffbb0b9b667b",
+          "bytes": 77963
+        },
+        {
+          "sha256": "93e951dc00bddc9d82b6f512f8f12950d5053d24a4bbce11f03f6a9ff4ab72e4",
+          "bytes": 75903
+        },
+        {
+          "sha256": "2a933d1be017d733aab888608c558afdd161ec7046beef5b5a1baf9d9cca00a3",
+          "bytes": 49442
+        },
+        {
+          "sha256": "c45636c5c48412c24e771c675d343964668609bb34650a3ff78d136c73da7b91",
+          "bytes": 79475
+        },
+        {
+          "sha256": "691b14f832bc9a44c34a8c72c27bce47dc591f82fdd01d7267fcd07868f0a716",
+          "bytes": 76556
+        },
+        {
+          "sha256": "a0e417acfb59b2f0b83eea6be5defefa94d0baa7be8494a797ac4f75641bda71",
+          "bytes": 76845
+        },
+        {
+          "sha256": "e1ebe9031b27084e491e194e1fd88b34d1b4b4b17a19c47c0c5f13633237a1f4",
+          "bytes": 76812
+        },
+        {
+          "sha256": "72f430efbfb1cabb6fadb9a5c029a925fb8446735d2247495331f7bd0b76d95d",
+          "bytes": 79747
+        },
+        {
+          "sha256": "3a028383bf6862475794cb692605edf1578cdfe56f3700f64aa2e21e39b43bd2",
+          "bytes": 78668
+        },
+        {
+          "sha256": "5d328e684233ba082e277d02eb6fb4852651ee1042c3174bd897c5019226fb9c",
+          "bytes": 78403
+        },
+        {
+          "sha256": "3f38cc5c8d516369071aeb8ffa8d34c5cb60bbd944281ab62df35864dd01ad0e",
+          "bytes": 50640
+        },
+        {
+          "sha256": "daf5851b86aeff87705da648d88d6e73d473ed3fdabec9cf890accce117ce67f",
+          "bytes": 78590
+        },
+        {
+          "sha256": "e310b37066d0520a29e8da2a1cd73349f0020e9c7202183b9c8237ff64374682",
+          "bytes": 79982
+        },
+        {
+          "sha256": "aff8fe1661b48328af2cf325ad819d5e360fc46ecc1a936987c63a40c212b04e",
+          "bytes": 78853
+        },
+        {
+          "sha256": "9108af6b520691a7a886c98c48d7fabd3857efd8464d2773f37adced8222d44e",
+          "bytes": 78703
+        },
+        {
+          "sha256": "024ef4b6621bbaea2838030acab03c73b4f77d7416eb675695edb8981c4cfb6d",
+          "bytes": 79101
+        },
+        {
+          "sha256": "7e719f3bb52ad2b739c5e92742fcf625021a231aa2cb6f0bd4a795728bbe87f1",
+          "bytes": 80359
+        },
+        {
+          "sha256": "01d63a8ff32c6b474c03a22bb39bb31738009f44d881eeb5a14fddd6a6fd75f5",
+          "bytes": 78643
+        },
+        {
+          "sha256": "4028e3f61f0c866cd37af4dd774367e99e3a522b100d92e520236edf231e5342",
+          "bytes": 80687
+        },
+        {
+          "sha256": "0deb3b851fd1ff149c994caa42b11744925f450a1e5b909c0f2cfbdcf4051c4b",
+          "bytes": 51374
+        },
+        {
+          "sha256": "c31b858ac9330228b98ff56332000b6ff2db9675b66cab95a8a47c177adda8d0",
+          "bytes": 76196
+        },
+        {
+          "sha256": "6b0f5b9b134ef660bfc047625bb551a5fd50f5e8542bdc71cdfec5a915b8c12e",
+          "bytes": 79704
+        },
+        {
+          "sha256": "09d7b7589cf844b2a4f57fc81eb48e127813c0b01d215041b13d33a214a3c164",
+          "bytes": 76618
+        },
+        {
+          "sha256": "edbd1313aeb19ffe737a29f4d46d8e21a4fb4366c98f513e492575cb6c8cb656",
+          "bytes": 80787
+        },
+        {
+          "sha256": "100223ce880823174a9aaa0cebfadc419c7dc8e4db5ccbb2d3157ba18f77ca18",
+          "bytes": 76414
+        },
+        {
+          "sha256": "2fbcf240ddd2094a058c47f070991f71102f6a793becd5b5865e42406c8571a6",
+          "bytes": 79289
+        },
+        {
+          "sha256": "377fe9165f3c2deb3828bf23aaccbf923457ec656dbb6dd1f757eca193841d83",
+          "bytes": 75203
+        },
+        {
+          "sha256": "13f01b6ce0b7ad797c79760ff81ff4f7e260d758f2ad9420ed3b76aed804e02c",
+          "bytes": 49003
+        },
+        {
+          "sha256": "da9f992db5a31e6779d20b32f76e17177f4ece41596208c4021db869ca1a4683",
+          "bytes": 80835
+        },
+        {
+          "sha256": "0d29d058101977c1692c746eb0d59df2a2aa8c495d48af1e0dda0e1822c8ad4e",
+          "bytes": 74639
+        },
+        {
+          "sha256": "0a15b10b7cc20edf14f1068b4c59c93aece197ca29a167a0303a87d0078438a9",
+          "bytes": 78661
+        },
+        {
+          "sha256": "930f5d57227ca93e2f45ff3f728429f5980f395a2f4658380d22c60cc388cb79",
+          "bytes": 77977
+        },
+        {
+          "sha256": "adef3754fec99c2400979f5def93aff227ca8b96080c11b5a0102fcaedc7fcf6",
+          "bytes": 80195
+        },
+        {
+          "sha256": "9cc9c1d5fd76fba01dab495999f0a05bc348805903b208ffb3ef97864b284b89",
+          "bytes": 74683
+        },
+        {
+          "sha256": "9b347a9c35b8f1c71bc19b7f2c48472e9827c4ab9d40aca5521f49d20467df06",
+          "bytes": 79014
+        },
+        {
+          "sha256": "15cccc434c21a0cdf88d04377a2324fa193a2f9c42a45f27c7059b94c456bc73",
+          "bytes": 75931
+        },
+        {
+          "sha256": "e5e80cb5d0b281e4765241ad77fd0ed344d78eb237b36402669ad4ddd0859cbe",
+          "bytes": 49183
+        },
+        {
+          "sha256": "f550d6c9d1bec6f4adad878535fe10336dca131808405c1447bd428585dabfa3",
+          "bytes": 80361
+        },
+        {
+          "sha256": "8c64200c4024f214dd3a25d186450857c4e9a2dc8ec8f13a5c7829380c53705a",
+          "bytes": 74905
+        },
+        {
+          "sha256": "9a1de4f7c0a241efe78e653364e81d681528213caa8ffe138961b516424e22f2",
+          "bytes": 78287
+        },
+        {
+          "sha256": "d52ee8341b3ea0bed0816a64696aec0dac898aff64c9c24e87c8abfe5b093eb1",
+          "bytes": 77415
+        },
+        {
+          "sha256": "44570f2ef22a2488b3ce1aecab241c43f0c69fd02f2ff3fe9e54142c4e3abfb5",
+          "bytes": 50699
+        },
+        {
+          "sha256": "bf4eb328c3592574eceda453b4d92da320ca750e45e12c2b2d9b44cce618dbda",
+          "bytes": 50790
+        },
+        {
+          "sha256": "2653db5b8f9796839035573b1ca0b47d89a953e36b6216dabecd388688cc2cfc",
+          "bytes": 50866
+        },
+        {
+          "sha256": "dbc45c3f590f42605027e32618a4d12a5044caa2160f9679f8fceeb49ddcf9b9",
+          "bytes": 51232
+        },
+        {
+          "sha256": "a416635ea777bc531e20f33726a227acc68951ae69532c09dce8ad78d74afd54",
+          "bytes": 53362
+        },
+        {
+          "sha256": "1e73f274aa35de9220d23f95a4c007996d0a0f4e22b667af6add92381587faa2",
+          "bytes": 53977
+        },
+        {
+          "sha256": "0ecec2aeb08447c55158b239d3b30f8ee6efdb245f287afdd19dc4bb1d20e0c0",
+          "bytes": 54198
+        },
+        {
+          "sha256": "211fc4702b5f16d0c3b29606760e89eb64be75809797cb6ef8059529749b8789",
+          "bytes": 55577
+        },
+        {
+          "sha256": "4c1eba8fd572cb61cc52261f44dc72b4141fdb6d584ac629062b11cfe8670c29",
+          "bytes": 55011
+        },
+        {
+          "sha256": "ce780fceedf763a3dc038ee48fa0ced420eda4be10155ff1618695c55a160caf",
+          "bytes": 56634
+        },
+        {
+          "sha256": "ff1308ec6a5359bc67d1ef05fe764cfd8bccef971dc5e4306b317ccead601224",
+          "bytes": 57196
+        },
+        {
+          "sha256": "d137d85addf6679f63880f29e7841953ca24a8984a7e22aa34dea379e22a9c33",
+          "bytes": 57265
+        },
+        {
+          "sha256": "e315bdd1dce1e229da2609c48524d3286522c758adf8676383235922c8f48dca",
+          "bytes": 57008
+        },
+        {
+          "sha256": "47e4ebe868340f9bc0a6b22aefc3058e08b1fda8b89981cfceb89102ace6f131",
+          "bytes": 57171
+        },
+        {
+          "sha256": "6c3da152de3ea287bfde0c9a78ba8f0f68c87fc1bd81febcbe2647f6f6cfe0ac",
+          "bytes": 57365
+        },
+        {
+          "sha256": "c67aa509bcc140e4d1f1bc11ce8de3ae18ed50a9d511606f951b74a6ada83486",
+          "bytes": 57996
+        },
+        {
+          "sha256": "ebf29e0e772a029809c0ee2b85f4d665f59713820d78ac15396adb2f87935dd7",
+          "bytes": 57335
+        }
+      ],
+      "frame_sampling_in_provider_metadata": false,
+      "videos": [],
+      "requested_image_detail": "high"
+    },
+    "model_seconds": 59.907,
+    "events": [
+      {
+        "event_id": "7c7d2964cc89f925b751",
+        "source_packet_ids": [
+          "sequence_004"
+        ],
+        "source_action_keys": [
+          "sequence_004:0:a1"
+        ],
+        "source_video_sha256": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+        "kind": "DUEL",
+        "event_type": "DUEL",
+        "outcome": "UNKNOWN",
+        "start_ms": 25632,
+        "end_ms": 27766,
+        "contact_ms": null,
+        "contact_interval_ms": null,
+        "contact_basis": "UNRESOLVED",
+        "contact_evidence": [],
+        "outcome_ms": 27766,
+        "selected_player": false,
+        "actor": "p2",
+        "actor_scope": "sequence_004:0",
+        "actor_evidence_frames": [
+          "s000027016",
+          "s000027266",
+          "s000027632"
+        ],
+        "reference_ids": [],
+        "outcome_evidence": [
+          {
+            "frame": "s000027266",
+            "fact": "The white player and blue challenger contest the ball at their feet on the left."
+          },
+          {
+            "frame": "s000027632",
+            "fact": "The white player is down; the active ball has emerged to the right of the contest."
+          },
+          {
+            "frame": "s000027766",
+            "fact": "The ball continues across open grass toward number 15."
+          }
+        ],
+        "receiver": null,
+        "finisher": null,
+        "reason": "VISIBLE_ACTION",
+        "details": "The interval begins with a crowded left-side contest involving p2, p3 and nearby p4. P2 falls while the ball escapes centrally. The final releasing touch is obscured; this is not established as a deliberate pass.",
+        "receipts": [
+          {
+            "packet_id": "sequence_004",
+            "payload_sha256": "06abdea3d41fd63dad4212d5a27d92e94241ab26eae4533076213a195bf2aa50",
+            "response_sha256": "8bedff4094afcba1a3a6cfd26c7cdda080150a25b2c74eb108e766758438ad46",
+            "origin": "LIVE_MODEL_REQUEST"
+          }
+        ],
+        "review_phase": "INITIAL",
+        "proof_eligible": false,
+        "model_requested_clarification": true,
+        "answers_source_action_keys": []
+      },
+      {
+        "event_id": "f5fd73d91277a41bedba",
+        "source_packet_ids": [
+          "sequence_004"
+        ],
+        "source_action_keys": [
+          "sequence_004:0:a3"
+        ],
+        "source_video_sha256": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+        "kind": "DRIBBLE",
+        "event_type": "DRIBBLE",
+        "outcome": "COMPLETED",
+        "start_ms": 28516,
+        "end_ms": 30882,
+        "contact_ms": null,
+        "contact_interval_ms": null,
+        "contact_basis": "UNRESOLVED",
+        "contact_evidence": [],
+        "outcome_ms": 30882,
+        "selected_player": true,
+        "actor": "p1",
+        "actor_scope": "sequence_004:0",
+        "actor_evidence_frames": [
+          "s000028882",
+          "s000029265",
+          "s000029765",
+          "s000030332"
+        ],
+        "reference_ids": [
+          "r6",
+          "r7",
+          "r2"
+        ],
+        "outcome_evidence": [
+          {
+            "frame": "s000029382",
+            "fact": "P1 and the blue defender are shoulder-to-shoulder with the ball briefly hidden between their legs."
+          },
+          {
+            "frame": "s000029515",
+            "fact": "The ball emerges forward to the right, and p1 accelerates after it."
+          },
+          {
+            "frame": "s000030332",
+            "fact": "Number 15 leads the pursuit of the same rolling ball, with the blue players behind."
+          },
+          {
+            "frame": "s000030882",
+            "fact": "P1 reaches the ball in front of goal and prepares his strike."
+          }
+        ],
+        "receiver": null,
+        "finisher": null,
+        "reason": "VISIBLE_ACTION",
+        "details": "P1 carries rightward, takes on p5 and runs onto the ball beyond him. The brief leg-level occlusion does not establish an opponent's controlled possession or another player's pass. P3 and p5 pursue.",
+        "receipts": [
+          {
+            "packet_id": "sequence_004",
+            "payload_sha256": "06abdea3d41fd63dad4212d5a27d92e94241ab26eae4533076213a195bf2aa50",
+            "response_sha256": "8bedff4094afcba1a3a6cfd26c7cdda080150a25b2c74eb108e766758438ad46",
+            "origin": "LIVE_MODEL_REQUEST"
+          }
+        ],
+        "review_phase": "INITIAL",
+        "proof_eligible": true,
+        "model_requested_clarification": false,
+        "answers_source_action_keys": []
+      },
+      {
+        "event_id": "574b72a63b116a12b3f5",
+        "source_packet_ids": [
+          "sequence_004"
+        ],
+        "source_action_keys": [
+          "sequence_004:0:a4"
+        ],
+        "source_video_sha256": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+        "kind": "SHOT",
+        "event_type": "GOAL",
+        "outcome": "GOAL",
+        "start_ms": 30765,
+        "end_ms": 32082,
+        "contact_ms": 30915,
+        "contact_interval_ms": [
+          30915,
+          30915
+        ],
+        "contact_basis": "VISIBLE_FRAME",
+        "contact_evidence": [],
+        "outcome_ms": 31982,
+        "selected_player": true,
+        "actor": "p1",
+        "actor_scope": "sequence_004:0",
+        "actor_evidence_frames": [
+          "s000030799",
+          "s000030915",
+          "s000030949",
+          "s000031132"
+        ],
+        "reference_ids": [
+          "r6",
+          "r7",
+          "r2"
+        ],
+        "outcome_evidence": [
+          {
+            "frame": "s000030915",
+            "fact": "P1's extended striking boot meets the active ball; the blue defenders are behind him."
+          },
+          {
+            "frame": "s000030982",
+            "fact": "The ball has lifted away from p1's boot toward goal."
+          },
+          {
+            "frame": "s000031199",
+            "fact": "The airborne active ball approaches the near-post area; a separate ball remains stationary on the ground farther right inside the goal."
+          },
+          {
+            "frame": "s000031265",
+            "fact": "The active ball reaches the post-and-player overlap as the goalkeeper reaches across; subsequent contact is obscured."
+          },
+          {
+            "frame": "s000031982",
+            "fact": "A second, moving ball is visible on the ground inside the goal, to the left of the pre-existing stationary spare."
+          },
+          {
+            "frame": "s000032015",
+            "fact": "The arriving ball continues rightward along the goal floor beside the spare."
+          }
+        ],
+        "receiver": null,
+        "finisher": "p1",
+        "reason": "VISIBLE_SHOT_OUTCOME",
+        "details": "Number 15 is the shooter, not a different white receiver. His strike lifts the ball toward goal while p3 slides behind him and p5 follows. The ball is briefly hidden around the near post, goalkeeper and standing players. No intervening touch can be confirmed during that overlap, and the hidden trajectory is not reconstructed. Its subsequent appearance and motion inside the goal, separately from the stationary spare, establish the goal; the goalkeeper's reaching movement is not counted as a save.",
+        "receipts": [
+          {
+            "packet_id": "sequence_004",
+            "payload_sha256": "06abdea3d41fd63dad4212d5a27d92e94241ab26eae4533076213a195bf2aa50",
+            "response_sha256": "8bedff4094afcba1a3a6cfd26c7cdda080150a25b2c74eb108e766758438ad46",
+            "origin": "LIVE_MODEL_REQUEST"
+          }
+        ],
+        "review_phase": "INITIAL",
+        "proof_eligible": true,
+        "model_requested_clarification": false,
+        "answers_source_action_keys": []
+      },
+      {
+        "event_id": "06674aeec7210f203963",
+        "source_packet_ids": [
+          "sequence_004"
+        ],
+        "source_action_keys": [
+          "sequence_004:0:a5"
+        ],
+        "source_video_sha256": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+        "kind": "DUEL",
+        "event_type": "DUEL",
+        "outcome": "INCOMPLETE",
+        "start_ms": 30765,
+        "end_ms": 31382,
+        "contact_ms": null,
+        "contact_interval_ms": null,
+        "contact_basis": "UNRESOLVED",
+        "contact_evidence": [],
+        "outcome_ms": 31132,
+        "selected_player": false,
+        "actor": "p3",
+        "actor_scope": "sequence_004:0",
+        "actor_evidence_frames": [
+          "s000030765",
+          "s000031015",
+          "s000031132"
+        ],
+        "reference_ids": [],
+        "outcome_evidence": [
+          {
+            "frame": "s000031015",
+            "fact": "The ball is already airborne ahead of the shooter while the pursuing blue player goes to ground."
+          },
+          {
+            "frame": "s000031132",
+            "fact": "The blue player is stretched out on the grass behind the departing ball."
+          }
+        ],
+        "receiver": null,
+        "finisher": null,
+        "reason": "VISIBLE_ACTION",
+        "details": "A sliding challenge from behind does not visibly stop the shot. No ball contact by the sliding player is established.",
+        "receipts": [
+          {
+            "packet_id": "sequence_004",
+            "payload_sha256": "06abdea3d41fd63dad4212d5a27d92e94241ab26eae4533076213a195bf2aa50",
+            "response_sha256": "8bedff4094afcba1a3a6cfd26c7cdda080150a25b2c74eb108e766758438ad46",
+            "origin": "LIVE_MODEL_REQUEST"
+          }
+        ],
+        "review_phase": "INITIAL",
+        "proof_eligible": false,
+        "model_requested_clarification": false,
+        "answers_source_action_keys": []
+      },
+      {
+        "event_id": "f5bfe1b7adab52f20152",
+        "source_packet_ids": [
+          "sequence_004"
+        ],
+        "source_action_keys": [
+          "sequence_004:0:a6"
+        ],
+        "source_video_sha256": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+        "kind": "RUN",
+        "event_type": "RUN",
+        "outcome": "COMPLETED",
+        "start_ms": 32632,
+        "end_ms": 34015,
+        "contact_ms": null,
+        "contact_interval_ms": null,
+        "contact_basis": "UNRESOLVED",
+        "contact_evidence": [],
+        "outcome_ms": 34015,
+        "selected_player": true,
+        "actor": "p1",
+        "actor_scope": "sequence_004:0",
+        "actor_evidence_frames": [
+          "s000032882",
+          "s000033382",
+          "s000033782",
+          "s000034015"
+        ],
+        "reference_ids": [
+          "r6",
+          "r7",
+          "r2"
+        ],
+        "outcome_evidence": [
+          {
+            "frame": "s000033782",
+            "fact": "The selected player runs leftward away from goal while the goalkeeper and a blue player remain low near the goalmouth."
+          }
+        ],
+        "receiver": null,
+        "finisher": null,
+        "reason": "VISIBLE_ACTION",
+        "details": "P1 turns and runs away from goal without another ball touch. His movement connects the shooter to the r7 selection; this aftermath is not used as goal evidence.",
+        "receipts": [
+          {
+            "packet_id": "sequence_004",
+            "payload_sha256": "06abdea3d41fd63dad4212d5a27d92e94241ab26eae4533076213a195bf2aa50",
+            "response_sha256": "8bedff4094afcba1a3a6cfd26c7cdda080150a25b2c74eb108e766758438ad46",
+            "origin": "LIVE_MODEL_REQUEST"
+          }
+        ],
+        "review_phase": "INITIAL",
+        "proof_eligible": true,
+        "model_requested_clarification": false,
+        "answers_source_action_keys": []
+      }
+    ],
+    "counts": {
+      "DRIBBLE": 1,
+      "GOAL": 1,
+      "RUN": 1
+    },
+    "questions": [
+      {
+        "reason": "CONTACT",
+        "action_id": "a1",
+        "start_ms": 25632,
+        "end_ms": 34015,
+        "focus_ms": null,
+        "source_action_key": "sequence_004:0:a1",
+        "source_packet_id": "sequence_004",
+        "explicit_model_question": true,
+        "target_related": false
+      }
+    ],
+    "conflicts": [],
+    "resolved_observations": {
+      "events": [
+        {
+          "event_id": "7c7d2964cc89f925b751",
+          "source_packet_ids": [
+            "sequence_004"
+          ],
+          "source_action_keys": [
+            "sequence_004:0:a1"
+          ],
+          "source_video_sha256": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+          "kind": "DUEL",
+          "event_type": "DUEL",
+          "outcome": "UNKNOWN",
+          "start_ms": 25632,
+          "end_ms": 27766,
+          "contact_ms": null,
+          "contact_interval_ms": null,
+          "contact_basis": "UNRESOLVED",
+          "contact_evidence": [],
+          "outcome_ms": 27766,
+          "selected_player": false,
+          "actor": "p2",
+          "actor_scope": "sequence_004:0",
+          "actor_evidence_frames": [
+            "s000027016",
+            "s000027266",
+            "s000027632"
+          ],
+          "reference_ids": [],
+          "outcome_evidence": [
+            {
+              "frame": "s000027266",
+              "fact": "The white player and blue challenger contest the ball at their feet on the left."
+            },
+            {
+              "frame": "s000027632",
+              "fact": "The white player is down; the active ball has emerged to the right of the contest."
+            },
+            {
+              "frame": "s000027766",
+              "fact": "The ball continues across open grass toward number 15."
+            }
+          ],
+          "receiver": null,
+          "finisher": null,
+          "reason": "VISIBLE_ACTION",
+          "details": "The interval begins with a crowded left-side contest involving p2, p3 and nearby p4. P2 falls while the ball escapes centrally. The final releasing touch is obscured; this is not established as a deliberate pass.",
+          "receipts": [
+            {
+              "packet_id": "sequence_004",
+              "payload_sha256": "06abdea3d41fd63dad4212d5a27d92e94241ab26eae4533076213a195bf2aa50",
+              "response_sha256": "8bedff4094afcba1a3a6cfd26c7cdda080150a25b2c74eb108e766758438ad46",
+              "origin": "LIVE_MODEL_REQUEST"
+            }
+          ],
+          "review_phase": "INITIAL",
+          "proof_eligible": false,
+          "model_requested_clarification": true,
+          "answers_source_action_keys": []
+        },
+        {
+          "event_id": "f5fd73d91277a41bedba",
+          "source_packet_ids": [
+            "sequence_004"
+          ],
+          "source_action_keys": [
+            "sequence_004:0:a3"
+          ],
+          "source_video_sha256": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+          "kind": "DRIBBLE",
+          "event_type": "DRIBBLE",
+          "outcome": "COMPLETED",
+          "start_ms": 28516,
+          "end_ms": 30882,
+          "contact_ms": null,
+          "contact_interval_ms": null,
+          "contact_basis": "UNRESOLVED",
+          "contact_evidence": [],
+          "outcome_ms": 30882,
+          "selected_player": true,
+          "actor": "p1",
+          "actor_scope": "sequence_004:0",
+          "actor_evidence_frames": [
+            "s000028882",
+            "s000029265",
+            "s000029765",
+            "s000030332"
+          ],
+          "reference_ids": [
+            "r6",
+            "r7",
+            "r2"
+          ],
+          "outcome_evidence": [
+            {
+              "frame": "s000029382",
+              "fact": "P1 and the blue defender are shoulder-to-shoulder with the ball briefly hidden between their legs."
+            },
+            {
+              "frame": "s000029515",
+              "fact": "The ball emerges forward to the right, and p1 accelerates after it."
+            },
+            {
+              "frame": "s000030332",
+              "fact": "Number 15 leads the pursuit of the same rolling ball, with the blue players behind."
+            },
+            {
+              "frame": "s000030882",
+              "fact": "P1 reaches the ball in front of goal and prepares his strike."
+            }
+          ],
+          "receiver": null,
+          "finisher": null,
+          "reason": "VISIBLE_ACTION",
+          "details": "P1 carries rightward, takes on p5 and runs onto the ball beyond him. The brief leg-level occlusion does not establish an opponent's controlled possession or another player's pass. P3 and p5 pursue.",
+          "receipts": [
+            {
+              "packet_id": "sequence_004",
+              "payload_sha256": "06abdea3d41fd63dad4212d5a27d92e94241ab26eae4533076213a195bf2aa50",
+              "response_sha256": "8bedff4094afcba1a3a6cfd26c7cdda080150a25b2c74eb108e766758438ad46",
+              "origin": "LIVE_MODEL_REQUEST"
+            }
+          ],
+          "review_phase": "INITIAL",
+          "proof_eligible": true,
+          "model_requested_clarification": false,
+          "answers_source_action_keys": []
+        },
+        {
+          "event_id": "574b72a63b116a12b3f5",
+          "source_packet_ids": [
+            "sequence_004"
+          ],
+          "source_action_keys": [
+            "sequence_004:0:a4"
+          ],
+          "source_video_sha256": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+          "kind": "SHOT",
+          "event_type": "GOAL",
+          "outcome": "GOAL",
+          "start_ms": 30765,
+          "end_ms": 32082,
+          "contact_ms": 30915,
+          "contact_interval_ms": [
+            30915,
+            30915
+          ],
+          "contact_basis": "VISIBLE_FRAME",
+          "contact_evidence": [],
+          "outcome_ms": 31982,
+          "selected_player": true,
+          "actor": "p1",
+          "actor_scope": "sequence_004:0",
+          "actor_evidence_frames": [
+            "s000030799",
+            "s000030915",
+            "s000030949",
+            "s000031132"
+          ],
+          "reference_ids": [
+            "r6",
+            "r7",
+            "r2"
+          ],
+          "outcome_evidence": [
+            {
+              "frame": "s000030915",
+              "fact": "P1's extended striking boot meets the active ball; the blue defenders are behind him."
+            },
+            {
+              "frame": "s000030982",
+              "fact": "The ball has lifted away from p1's boot toward goal."
+            },
+            {
+              "frame": "s000031199",
+              "fact": "The airborne active ball approaches the near-post area; a separate ball remains stationary on the ground farther right inside the goal."
+            },
+            {
+              "frame": "s000031265",
+              "fact": "The active ball reaches the post-and-player overlap as the goalkeeper reaches across; subsequent contact is obscured."
+            },
+            {
+              "frame": "s000031982",
+              "fact": "A second, moving ball is visible on the ground inside the goal, to the left of the pre-existing stationary spare."
+            },
+            {
+              "frame": "s000032015",
+              "fact": "The arriving ball continues rightward along the goal floor beside the spare."
+            }
+          ],
+          "receiver": null,
+          "finisher": "p1",
+          "reason": "VISIBLE_SHOT_OUTCOME",
+          "details": "Number 15 is the shooter, not a different white receiver. His strike lifts the ball toward goal while p3 slides behind him and p5 follows. The ball is briefly hidden around the near post, goalkeeper and standing players. No intervening touch can be confirmed during that overlap, and the hidden trajectory is not reconstructed. Its subsequent appearance and motion inside the goal, separately from the stationary spare, establish the goal; the goalkeeper's reaching movement is not counted as a save.",
+          "receipts": [
+            {
+              "packet_id": "sequence_004",
+              "payload_sha256": "06abdea3d41fd63dad4212d5a27d92e94241ab26eae4533076213a195bf2aa50",
+              "response_sha256": "8bedff4094afcba1a3a6cfd26c7cdda080150a25b2c74eb108e766758438ad46",
+              "origin": "LIVE_MODEL_REQUEST"
+            }
+          ],
+          "review_phase": "INITIAL",
+          "proof_eligible": true,
+          "model_requested_clarification": false,
+          "answers_source_action_keys": []
+        },
+        {
+          "event_id": "06674aeec7210f203963",
+          "source_packet_ids": [
+            "sequence_004"
+          ],
+          "source_action_keys": [
+            "sequence_004:0:a5"
+          ],
+          "source_video_sha256": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+          "kind": "DUEL",
+          "event_type": "DUEL",
+          "outcome": "INCOMPLETE",
+          "start_ms": 30765,
+          "end_ms": 31382,
+          "contact_ms": null,
+          "contact_interval_ms": null,
+          "contact_basis": "UNRESOLVED",
+          "contact_evidence": [],
+          "outcome_ms": 31132,
+          "selected_player": false,
+          "actor": "p3",
+          "actor_scope": "sequence_004:0",
+          "actor_evidence_frames": [
+            "s000030765",
+            "s000031015",
+            "s000031132"
+          ],
+          "reference_ids": [],
+          "outcome_evidence": [
+            {
+              "frame": "s000031015",
+              "fact": "The ball is already airborne ahead of the shooter while the pursuing blue player goes to ground."
+            },
+            {
+              "frame": "s000031132",
+              "fact": "The blue player is stretched out on the grass behind the departing ball."
+            }
+          ],
+          "receiver": null,
+          "finisher": null,
+          "reason": "VISIBLE_ACTION",
+          "details": "A sliding challenge from behind does not visibly stop the shot. No ball contact by the sliding player is established.",
+          "receipts": [
+            {
+              "packet_id": "sequence_004",
+              "payload_sha256": "06abdea3d41fd63dad4212d5a27d92e94241ab26eae4533076213a195bf2aa50",
+              "response_sha256": "8bedff4094afcba1a3a6cfd26c7cdda080150a25b2c74eb108e766758438ad46",
+              "origin": "LIVE_MODEL_REQUEST"
+            }
+          ],
+          "review_phase": "INITIAL",
+          "proof_eligible": false,
+          "model_requested_clarification": false,
+          "answers_source_action_keys": []
+        },
+        {
+          "event_id": "f5bfe1b7adab52f20152",
+          "source_packet_ids": [
+            "sequence_004"
+          ],
+          "source_action_keys": [
+            "sequence_004:0:a6"
+          ],
+          "source_video_sha256": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+          "kind": "RUN",
+          "event_type": "RUN",
+          "outcome": "COMPLETED",
+          "start_ms": 32632,
+          "end_ms": 34015,
+          "contact_ms": null,
+          "contact_interval_ms": null,
+          "contact_basis": "UNRESOLVED",
+          "contact_evidence": [],
+          "outcome_ms": 34015,
+          "selected_player": true,
+          "actor": "p1",
+          "actor_scope": "sequence_004:0",
+          "actor_evidence_frames": [
+            "s000032882",
+            "s000033382",
+            "s000033782",
+            "s000034015"
+          ],
+          "reference_ids": [
+            "r6",
+            "r7",
+            "r2"
+          ],
+          "outcome_evidence": [
+            {
+              "frame": "s000033782",
+              "fact": "The selected player runs leftward away from goal while the goalkeeper and a blue player remain low near the goalmouth."
+            }
+          ],
+          "receiver": null,
+          "finisher": null,
+          "reason": "VISIBLE_ACTION",
+          "details": "P1 turns and runs away from goal without another ball touch. His movement connects the shooter to the r7 selection; this aftermath is not used as goal evidence.",
+          "receipts": [
+            {
+              "packet_id": "sequence_004",
+              "payload_sha256": "06abdea3d41fd63dad4212d5a27d92e94241ab26eae4533076213a195bf2aa50",
+              "response_sha256": "8bedff4094afcba1a3a6cfd26c7cdda080150a25b2c74eb108e766758438ad46",
+              "origin": "LIVE_MODEL_REQUEST"
+            }
+          ],
+          "review_phase": "INITIAL",
+          "proof_eligible": true,
+          "model_requested_clarification": false,
+          "answers_source_action_keys": []
+        }
+      ],
+      "questions": [
+        {
+          "reason": "CONTACT",
+          "action_id": "a1",
+          "start_ms": 25632,
+          "end_ms": 34015,
+          "focus_ms": null,
+          "source_action_key": "sequence_004:0:a1",
+          "source_packet_id": "sequence_004",
+          "explicit_model_question": true,
+          "target_related": false
+        }
+      ],
+      "invalid_rows": [
+        "ACTION_SOURCE_ORDER_INVALID"
+      ]
+    },
+    "probe_seconds": 66.729
+  },
+  "replay_context": {
+    "frames": [
+      {
+        "frame_id": "s000025632",
+        "media_ms": 25632
+      },
+      {
+        "frame_id": "s000025766",
+        "media_ms": 25766
+      },
+      {
+        "frame_id": "s000025882",
+        "media_ms": 25882
+      },
+      {
+        "frame_id": "s000026016",
+        "media_ms": 26016
+      },
+      {
+        "frame_id": "s000026132",
+        "media_ms": 26132
+      },
+      {
+        "frame_id": "s000026266",
+        "media_ms": 26266
+      },
+      {
+        "frame_id": "s000026382",
+        "media_ms": 26382
+      },
+      {
+        "frame_id": "s000026516",
+        "media_ms": 26516
+      },
+      {
+        "frame_id": "s000026632",
+        "media_ms": 26632
+      },
+      {
+        "frame_id": "s000026766",
+        "media_ms": 26766
+      },
+      {
+        "frame_id": "s000026882",
+        "media_ms": 26882
+      },
+      {
+        "frame_id": "s000027016",
+        "media_ms": 27016
+      },
+      {
+        "frame_id": "s000027132",
+        "media_ms": 27132
+      },
+      {
+        "frame_id": "s000027266",
+        "media_ms": 27266
+      },
+      {
+        "frame_id": "s000027382",
+        "media_ms": 27382
+      },
+      {
+        "frame_id": "s000027516",
+        "media_ms": 27516
+      },
+      {
+        "frame_id": "s000027632",
+        "media_ms": 27632
+      },
+      {
+        "frame_id": "s000027766",
+        "media_ms": 27766
+      },
+      {
+        "frame_id": "s000027882",
+        "media_ms": 27882
+      },
+      {
+        "frame_id": "s000028016",
+        "media_ms": 28016
+      },
+      {
+        "frame_id": "s000028132",
+        "media_ms": 28132
+      },
+      {
+        "frame_id": "s000028266",
+        "media_ms": 28266
+      },
+      {
+        "frame_id": "s000028382",
+        "media_ms": 28382
+      },
+      {
+        "frame_id": "s000028516",
+        "media_ms": 28516
+      },
+      {
+        "frame_id": "s000028632",
+        "media_ms": 28632
+      },
+      {
+        "frame_id": "s000028766",
+        "media_ms": 28766
+      },
+      {
+        "frame_id": "s000028882",
+        "media_ms": 28882
+      },
+      {
+        "frame_id": "s000029016",
+        "media_ms": 29016
+      },
+      {
+        "frame_id": "s000029132",
+        "media_ms": 29132
+      },
+      {
+        "frame_id": "s000029265",
+        "media_ms": 29265
+      },
+      {
+        "frame_id": "s000029382",
+        "media_ms": 29382
+      },
+      {
+        "frame_id": "s000029515",
+        "media_ms": 29515
+      },
+      {
+        "frame_id": "s000029632",
+        "media_ms": 29632
+      },
+      {
+        "frame_id": "s000029765",
+        "media_ms": 29765
+      },
+      {
+        "frame_id": "s000029882",
+        "media_ms": 29882
+      },
+      {
+        "frame_id": "s000030015",
+        "media_ms": 30015
+      },
+      {
+        "frame_id": "s000030132",
+        "media_ms": 30132
+      },
+      {
+        "frame_id": "s000030265",
+        "media_ms": 30265
+      },
+      {
+        "frame_id": "s000030282",
+        "media_ms": 30282
+      },
+      {
+        "frame_id": "s000030299",
+        "media_ms": 30299
+      },
+      {
+        "frame_id": "s000030315",
+        "media_ms": 30315
+      },
+      {
+        "frame_id": "s000030332",
+        "media_ms": 30332
+      },
+      {
+        "frame_id": "s000030349",
+        "media_ms": 30349
+      },
+      {
+        "frame_id": "s000030365",
+        "media_ms": 30365
+      },
+      {
+        "frame_id": "s000030382",
+        "media_ms": 30382
+      },
+      {
+        "frame_id": "s000030399",
+        "media_ms": 30399
+      },
+      {
+        "frame_id": "s000030415",
+        "media_ms": 30415
+      },
+      {
+        "frame_id": "s000030432",
+        "media_ms": 30432
+      },
+      {
+        "frame_id": "s000030449",
+        "media_ms": 30449
+      },
+      {
+        "frame_id": "s000030465",
+        "media_ms": 30465
+      },
+      {
+        "frame_id": "s000030482",
+        "media_ms": 30482
+      },
+      {
+        "frame_id": "s000030499",
+        "media_ms": 30499
+      },
+      {
+        "frame_id": "s000030515",
+        "media_ms": 30515
+      },
+      {
+        "frame_id": "s000030532",
+        "media_ms": 30532
+      },
+      {
+        "frame_id": "s000030549",
+        "media_ms": 30549
+      },
+      {
+        "frame_id": "s000030565",
+        "media_ms": 30565
+      },
+      {
+        "frame_id": "s000030582",
+        "media_ms": 30582
+      },
+      {
+        "frame_id": "s000030599",
+        "media_ms": 30599
+      },
+      {
+        "frame_id": "s000030615",
+        "media_ms": 30615
+      },
+      {
+        "frame_id": "s000030632",
+        "media_ms": 30632
+      },
+      {
+        "frame_id": "s000030649",
+        "media_ms": 30649
+      },
+      {
+        "frame_id": "s000030665",
+        "media_ms": 30665
+      },
+      {
+        "frame_id": "s000030682",
+        "media_ms": 30682
+      },
+      {
+        "frame_id": "s000030699",
+        "media_ms": 30699
+      },
+      {
+        "frame_id": "s000030715",
+        "media_ms": 30715
+      },
+      {
+        "frame_id": "s000030732",
+        "media_ms": 30732
+      },
+      {
+        "frame_id": "s000030749",
+        "media_ms": 30749
+      },
+      {
+        "frame_id": "s000030765",
+        "media_ms": 30765
+      },
+      {
+        "frame_id": "s000030782",
+        "media_ms": 30782
+      },
+      {
+        "frame_id": "s000030799",
+        "media_ms": 30799
+      },
+      {
+        "frame_id": "s000030815",
+        "media_ms": 30815
+      },
+      {
+        "frame_id": "s000030832",
+        "media_ms": 30832
+      },
+      {
+        "frame_id": "s000030849",
+        "media_ms": 30849
+      },
+      {
+        "frame_id": "s000030865",
+        "media_ms": 30865
+      },
+      {
+        "frame_id": "s000030882",
+        "media_ms": 30882
+      },
+      {
+        "frame_id": "s000030899",
+        "media_ms": 30899
+      },
+      {
+        "frame_id": "s000030915",
+        "media_ms": 30915
+      },
+      {
+        "frame_id": "s000030932",
+        "media_ms": 30932
+      },
+      {
+        "frame_id": "s000030949",
+        "media_ms": 30949
+      },
+      {
+        "frame_id": "s000030965",
+        "media_ms": 30965
+      },
+      {
+        "frame_id": "s000030982",
+        "media_ms": 30982
+      },
+      {
+        "frame_id": "s000030999",
+        "media_ms": 30999
+      },
+      {
+        "frame_id": "s000031015",
+        "media_ms": 31015
+      },
+      {
+        "frame_id": "s000031032",
+        "media_ms": 31032
+      },
+      {
+        "frame_id": "s000031049",
+        "media_ms": 31049
+      },
+      {
+        "frame_id": "s000031065",
+        "media_ms": 31065
+      },
+      {
+        "frame_id": "s000031082",
+        "media_ms": 31082
+      },
+      {
+        "frame_id": "s000031099",
+        "media_ms": 31099
+      },
+      {
+        "frame_id": "s000031115",
+        "media_ms": 31115
+      },
+      {
+        "frame_id": "s000031132",
+        "media_ms": 31132
+      },
+      {
+        "frame_id": "s000031149",
+        "media_ms": 31149
+      },
+      {
+        "frame_id": "s000031165",
+        "media_ms": 31165
+      },
+      {
+        "frame_id": "s000031182",
+        "media_ms": 31182
+      },
+      {
+        "frame_id": "s000031199",
+        "media_ms": 31199
+      },
+      {
+        "frame_id": "s000031215",
+        "media_ms": 31215
+      },
+      {
+        "frame_id": "s000031232",
+        "media_ms": 31232
+      },
+      {
+        "frame_id": "s000031249",
+        "media_ms": 31249
+      },
+      {
+        "frame_id": "s000031265",
+        "media_ms": 31265
+      },
+      {
+        "frame_id": "s000031282",
+        "media_ms": 31282
+      },
+      {
+        "frame_id": "s000031299",
+        "media_ms": 31299
+      },
+      {
+        "frame_id": "s000031315",
+        "media_ms": 31315
+      },
+      {
+        "frame_id": "s000031332",
+        "media_ms": 31332
+      },
+      {
+        "frame_id": "s000031349",
+        "media_ms": 31349
+      },
+      {
+        "frame_id": "s000031365",
+        "media_ms": 31365
+      },
+      {
+        "frame_id": "s000031382",
+        "media_ms": 31382
+      },
+      {
+        "frame_id": "s000031399",
+        "media_ms": 31399
+      },
+      {
+        "frame_id": "s000031415",
+        "media_ms": 31415
+      },
+      {
+        "frame_id": "s000031432",
+        "media_ms": 31432
+      },
+      {
+        "frame_id": "s000031449",
+        "media_ms": 31449
+      },
+      {
+        "frame_id": "s000031465",
+        "media_ms": 31465
+      },
+      {
+        "frame_id": "s000031482",
+        "media_ms": 31482
+      },
+      {
+        "frame_id": "s000031499",
+        "media_ms": 31499
+      },
+      {
+        "frame_id": "s000031515",
+        "media_ms": 31515
+      },
+      {
+        "frame_id": "s000031532",
+        "media_ms": 31532
+      },
+      {
+        "frame_id": "s000031549",
+        "media_ms": 31549
+      },
+      {
+        "frame_id": "s000031565",
+        "media_ms": 31565
+      },
+      {
+        "frame_id": "s000031582",
+        "media_ms": 31582
+      },
+      {
+        "frame_id": "s000031599",
+        "media_ms": 31599
+      },
+      {
+        "frame_id": "s000031615",
+        "media_ms": 31615
+      },
+      {
+        "frame_id": "s000031632",
+        "media_ms": 31632
+      },
+      {
+        "frame_id": "s000031649",
+        "media_ms": 31649
+      },
+      {
+        "frame_id": "s000031665",
+        "media_ms": 31665
+      },
+      {
+        "frame_id": "s000031682",
+        "media_ms": 31682
+      },
+      {
+        "frame_id": "s000031699",
+        "media_ms": 31699
+      },
+      {
+        "frame_id": "s000031715",
+        "media_ms": 31715
+      },
+      {
+        "frame_id": "s000031732",
+        "media_ms": 31732
+      },
+      {
+        "frame_id": "s000031749",
+        "media_ms": 31749
+      },
+      {
+        "frame_id": "s000031765",
+        "media_ms": 31765
+      },
+      {
+        "frame_id": "s000031782",
+        "media_ms": 31782
+      },
+      {
+        "frame_id": "s000031799",
+        "media_ms": 31799
+      },
+      {
+        "frame_id": "s000031815",
+        "media_ms": 31815
+      },
+      {
+        "frame_id": "s000031832",
+        "media_ms": 31832
+      },
+      {
+        "frame_id": "s000031849",
+        "media_ms": 31849
+      },
+      {
+        "frame_id": "s000031865",
+        "media_ms": 31865
+      },
+      {
+        "frame_id": "s000031882",
+        "media_ms": 31882
+      },
+      {
+        "frame_id": "s000031899",
+        "media_ms": 31899
+      },
+      {
+        "frame_id": "s000031915",
+        "media_ms": 31915
+      },
+      {
+        "frame_id": "s000031932",
+        "media_ms": 31932
+      },
+      {
+        "frame_id": "s000031949",
+        "media_ms": 31949
+      },
+      {
+        "frame_id": "s000031965",
+        "media_ms": 31965
+      },
+      {
+        "frame_id": "s000031982",
+        "media_ms": 31982
+      },
+      {
+        "frame_id": "s000031999",
+        "media_ms": 31999
+      },
+      {
+        "frame_id": "s000032015",
+        "media_ms": 32015
+      },
+      {
+        "frame_id": "s000032032",
+        "media_ms": 32032
+      },
+      {
+        "frame_id": "s000032049",
+        "media_ms": 32049
+      },
+      {
+        "frame_id": "s000032065",
+        "media_ms": 32065
+      },
+      {
+        "frame_id": "s000032082",
+        "media_ms": 32082
+      },
+      {
+        "frame_id": "s000032132",
+        "media_ms": 32132
+      },
+      {
+        "frame_id": "s000032265",
+        "media_ms": 32265
+      },
+      {
+        "frame_id": "s000032382",
+        "media_ms": 32382
+      },
+      {
+        "frame_id": "s000032515",
+        "media_ms": 32515
+      },
+      {
+        "frame_id": "s000032632",
+        "media_ms": 32632
+      },
+      {
+        "frame_id": "s000032765",
+        "media_ms": 32765
+      },
+      {
+        "frame_id": "s000032882",
+        "media_ms": 32882
+      },
+      {
+        "frame_id": "s000033015",
+        "media_ms": 33015
+      },
+      {
+        "frame_id": "s000033132",
+        "media_ms": 33132
+      },
+      {
+        "frame_id": "s000033265",
+        "media_ms": 33265
+      },
+      {
+        "frame_id": "s000033382",
+        "media_ms": 33382
+      },
+      {
+        "frame_id": "s000033515",
+        "media_ms": 33515
+      },
+      {
+        "frame_id": "s000033632",
+        "media_ms": 33632
+      },
+      {
+        "frame_id": "s000033765",
+        "media_ms": 33765
+      },
+      {
+        "frame_id": "s000033782",
+        "media_ms": 33782
+      },
+      {
+        "frame_id": "s000033882",
+        "media_ms": 33882
+      },
+      {
+        "frame_id": "s000034015",
+        "media_ms": 34015
+      }
+    ],
+    "references": [
+      {
+        "reference_id": "r1"
+      },
+      {
+        "reference_id": "r2"
+      },
+      {
+        "reference_id": "r3"
+      },
+      {
+        "reference_id": "r4"
+      },
+      {
+        "reference_id": "r5"
+      },
+      {
+        "reference_id": "r6"
+      },
+      {
+        "reference_id": "r7"
+      },
+      {
+        "reference_id": "r8"
+      },
+      {
+        "reference_id": "r9"
+      },
+      {
+        "reference_id": "r10"
+      }
+    ],
+    "source_video_sha256": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999"
+  }
+}
+

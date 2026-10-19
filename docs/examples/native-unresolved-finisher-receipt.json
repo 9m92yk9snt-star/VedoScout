@@ -1,0 +1,423 @@
+{
+  "origin_run": 39151281244,
+  "source_video_sha256": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+  "question": {
+    "packet_id": "sequence_007",
+    "start_ms": 47265,
+    "end_ms": 53014,
+    "focus_ms": 50565,
+    "reason": "FINAL_TOUCH_ACTOR_WITHOUT_LOCAL_IDENTITY_MARK",
+    "question": "Identify the physical player at the selected player's release and at the final touch. Determine whether they are the same person and whether another teammate touches the active ball before the outcome.",
+    "detail_start_ms": 49665,
+    "detail_end_ms": 51465,
+    "selection_policy": "ACTUAL_NATIVE_UNCERTAINTY_OR_TERMINAL_IDENTITY_OUTCOME_GAP"
+  },
+  "receipt": {
+    "packet_id": "sequence_007",
+    "provider": "emergent",
+    "requested_model": "gpt-6-astra",
+    "origin": "LIVE_MODEL_REQUEST",
+    "status": "COMPLETED",
+    "requested_reasoning_effort": "medium",
+    "payload_sha256": "e150b72e98cbe02a69afb400ca9afedd2eb6927849a9b8a2849c8e845180b753",
+    "payload_bytes": 12205322,
+    "explicit_image_count": 93,
+    "images": [
+      {
+        "sha256": "07ade3bd308f037c88df80c6263e6bb78dd40b79fd0b7e4e18e7d83d02f2c4a6",
+        "bytes": 11688
+      },
+      {
+        "sha256": "923cffbd1ee55df6ecf2f8b3fe3110c318a2606cc0500726d923a1832a891759",
+        "bytes": 8737
+      },
+      {
+        "sha256": "aaccfeb6493345ab3d27192569f96f2cc09782389e0d525a7afbbc7745d72454",
+        "bytes": 13380
+      },
+      {
+        "sha256": "fc35cb29797c49e7ad9ea349ad3f6ed90d48acc981a26b9f1a06e4d7706a5518",
+        "bytes": 50294
+      },
+      {
+        "sha256": "32a4ca199354481e32b8817c00ee0a2dd9f964e647336e6d448750dfd450e58c",
+        "bytes": 51941
+      },
+      {
+        "sha256": "367561c0e04f10e617c9bd2c3a302196a9a7ad7fb5549b16b4222b87e112ba37",
+        "bytes": 52468
+      },
+      {
+        "sha256": "5747a062128c90107efac258c8446dc50804086fe740b10101e30153dd478ce0",
+        "bytes": 51732
+      },
+      {
+        "sha256": "e756a7ff5ccb94119ccc0c02ee86ca0e7c27a15d06de9c91d65b507fba9fa80e",
+        "bytes": 53122
+      },
+      {
+        "sha256": "ed8b6c8417ed4e6eeb4769de7b5537cbbc1e9844d4080e1c8489848b29eda4ce",
+        "bytes": 51903
+      },
+      {
+        "sha256": "086a8fc05d8948fab265d823d83bc0ec7f6b29d8a834e1df008e7e8fb264283b",
+        "bytes": 51830
+      },
+      {
+        "sha256": "0adc5eb7fcb813e1be069fcc60951c2298642baa25942827204a2133b8dcf4de",
+        "bytes": 54477
+      },
+      {
+        "sha256": "119de259e425e20a4453482b2876009f77d123be03ece22f8aabce6cae5b89b3",
+        "bytes": 54745
+      },
+      {
+        "sha256": "1afb21d68355d6f2a66bca9047ee1bb19f0823702c1986a2afbe1cd7537cd065",
+        "bytes": 52116
+      },
+      {
+        "sha256": "35a46aa131912091db406cae2db3ad95bdd95acc4b883fa7ed51f6226e5c7c25",
+        "bytes": 51896
+      },
+      {
+        "sha256": "20b3a07993b9ac64b2357019a11ec04df6e77aa4d3fcc432dab8b3cb22718fc7",
+        "bytes": 52615
+      },
+      {
+        "sha256": "b264b4254e916e17c06d11354a72d9be3b3b1c1521bb01a5f25a1d36d4a1f5d9",
+        "bytes": 52288
+      },
+      {
+        "sha256": "a0093241919f107fd4fb0289f2a9cc3ba088df8ff41a93e1105175c70ec5c6a3",
+        "bytes": 50959
+      },
+      {
+        "sha256": "daef3675acdc4b987a7dc69dcf578b6296b8e2d1ddaf2a864ff211a57a9b4e24",
+        "bytes": 51034
+      },
+      {
+        "sha256": "3664617bee829b23b53b37acba0f1b0b6b3b014418a9adf804c221759b39321b",
+        "bytes": 53458
+      },
+      {
+        "sha256": "f7fb119f42116aa7194360d80786e7393ea51fbe8b459ca68c8b90a6da618336",
+        "bytes": 50892
+      },
+      {
+        "sha256": "dbee2f56bed833918a3aa0ec3112cb863caea0823d7ed18b53804ae42c9a8c96",
+        "bytes": 52525
+      },
+      {
+        "sha256": "02cbe8615de63e7b1ad5af1f38dabac07caab209ded3fafb6023af56ff779b9e",
+        "bytes": 52455
+      },
+      {
+        "sha256": "b8098a9f6609ed42becf193b2a6dd53625b4b4026a10999c5e7c94d93e1069be",
+        "bytes": 50430
+      },
+      {
+        "sha256": "4fca995c90ce633fe360eaa7c9a6321833094bbdf7d4f8fa585906ed11ad29b4",
+        "bytes": 143403
+      },
+      {
+        "sha256": "dc4ebe2265ac08b109ca5298c8b43a375ef6789173c218e25334e6e97688f010",
+        "bytes": 140962
+      },
+      {
+        "sha256": "236ae6463b12617f1e3d611679edd3610748e1cae202ed2f7a1d1364936d081c",
+        "bytes": 152518
+      },
+      {
+        "sha256": "533ca0c67bd664ae01604dc5398547e99e2f5f27d589cdb43f540db9c08dd3e7",
+        "bytes": 52182
+      },
+      {
+        "sha256": "7c3968571a2ad10e25e702cba3659dfdd83038528e91bc0fd7c41910d2bfa22a",
+        "bytes": 144251
+      },
+      {
+        "sha256": "9e5964f5bbf459d37a95ea06a872373989a922f0d7069cb9eec5b4f8db205e25",
+        "bytes": 140699
+      },
+      {
+        "sha256": "372c290ee002366c8f044feb396857385b04f12e93924bd80ef153b49559c801",
+        "bytes": 140812
+      },
+      {
+        "sha256": "fef8dfb7a6e70487afc3c034ddb2cea223c033f5677c4381e64a7907fdd281f4",
+        "bytes": 50407
+      },
+      {
+        "sha256": "555c790dc8c6a0ca6f5ba709a649388a240bec8d9fdb393071e3782716db767f",
+        "bytes": 143368
+      },
+      {
+        "sha256": "75b341660bd73e01314ed8cb66c56d64fac5b2ead6800ecd6383d7685f4bb670",
+        "bytes": 153821
+      },
+      {
+        "sha256": "26c0c49fe962f4fa4fa815fe1035bc02ab4f82d5548823c6920924907fb1893d",
+        "bytes": 141403
+      },
+      {
+        "sha256": "b4a39d9ef13b1af787d7510f0e5463823481c2db6583c9cbd18e8f48a61c9bde",
+        "bytes": 50209
+      },
+      {
+        "sha256": "d8281e9b17ae0ecec558944f9d2f017d82ce37a7c48c648bdb536399bcc78c63",
+        "bytes": 144726
+      },
+      {
+        "sha256": "6726abfd4ffd71ca987303e7d2930dea1e35f91ae4082652380b3aded4db171c",
+        "bytes": 144325
+      },
+      {
+        "sha256": "bba44c2b459d033f8107b127a3481abdd97d7e625cd9f270afc32f67e9ddefdd",
+        "bytes": 141160
+      },
+      {
+        "sha256": "19c5274407a2ded4492e187f2a77db68f344b56ef49d42a999156e2c02d89914",
+        "bytes": 49973
+      },
+      {
+        "sha256": "ba9b91134eee5897c2431c2aee4b5ef733884336d8e84f6ece8e5122d3bd4070",
+        "bytes": 142201
+      },
+      {
+        "sha256": "f3567b5541c93277ee032c87bbb1bd0f1ed2a16afae06c3c49b3df1d568e8e7c",
+        "bytes": 147043
+      },
+      {
+        "sha256": "f417aafcbc22a1858b2842d0d0b679f47af8a0b69494554084abc9d589d8b344",
+        "bytes": 144981
+      },
+      {
+        "sha256": "0574d21b00bc36c006cd09a699e2d3d12de61cb31fcc0bb30b560fbe760f6a31",
+        "bytes": 50357
+      },
+      {
+        "sha256": "b1d09421ba635843b393c1373d15a6482788541e3d31d57970abb82bf3e7c5a9",
+        "bytes": 143565
+      },
+      {
+        "sha256": "ed6a65e767f6a10a6a753405689c92b2cfbf5d6b1d75929556f65a51da99e70d",
+        "bytes": 154164
+      },
+      {
+        "sha256": "126717f87d0da4c53c25ed8ed63b83c9db5c1f19e0155c40ea0c349b8dff64c1",
+        "bytes": 154395
+      },
+      {
+        "sha256": "a34078b32db7172721004009266e75b882293943b966d41e27c3922ec29bf503",
+        "bytes": 51997
+      },
+      {
+        "sha256": "37e47069273a71b1eb9af77582768b6116aded9ff983442e89ece33dc2144918",
+        "bytes": 147187
+      },
+      {
+        "sha256": "50c7046a99187ed3485b89ddf55b13f68369f74ddb99e746ef575dc856f41657",
+        "bytes": 145156
+      },
+      {
+        "sha256": "08be58e7b715f00c7abf833196c1c2db6f7edacf0ab7bf61b1355d184d217f53",
+        "bytes": 142141
+      },
+      {
+        "sha256": "39f6278d26cde1bc8d0288eaf3fa4e9c1476279644d3e6c3a2fb8ec97460ea98",
+        "bytes": 49808
+      },
+      {
+        "sha256": "10a453bacf4f54ca7eea857cbbabe817fe64de0550583c11c78fa389c0ae1230",
+        "bytes": 143333
+      },
+      {
+        "sha256": "396313ddb046ba330681ee0cec527a166a09b2f7332767f8e748c770f4a3a175",
+        "bytes": 142715
+      },
+      {
+        "sha256": "3ada1e346503b6f184abace2a9fe8ff34d0439443d6146acbc50fcd8f0621205",
+        "bytes": 146606
+      },
+      {
+        "sha256": "fe9cde34d4fe8ab8d41b8e85d59a81f2c66c2f2e6418a0be48bc44271f0b7e3d",
+        "bytes": 50217
+      },
+      {
+        "sha256": "0d55e7aca7b62495e74c5f078d742593ff8cd37c6435e298438b48a20c91ea2a",
+        "bytes": 148745
+      },
+      {
+        "sha256": "7be46994e2deb1808c40f6e6378bde9773959dd076e632b6e27232fea522d6fd",
+        "bytes": 145326
+      },
+      {
+        "sha256": "1eba00b4bd68ccde9093f0e946e264aab8b3f30fa5b3c34410266f08dca6cf76",
+        "bytes": 157124
+      },
+      {
+        "sha256": "3aaedb23e03b0b2aac71cea67cfc57d8764538bbddb44f350c27e1bef3b6f60d",
+        "bytes": 51914
+      },
+      {
+        "sha256": "1178424a69dba2271e236cf28316f4020d8cbbcaf85228415ce3cdfbf5991bf6",
+        "bytes": 157795
+      },
+      {
+        "sha256": "f8c2b7cf529d0620ed7fc72866054eb51cdacd96898a374d91ac06f5058a4260",
+        "bytes": 159215
+      },
+      {
+        "sha256": "e5b6bae105268d1626032dd0a0966d02b1832cf164103851a200d81770e2c70e",
+        "bytes": 148257
+      },
+      {
+        "sha256": "072ae97de7767d49212eafde9bbecd04efb797e3105712b72cb5987235510642",
+        "bytes": 50159
+      },
+      {
+        "sha256": "b25cdee7bf25e905b8c21234e7d8580caa031008bba5e7335fc7653c6e2a07c4",
+        "bytes": 153060
+      },
+      {
+        "sha256": "a480f5e66a1bd8a338a3b2c74b5e5f63801fecc37161ea02896148bff2d4b4a1",
+        "bytes": 154345
+      },
+      {
+        "sha256": "1dd74fe6bf18e8912dee012d2296dd7d9d50cc94c3b3af17d397fc5454ef493f",
+        "bytes": 163784
+      },
+      {
+        "sha256": "b54b90cdcf0dad7682745b8413a7f06722471ccbc9e93fe0eb765aa6cce61a43",
+        "bytes": 52950
+      },
+      {
+        "sha256": "a94dfc35c9cea1ae9417ac7cd0e3efc88292de9fce1e590498c4ef7d14f2754d",
+        "bytes": 164279
+      },
+      {
+        "sha256": "21a3d4a9bd7bb26439441617ed6667e5b1c80793a709e6401f9b9eb3a640b226",
+        "bytes": 160241
+      },
+      {
+        "sha256": "477dd56aa4e6f30fc71bb5465a2c3d6bf34e0a99db6dc2e84416cc5e7ae760f0",
+        "bytes": 165915
+      },
+      {
+        "sha256": "05d562f6677f6cb6bb76cbdacd09c53e0d28aced8e53b1f4478ec4ea757a4ee6",
+        "bytes": 53725
+      },
+      {
+        "sha256": "2b48860149d6b3e5e35d41700fb394f9481c2060e74844240493e7d25b6a226e",
+        "bytes": 163440
+      },
+      {
+        "sha256": "41c12c4dcacc53c118917e40d2dd3f141fff15557588bc2e2ca80b171e5334c1",
+        "bytes": 162561
+      },
+      {
+        "sha256": "c9bf4f111f4902c23dcbfbb514ae7461a5542906a28c3169367a9682e93667dc",
+        "bytes": 165929
+      },
+      {
+        "sha256": "41c2c33763ac947f8515400608c90d76fd88fb9351026bf5bee07303162d5e86",
+        "bytes": 53452
+      },
+      {
+        "sha256": "a5708b85fe7fe06cf9dd084c1849af39d9f6e2e4772953bd8d3ed5661b86bb2e",
+        "bytes": 165182
+      },
+      {
+        "sha256": "8925324c4bd4945128ebb5919ff78e77e680fa45e2f054f98489c1ac8c4bde21",
+        "bytes": 161637
+      },
+      {
+        "sha256": "818470d5cbeabd4c87b2e7aea32cf10375d169f2513d63096a2d261d2d7e510e",
+        "bytes": 168697
+      },
+      {
+        "sha256": "f084082ed41213a0bfb1773716fe37b13f523f99b1ac851cf9c39f2bc9199ba6",
+        "bytes": 53884
+      },
+      {
+        "sha256": "e2cb9f67df3b30fdb5accd51128264605bc84990340b83438f5bd0183a4a1c74",
+        "bytes": 169085
+      },
+      {
+        "sha256": "b3d37cb35cbd9e31d89cb85b15773af11c8d3dbcbb06d7ffdaae0d7028e16d0d",
+        "bytes": 166684
+      },
+      {
+        "sha256": "8448085bf4e0ed7a3a77288ceadd0fd6737f6151eb3aa430715c6e62f783e547",
+        "bytes": 53904
+      },
+      {
+        "sha256": "7727ae80c4aaf035e2b508322dccdddc09f458408078879606ed8712f78c8516",
+        "bytes": 55040
+      },
+      {
+        "sha256": "baf7ee3306825694c7e915dd073e9e06f81b9f59f0eb7fe4030e6ab85847d5ac",
+        "bytes": 55569
+      },
+      {
+        "sha256": "c8d816c437d41a6f01072970a710ca757dcdaa92c6e97b0cdc19aa200dcfe9d3",
+        "bytes": 54321
+      },
+      {
+        "sha256": "e0f4e1927bd0de1534bb1e3ad62d5976668eee0b1670ba48db97b023908af76e",
+        "bytes": 54215
+      },
+      {
+        "sha256": "3620ae2bf7fc59eab1f54a87f6183b900bb4c5724788d8ed1558519c4813e0e8",
+        "bytes": 54499
+      },
+      {
+        "sha256": "840d3f022f4ddaab481ce6e00421322f3a8fb53acb5d3fb5da70c2abdf8cbbe9",
+        "bytes": 54539
+      },
+      {
+        "sha256": "401881f5b89bbad8c1e23f61a3366e9f45a1f04173959c206362558baa75aee6",
+        "bytes": 55120
+      },
+      {
+        "sha256": "25472051600fc0af0c93e1ab7e3cc35e07500284edbba5b749d009e9f87cab95",
+        "bytes": 54854
+      },
+      {
+        "sha256": "0c2e5754b3a0bc93e48337268ce46cd2238fbe447f26bdb9cc15d838bd149997",
+        "bytes": 54373
+      },
+      {
+        "sha256": "5bc7c1cfde74dbc83ab2aa0701637a4754e5be86e8223edef8d09730e0741cc5",
+        "bytes": 54750
+      },
+      {
+        "sha256": "061b9eb6b0acb3baa8572824d69f4e851c03c58e01ca6c62f8f9d752ff05e443",
+        "bytes": 53973
+      }
+    ],
+    "frame_sampling_in_provider_metadata": false,
+    "videos": [],
+    "requested_image_detail": "high",
+    "model_version": "gpt-6-astra",
+    "response_id": "chatcmpl-EaPJhEMuJIZZ1c6BullvzEdJRgVs2",
+    "usage": {
+      "completion_tokens": 3397,
+      "prompt_tokens": 93064,
+      "total_tokens": 96461,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": 0,
+        "audio_tokens": 0,
+        "reasoning_tokens": 1981,
+        "rejected_prediction_tokens": 0
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": 0,
+        "cached_tokens": 0
+      }
+    },
+    "raw_response": "{\n  \"selected_player_actions\": [\n    {\n      \"actor_description\": \"Light-haired player in white, No. 15 in the identity reference; the central white player receiving the loose ball, not the white No. 7 initially carrying it.\",\n      \"action\": \"Collects the loose ball and takes short touches as blue defenders close around him.\",\n      \"before_frame\": \"s000049131\",\n      \"after_frame\": \"s000049515\",\n      \"recipient_description\": null,\n      \"finisher_description\": null,\n      \"outcome\": \"Ball brought into the crowded central area.\",\n      \"evidence\": [\n        {\n          \"frame\": \"s000049131\",\n          \"fact\": \"The ball rolls toward the central light-haired white player, while white No. 7 moves away on the left.\"\n        },\n        {\n          \"frame\": \"s000049265\",\n          \"fact\": \"The central white player meets the ball with his foot.\"\n        },\n        {\n          \"frame\": \"s000049515\",\n          \"fact\": \"He follows the ball between converging blue defenders.\"\n        }\n      ],\n      \"uncertainty\": \"\"\n    },\n    {\n      \"actor_description\": \"The same light-haired white No. 15.\",\n      \"action\": \"Reaches for and releases the ball from the congested challenge; it subsequently emerges toward the right.\",\n      \"before_frame\": \"s000049765\",\n      \"after_frame\": \"s000050215\",\n      \"recipient_description\": \"A separate white teammate with short dark hair and darker visible skin, positioned beyond the defenders toward the right.\",\n      \"finisher_description\": \"The separate dark-haired white teammate appears to make the finishing contact.\",\n      \"outcome\": \"The ball continues into a shooting opportunity and ultimately enters the goal.\",\n      \"evidence\": [\n        {\n          \"frame\": \"s000049798\",\n          \"fact\": \"The selected player is low behind the blue defenders, reaching into the ball area.\"\n        },\n        {\n          \"frame\": \"s000049915\",\n          \"fact\": \"The ball is visible among the reaching feet; several legs overlap the contact area.\"\n        },\n        {\n          \"frame\": \"s000050215\",\n          \"fact\": \"The selected player remains behind the defensive cluster, while a separate white teammate is positioned farther right.\"\n        }\n      ],\n      \"uncertainty\": \"The crowded feet prevent a clean distinction between an intentional pass and a poke followed by a defensive ricochet. The final shooter appears to be the separate teammate, not No. 15, but the obscured finishing contact prevents an entirely secure same-person/different-person determination.\"\n    }\n  ],\n  \"ball_contact_chain\": [\n    {\n      \"person\": \"White No. 7, the initial carrier.\",\n      \"before_frame\": \"s000047265\",\n      \"after_frame\": \"s000048631\",\n      \"type\": \"control\",\n      \"evidence\": \"Keeps the ball close while turning and shielding against the blue player in orange boots.\",\n      \"uncertainty\": \"\"\n    },\n    {\n      \"person\": \"Blue player in orange boots, with a two-digit back number appearing to be 20.\",\n      \"before_frame\": \"s000048631\",\n      \"after_frame\": \"s000049131\",\n      \"type\": \"other\",\n      \"evidence\": \"Challenges the carrier and sends the ball rightward out of their immediate contest toward the central white player.\",\n      \"uncertainty\": \"A tackling touch is supported; deliberate controlled possession or an intended pass is not established.\"\n    },\n    {\n      \"person\": \"Selected light-haired white No. 15.\",\n      \"before_frame\": \"s000049131\",\n      \"after_frame\": \"s000049515\",\n      \"type\": \"control\",\n      \"evidence\": \"Meets the approaching ball and follows it with close touches into the defenders.\",\n      \"uncertainty\": \"\"\n    },\n    {\n      \"person\": \"Selected white No. 15, with blue defenders also contesting the contact area.\",\n      \"before_frame\": \"s000049765\",\n      \"after_frame\": \"s000050215\",\n      \"type\": \"other\",\n      \"evidence\": \"The ball changes from moving into the crowded feet to emerging rightward as No. 15 reaches through the challenge.\",\n      \"uncertainty\": \"An additional blue deflection is possible. The overlapping boots do not securely identify a separate defensive contact, and do not establish blue controlled possession.\"\n    },\n    {\n      \"person\": \"Apparently the separate dark-haired white teammate beyond the cluster.\",\n      \"before_frame\": \"s000050415\",\n      \"after_frame\": \"s000050665\",\n      \"type\": \"shot\",\n      \"evidence\": \"The teammate steps into the ball area behind blue No. 20; the ball then emerges airborne and travels rapidly rightward toward goal. No. 15 follows from the left-rear.\",\n      \"uncertainty\": \"The kicking foot is hidden by blue No. 20. This sequence favors the separate teammate as finisher, but a final poke by No. 15 or a defensive deflection cannot be conclusively excluded.\"\n    }\n  ],\n  \"outcome\": {\n    \"kind\": \"GOAL\",\n    \"last_touch_player\": \"Unknown with certainty; the separate dark-haired white teammate is the apparent finisher.\",\n    \"evidence\": [\n      {\n        \"frame\": \"s000050715\",\n        \"fact\": \"The active ball is airborne between the shooting cluster and blue No. 7.\"\n      },\n      {\n        \"frame\": \"s000050915\",\n        \"fact\": \"It has continued past blue No. 7 toward the red-clad goalkeeper; no definite contact by No. 7 is visible.\"\n      },\n      {\n        \"frame\": \"s000051048\",\n        \"fact\": \"The active ball is beyond the goalkeeper and still moving toward the near upright.\"\n      },\n      {\n        \"frame\": \"s000051131\",\n        \"fact\": \"The moving ball passes inside the upright into the goal.\"\n      },\n      {\n        \"frame\": \"s000051215\",\n        \"fact\": \"The same ball continues deeper into the net area; this is a moving continuation, not identification of a stationary spare as the scored ball.\"\n      }\n    ],\n    \"uncertainty\": \"The goal is supported by the active ball's motion, not the goalkeeper's dive. A slight goalkeeper touch is unresolved. Another white teammate appears to supply the finishing touch after No. 15's release, but the occluded striking area leaves that connection less certain than the goal itself.\"\n  }\n}",
+    "response_sha256": "f58ff53a77372926c21a6e0d7bee1e2f4f8bb87faf0e4398e42a07b3046038c9",
+    "elapsed_seconds": 67.319
+  }
+}

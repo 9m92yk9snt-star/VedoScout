@@ -1,0 +1,25 @@
+{
+  "origin_run": 39188297174,
+  "source_video_sha256": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+  "source_discovery_replayed": true,
+  "full_report_status": "failed",
+  "ready": false,
+  "receipt": {
+    "packet_id": "report_facts_1",
+    "provider": "emergent",
+    "requested_model": "gemini-2.5-pro",
+    "origin": "LIVE_MODEL_REQUEST",
+    "status": "ERROR",
+    "requested_reasoning_effort": null,
+    "payload_sha256": "a5dce611ef8241fb3c507ed962f5d78af9c296ddfa7a16804c3fc2f41cc18370",
+    "payload_bytes": 33874,
+    "explicit_image_count": 0,
+    "images": [],
+    "frame_sampling_in_provider_metadata": false,
+    "videos": [],
+    "requested_image_detail": null,
+    "http_status": 429,
+    "error": "MODEL_QUOTA_OR_RATE_LIMIT",
+    "elapsed_seconds": 62.343
+  }
+}

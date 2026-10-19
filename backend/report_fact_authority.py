@@ -130,11 +130,16 @@ def _supports(text, events):
         return False
     if _SAVE.search(text) and not any(e.get("canonical_outcome") == "SAVED" for e in events):
         return False
-    if _GOAL.search(text):
+    # A verified save can end outside the goal. That location is not a
+    # scoring claim; other goal/scoring clauses in the sentence still are.
+    goal_text = text
+    if any(e.get("canonical_outcome") == "SAVED" for e in events):
+        goal_text = re.sub(r"\boutside\s+(?:the\s+)?(?:goal|net)\b", "outside", text, flags=re.I)
+    if _GOAL.search(goal_text):
         # Finishing assessments can use verified shots; an actual goal claim
         # requires the verified scoring outcome, never a model story.
         kinds = {e.get("canonical_event_type") for e in events}
-        if re.search(r"\b(?:finishing|finisher|clinical)\b", text, re.I) and not re.search(r"\b(?:goals?|scor\w*|net)\b", text, re.I):
+        if re.search(r"\b(?:finishing|finisher|clinical)\b", goal_text, re.I) and not re.search(r"\b(?:goals?|scor\w*|net)\b", goal_text, re.I):
             return bool(kinds & {"SHOT", "GOAL"})
         return any(e.get("canonical_event_type") == "GOAL" and e.get("causal_verified") is True for e in events)
     return True

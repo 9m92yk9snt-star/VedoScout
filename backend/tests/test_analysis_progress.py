@@ -71,9 +71,13 @@ def status_app(doc):
     node.decorator_list = []
     reads = []
 
-    async def find_one(query):
+    async def find_one(query, projection):
+        assert projection == {"sequence_audit": 0}
         reads.append(query)
-        return copy.deepcopy(doc)
+        result = copy.deepcopy(doc)
+        if result:
+            result.pop("sequence_audit", None)
+        return result
 
     async def current_user(authorization: str = Header(None)):
         if not authorization:

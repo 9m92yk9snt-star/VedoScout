@@ -1,0 +1,429 @@
+{
+  "workflow_source_preparation_seconds": 19.279,
+  "result": {
+    "status": "SOURCE_GAP_IMAGE_PROBE",
+    "source_video_sha256": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+    "production_pipeline_changed": false,
+    "expected_answers_used_as_input": false,
+    "target_events": [],
+    "independent_visual_correctness_verified": false,
+    "questions": [
+      {
+        "packet_id": "sequence_003",
+        "start_ms": 19266,
+        "end_ms": 25631,
+        "focus_ms": 24466,
+        "reason": "ACTIVE_BALL_OUTCOME_AFTER_ATTEMPT",
+        "question": "Follow the same active ball after the attempt. Establish any goalkeeper touch or change of motion, and distinguish spare balls from the active ball.",
+        "detail_start_ms": 23566,
+        "detail_end_ms": 25366,
+        "selection_policy": "ACTUAL_NATIVE_UNCERTAINTY_OR_TERMINAL_IDENTITY_OUTCOME_GAP"
+      },
+      {
+        "packet_id": "sequence_006",
+        "start_ms": 38632,
+        "end_ms": 47264,
+        "focus_ms": 44032,
+        "reason": "INTERVENING_CONTACT_OR_CONTROL",
+        "question": "Inspect the selected player's release, any opponent touch versus controlled possession, and the recipient's next contact.",
+        "detail_start_ms": 43132,
+        "detail_end_ms": 44932,
+        "selection_policy": "ACTUAL_NATIVE_UNCERTAINTY_OR_TERMINAL_IDENTITY_OUTCOME_GAP"
+      },
+      {
+        "packet_id": "sequence_007",
+        "start_ms": 47265,
+        "end_ms": 53014,
+        "focus_ms": 50565,
+        "reason": "FINAL_TOUCH_ACTOR_WITHOUT_LOCAL_IDENTITY_MARK",
+        "question": "Identify the physical player at the selected player's release and at the final touch. Determine whether they are the same person and whether another teammate touches the active ball before the outcome.",
+        "detail_start_ms": 49665,
+        "detail_end_ms": 51465,
+        "selection_policy": "ACTUAL_NATIVE_UNCERTAINTY_OR_TERMINAL_IDENTITY_OUTCOME_GAP"
+      }
+    ],
+    "observations": {
+      "sequence_003": {
+        "selected_player_actions": [
+          {
+            "actor_description": "Short-haired player in white shirt, white shorts and white socks, dark boots, with back number appearing to be 15; the player indicated by the original r5 cyan cross.",
+            "action": "Collects the moving ball and advances rightward with close touches while blue-shirted defenders converge, then continues pursuing the same active ball through the challenge.",
+            "before_frame": "s000019633",
+            "after_frame": "s000023666",
+            "recipient_description": null,
+            "finisher_description": null,
+            "outcome": "The same selected player reaches the ball before the subsequent shooting action. No deliberate pass to a teammate is established.",
+            "evidence": [
+              {
+                "frame": "s000019766",
+                "fact": "The moving ball approaches the central white-shirted player's feet."
+              },
+              {
+                "frame": "s000020383",
+                "fact": "The white-shirted player advances with the ball immediately ahead of his feet as a blue defender faces him."
+              },
+              {
+                "frame": "s000021482",
+                "fact": "The original selection identifies the crouched white-shirted player between the converging blue defenders, not the other white-shirted player farther behind/right."
+              },
+              {
+                "frame": "s000022016",
+                "fact": "The selected player remains to the left of the tall blue defender, pursuing the active ball through the congested group."
+              },
+              {
+                "frame": "s000023666",
+                "fact": "Native detail shows the selected player immediately behind the active ball, left of the tall blue defender; another white teammate is separately visible behind that defender."
+              }
+            ],
+            "uncertainty": "Several intermediate foot contacts are obscured by defenders. A defensive nick during the challenge is possible, but neither deliberate blue possession nor a white-to-white pass is established."
+          },
+          {
+            "actor_description": "The same selected short-haired white-kit player, with back number appearing to be 15 and dark boots.",
+            "action": "Strikes a right-footed shot toward the goal on the right.",
+            "before_frame": "s000023666",
+            "after_frame": "s000023782",
+            "recipient_description": null,
+            "finisher_description": "The selected white-kit player himself.",
+            "outcome": "The active ball lifts away toward goal and is subsequently parried by the red-clad goalkeeper.",
+            "evidence": [
+              {
+                "frame": "s000023666",
+                "fact": "The ball is low beside the selected player's feet as he prepares his kicking motion."
+              },
+              {
+                "frame": "s000023699",
+                "fact": "The selected player plants and swings through the ball while the nearby blue defender continues running."
+              },
+              {
+                "frame": "s000023749",
+                "fact": "The selected player's kicking leg is extended in follow-through and the ball has emerged airborne to the right."
+              },
+              {
+                "frame": "s000023782",
+                "fact": "The ball is farther right and rising, separated from the players."
+              }
+            ],
+            "uncertainty": "The exact foot/ball instant is partly obscured, but the short preparation-to-follow-through sequence establishes the selected player as the shooter. No additional defender contact is established."
+          }
+        ],
+        "ball_contact_chain": [
+          {
+            "person": "Selected short-haired white-kit player, number appearing to be 15.",
+            "before_frame": "s000019766",
+            "after_frame": "s000021382",
+            "type": "control",
+            "evidence": "The approaching ground ball becomes a close moving ball at this player's feet, and he advances it rightward with successive short touches.",
+            "uncertainty": "Individual touches cannot all be isolated at overview resolution."
+          },
+          {
+            "person": "Selected short-haired white-kit player, number appearing to be 15.",
+            "before_frame": "s000023666",
+            "after_frame": "s000023782",
+            "type": "shot",
+            "evidence": "The ball changes from low movement beside his feet to an airborne forward trajectory during his right-foot swing and follow-through.",
+            "uncertainty": "Intervening contacts during the earlier crowded challenge are not fully resolved; no intervening pass or controlled possession by another player is demonstrated."
+          },
+          {
+            "person": "Goalkeeper wearing red, gloves and light-colored boots.",
+            "before_frame": "s000024332",
+            "after_frame": "s000024449",
+            "type": "deflection",
+            "evidence": "The incoming ball reaches the raised glove area around s000024366. Its rapid approach then changes to a much slower, floating departure above and to the left of the diving goalkeeper, rather than continuing its previous flight toward the goal. The goalkeeper does not retain it.",
+            "uncertainty": "The precise glove and contact instant are blurred, but the localized change in ball motion establishes a parry rather than merely an unsuccessful dive."
+          }
+        ],
+        "outcome": {
+          "kind": "Goalkeeper parry; active ball remains loose. No goal is established.",
+          "last_touch_player": "Red-clad goalkeeper.",
+          "evidence": [
+            {
+              "frame": "s000024366",
+              "fact": "The active airborne ball reaches the goalkeeper's extended glove area."
+            },
+            {
+              "frame": "s000024532",
+              "fact": "After the change in motion, the active ball floats above the goalkeeper and remains left of the near upright."
+            },
+            {
+              "frame": "s000024866",
+              "fact": "The same active ball descends outside the left side of the visible goalmouth while the goalkeeper lands."
+            },
+            {
+              "frame": "s000025032",
+              "fact": "The active ball reaches the grass left of the near upright; a separate ball remains stationary farther inside the net."
+            },
+            {
+              "frame": "s000025166",
+              "fact": "The active ball rises again after its ground bounce, distinguishing it from the stationary spare."
+            },
+            {
+              "frame": "s000025516",
+              "fact": "The moving ball remains visible near the projected position of the left upright; the spare ball is still stationary inside the goal."
+            }
+          ],
+          "uncertainty": "The final in-play/out-of-play status is unresolved. Later screen overlap with the upright does not establish post contact or a goal-line crossing; no clear post-induced change of motion is visible."
+        }
+      },
+      "sequence_006": {
+        "selected_player_actions": [
+          {
+            "actor_description": "Short light-brown-haired player in white, number 15, matching the original cyan-marked player and references r2, r6 and r7; distinct from white 17 and the longer-blond-haired white 12.",
+            "action": "Collects the ball arriving from the central group and dribbles left, then turns back toward the defenders while retaining possession.",
+            "before_frame": "s000041515",
+            "after_frame": "s000043932",
+            "recipient_description": null,
+            "finisher_description": null,
+            "outcome": "Retains the ball through the turn and prepares a forward release.",
+            "evidence": [
+              {
+                "frame": "s000041632",
+                "fact": "The selected player approaches the rolling ball on the left of the central group."
+              },
+              {
+                "frame": "s000041915",
+                "fact": "The player carrying the ball matches the original marked identity at this source instant."
+              },
+              {
+                "frame": "s000043132",
+                "fact": "The native detail shows number 15 turning with the ball beside his foot; the nearby blue player has not taken possession."
+              },
+              {
+                "frame": "s000043932",
+                "fact": "The same player has advanced toward the defensive group with the ball still immediately ahead."
+              }
+            ],
+            "uncertainty": ""
+          },
+          {
+            "actor_description": "Short light-brown-haired white number 15, the selected player.",
+            "action": "Makes a short forward pass into the central-right channel. A blue opponent gets a glancing blocking touch, and the ball continues through toward another white attacker.",
+            "before_frame": "s000043982",
+            "after_frame": "s000044598",
+            "recipient_description": "Short dark-haired white attacker beyond the central blue defenders, subsequently visible striking the ball; shirt number unreadable.",
+            "finisher_description": "The same short dark-haired white attacker, not selected white 15, foreground white 17, or blond white 12.",
+            "outcome": "The release continues through a defensive deflection and reaches the white attacker who subsequently shoots.",
+            "evidence": [
+              {
+                "frame": "s000044065",
+                "fact": "White 15 extends his foot into the ball."
+              },
+              {
+                "frame": "s000044132",
+                "fact": "The ball has separated from white 15 and is moving toward the dark-haired blue defender ahead."
+              },
+              {
+                "frame": "s000044348",
+                "fact": "The defender's extended boot meets the ball's path."
+              },
+              {
+                "frame": "s000044598",
+                "fact": "The ball has escaped to the defender's right while he bends and turns after it; there is no established controlled possession."
+              },
+              {
+                "frame": "s000045382",
+                "fact": "A different white attacker is visible beyond the defenders with the ball at his feet."
+              }
+            ],
+            "uncertainty": "The recipient's initial receiving touch is obscured by the central players. No additional deliberate pass is established during that occlusion. The blue touch is consistent with a deflection or unsuccessful interception, not a controlled pass."
+          }
+        ],
+        "ball_contact_chain": [
+          {
+            "person": "Selected short light-brown-haired white number 15.",
+            "before_frame": "s000041515",
+            "after_frame": "s000043932",
+            "type": "control",
+            "evidence": "The arriving ball comes within his stride, travels with his successive dribbling movements, and changes direction with his turn. Continuous tracking connects this player to the original marked identity.",
+            "uncertainty": "Individual dribbling contacts are not all resolved, but possession and actor identity are established."
+          },
+          {
+            "person": "Selected white number 15.",
+            "before_frame": "s000043982",
+            "after_frame": "s000044132",
+            "type": "pass",
+            "evidence": "His forward foot extension is followed by the ball separating and moving toward the central defensive gap.",
+            "uncertainty": ""
+          },
+          {
+            "person": "Short dark-haired blue defender directly ahead of white 15, wearing white shorts and dark socks.",
+            "before_frame": "s000044232",
+            "after_frame": "s000044598",
+            "type": "deflection",
+            "evidence": "The ball enters his extended-boot area, passes beneath or alongside him, and emerges to his right as he bends and turns to chase. It does not settle into a controlled dribble or deliberate passing action.",
+            "uncertainty": "The precise boot surface and number of glancing contacts are unresolved."
+          },
+          {
+            "person": "Short dark-haired white attacker beyond the blue defensive group; number unreadable.",
+            "before_frame": "s000044598",
+            "after_frame": "s000045382",
+            "type": "control",
+            "evidence": "The ball continues into the crowded channel and next becomes visible at this white attacker's feet. White 15 remains farther left, and white 17 remains in the foreground.",
+            "uncertainty": "The initial receiving instant is occluded. An additional touch within the crowd cannot be excluded, but no intervening controlled pass is visible."
+          },
+          {
+            "person": "The same short dark-haired white attacker beyond the defensive group.",
+            "before_frame": "s000045382",
+            "after_frame": "s000045765",
+            "type": "shot",
+            "evidence": "The ball is at the attacker's feet before his striking movement and follow-through; it then leaves that location toward the goal as the goalkeeper moves across and drops. This short sequence establishes the shooter without requiring an exact foot-ball frame.",
+            "uncertainty": "The shooting foot is not reliably resolved. A subsequent goalkeeper touch is not visibly established."
+          }
+        ],
+        "outcome": {
+          "kind": "GOAL",
+          "last_touch_player": "Short dark-haired white attacker who shoots; last clearly established player touch.",
+          "evidence": [
+            {
+              "frame": "s000045881",
+              "fact": "The goalkeeper is dropping across the shot's route; this movement alone does not establish a save."
+            },
+            {
+              "frame": "s000046015",
+              "fact": "The moving active ball is visible low inside the goal opening, beyond the goalkeeper."
+            },
+            {
+              "frame": "s000046131",
+              "fact": "The active ball has advanced rightward across the interior of the goal rather than remaining at a fixed ground position."
+            },
+            {
+              "frame": "s000046381",
+              "fact": "The ball reaches the right/back net region."
+            },
+            {
+              "frame": "s000046515",
+              "fact": "The ball rises in that net region, followed by a descending bounce in later frames; this is a moving ball, not the stationary spare."
+            }
+          ],
+          "uncertainty": "The sequence supports the ball entering the goal and bouncing in the net. A slight goalkeeper touch before entry cannot be excluded, so the shooter is the last clearly established touch rather than a guaranteed last physical touch."
+        }
+      },
+      "sequence_007": {
+        "selected_player_actions": [
+          {
+            "actor_description": "Light-haired player in white, No. 15 in the identity reference; the central white player receiving the loose ball, not the white No. 7 initially carrying it.",
+            "action": "Collects the loose ball and takes short touches as blue defenders close around him.",
+            "before_frame": "s000049131",
+            "after_frame": "s000049515",
+            "recipient_description": null,
+            "finisher_description": null,
+            "outcome": "Ball brought into the crowded central area.",
+            "evidence": [
+              {
+                "frame": "s000049131",
+                "fact": "The ball rolls toward the central light-haired white player, while white No. 7 moves away on the left."
+              },
+              {
+                "frame": "s000049265",
+                "fact": "The central white player meets the ball with his foot."
+              },
+              {
+                "frame": "s000049515",
+                "fact": "He follows the ball between converging blue defenders."
+              }
+            ],
+            "uncertainty": ""
+          },
+          {
+            "actor_description": "The same light-haired white No. 15.",
+            "action": "Reaches for and releases the ball from the congested challenge; it subsequently emerges toward the right.",
+            "before_frame": "s000049765",
+            "after_frame": "s000050215",
+            "recipient_description": "A separate white teammate with short dark hair and darker visible skin, positioned beyond the defenders toward the right.",
+            "finisher_description": "The separate dark-haired white teammate appears to make the finishing contact.",
+            "outcome": "The ball continues into a shooting opportunity and ultimately enters the goal.",
+            "evidence": [
+              {
+                "frame": "s000049798",
+                "fact": "The selected player is low behind the blue defenders, reaching into the ball area."
+              },
+              {
+                "frame": "s000049915",
+                "fact": "The ball is visible among the reaching feet; several legs overlap the contact area."
+              },
+              {
+                "frame": "s000050215",
+                "fact": "The selected player remains behind the defensive cluster, while a separate white teammate is positioned farther right."
+              }
+            ],
+            "uncertainty": "The crowded feet prevent a clean distinction between an intentional pass and a poke followed by a defensive ricochet. The final shooter appears to be the separate teammate, not No. 15, but the obscured finishing contact prevents an entirely secure same-person/different-person determination."
+          }
+        ],
+        "ball_contact_chain": [
+          {
+            "person": "White No. 7, the initial carrier.",
+            "before_frame": "s000047265",
+            "after_frame": "s000048631",
+            "type": "control",
+            "evidence": "Keeps the ball close while turning and shielding against the blue player in orange boots.",
+            "uncertainty": ""
+          },
+          {
+            "person": "Blue player in orange boots, with a two-digit back number appearing to be 20.",
+            "before_frame": "s000048631",
+            "after_frame": "s000049131",
+            "type": "other",
+            "evidence": "Challenges the carrier and sends the ball rightward out of their immediate contest toward the central white player.",
+            "uncertainty": "A tackling touch is supported; deliberate controlled possession or an intended pass is not established."
+          },
+          {
+            "person": "Selected light-haired white No. 15.",
+            "before_frame": "s000049131",
+            "after_frame": "s000049515",
+            "type": "control",
+            "evidence": "Meets the approaching ball and follows it with close touches into the defenders.",
+            "uncertainty": ""
+          },
+          {
+            "person": "Selected white No. 15, with blue defenders also contesting the contact area.",
+            "before_frame": "s000049765",
+            "after_frame": "s000050215",
+            "type": "other",
+            "evidence": "The ball changes from moving into the crowded feet to emerging rightward as No. 15 reaches through the challenge.",
+            "uncertainty": "An additional blue deflection is possible. The overlapping boots do not securely identify a separate defensive contact, and do not establish blue controlled possession."
+          },
+          {
+            "person": "Apparently the separate dark-haired white teammate beyond the cluster.",
+            "before_frame": "s000050415",
+            "after_frame": "s000050665",
+            "type": "shot",
+            "evidence": "The teammate steps into the ball area behind blue No. 20; the ball then emerges airborne and travels rapidly rightward toward goal. No. 15 follows from the left-rear.",
+            "uncertainty": "The kicking foot is hidden by blue No. 20. This sequence favors the separate teammate as finisher, but a final poke by No. 15 or a defensive deflection cannot be conclusively excluded."
+          }
+        ],
+        "outcome": {
+          "kind": "GOAL",
+          "last_touch_player": "Unknown with certainty; the separate dark-haired white teammate is the apparent finisher.",
+          "evidence": [
+            {
+              "frame": "s000050715",
+              "fact": "The active ball is airborne between the shooting cluster and blue No. 7."
+            },
+            {
+              "frame": "s000050915",
+              "fact": "It has continued past blue No. 7 toward the red-clad goalkeeper; no definite contact by No. 7 is visible."
+            },
+            {
+              "frame": "s000051048",
+              "fact": "The active ball is beyond the goalkeeper and still moving toward the near upright."
+            },
+            {
+              "frame": "s000051131",
+              "fact": "The moving ball passes inside the upright into the goal."
+            },
+            {
+              "frame": "s000051215",
+              "fact": "The same ball continues deeper into the net area; this is a moving continuation, not identification of a stationary spare as the scored ball."
+            }
+          ],
+          "uncertainty": "The goal is supported by the active ball's motion, not the goalkeeper's dive. A slight goalkeeper touch is unresolved. Another white teammate appears to supply the finishing touch after No. 15's release, but the occluded striking area leaves that connection less certain than the goal itself."
+        }
+      }
+    },
+    "source_preparation_seconds": 10.844,
+    "model": "gpt-6-astra",
+    "prior_native_trial_seconds": 120.96600000000001,
+    "remaining_wall_budget_seconds": 179.034,
+    "native_observations_file_sha256": "7b5302571fd391508dd90804db58539f6b80c3b95fbb5343b745236b3519858c",
+    "analysis_seconds": 124.775
+  }
+}

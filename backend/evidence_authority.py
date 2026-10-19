@@ -184,6 +184,8 @@ def apply_fail_closed_proof_authority(full: dict) -> dict:
         isinstance(full.get("analysis_authority"), dict)
         and full["analysis_authority"].get("output") == "FIX09C"
     )
+    sequence_mode = (isinstance(full.get("analysis_authority"), dict)
+                     and full["analysis_authority"].get("output") == "SEQUENCE_V1")
     verified_event_ids = set()
     for e in (full.get("action_timeline") or []):
         if not isinstance(e, dict):
@@ -199,6 +201,10 @@ def apply_fail_closed_proof_authority(full: dict) -> dict:
         ok = bool(c.get("event_id")) and c["event_id"] in verified_event_ids
         if canonical_mode:
             ok = ok and c.get("canonical_event_native") is True
+        if sequence_mode:
+            ok = (ok and c.get("sequence_event_native") is True
+                  and c.get("source_sequence_verified") is True
+                  and c.get("source_video_sha256") == full["analysis_authority"].get("source_video_sha256"))
         c["proof_verified"] = ok
         if ok and c.get("evidence_id"):
             verified_evidence_ids.add(c["evidence_id"])
@@ -216,7 +222,7 @@ def apply_fail_closed_proof_authority(full: dict) -> dict:
         # In FIX09C, an exact timestamp alone is not a semantic join. A rich
         # report claim inherits proof only through the deterministic canonical
         # evidence row, never merely through the event's millisecond.
-        row["proof_verified"] = evidence_ok if canonical_mode else (evidence_ok or event_ok)
+        row["proof_verified"] = evidence_ok if canonical_mode or sequence_mode else (evidence_ok or event_ok)
     return full
 
 
@@ -241,7 +247,7 @@ def compute_proof_frame_verified(comment: dict) -> bool:
     # FIX09C canonical frames are decoded through the VFR-safe media-time
     # reader. Merely copying the requested timestamp into frame_time_ms is not
     # evidence that the JPEG actually represents that media instant.
-    if (comment.get("canonical_event_native") is True
+    if ((comment.get("canonical_event_native") is True or comment.get("sequence_event_native") is True)
             and comment.get("frame_time_authority") != "ACTUAL_MEDIA_PTS"):
         return False
     et, ft = comment.get("evidence_time_ms"), comment.get("frame_time_ms")

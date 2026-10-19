@@ -30,6 +30,7 @@ import video_timebase
 import fix10a_runtime
 import fix10b_runtime
 import analysis_jobs
+import sequence_report_runtime
 from analysis_progress import analysis_progress
 from analysis_eta import completion_estimate
 from evidence_authority import (
@@ -5793,7 +5794,7 @@ async def get_report_status(report_id: str, user=Depends(get_current_user)):
     `status` remains the legacy preview status. `analysis_complete` is scoped
     to this report's entitlement; a paid preview is never a completed dossier.
     """
-    doc = await db.reports.find_one({"id": report_id})
+    doc = await db.reports.find_one({"id": report_id}, {"sequence_audit": 0})
     if not doc:
         raise HTTPException(status_code=404, detail="Report not found.")
     # Allow the owner or admin to poll
@@ -7043,7 +7044,7 @@ async def _ensure_report_video_local(report_id: str) -> Optional[Path]:
 async def my_reports(user=Depends(get_current_user)):
     docs = await db.reports.find(
         {"user_id": user["id"]},
-        {"_id": 0, "full_report": 0},
+        {"_id": 0, "full_report": 0, "sequence_audit": 0},
     ).sort("created_at", -1).to_list(100)
     for d in docs:
         d["video_url"] = _resolve_video_url(d)
@@ -7458,7 +7459,7 @@ async def get_demo_report():
 
 @api_router.get("/reports/{report_id}")
 async def get_report(report_id: str, user=Depends(get_current_user)):
-    doc = await db.reports.find_one({"id": report_id}, {"_id": 0})
+    doc = await db.reports.find_one({"id": report_id}, {"_id": 0, "sequence_audit": 0})
     if not doc:
         raise HTTPException(status_code=404, detail="Report not found")
     if doc["user_id"] != user["id"] and user["role"] != "admin":
@@ -8289,6 +8290,14 @@ async def _persist_video_frames(report_id: str, video_path) -> Optional[dict]:
     URLs directly on full_report.video_comments. Best-effort — never raises.
     Returns GPT identity-verification stats when the check ran."""
     doc = await db.reports.find_one({"id": report_id})
+    if doc and doc.get("analysis_engine") == "SEQUENCE_V1":
+        directory = _analysis_frames_dir(report_id) / "sequence"
+        async def publish_sequence_asset(path, content_type):
+            key = f"reports/{report_id}/sequence/{path.name}"
+            if r2_storage.is_configured():
+                return await asyncio.to_thread(r2_storage.upload_file, key, path, content_type)
+            return f"/api/uploads/{path.relative_to(UPLOAD_DIR).as_posix()}"
+        return await sequence_report_runtime.persist_assets(db.reports, doc, video_path, directory, publish_sequence_asset)
     if not doc or not (doc.get("full_report") or {}).get("video_comments"):
         return None
     frames_dir = _analysis_frames_dir(report_id)
@@ -8989,6 +8998,9 @@ async def _finalize_full_report(report_id: str, file_path, persist_frames: bool 
         doc = await db.reports.find_one({"id": report_id})
         if not doc:
             return
+        if doc.get("analysis_engine") == "SEQUENCE_V1" and doc.get("identity_regen_required"):
+            # A sequence report never recovers through legacy re-identification.
+            raise RuntimeError("SEQUENCE_IDENTITY_RECOVERY_REQUIRES_REVIEW")
         if doc.get("identity_gate_done"):
             logger.info(f"[finalize-recovery] {report_id}: identity gate checkpoint complete — skipping re-verification")
         else:
@@ -9060,6 +9072,8 @@ async def generate_full_report_task(report_id: str) -> None:
         doc = await db.reports.find_one({"id": report_id})
         if not doc:
             return
+        if doc.get("analysis_engine") == "SEQUENCE_V1" and doc.get("identity_regen_required"):
+            raise RuntimeError("SEQUENCE_IDENTITY_RECOVERY_REQUIRES_REVIEW")
         if doc.get("full_report") and doc.get("identity_regen_required"):
             # FIX 00B — corrective-only recovery: the body exists and requires
             # identity correction. NEVER re-run the standard full-{id} Gemini
@@ -9104,12 +9118,13 @@ async def generate_full_report_task(report_id: str) -> None:
             {"id": report_id},
             {"$set": {
                 "full_report_status": "generating",
+                "analysis_engine": "SEQUENCE_V1" if sequence_report_runtime.enabled() else "LEGACY",
                 "full_report_error": None,
                 "full_report_started_at": datetime.now(timezone.utc).isoformat(),
                 # FIX 00B — internal checkpoints reset for the new analysis run.
                 "identity_gate_done": False,
                 "identity_regen_required": False,
-            }, "$unset": {k: "" for k in doc if k.startswith(("fix10a_", "fix10b_", "unified_", "football_sequence_"))
+            }, "$unset": {k: "" for k in doc if k.startswith(("fix10a_", "fix10b_", "unified_", "football_sequence_", "sequence_"))
                            or k in {"canonical_events", "event_ledger", "football_scene_graph", "event_discovery_raw",
                                     "identity_timeline", "identity_timeline_compare"}}},
         )
@@ -9120,6 +9135,25 @@ async def generate_full_report_task(report_id: str) -> None:
                 {"id": report_id},
                 {"$set": {"full_report_status": "failed", "full_report_error": "Source video file missing on server."}},
             )
+            return
+
+        if sequence_report_runtime.enabled():
+            await _trace(report_id, "sequence_report_start")
+            # Clear measurements made by a different engine. They are not
+            # measured by sequence observations and must not survive a retry.
+            await db.reports.update_one({"id": report_id}, {"$unset": {
+                k: "" for k in ("gt_track", "player_track", "movement_map", "pace_metrics", "speed_metrics", "heatmap",
+                                 "identity_timeline", "identity_timeline_compare", "sequence_audit",
+                                 "sequence_timings", "canonical_events")}})
+            async def checkpoint_sequence_observations(values):
+                await db.reports.update_one({"id": report_id}, {"$set": values})
+            payload = await sequence_report_runtime.generate(file_path, doc, template=FULL_REPORT_PROMPT,
+                                                             checkpoint=checkpoint_sequence_observations)
+            await db.reports.update_one({"id": report_id}, {"$set": {
+                **payload, "full_report_status": "verifying", "full_generated_at": now_iso()}})
+            await _persist_video_frames(report_id, file_path)
+            await _trace(report_id, "sequence_report_complete")
+            await _finalize_full_report(report_id, file_path, persist_frames=False)
             return
 
         marker_path, crop_path_str = _report_media_paths(doc)
@@ -9827,7 +9861,7 @@ async def admin_agent_queue(_=Depends(get_current_admin_or_scout)):
     """All unlocked reports with their agent review state — oldest pending first."""
     cursor = db.reports.find(
         {"$or": [{"is_paid": True}, {"manually_unlocked": True}]},
-        {"_id": 0, "full_report": 0, "preview": 0},
+        {"_id": 0, "full_report": 0, "preview": 0, "sequence_audit": 0},
     ).sort("paid_at", 1)
     out = []
     async for d in cursor:
@@ -15220,7 +15254,7 @@ async def admin_delete_contact(msg_id: str, _=Depends(get_current_admin)):
 
 @api_router.get("/admin/reports")
 async def admin_reports(_=Depends(get_current_admin)):
-    docs = await db.reports.find({}, {"_id": 0, "full_report": 0}).sort("created_at", -1).to_list(500)
+    docs = await db.reports.find({}, {"_id": 0, "full_report": 0, "sequence_audit": 0}).sort("created_at", -1).to_list(500)
     for d in docs:
         d["video_url"] = _resolve_video_url(d)
         d["poster_url"] = _resolve_poster_url(d)

@@ -1,0 +1,45 @@
+name: One-off sequence model access check
+
+on:
+  pull_request:
+    types: [synchronize]
+    paths:
+      - '.github/workflows/sequence-pilot-access.yml'
+      - 'backend/scripts/probe_sequence_model.py'
+
+permissions:
+  contents: read
+
+jobs:
+  model_access:
+    if: >-
+      github.repository == '9m92yk9snt-star/VedoScout' &&
+      github.event.pull_request.number == 39 &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.head.ref == 'codex/sequence-pilot-foundation' &&
+      github.event.before == 'e6d8c8e30794cc4534b1cd7384f323f410e85d50' &&
+      github.run_attempt == 1
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /backend/sequence_pilot_transport.py
+            /backend/scripts/probe_sequence_model.py
+      - name: One authenticated request, 64 output tokens, no footage
+        env:
+          EMERGENT_LLM_KEY: ${{ secrets.EMERGENT_LLM_KEY }}
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: python backend/scripts/probe_sequence_model.py --output "$RUNNER_TEMP/sequence-pilot-access.json"
+      - name: Preserve safe connection receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sequence-pilot-access-${{ github.run_id }}
+          path: ${{ runner.temp }}/sequence-pilot-access.json
+          if-no-files-found: warn
+          retention-days: 7

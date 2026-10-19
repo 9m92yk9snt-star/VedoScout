@@ -1,0 +1,18 @@
+{
+  "origin_run": 39152527031,
+  "source_video_sha256": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+  "response_sha256": "484357fe9b015124dc5145993fc4e195377a05e7ae277fa9a9d76f73e175499d",
+  "review_kind": "POST_RESPONSE_STRUCTURAL_IDENTITY_CHECK",
+  "identity_review": {
+    "status": "UNRESOLVED",
+    "reasons": [
+      "SELECTED_IDENTITY_UNSUPPORTED",
+      "UNTYPED_IDENTITY_EVIDENCE"
+    ],
+    "conflicting_person_ids": [],
+    "independent_visual_correctness_verified": false,
+    "target_events": []
+  },
+  "model_request_repeated": false,
+  "note": "Legacy free-text identity citations do not say whether references are positive matches or negative comparisons. No identity or event is inferred from them."
+}
