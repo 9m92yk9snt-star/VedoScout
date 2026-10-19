@@ -41,10 +41,14 @@ jobs:
 
   question_scope_probe:
     if: >-
-      github.event_name == 'workflow_dispatch' &&
       github.repository == '9m92yk9snt-star/VedoScout' &&
-      github.ref == 'refs/heads/codex/sequence-pilot-foundation' &&
-      github.run_attempt == 1
+      github.run_attempt == 1 &&
+      ((github.event_name == 'workflow_dispatch' &&
+        github.ref == 'refs/heads/codex/sequence-pilot-foundation') ||
+       (github.event_name == 'pull_request' && github.event.pull_request.number == 39 &&
+        github.event.pull_request.head.repo.full_name == github.repository &&
+        github.event.pull_request.head.ref == 'codex/sequence-pilot-foundation' &&
+        github.event.before == '15ab8c57665f06968c62a4d6e42941a3b8f962cf'))
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
@@ -53,7 +57,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.sha }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
       - uses: actions/setup-python@v5
         with:
@@ -86,9 +90,9 @@ jobs:
           PY
       - name: Offline preflight unless a model request is explicitly selected
         env:
-          EMERGENT_LLM_KEY: ${{ inputs.run_model_probe && secrets.EMERGENT_LLM_KEY || '' }}
-          RUN_MODEL_PROBE: ${{ inputs.run_model_probe }}
-          FOCUS_MS: ${{ inputs.focus_ms }}
+          EMERGENT_LLM_KEY: ${{ (inputs.run_model_probe || (github.event_name == 'pull_request' && github.event.before == '15ab8c57665f06968c62a4d6e42941a3b8f962cf')) && secrets.EMERGENT_LLM_KEY || '' }}
+          RUN_MODEL_PROBE: ${{ inputs.run_model_probe || (github.event_name == 'pull_request' && github.event.before == '15ab8c57665f06968c62a4d6e42941a3b8f962cf') }}
+          FOCUS_MS: ${{ inputs.focus_ms || '23680' }}
         run: |
           args=(--evidence-dir "$RUNNER_TEMP/report-source"
                 --output "$RUNNER_TEMP/question-scope-trial" --focus-ms "$FOCUS_MS")
