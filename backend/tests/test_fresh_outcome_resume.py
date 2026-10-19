@@ -57,3 +57,33 @@ def test_tampered_actual_review_response_stops_before_resolution():
     receipt = saved["receipts"][1]
     with pytest.raises(ValueError, match="REVIEW_RECEIPT_MISMATCH"):
         checked_observation({**receipt,"raw_response":receipt["raw_response"]+" "}, {}, {})
+
+
+def actual_outcome():
+    path = Path(__file__).resolve().parents[2]/"docs/examples/fresh-outcome-approval-receipt.json"
+    return json.loads(path.read_text())
+
+
+def test_actual_continuous_outcome_reply_replays_selected_saved_shot_with_provenance():
+    saved = actual_outcome()
+    observed = checked_observation(saved["receipt"], saved["replay_context"], saved["result"]["job"])
+    assert observed == saved["result"]["resolved_observations"]
+    shot = next(e for e in observed["events"] if e["kind"] == "SHOT")
+    assert shot["selected_player"] is True and shot["outcome"] == "SAVED" and shot["proof_eligible"]
+    assert shot["contact_interval_ms"] == [23682,23749]
+    assert observed["questions"] == [] and observed["invalid_rows"] == []
+    assert saved["evaluation"]["continued_observations_pass"] is True
+    assert saved["evaluation"]["fresh_run_complete"] is False
+    assert saved["result"]["previous_terminal_observations"][0]["events"]
+
+
+def test_actual_new_reply_cannot_approve_shot_with_an_explicit_target_contact_question():
+    from scripts.resume_fresh_outcome import p
+    saved = actual_outcome()
+    data = json.loads(saved["receipt"]["raw_response"])
+    play = next(play for play in data["plays"] if any(a["kind"] == "SHOT" for a in play["actions"]))
+    action = next(a for a in play["actions"] if a["kind"] == "SHOT")
+    play["questions"].append({"reason":"CONTACT","action_id":action["action_id"]})
+    observed = p.resolve_response(data, saved["replay_context"], saved["result"]["job"],
+        {k:saved["receipt"][k] for k in ("packet_id","payload_sha256","response_sha256","origin")})
+    assert not next(e for e in observed["events"] if e["kind"] == "SHOT")["proof_eligible"]

@@ -119,3 +119,48 @@ smaller. Full-source overviews remain. Source inspection at the strike, keeper
 encounter, departure and descending ball confirms the relevant motion stays
 inside the local strip. This delivery, unlike the first review's early control
 window, includes all native instants through the keeper encounter.
+
+## Actual smaller continuation: all five matched
+
+Run 39181686181 completed the one smaller GPT-6-astra medium request in
+55.808s. Source processing for this continuation, including fresh preparation
+and thirteen exact prior-request checks, took 96.059s. No initial or prior
+review call was repeated. The actual request hash exactly matches the offline
+preflight, 99495f97d9b0f90bacbbd7da4276f9609742633d4999d5ad396d9eb446db27ea.
+
+The new answer identifies selected white #15 through r5/r6 and continuous
+motion, brackets his strike at 23.682–23.749s, and returns SAVED. It separately
+brackets the goalkeeper encounter at 24.349–24.382s: the incoming ball reaches
+the raised glove, loses its previous forward progress and departs above/left,
+then descends and bounces outside the goalmouth. It distinguishes that moving
+ball from the stationary spare inside goal. There are no new model questions
+or invalid rows. The existing resolver emits one proof-eligible selected
+SHOT/SAVED without changing acceptance requirements.
+
+The active combined continuation matches all five references, with no extra
+scoring events or conflicts: saved shot [23.682,23.749], goal [30.882,31.015],
+assist 1 [44.015,44.132], assist 2 [49.631,50.265], assist 3 [56.264,56.514]s.
+These are the actual new observation brackets, not substituted earlier golden
+timestamps. Raw receipt, response/request hashes, source-frame replay context,
+combined result and separate evaluation are retained in
+fresh-outcome-approval-receipt.json. The preceding UNKNOWN reading remains
+inside previous_terminal_observations and in its original receipt bundle; the
+HTTP 429 remains separately preserved.
+
+continued_observations_pass is true; fresh_run_complete and experiment_pass
+remain false because this is a verified multi-stage continuation, not a new
+cold end-to-end benchmark. The fresh initial stage took 455.956s, first review
+continuation 175.232s, rejected wide outcome attempt 105.488s, and successful
+local outcome continuation 96.059s: 832.735s measured source processing across
+the resumed stages, including repeated preparation but excluding workflow
+setup and offline work between runs. That is not acceptable production latency
+and is not presented as one uninterrupted execution. Live-report integration
+and a fresh complete cold run remain unverified. No merge or deployment.
+
+Validation: the standalone GitHub check passed 264 tests at the smaller-run
+commit (39181686295). Two further retained-answer replay/refusal tests now
+check the new actual SAVED reply and prevent approval if an explicit target
+CONTACT question is introduced. All five new continuation tests pass locally;
+with the 261 existing relevant tests, 266 local checks pass. An offline injected
+transport error also retained all four prior approvals and the unresolved shot
+without any model call. These are code validations, not extra perception calls.

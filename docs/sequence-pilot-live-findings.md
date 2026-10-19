@@ -1187,3 +1187,14 @@ The three raw new receipts and result are retained in
 `examples/fresh-whole-source-review-receipts.json`. See
 `fresh-source-continuation.md` for measured timing, sparse outcome coverage and
 the bounded second continuation. No merge or deployment.
+
+
+Fresh-source continuation now matches all five references after run
+39181686181: selected SHOT/SAVED at bracket 23.682–23.749s, selected GOAL,
+and all three assists. The new outcome call took 55.808s and its continuation
+source-processing stage 96.059s. No extra scoring event or conflict remains
+in the active result. All actual raw stages, the prior UNKNOWN answer and
+the intervening HTTP 429 are preserved; no independent foot-side resolution
+is claimed. See `fresh-source-continuation.md` and
+`examples/fresh-outcome-approval-receipt.json`. This is a resumed result,
+not a cold full-run benchmark or production deployment.
