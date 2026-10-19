@@ -55,10 +55,14 @@ def run(evidence_dir, output, focus_ms, *, preflight_only=False):
             "reasoning_effort": "medium", "image_detail": "high"}], "emergent", "gpt-6-astra",
             deadline=time.monotonic()+125, per_call_s=120, workers=1)[0]
         result.update(receipt=receipt, model_calls=1, status=receipt["status"])
+        p.write_json(output / "result.json", result)  # retain paid raw evidence before parsing
         if receipt["status"] == "COMPLETED":
-            resolved = p.resolve_response(p.parse_response(receipt["raw_response"]), enriched, packet,
-                {k: receipt[k] for k in ("packet_id", "payload_sha256", "response_sha256", "origin")})
-            result["resolved"] = p.reconcile([resolved])
+            try:
+                resolved = p.resolve_response(p.parse_response(receipt["raw_response"]), enriched, packet,
+                    {k: receipt[k] for k in ("packet_id", "payload_sha256", "response_sha256", "origin")})
+                result["resolved"] = p.reconcile([resolved])
+            except (ValueError, KeyError, TypeError):
+                result.update(status="INVALID_OBSERVATION_RESPONSE", error="OBSERVATION_PARSE_FAILED")
     result["total_wall_seconds"] = round(time.monotonic()-started, 3)
     p.write_json(output / "result.json", result)
     print(json.dumps(result), flush=True)

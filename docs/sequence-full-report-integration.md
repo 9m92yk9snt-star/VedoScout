@@ -184,6 +184,19 @@ discovery and stops on any further quota/rate error. Only original video and
 selections, the user-located window and the new question contract are inputs;
 no prior model answers or expected result is supplied.
 
+That bounded follow-up was run **39191911227**, commit
+`6e485d585d49bf0ff92bb89fcf329c8787cde46c`. Offline preflight prepared the
+19,266–25,631ms source window, 135 source instants / 159 delivered images and a
+7,572,361-byte request with zero model calls. The later actual request used the
+same ordinary API/model and returned **HTTP 429 after 63.330s**; total probe wall
+time was **79.199s**, exactly one model request. No new model observation or
+approval was obtained. Its complete request/selection hashes and error receipt
+are retained in `examples/sequence-question-scope-rate-limit.json`. Model calls
+stop here; no repeated quota retries, alternative credentials or model fallback
+are used. The structured scope contract remains offline-tested, awaiting actual
+model validation. The probe also checkpoints raw responses before parsing so a
+malformed response cannot discard paid evidence.
+
 There is still no successful uninterrupted cold source-to-READY timing. The
 successful 192.669s report-stage replay and earlier 518.498s source run cannot
 be added and presented as one observed complete run. Production/long-match
