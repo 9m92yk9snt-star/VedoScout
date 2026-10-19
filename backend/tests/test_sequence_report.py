@@ -363,9 +363,18 @@ def test_verified_skill_uses_exact_event_id_despite_rounded_display_time(retaine
     assert f["snapshot_moments"][0]["proof_verified"] is False
 
 
+@pytest.mark.parametrize("configured", [None, "legacy", "sequence_v1", "", "unknown"])
+def test_new_full_reports_always_select_sequence_engine(monkeypatch, configured):
+    if configured is None:
+        monkeypatch.delenv("FULL_REPORT_ENGINE", raising=False)
+    else:
+        monkeypatch.setenv("FULL_REPORT_ENGINE", configured)
+    assert runtime.enabled() is True
+
+
 @pytest.mark.parametrize("fail_assets", [False, True])
 def test_actual_server_bypasses_legacy_and_never_readies_failed_assets(tmp_path, retained, monkeypatch, fail_assets):
-    monkeypatch.setenv("FULL_REPORT_ENGINE", "sequence_v1")
+    monkeypatch.delenv("FULL_REPORT_ENGINE", raising=False)
     b = bundle(retained)
     full = adapter.build_report({"summary": "Actions"}, b)
     calls = []

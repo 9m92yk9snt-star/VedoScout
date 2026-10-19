@@ -1,4 +1,4 @@
-"""Opt-in full-report engine, with a bounded, owned source-analysis process.
+"""Default full-report engine, with a bounded, owned source-analysis process.
 
 The legacy detector/reconstruction is never called here, including on failure.
 All external persistence and the facts-only writer are injected by the server.
@@ -22,7 +22,11 @@ from report_fact_authority import assessment_prompt
 
 
 def enabled():
-    return os.environ.get("FULL_REPORT_ENGINE", "legacy").strip().lower() == "sequence_v1"
+    """All new full reports use sequences; obsolete environment flags cannot
+    silently reactivate legacy reconstruction. Retained reports still recover
+    through their existing engine-specific asset path in the server.
+    """
+    return True
 
 
 async def owned_process(args, *, timeout_s, log_path):

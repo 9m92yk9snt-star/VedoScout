@@ -1,8 +1,12 @@
-# Opt-in sequence full report (draft PR #39)
+# Sequence full report (PR #39)
 
-`FULL_REPORT_ENGINE=sequence_v1` selects the new path in
-`generate_full_report_task`. The default remains `legacy`. No merge, deployment
-or production switch is part of this change.
+All new full reports use the source-sequence path in
+`generate_full_report_task`. The user authorized replacing the legacy analysis
+path and merging PR #39. `FULL_REPORT_ENGINE` is obsolete: even a retained
+`legacy` value cannot reactivate the old reconstruction for a new report.
+No deployment is performed as part of this change. Existing report bodies and
+their engine-specific asset recovery remain intact; historical reports are not
+automatically reanalyzed. The existing frontend and PDF templates are retained.
 
 ## Model-call economy and offline defaults
 
