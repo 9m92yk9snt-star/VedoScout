@@ -4,6 +4,12 @@
 `generate_full_report_task`. The default remains `legacy`. No merge, deployment
 or production switch is part of this change.
 
+`SEQUENCE_REPORT_WRITER_MODEL` explicitly selects `gemini-2.5-pro` (default) or
+`gpt-6-astra`. Actual successful section-writing tests use GPT-6 Astra with low
+reasoning; source discovery uses GPT-6 Astra with medium reasoning. There is no
+automatic provider/model fallback. Enabling the sequence engine alone does not
+change the default writer selection.
+
 ## Report contract
 
 The new path starts from the source video and original positive user selections.
@@ -137,5 +143,43 @@ the evidence authority withheld the aggregate tier. The presentation writer now
 consumes the reconciled assessment; deterministic final projection also removes
 current/potential level labels and recruitment dots when the tier is unavailable.
 Regression tests reproduce the inconsistency using the actual raw responses.
-The same-video cold source-to-READY trial is the remaining complete-run timing
-check. Distinct-match validation remains outstanding.
+The fresh source-to-report trial is recorded below. Distinct-match validation
+remains outstanding.
+
+## Latest cold attempt: blocked, not a completed benchmark
+
+Run **39190024773**, commit `0dc4901342d53409300fb0aa9c5a7e283b02174e`,
+started with only the original video/selections and age 11/Winger metadata.
+It completed fifteen fresh source calls in **650.155s**. The first assessment
+request then returned **HTTP 429** after **62.292s**. Total failed trial wall time
+was **713.018s (11m53.018s)**. No report body, assets or READY were produced;
+no production database, notifications or legacy reconstruction were used.
+This is a failed attempt duration, not a new full-report processing benchmark.
+The complete unchanged source/writer receipts and failure document are retained
+in `examples/sequence-report-cold-failed.json`.
+
+Four scoring references passed the old resolver. The fifth raw observation
+explicitly identifies the selected shooter, contact interval 23666–23749ms,
+keeper glove contact, changed active-ball motion and SAVED. Its separate question
+asks whether the parried ball goes out of play after frame s000025516. Because
+the old contract gives every OUTCOME question the same blocking scope, this
+later-possession uncertainty also blocks the already described shot. This is
+not a fresh model assertion that another player shot.
+
+The question contract now preserves the exact question text and distinguishes
+ACTION from explicitly structured AFTERMATH. AFTERMATH can be nonblocking only
+for a shot with structurally established contact/terminal outcome, continuous
+active ball and a supplied after_frame at or beyond the action end. It remains
+an open question and creates no claim about the later possession. Identity,
+contact and terminal-outcome questions, unknown scopes and invalid boundaries
+continue to block approval. Aftermath-only gaps do not trigger more release
+reviews. Tests use the actual retained response with explicit synthetic scope
+metadata and counterexamples; **the original unscoped receipt is not rewritten
+or retrospectively promoted**. This new contract still needs an actual fresh
+model validation when normal API access is available. No further paid calls
+were started after the rate-limit response.
+
+There is still no successful uninterrupted cold source-to-READY timing. The
+successful 192.669s report-stage replay and earlier 518.498s source run cannot
+be added and presented as one observed complete run. Production/long-match
+rollout is not validated.

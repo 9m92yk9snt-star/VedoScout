@@ -118,7 +118,15 @@ def test_actual_cold_whole_source_run_replays_all_packets_and_preserves_its_comp
               for key in ("replaces_initial_packet_id","replaces_review_packet_id") if r.get(key)}
     merged=p.reconcile([r for r in observed if r["packet_id"] not in replaced])
     for key in ("events","target_events","counts","questions","conflicts"):
-        assert merged[key]==saved["result"][key],key
+        if key == "questions":
+            # New descriptive scope/text metadata must not change old question
+            # links, order or blocking semantics. Legacy scopes stay ACTION.
+            assert all(q.get("scope", "ACTION") == "ACTION" for q in merged[key])
+            without_metadata = [{k: v for k, v in q.items() if k not in {"scope", "question", "after_ms"}}
+                                for q in merged[key]]
+            assert without_metadata == saved["result"][key], key
+        else:
+            assert merged[key]==saved["result"][key],key
     assert len(saved["receipts"])==13 and saved["result"]["model_jobs_completed"]==13
     assert saved["result"]["historical_action_results_used"] is False
     assert saved["result"]["fresh_end_to_end_run"] is True

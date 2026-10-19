@@ -123,6 +123,71 @@ def test_estimated_finishing_contact_does_not_answer_its_own_model_question():
     assert not any(q.get("explicit_model_question") for q in final["questions"])
 
 
+def cold_saved_shot_question_fixture():
+    # Actual raw model response, offline resolver test only. The original
+    # unscoped question is not retrospectively changed in the retained run.
+    root = Path(__file__).resolve().parents[2]
+    retained = p.read_json(root / "docs/examples/sequence-report-cold-failed.json")
+    audit = retained["report_document"]["sequence_audit"]
+    receipt = next(r for r in audit["receipts"] if r["packet_id"] == "contact_review_002")
+    raw = __import__('json').loads(receipt["raw_response"])
+    manifest = {"source_video_sha256": audit["source_video_sha256"],
+                "frames": audit["source_frames"], "references": audit["references"],
+                "source_end_ms": max(f["media_ms"] for f in audit["source_frames"])}
+    packet = {"packet_id": receipt["packet_id"], "phase": "FOLLOWUP",
+              "frame_ids": [f["frame_id"] for f in audit["source_frames"]],
+              "reference_ids": [r["reference_id"] for r in audit["references"]]}
+    question = next(q for q in raw["plays"][0]["questions"] if q["action_id"] == "a4")
+    return manifest, packet, raw, receipt, question
+
+
+def test_actual_unscoped_rebound_question_remains_blocking_and_keeps_its_text():
+    manifest, packet, raw, receipt, question = cold_saved_shot_question_fixture()
+    resolved = p.resolve_response(raw, manifest, packet, receipt)
+    shot = next(e for e in resolved["events"] if e["kind"] == "SHOT")
+    assert shot["selected_player"] is True and shot["outcome"] == "SAVED"
+    assert shot["proof_eligible"] is False
+    q = next(q for q in resolved["questions"] if q["action_id"] == "a4")
+    assert q["scope"] == "ACTION" and q["question"] == question["question"]
+
+
+def test_structured_later_possession_question_keeps_saved_shot_and_unknown_aftermath():
+    manifest, packet, raw, receipt, question = cold_saved_shot_question_fixture()
+    question.update(scope="AFTERMATH", after_frame="s000025516")
+    resolved = p.reconcile([p.resolve_response(raw, manifest, packet, receipt)])
+    shot = next(e for e in resolved["target_events"] if e["kind"] == "SHOT")
+    assert shot["outcome"] == "SAVED" and shot["contact_interval_ms"] == [23666, 23749]
+    assert shot["model_requested_clarification"] is False
+    q = next(q for q in resolved["questions"] if q["action_id"] == "a4")
+    assert q["scope"] == "AFTERMATH" and q["after_ms"] == 25516
+    assert any(q["action_id"] == "a2" and q["scope"] == "ACTION" for q in resolved["questions"])
+    aftermath_only = {**resolved, "questions": [q]}
+    assert p.plan_contact_reviews(manifest, aftermath_only) == []
+    assert p.followup_plan(manifest, aftermath_only) == []
+
+
+@pytest.mark.parametrize("change", [
+    lambda q, a: q.update(scope="ACTION"),
+    lambda q, a: q.update(scope="unrecognised"),
+    lambda q, a: q.update(reason="CONTACT"),
+    lambda q, a: q.update(reason="IDENTITY"),
+    lambda q, a: q.update(after_frame=None),
+    lambda q, a: q.update(after_frame="s000023666"),
+    lambda q, a: a.update(outcome="UNKNOWN"),
+    lambda q, a: a.update(same_active_ball=False),
+    lambda q, a: a.update(contact_actor_unique=False),
+])
+def test_aftermath_scope_cannot_bypass_missing_or_uncertain_action_proof(change):
+    manifest, packet, raw, receipt, question = cold_saved_shot_question_fixture()
+    question.update(scope="AFTERMATH", after_frame="s000025516")
+    action = next(a for a in raw["plays"][0]["actions"] if a["action_id"] == "a4")
+    change(question, action)
+    resolved = p.resolve_response(raw, manifest, packet, receipt)
+    shot = next(e for e in resolved["events"] if e["kind"] == "SHOT")
+    assert shot["proof_eligible"] is False
+    assert shot["model_requested_clarification"] is True
+
+
 def test_contact_question_is_not_filtered_out_by_coarse_run_label():
     manifest, packet, data = fixture()
     a = data["plays"][0]["actions"][0]

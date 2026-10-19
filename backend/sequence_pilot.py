@@ -54,13 +54,20 @@ Return one JSON object:
 "same_active_ball":null,"continuous_play":true,
 "outcome_evidence":[{"frame":"s...","fact":"what is visible"}],
 "details":"what happens, including any visible contradiction"}],
-"questions":[{"reason":"IDENTITY|CONTACT|RECEIVER|OUTCOME","action_id":"a1"}]}]}.
+"questions":[{"reason":"IDENTITY|CONTACT|RECEIVER|OUTCOME","action_id":"a1",
+"scope":"ACTION|AFTERMATH","after_frame":null,"question":"specific uncertainty"}]}]}.
 selected, kit_consistent and receiver_is_teammate are true/false/null. For a
 visible teammate goal on a pass include recipient, receiving frame, finisher,
 finishing contact and the goal evidence. For observed different people use
 selected=false; don't identify everyone in matching kit as the selected person.
 If the packet ends during a play, keep its partial observation and ask the
 specific missing-link question. Report the actual unsuccessful result too.
+Question scope defaults to ACTION and blocks approval of that action. Use
+AFTERMATH only for what happens after an already established shot outcome,
+such as who retrieves a saved rebound. Set after_frame to a supplied frame at
+or after that shot action's end_frame. Identity, contact, save-versus-goal and
+active-ball uncertainty always have scope ACTION. An unknown later possession
+does not itself make an established shooter or save uncertain.
 """
 
 
@@ -498,12 +505,14 @@ def resolve_response(data, manifest, packet, receipt):
                 and {action.get("contact_before_frame"), action.get("contact_after_frame")} <= {v["frame"] for v in facts}):
             return [before, after], "BRACKETED_VISUAL_SEQUENCE", facts
         return None, "UNRESOLVED", facts
-    def question(play, reason, action_id=None, focus_ms=None, explicit=False, target_related=None):
+    def question(play, reason, action_id=None, focus_ms=None, explicit=False, target_related=None,
+                 scope="ACTION", text=None, after_ms=None):
         questions.append({"reason": reason, "action_id": action_id, "start_ms": ms(play.get("start_frame")),
                           "end_ms": ms(play.get("end_frame")), "focus_ms": focus_ms,
                           "source_action_key": f"{packet['packet_id']}:{play_index}:{action_id}" if action_id else None,
                           "source_packet_id": packet["packet_id"], "explicit_model_question": explicit,
-                          "target_related": target_related})
+                          "target_related": target_related, "scope": scope,
+                          "question": str(text or "")[:1000], "after_ms": after_ms})
     for play_index, play in enumerate(data["plays"][:100]):
         if not isinstance(play, dict) or ms(play.get("start_frame")) is None or ms(play.get("end_frame")) is None:
             invalid.append("PLAY_SOURCE_BOUNDS_MISSING"); continue
@@ -535,7 +544,21 @@ def resolve_response(data, manifest, packet, receipt):
             people[pid]["selected"] = None
         model_questions = [q for q in play.get("questions") or [] if isinstance(q, dict)
                            and q.get("reason") in {"IDENTITY", "CONTACT", "RECEIVER", "OUTCOME"}]
-        unresolved_ids = {q.get("action_id") for q in model_questions}
+        def aftermath(q):
+            a = next((a for a in play.get("actions") or [] if isinstance(a, dict)
+                      and a.get("action_id") == q.get("action_id")), {})
+            interval = contact_support(a)[0]
+            tail, outcome_at, action_end = ms(q.get("after_frame")), ms(a.get("outcome_frame")), ms(a.get("end_frame"))
+            facts = a.get("outcome_evidence") or []
+            return (q.get("reason") == "OUTCOME" and q.get("scope") == "AFTERMATH"
+                    and a.get("kind") == "SHOT" and a.get("outcome") in {"GOAL", "SAVED", "BLOCKED", "OFF_TARGET"}
+                    and interval is not None and None not in (tail, outcome_at, action_end)
+                    and interval[1] <= outcome_at <= action_end <= tail <= end
+                    and a.get("same_active_ball") is True and a.get("continuous_play") is True
+                    and any(isinstance(f, dict) and ms(f.get("frame")) is not None
+                            and interval[1] <= ms(f["frame"]) <= action_end
+                            and str(f.get("fact") or "").strip() for f in facts))
+        unresolved_ids = {q.get("action_id") for q in model_questions if not aftermath(q)}
         uncertain_finishers = {a.get("actor") for a in play.get("actions") or [] if isinstance(a, dict)
                               and a.get("action_id") in unresolved_ids}
         if identity_conflicts:
@@ -638,7 +661,9 @@ def resolve_response(data, manifest, packet, receipt):
                 for other in play.get("actions") or [])
             focus = ms(a.get("outcome_frame")) if q["reason"] == "OUTCOME" else ms(a.get("contact_frame"))
             question(play, q["reason"], q.get("action_id"), focus, explicit=True,
-                     target_related=actor.get("selected") is not False or linked)
+                     target_related=actor.get("selected") is not False or linked,
+                     scope="AFTERMATH" if aftermath(q) else "ACTION", text=q.get("question"),
+                     after_ms=ms(q.get("after_frame")))
     return {"events": events, "questions": questions, "invalid_rows": invalid}
 
 
@@ -697,6 +722,8 @@ def reconcile(results, *, sampling_gap_ms=125):
     # A wider overlapping packet may already provide exactly the missing link.
     # Do not ask the model to approve that completed observation again.
     def answered(q):
+        if q.get("scope") == "AFTERMATH":
+            return False  # preserve the unknown next phase; the shot does not answer it
         if q.get("explicit_model_question"):
             return any(q.get("source_action_key") in e.get("answers_source_action_keys", []) and e["proof_eligible"] for e in events)
         for e in events:
@@ -721,6 +748,8 @@ def plan_contact_reviews(manifest, resolved, *, limit=6, terminal_only=False, co
     events = {key: e for e in resolved["events"] for key in e["source_action_keys"]}
     candidates = []
     for q in resolved["questions"]:
+        if q.get("scope") == "AFTERMATH":
+            continue  # a later rebound possession is not an unresolved release
         event = events.get(q.get("source_action_key"))
         if event is None:
             continue
@@ -764,6 +793,12 @@ def plan_contact_reviews(manifest, resolved, *, limit=6, terminal_only=False, co
     for terminal in rows:
         if terminal["kind"] not in {"SHOT", "OTHER"} or not terminal.get("outcome_evidence"):
             continue
+        if (terminal.get("proof_eligible") is True and terminal.get("selected_player") is True
+                and terminal.get("reason") == "VISIBLE_SHOT_OUTCOME"
+                and any(q.get("scope") == "AFTERMATH"
+                        and q.get("source_action_key") in terminal["source_action_keys"]
+                        for q in resolved["questions"])):
+            continue  # this shot's only uncertainty concerns the later possession
         if any(e["actor_scope"] == terminal["actor_scope"] and e.get("proof_eligible")
                and e["event_type"] == "ASSIST" and e.get("finisher") == terminal.get("actor")
                for e in rows):
@@ -813,7 +848,7 @@ def plan_contact_reviews(manifest, resolved, *, limit=6, terminal_only=False, co
 def plan_outcome_reviews(manifest, resolved, parents, *, limit=2):
     """One second-round native reading per explicit selected-shot outcome gap."""
     explicit = {q.get("source_action_key") for q in resolved["questions"]
-                if q["reason"] == "OUTCOME" and q.get("explicit_model_question")}
+                if q["reason"] == "OUTCOME" and q.get("explicit_model_question") and q.get("scope") != "AFTERMATH"}
     grouped = {}
     for event in resolved["events"]:
         if (event["kind"] != "SHOT" or event["selected_player"] is not True
@@ -931,6 +966,8 @@ def followup_plan(manifest, resolved, *, limit=2, max_span_ms=30000):
     priorities = {"IDENTITY_CONFLICT": 0, "OUTCOME_CONFLICT": 0, "RECEIVER": 1, "OUTCOME": 1, "CONTACT": 2, "IDENTITY": 3}
     questions = sorted(resolved["questions"], key=lambda q: (priorities.get(q["reason"], 4), q.get("start_ms") or 0))
     for q in questions:
+        if q.get("scope") == "AFTERMATH":
+            continue
         if len(jobs) >= limit:
             break
         if not _number(q.get("start_ms")) or not _number(q.get("end_ms")):
