@@ -176,8 +176,13 @@ continue to block approval. Aftermath-only gaps do not trigger more release
 reviews. Tests use the actual retained response with explicit synthetic scope
 metadata and counterexamples; **the original unscoped receipt is not rewritten
 or retrospectively promoted**. This new contract still needs an actual fresh
-model validation when normal API access is available. No further paid calls
-were started after the rate-limit response.
+model validation when normal API access is available. No additional calls
+were started within that attempt after the rate-limit response. After the
+user requested continuation, a separate one-call source-window validation was
+prepared using the same ordinary API/model. It never repeats whole-source
+discovery and stops on any further quota/rate error. Only original video and
+selections, the user-located window and the new question contract are inputs;
+no prior model answers or expected result is supplied.
 
 There is still no successful uninterrupted cold source-to-READY timing. The
 successful 192.669s report-stage replay and earlier 518.498s source run cannot
