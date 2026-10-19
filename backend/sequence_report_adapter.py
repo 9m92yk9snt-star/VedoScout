@@ -107,6 +107,11 @@ def build_report(prose, bundle):
     if not isinstance(prose, dict) or not prose:
         raise ValueError("SEQUENCE_REPORT_WRITER_INVALID")
     full = deepcopy(prose)
+    weak_foot = (full.get("technical") or {}).get("weak_foot")
+    if isinstance(weak_foot, dict):
+        # The sequence contract has no verified anatomical side. A writer's
+        # event citation cannot manufacture weak-foot evidence from UNKNOWN.
+        weak_foot["evidence"] = []
     # Writer has no authority over events, physical metrics, evidence or totals.
     for key in ("match_stats", "verified_stats", "movement_map", "pace_metrics", "heatmap", "speed_metrics",
                 "verified_stat_line", "cross_verification", "analysis_authority", "_scoring_scan"):

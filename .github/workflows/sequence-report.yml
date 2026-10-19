@@ -25,7 +25,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: python -m pip install 'numpy<3' 'opencv-python-headless<5' 'Pillow>=10,<15' 'pytest>=8,<10'
+      - run: python -m pip install 'numpy<3' 'opencv-python-headless<5' 'Pillow>=10,<15' 'pytest>=8,<10' 'python-dotenv>=1,<2'
       - run: python -m pytest backend/tests/test_sequence_report.py -q
 
   cold_full_report:
@@ -83,6 +83,7 @@ jobs:
           --video "$RUNNER_TEMP/report-source/video/source.mp4"
           --anchors "$RUNNER_TEMP/report-source/anchors.json"
           --output "$RUNNER_TEMP/full-report-trial"
+          --age 11 --position Winger
       - name: Preserve actual report receipts and evaluate after generation
         if: always()
         run: |

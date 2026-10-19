@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 from types import SimpleNamespace
 import sys
+import subprocess
 
 import pytest
 
@@ -65,6 +66,23 @@ def test_teammate_finish_cannot_be_assigned_to_the_passer(retained):
     event["finisher"] = event["actor"]
     with pytest.raises(ValueError, match="ASSIST_ROLE"):
         bundle(retained)
+
+
+def test_event_citation_cannot_authorize_weak_foot_grade(retained):
+    b = bundle(retained)
+    event = next(e for e in b["events"] if e["canonical_event_type"] == "ASSIST")
+    prose = {"summary": "Actions", "technical": {"weak_foot": {
+        "score": 8, "evidence": [{"event_id": event["event_id"], "timestamp": "00:50", "what": "Pass"}]}}}
+    f = adapter.build_report(prose, b)
+    assert f["technical"]["weak_foot"]["score"] is None
+    assert f["technical"]["weak_foot"]["cannot_evaluate"] is True
+
+
+def test_empty_retained_proofs_prevent_ready_before_encoding(tmp_path):
+    async def publish(*args):
+        pytest.fail("Empty evidence must not publish or become ready")
+    with pytest.raises(ValueError, match="SOURCE_PROOFS_MISSING"):
+        asyncio.run(runtime.persist_assets(None, {"full_report": {}}, tmp_path / "absent.mp4", tmp_path, publish))
 
 
 def test_unbound_comment_and_inexact_source_image_are_not_proof(retained):
@@ -140,3 +158,31 @@ def test_owned_process_timeout_reaps_the_child(tmp_path):
     with pytest.raises(TimeoutError):
         asyncio.run(runtime.owned_process([sys.executable, "-c", "import time; time.sleep(30)"],
                                           timeout_s=.1, log_path=tmp_path / "process.log"))
+
+
+def test_existing_frontend_shows_verified_counts_and_joins_only_matching_proofs(tmp_path, retained):
+    full = adapter.build_report({"summary": "Actions"}, bundle(retained))
+    for c in full["video_comments"]:
+        c.update(frame_url="/frames/"+c["evidence_id"]+".jpg", tele_clip_url="/clips/"+c["evidence_id"]+".mp4",
+                 proof_frame_verified=True, identity_verified=True)
+    joins = (ROOT / "frontend/src/lib/authorityJoin.mjs").as_uri()
+    derive = (ROOT / "frontend/src/components/report-v2/derive.js").read_text().replace(
+        '"../../lib/authorityJoin.mjs"', json.dumps(joins))
+    module = tmp_path / "derive.mjs"
+    module.write_text(derive)
+    script = f'''
+      import {{deriveV2}} from {json.dumps(module.as_uri())};
+      import {{resolveProofClip}} from {json.dumps(joins)};
+      let input='';for await (const chunk of process.stdin) input+=chunk;
+      const full=JSON.parse(input), view=deriveV2({{full_report:full}});
+      const clip=resolveProofClip(full.video_comments,{{eventId:full.video_comments[0].event_id}},true);
+      const wrong=resolveProofClip(full.video_comments,{{eventId:'absent',timestamp:full.video_comments[0].timestamp}},true);
+      console.log(JSON.stringify({{stats:view.matchStats,clip:clip?.event_id,wrong,highlight:view.videoHighlight}}));
+    '''
+    result = subprocess.run(["node", "--input-type=module", "-e", script], input=json.dumps(full),
+                            text=True, capture_output=True, check=True)
+    view = json.loads(result.stdout)
+    stats = {r["label"]: r["value"] for r in view["stats"]}
+    assert stats["Verified Goals"] == 1 and stats["Verified Assists"] == 3 and stats["Shots"] == 2
+    assert view["clip"] == full["video_comments"][0]["event_id"] and view["wrong"] is None
+    assert view["highlight"]["thumbVerified"] is True

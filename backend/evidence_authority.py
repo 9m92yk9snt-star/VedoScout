@@ -184,7 +184,8 @@ def apply_fail_closed_proof_authority(full: dict) -> dict:
         isinstance(full.get("analysis_authority"), dict)
         and full["analysis_authority"].get("output") == "FIX09C"
     )
-    sequence_mode = (full.get("analysis_authority") or {}).get("output") == "SEQUENCE_V1"
+    sequence_mode = (isinstance(full.get("analysis_authority"), dict)
+                     and full["analysis_authority"].get("output") == "SEQUENCE_V1")
     verified_event_ids = set()
     for e in (full.get("action_timeline") or []):
         if not isinstance(e, dict):

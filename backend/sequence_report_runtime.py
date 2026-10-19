@@ -120,7 +120,8 @@ async def generate(video, doc, *, template, writer=write_facts, discovery=discov
         bundle = adapter.canonical_bundle(result, manifest, receipts)
         observed = time.monotonic()
         prompt = assessment_prompt(template, bundle, doc.get("player_details"),
-                                   {"coverage_status": "PARTIAL", "engine": adapter.ENGINE})
+                                   {"coverage_status": "PARTIAL", "engine": adapter.ENGINE,
+                                    "anatomical_foot_side": "UNVERIFIED; do not grade weak foot or settle left/right"})
         written = await asyncio.wait_for(writer(prompt), timeout=420)
         full = adapter.build_report(written["report"], bundle)
         # Store replayable raw model receipts with the report, not ephemeral paths.
@@ -188,6 +189,8 @@ def render_assets(video, full, bundle, directory):
 async def persist_assets(collection, doc, video, directory, publish):
     started = time.monotonic()
     full = deepcopy(doc["full_report"])
+    if not full.get("video_comments"):
+        raise ValueError("SEQUENCE_SOURCE_PROOFS_MISSING")
     assets = await asyncio.to_thread(render_assets, video, full, doc["canonical_events"], directory)
     for row, image, clip in assets:
         row["frame_url"] = await publish(image, "image/jpeg")

@@ -69,11 +69,11 @@ def server_harness(video, doc, directory, *, runtime=sequence_report_runtime):
     return namespace, store, trace, notifications
 
 
-async def trial(video, anchors, output):
+async def trial(video, anchors, output, *, player_details=None):
     output.mkdir(parents=True, exist_ok=False)
     os.environ["FULL_REPORT_ENGINE"] = "sequence_v1"
     doc = {"id": "sequence-full-report-trial", "raw_marker_anchors": anchors["raw_marker_anchors"],
-           "anchors": [], "player_details": {"age": 12}, "is_paid": False}
+           "anchors": [], "player_details": player_details or {}, "is_paid": False}
     ns, store, trace, suppressed = server_harness(video, doc, output)
     started = time.monotonic()
     await ns["generate_full_report_task"](doc["id"])
@@ -102,5 +102,8 @@ if __name__ == "__main__":
     parser.add_argument("--video", type=Path, required=True)
     parser.add_argument("--anchors", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--age", type=int)
+    parser.add_argument("--position")
     args = parser.parse_args()
-    asyncio.run(trial(args.video, json.loads(args.anchors.read_text()), args.output))
+    details = {k: v for k, v in {"age": args.age, "position": args.position}.items() if v is not None}
+    asyncio.run(trial(args.video, json.loads(args.anchors.read_text()), args.output, player_details=details))

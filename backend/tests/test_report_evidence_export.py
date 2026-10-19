@@ -35,6 +35,16 @@ def test_export_contains_transitive_local_analysis_source_dependencies():
     assert not visited-listed, "An exported analysis must include the code used by its local dependencies"
 
 
+def test_sequence_receipts_timings_and_engine_are_exported_without_new_analysis(case):
+    doc, _, _, _ = case
+    doc.update(analysis_engine="SEQUENCE_V1", sequence_audit={"receipts": [{"response_sha256": "kept"}]},
+               sequence_timings={"total_processing_seconds": 600})
+    build(case)
+    assert read(case, "sequence/audit.json") == doc["sequence_audit"]
+    assert read(case, "sequence/timings.json") == doc["sequence_timings"]
+    assert read(case, "canonical.json")["analysis_engine"] == "SEQUENCE_V1"
+
+
 @pytest.fixture
 def case(tmp_path):
     uploads = tmp_path / "uploads"
