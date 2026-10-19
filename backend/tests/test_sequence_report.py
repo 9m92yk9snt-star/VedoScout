@@ -170,6 +170,24 @@ def test_actual_writer_presentation_cannot_retain_level_after_aggregate_withheld
     assert full["match_stats"]["observed_assists"] == 3
 
 
+def test_actual_saved_shot_location_is_not_a_goal_claim():
+    from report_fact_authority import _supports
+    actual, canonical = actual_section_reports()
+    prose = {}
+    for receipt in actual["writer_receipts"]:
+        prose.update(json.loads(receipt["raw_response"]))
+    full = adapter.build_report(prose, canonical)
+    saved = next(e for e in canonical["events"] if e["canonical_outcome"] == "SAVED")
+    assert {row["event_id"] for row in full["technical"]["shooting"]["evidence"]} == {
+        saved["event_id"], next(e["event_id"] for e in canonical["events"] if e["canonical_event_type"] == "GOAL")}
+    assert full["technical"]["shooting"]["observations_used"] == 2
+    assert full["report_fact_authority"]["unbound_skill_observations"] == 0
+    assert _supports("The goalkeeper parries the shot outside the goal.", [saved])
+    assert not _supports("He scores a goal and the goalkeeper parries outside the goal.", [saved])
+    assert not _supports("The ball enters the goal after a save outside the goal.", [saved])
+    assert not _supports("The goalkeeper parries the shot outside the goal.", [])
+
+
 def test_presentation_writer_consumes_actual_reconciled_assessment(monkeypatch):
     actual, canonical = actual_section_reports()
     calls = []

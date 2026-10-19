@@ -1,0 +1,2408 @@
+{
+  "schema_version": 1,
+  "scope": "OFFLINE_REPORT_REVIEW",
+  "new_model_calls": 0,
+  "fresh_end_to_end_timing": false,
+  "production_report_updated": false,
+  "source_observations_replayed": true,
+  "writer_text_replayed": true,
+  "source_checkpoint_file": "sequence-report-source-checkpoint.json",
+  "writer_receipts_file": "sequence-report-sections-receipts.json",
+  "separate_latest_shot_validation_file": "sequence-shot-filter-validation.json",
+  "latest_shot_merged_into_source_events": false,
+  "source_video_sha256": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+  "checks": {
+    "source_receipts_revalidated": true,
+    "canonical_bundle_reproduced": true,
+    "latest_raw_shot_resolution_reproduced": true,
+    "observed_stats": [
+      1,
+      3,
+      2,
+      2
+    ],
+    "evidence_comments": 8,
+    "unbound_skill_observations": 0,
+    "unsupported_claim_paths": [],
+    "aggregate_level_withheld": true,
+    "anatomical_foot_unresolved": true
+  },
+  "latest_shot_validation": {
+    "origin_run": 39193772410,
+    "event_id": "c2f922c004509f980768",
+    "contact_interval_ms": [
+      23682,
+      23749
+    ],
+    "outcome": "SAVED",
+    "aftermath_question_retained": true
+  },
+  "full_report": {
+    "player_type": "Close-control winger and chance creator",
+    "executive_summary": "The recorded actions show an 11-year-old winger who uses close touches, turns and body feints to advance the ball. His passing stands out, with three verified passes leading to teammate goals. He also takes two recorded shots himself: one is saved and one scores after his own dribble. Keeping possession through crowded challenges is a useful development focus, with both a successful carry through contact and a recorded loss while shielding. These are promising attacking examples, but the partial observation packet cannot establish his full-match level or long-term potential.",
+    "content_analysis": {
+      "content_type_observed": "Partial football action sequences described in a resolved observation packet; no footage supplied.",
+      "minutes_observed": 0.65,
+      "key_situations": [
+        "Receiving ground passes and carrying forward",
+        "Turning and dribbling near defenders",
+        "Shielding in crowded challenges",
+        "Chasing after losing possession",
+        "Shooting after a dribble",
+        "Passing through gaps to teammates near goal"
+      ]
+    },
+    "technical": {
+      "first_touch": {
+        "score": 6,
+        "notes": "Settles ground balls into a usable position for his next action.",
+        "confidence": "medium",
+        "confidence_reason": "Two clear receiving descriptions support a limited assessment.",
+        "observations_used": 2,
+        "evidence": [
+          {
+            "event_id": "a8b5662ae46646b8f0ae",
+            "timestamp": "00:02",
+            "what": "Receives and settles a ground pass before advancing with close touches.",
+            "canonical_event_ids": [
+              "a8b5662ae46646b8f0ae"
+            ],
+            "identity_verified": true,
+            "evidence_id": "evd_74bdb6d4d263",
+            "evidence_time_ms": 1633,
+            "proof_verified": true
+          },
+          {
+            "event_id": "ae3dbc4f32a81b2bca84",
+            "timestamp": "00:20.383",
+            "what": "Receives an approaching ground ball and advances with close touches.",
+            "canonical_event_ids": [
+              "ae3dbc4f32a81b2bca84"
+            ],
+            "identity_verified": true,
+            "proof_verified": false
+          }
+        ],
+        "cannot_evaluate": false,
+        "evaluable_reason": "The receiving actions are explicitly described.",
+        "why_this_score": "Useful ground-ball control is shown without enough variety to establish a higher level.",
+        "tier_for_age": "strong_club",
+        "benchmarks": {
+          "age_bracket": "U11-U12",
+          "position": "Winger",
+          "standard_club": "3-5",
+          "strong_club": "5-6.5",
+          "pro_academy": "6.5-8",
+          "elite_academy": "8-9"
+        },
+        "verdict": "A useful foundation for receiving and attacking."
+      },
+      "ball_control": {
+        "score": 6,
+        "notes": "Shows close control, with less reliable retention in crowded contact.",
+        "confidence": "medium",
+        "confidence_reason": "The packet describes both controlled touches and a clear possession loss.",
+        "observations_used": 2,
+        "evidence": [
+          {
+            "event_id": "966c91c7243829d6fab0",
+            "timestamp": "00:07.750",
+            "what": "Collects the ball, turns and uses close touches with body feints.",
+            "canonical_event_ids": [
+              "966c91c7243829d6fab0"
+            ],
+            "identity_verified": true,
+            "proof_verified": false
+          },
+          {
+            "event_id": "88aa8bbdedbec570d4de",
+            "timestamp": "00:09",
+            "what": "Attempts to shield against successive opponents, stumbles and loses possession.",
+            "canonical_event_ids": [
+              "88aa8bbdedbec570d4de"
+            ],
+            "identity_verified": true,
+            "evidence_id": "evd_db2aeb8f6b2d",
+            "evidence_time_ms": 8883,
+            "proof_verified": true
+          }
+        ],
+        "cannot_evaluate": false,
+        "evaluable_reason": "Touch control and a retention difficulty are recorded.",
+        "why_this_score": "Close touches are a strength, but protection under contact remains inconsistent in this sample.",
+        "tier_for_age": "strong_club",
+        "benchmarks": {
+          "age_bracket": "U11-U12",
+          "position": "Winger",
+          "standard_club": "3-5",
+          "strong_club": "5-6.5",
+          "pro_academy": "6.5-8",
+          "elite_academy": "8-9"
+        },
+        "verdict": "Build on close control with short shielding-and-release games."
+      },
+      "dribbling": {
+        "score": 7,
+        "notes": "Uses successive touches and changes of direction to progress near defenders.",
+        "confidence": "medium",
+        "confidence_reason": "Several described carries support the grade, but coverage is selective.",
+        "observations_used": 2,
+        "evidence": [
+          {
+            "event_id": "1349b8676c1e07e88c00",
+            "timestamp": "00:28",
+            "what": "Takes forward touches, withstands a close challenge and carries into shooting range.",
+            "canonical_event_ids": [
+              "1349b8676c1e07e88c00"
+            ],
+            "identity_verified": true,
+            "evidence_id": "evd_0a1d9d4b7760",
+            "evidence_time_ms": 27882,
+            "proof_verified": true
+          },
+          {
+            "event_id": "421c340be60ca0a2d7d1",
+            "timestamp": "00:41.915",
+            "what": "Carries left, checks near a defender, then turns inward and dribbles right before releasing.",
+            "canonical_event_ids": [
+              "421c340be60ca0a2d7d1"
+            ],
+            "identity_verified": true,
+            "proof_verified": false
+          }
+        ],
+        "cannot_evaluate": false,
+        "evaluable_reason": "The descriptions identify how he carries and changes direction.",
+        "why_this_score": "Progression through a challenge and varied direction changes are promising for a U11-U12 winger.",
+        "tier_for_age": "pro_academy",
+        "benchmarks": {
+          "age_bracket": "U11-U12",
+          "position": "Winger",
+          "standard_club": "3-5",
+          "strong_club": "5-6.5",
+          "pro_academy": "6.5-8",
+          "elite_academy": "8-9"
+        },
+        "verdict": "An attacking strength within the recorded sample, not an academy-placement verdict."
+      },
+      "passing": {
+        "score": 7,
+        "notes": "Finds teammates through defensive gaps and across the goalkeeper.",
+        "confidence": "medium",
+        "confidence_reason": "Verified goal-creating passes support the assessment, although some contact details are obscured.",
+        "observations_used": 2,
+        "evidence": [
+          {
+            "event_id": "ec74209ace700fa49d2e",
+            "timestamp": "00:44",
+            "what": "Passes through a defensive gap to a teammate who finishes, without an intervening controlled possession.",
+            "canonical_event_ids": [
+              "ec74209ace700fa49d2e"
+            ],
+            "identity_verified": true,
+            "evidence_id": "evd_5c3a6b29a240",
+            "evidence_time_ms": 44015,
+            "proof_verified": true
+          },
+          {
+            "event_id": "9e9a8a68c1772db2614f",
+            "timestamp": "00:56",
+            "what": "Sends a low ball across the advancing goalkeeper for a teammate to finish at close range.",
+            "canonical_event_ids": [
+              "9e9a8a68c1772db2614f"
+            ],
+            "identity_verified": true,
+            "evidence_id": "evd_24cac1bfc04f",
+            "evidence_time_ms": 56264,
+            "proof_verified": true
+          }
+        ],
+        "cannot_evaluate": false,
+        "evaluable_reason": "Pass direction and teammate outcomes are established.",
+        "why_this_score": "The recorded passes create clear chances in different crowded attacking situations.",
+        "tier_for_age": "pro_academy",
+        "benchmarks": {
+          "age_bracket": "U11-U12",
+          "position": "Winger",
+          "standard_club": "3-5",
+          "strong_club": "5-6.5",
+          "pro_academy": "6.5-8",
+          "elite_academy": "8-9"
+        },
+        "verdict": "Keep developing the pass after drawing a defender."
+      },
+      "shooting": {
+        "score": 6,
+        "notes": "",
+        "confidence": "medium",
+        "confidence_reason": "Both shot outcomes are verified, but the sample and visible technique details are limited.",
+        "observations_used": 2,
+        "evidence": [
+          {
+            "event_id": "dc2acb1e19ba55950e7f",
+            "timestamp": "00:24",
+            "what": "Makes the shooting swing for an airborne attempt that the goalkeeper parries outside the goal.",
+            "canonical_event_ids": [
+              "dc2acb1e19ba55950e7f"
+            ],
+            "identity_verified": true,
+            "evidence_id": "evd_aabf6a6b948d",
+            "evidence_time_ms": 23666,
+            "proof_verified": true
+          },
+          {
+            "event_id": "a512ae64e102f24b3383",
+            "timestamp": "00:31",
+            "what": "Finishes after his own dribble; the ball's subsequent appearance inside the goal establishes the score.",
+            "canonical_event_ids": [
+              "a512ae64e102f24b3383"
+            ],
+            "identity_verified": true,
+            "evidence_id": "evd_fc64e45e69e2",
+            "evidence_time_ms": 30915,
+            "proof_verified": true
+          }
+        ],
+        "cannot_evaluate": false,
+        "evaluable_reason": "Two target-player shots and their outcomes are established.",
+        "why_this_score": "He produces a goal and a saved attempt, without enough evidence of placement or repeatability for a higher grade.",
+        "tier_for_age": "strong_club",
+        "benchmarks": {
+          "age_bracket": "U11-U12",
+          "position": "Winger",
+          "standard_club": "3-5",
+          "strong_club": "5-6.5",
+          "pro_academy": "6.5-8",
+          "elite_academy": "8-9"
+        },
+        "verdict": "Practise finishing after a controlled final dribble touch."
+      },
+      "weak_foot": {
+        "score": null,
+        "notes": "The verified evidence is insufficient to assess this claim.",
+        "confidence": "Low",
+        "confidence_reason": "The verified evidence is insufficient to assess this claim.",
+        "observations_used": 0,
+        "evidence": [],
+        "cannot_evaluate": true,
+        "evaluable_reason": "No reliable comparison between feet is available.",
+        "why_this_score": "The verified evidence is insufficient to assess this claim.",
+        "tier_for_age": null,
+        "benchmarks": {
+          "age_bracket": "U11-U12",
+          "position": "Winger",
+          "standard_club": "3-5",
+          "strong_club": "5-6.5",
+          "pro_academy": "6.5-8",
+          "elite_academy": "8-9"
+        },
+        "verdict": "The verified evidence is insufficient to assess this claim."
+      },
+      "one_v_one": {
+        "score": 5,
+        "notes": "Shows mixed results when challenged closely.",
+        "confidence": "low",
+        "confidence_reason": "The challenges are often crowded rather than isolated winger duels.",
+        "observations_used": 2,
+        "evidence": [
+          {
+            "event_id": "88aa8bbdedbec570d4de",
+            "timestamp": "00:09",
+            "what": "Loses possession while attempting to shield against successive opponents.",
+            "canonical_event_ids": [
+              "88aa8bbdedbec570d4de"
+            ],
+            "identity_verified": true,
+            "evidence_id": "evd_db2aeb8f6b2d",
+            "evidence_time_ms": 8883,
+            "proof_verified": true
+          },
+          {
+            "event_id": "1349b8676c1e07e88c00",
+            "timestamp": "00:28",
+            "what": "Withstands a close challenge and continues into shooting range.",
+            "canonical_event_ids": [
+              "1349b8676c1e07e88c00"
+            ],
+            "identity_verified": true,
+            "evidence_id": "evd_0a1d9d4b7760",
+            "evidence_time_ms": 27882,
+            "proof_verified": true
+          }
+        ],
+        "cannot_evaluate": false,
+        "evaluable_reason": "Direct challenge outcomes provide a narrow basis for assessment.",
+        "why_this_score": "One successful carry and one failed retention sequence place this at the lower strong-club boundary.",
+        "tier_for_age": "strong_club",
+        "benchmarks": {
+          "age_bracket": "U11-U12",
+          "position": "Winger",
+          "standard_club": "3-5",
+          "strong_club": "5-6.5",
+          "pro_academy": "6.5-8",
+          "elite_academy": "8-9"
+        },
+        "verdict": "Use isolated one-against-one games to develop protection and an exit touch."
+      }
+    },
+    "tactical": {
+      "positioning": {
+        "score": null,
+        "notes": "The verified evidence is insufficient to assess this claim.",
+        "confidence": "Low",
+        "confidence_reason": "The verified evidence is insufficient to assess this claim.",
+        "observations_used": 0,
+        "evidence": [],
+        "cannot_evaluate": true,
+        "evaluable_reason": "Sustained positional context is missing.",
+        "why_this_score": "The verified evidence is insufficient to assess this claim.",
+        "tier_for_age": null,
+        "benchmarks": {
+          "age_bracket": "U11-U12",
+          "position": "Winger",
+          "standard_club": "3-5",
+          "strong_club": "5-6.5",
+          "pro_academy": "6.5-8",
+          "elite_academy": "8-9"
+        },
+        "verdict": "The verified evidence is insufficient to assess this claim."
+      },
+      "off_ball_movement": {
+        "score": null,
+        "notes": "The verified evidence is insufficient to assess this claim.",
+        "confidence": "Low",
+        "confidence_reason": "The verified evidence is insufficient to assess this claim.",
+        "observations_used": 0,
+        "evidence": [],
+        "cannot_evaluate": true,
+        "evaluable_reason": "No sustained evidence of creating space without the ball is supplied.",
+        "why_this_score": "The verified evidence is insufficient to assess this claim.",
+        "tier_for_age": null,
+        "benchmarks": {
+          "age_bracket": "U11-U12",
+          "position": "Winger",
+          "standard_club": "3-5",
+          "strong_club": "5-6.5",
+          "pro_academy": "6.5-8",
+          "elite_academy": "8-9"
+        },
+        "verdict": "The verified evidence is insufficient to assess this claim."
+      },
+      "scanning": {
+        "score": null,
+        "notes": "The verified evidence is insufficient to assess this claim.",
+        "confidence": "Low",
+        "confidence_reason": "The verified evidence is insufficient to assess this claim.",
+        "observations_used": 0,
+        "evidence": [],
+        "cannot_evaluate": true,
+        "evaluable_reason": "Direct scanning observations are absent.",
+        "why_this_score": "The verified evidence is insufficient to assess this claim.",
+        "tier_for_age": null,
+        "benchmarks": {
+          "age_bracket": "U11-U12",
+          "position": "Winger",
+          "standard_club": "3-5",
+          "strong_club": "5-6.5",
+          "pro_academy": "6.5-8",
+          "elite_academy": "8-9"
+        },
+        "verdict": "The verified evidence is insufficient to assess this claim."
+      },
+      "decision_making": {
+        "score": 7,
+        "notes": "Uses productive passing options in crowded scoring situations.",
+        "confidence": "medium",
+        "confidence_reason": "Verified releases show useful choices, but not every alternative is visible.",
+        "observations_used": 2,
+        "evidence": [
+          {
+            "event_id": "9a392fb19c052dfe6719",
+            "timestamp": "00:50",
+            "what": "Releases a short ball through a crowded challenge to a teammate who finishes directly.",
+            "canonical_event_ids": [
+              "9a392fb19c052dfe6719"
+            ],
+            "identity_verified": true,
+            "evidence_id": "evd_fa261dccb836",
+            "evidence_time_ms": 49615,
+            "proof_verified": true
+          },
+          {
+            "event_id": "9e9a8a68c1772db2614f",
+            "timestamp": "00:56",
+            "what": "Passes across the advancing goalkeeper to a teammate for a close-range finish.",
+            "canonical_event_ids": [
+              "9e9a8a68c1772db2614f"
+            ],
+            "identity_verified": true,
+            "evidence_id": "evd_24cac1bfc04f",
+            "evidence_time_ms": 56264,
+            "proof_verified": true
+          }
+        ],
+        "cannot_evaluate": false,
+        "evaluable_reason": "The chosen actions and their attacking context are described.",
+        "why_this_score": "These releases demonstrate useful attacking choices for his age without proving all-round tactical judgement.",
+        "tier_for_age": "pro_academy",
+        "benchmarks": {
+          "age_bracket": "U11-U12",
+          "position": "Winger",
+          "standard_club": "3-5",
+          "strong_club": "5-6.5",
+          "pro_academy": "6.5-8",
+          "elite_academy": "8-9"
+        },
+        "verdict": "Encourage choosing between carrying and releasing in small-sided games."
+      },
+      "timing_of_runs": {
+        "score": null,
+        "notes": "The verified evidence is insufficient to assess this claim.",
+        "confidence": "Low",
+        "confidence_reason": "The verified evidence is insufficient to assess this claim.",
+        "observations_used": 0,
+        "evidence": [],
+        "cannot_evaluate": true,
+        "evaluable_reason": "The necessary passer-and-defender context is missing.",
+        "why_this_score": "The verified evidence is insufficient to assess this claim.",
+        "tier_for_age": null,
+        "benchmarks": {
+          "age_bracket": "U11-U12",
+          "position": "Winger",
+          "standard_club": "3-5",
+          "strong_club": "5-6.5",
+          "pro_academy": "6.5-8",
+          "elite_academy": "8-9"
+        },
+        "verdict": "The verified evidence is insufficient to assess this claim."
+      },
+      "game_understanding": {
+        "score": null,
+        "notes": "The verified evidence is insufficient to assess this claim.",
+        "confidence": "Low",
+        "confidence_reason": "The verified evidence is insufficient to assess this claim.",
+        "observations_used": 0,
+        "evidence": [],
+        "cannot_evaluate": true,
+        "evaluable_reason": "Evidence across attacking and defensive phases is missing.",
+        "why_this_score": "The verified evidence is insufficient to assess this claim.",
+        "tier_for_age": null,
+        "benchmarks": {
+          "age_bracket": "U11-U12",
+          "position": "Winger",
+          "standard_club": "3-5",
+          "strong_club": "5-6.5",
+          "pro_academy": "6.5-8",
+          "elite_academy": "8-9"
+        },
+        "verdict": "The verified evidence is insufficient to assess this claim."
+      }
+    },
+    "physical": {
+      "acceleration": {
+        "score": null,
+        "notes": "The verified evidence is insufficient to assess this claim.",
+        "confidence": "Low",
+        "confidence_reason": "The verified evidence is insufficient to assess this claim.",
+        "observations_used": 0,
+        "evidence": [],
+        "cannot_evaluate": true,
+        "evaluable_reason": "Comparable starts and movement context are absent.",
+        "why_this_score": "The verified evidence is insufficient to assess this claim.",
+        "tier_for_age": null,
+        "benchmarks": {
+          "age_bracket": "U11-U12",
+          "position": "Winger",
+          "standard_club": "3-5",
+          "strong_club": "5-6.5",
+          "pro_academy": "6.5-8",
+          "elite_academy": "8-9"
+        },
+        "verdict": "The verified evidence is insufficient to assess this claim."
+      },
+      "speed": {
+        "score": null,
+        "notes": "The verified evidence is insufficient to assess this claim.",
+        "confidence": "Low",
+        "confidence_reason": "The verified evidence is insufficient to assess this claim.",
+        "observations_used": 0,
+        "evidence": [],
+        "cannot_evaluate": true,
+        "evaluable_reason": "No direct speed evidence is supplied.",
+        "why_this_score": "The verified evidence is insufficient to assess this claim.",
+        "tier_for_age": null,
+        "benchmarks": {
+          "age_bracket": "U11-U12",
+          "position": "Winger",
+          "standard_club": "3-5",
+          "strong_club": "5-6.5",
+          "pro_academy": "6.5-8",
+          "elite_academy": "8-9"
+        },
+        "verdict": "The verified evidence is insufficient to assess this claim."
+      },
+      "balance": {
+        "score": 5,
+        "notes": "Stability through contact varies across the recorded challenges.",
+        "confidence": "low",
+        "confidence_reason": "Two contrasting sequences offer only a narrow sample.",
+        "observations_used": 2,
+        "evidence": [
+          {
+            "event_id": "88aa8bbdedbec570d4de",
+            "timestamp": "00:09",
+            "what": "Stumbles repeatedly while shielding and loses possession.",
+            "canonical_event_ids": [
+              "88aa8bbdedbec570d4de"
+            ],
+            "identity_verified": true,
+            "evidence_id": "evd_db2aeb8f6b2d",
+            "evidence_time_ms": 8883,
+            "proof_verified": true
+          },
+          {
+            "event_id": "1349b8676c1e07e88c00",
+            "timestamp": "00:28",
+            "what": "Withstands a close challenge and continues carrying toward shooting range.",
+            "canonical_event_ids": [
+              "1349b8676c1e07e88c00"
+            ],
+            "identity_verified": true,
+            "evidence_id": "evd_0a1d9d4b7760",
+            "evidence_time_ms": 27882,
+            "proof_verified": true
+          }
+        ],
+        "cannot_evaluate": false,
+        "evaluable_reason": "Specific stability details are recorded rather than inferred from duel labels.",
+        "why_this_score": "Mixed stability supports a cautious lower strong-club grade, not a general physical weakness.",
+        "tier_for_age": "strong_club",
+        "benchmarks": {
+          "age_bracket": "U11-U12",
+          "position": "Winger",
+          "standard_club": "3-5",
+          "strong_club": "5-6.5",
+          "pro_academy": "6.5-8",
+          "elite_academy": "8-9"
+        },
+        "verdict": "Practise staying set while protecting and moving the ball."
+      },
+      "agility": {
+        "score": null,
+        "notes": "The verified evidence is insufficient to assess this claim.",
+        "confidence": "Low",
+        "confidence_reason": "The verified evidence is insufficient to assess this claim.",
+        "observations_used": 0,
+        "evidence": [],
+        "cannot_evaluate": true,
+        "evaluable_reason": "Change-of-direction execution is insufficiently documented.",
+        "why_this_score": "The verified evidence is insufficient to assess this claim.",
+        "tier_for_age": null,
+        "benchmarks": {
+          "age_bracket": "U11-U12",
+          "position": "Winger",
+          "standard_club": "3-5",
+          "strong_club": "5-6.5",
+          "pro_academy": "6.5-8",
+          "elite_academy": "8-9"
+        },
+        "verdict": "The verified evidence is insufficient to assess this claim."
+      },
+      "intensity": {
+        "score": null,
+        "notes": "The verified evidence is insufficient to assess this claim.",
+        "confidence": "Low",
+        "confidence_reason": "The verified evidence is insufficient to assess this claim.",
+        "observations_used": 0,
+        "evidence": [],
+        "cannot_evaluate": true,
+        "evaluable_reason": "Continuous work and recovery periods are missing.",
+        "why_this_score": "The verified evidence is insufficient to assess this claim.",
+        "tier_for_age": null,
+        "benchmarks": {
+          "age_bracket": "U11-U12",
+          "position": "Winger",
+          "standard_club": "3-5",
+          "strong_club": "5-6.5",
+          "pro_academy": "6.5-8",
+          "elite_academy": "8-9"
+        },
+        "verdict": "The verified evidence is insufficient to assess this claim."
+      },
+      "body_control": {
+        "score": null,
+        "notes": "The verified evidence is insufficient to assess this claim.",
+        "confidence": "Low",
+        "confidence_reason": "The verified evidence is insufficient to assess this claim.",
+        "observations_used": 0,
+        "evidence": [],
+        "cannot_evaluate": true,
+        "evaluable_reason": "The packet does not support a distinct body-control assessment.",
+        "why_this_score": "The verified evidence is insufficient to assess this claim.",
+        "tier_for_age": null,
+        "benchmarks": {
+          "age_bracket": "U11-U12",
+          "position": "Winger",
+          "standard_club": "3-5",
+          "strong_club": "5-6.5",
+          "pro_academy": "6.5-8",
+          "elite_academy": "8-9"
+        },
+        "verdict": "The verified evidence is insufficient to assess this claim."
+      }
+    },
+    "mentality": {
+      "confidence": {
+        "score": null,
+        "notes": "The verified evidence is insufficient to assess this claim.",
+        "confidence": "Low",
+        "confidence_reason": "The verified evidence is insufficient to assess this claim.",
+        "observations_used": 0,
+        "evidence": [],
+        "cannot_evaluate": true,
+        "evaluable_reason": "Confidence cannot be inferred from shots or dribbles alone.",
+        "why_this_score": "The verified evidence is insufficient to assess this claim.",
+        "tier_for_age": null,
+        "benchmarks": {
+          "age_bracket": "U11-U12",
+          "position": "Winger",
+          "standard_club": "3-5",
+          "strong_club": "5-6.5",
+          "pro_academy": "6.5-8",
+          "elite_academy": "8-9"
+        },
+        "verdict": "The verified evidence is insufficient to assess this claim."
+      },
+      "work_rate": {
+        "score": null,
+        "notes": "The verified evidence is insufficient to assess this claim.",
+        "confidence": "Low",
+        "confidence_reason": "The verified evidence is insufficient to assess this claim.",
+        "observations_used": 0,
+        "evidence": [],
+        "cannot_evaluate": true,
+        "evaluable_reason": "Longer off-ball coverage is required.",
+        "why_this_score": "The verified evidence is insufficient to assess this claim.",
+        "tier_for_age": null,
+        "benchmarks": {
+          "age_bracket": "U11-U12",
+          "position": "Winger",
+          "standard_club": "3-5",
+          "strong_club": "5-6.5",
+          "pro_academy": "6.5-8",
+          "elite_academy": "8-9"
+        },
+        "verdict": "The verified evidence is insufficient to assess this claim."
+      },
+      "courage_in_duels": {
+        "score": null,
+        "notes": "The verified evidence is insufficient to assess this claim.",
+        "confidence": "Low",
+        "confidence_reason": "The verified evidence is insufficient to assess this claim.",
+        "observations_used": 0,
+        "evidence": [],
+        "cannot_evaluate": true,
+        "evaluable_reason": "Sufficient behavioural evidence is absent.",
+        "why_this_score": "The verified evidence is insufficient to assess this claim.",
+        "tier_for_age": null,
+        "benchmarks": {
+          "age_bracket": "U11-U12",
+          "position": "Winger",
+          "standard_club": "3-5",
+          "strong_club": "5-6.5",
+          "pro_academy": "6.5-8",
+          "elite_academy": "8-9"
+        },
+        "verdict": "The verified evidence is insufficient to assess this claim."
+      },
+      "response_to_mistakes": {
+        "score": 7,
+        "notes": "Responds to losing possession by getting up and chasing to challenge again.",
+        "confidence": "low",
+        "confidence_reason": "One clearly linked response is available.",
+        "observations_used": 2,
+        "evidence": [
+          {
+            "event_id": "88aa8bbdedbec570d4de",
+            "timestamp": "00:09",
+            "what": "Loses possession after stumbling while attempting to shield.",
+            "canonical_event_ids": [
+              "88aa8bbdedbec570d4de"
+            ],
+            "identity_verified": true,
+            "evidence_id": "evd_db2aeb8f6b2d",
+            "evidence_time_ms": 8883,
+            "proof_verified": true
+          },
+          {
+            "event_id": "0fc666670ff612a8af2f",
+            "timestamp": "00:12.633",
+            "what": "Gets up and chases the opponent who recovered the ball, closing enough to challenge again.",
+            "canonical_event_ids": [
+              "0fc666670ff612a8af2f"
+            ],
+            "identity_verified": true,
+            "proof_verified": false
+          }
+        ],
+        "cannot_evaluate": false,
+        "evaluable_reason": "The packet explicitly links the loss to the subsequent recovery action.",
+        "why_this_score": "A constructive immediate response is shown, although repeatability remains unknown.",
+        "tier_for_age": "pro_academy",
+        "benchmarks": {
+          "age_bracket": "U11-U12",
+          "position": "Winger",
+          "standard_club": "3-5",
+          "strong_club": "5-6.5",
+          "pro_academy": "6.5-8",
+          "elite_academy": "8-9"
+        },
+        "verdict": "Reinforce the habit of taking the next useful action after a loss."
+      },
+      "competitive_mindset": {
+        "score": null,
+        "notes": "The verified evidence is insufficient to assess this claim.",
+        "confidence": "Low",
+        "confidence_reason": "The verified evidence is insufficient to assess this claim.",
+        "observations_used": 0,
+        "evidence": [],
+        "cannot_evaluate": true,
+        "evaluable_reason": "The isolated recovery response is too narrow for this trait.",
+        "why_this_score": "The verified evidence is insufficient to assess this claim.",
+        "tier_for_age": null,
+        "benchmarks": {
+          "age_bracket": "U11-U12",
+          "position": "Winger",
+          "standard_club": "3-5",
+          "strong_club": "5-6.5",
+          "pro_academy": "6.5-8",
+          "elite_academy": "8-9"
+        },
+        "verdict": "The verified evidence is insufficient to assess this claim."
+      },
+      "focus": {
+        "score": null,
+        "notes": "The verified evidence is insufficient to assess this claim.",
+        "confidence": "Low",
+        "confidence_reason": "The verified evidence is insufficient to assess this claim.",
+        "observations_used": 0,
+        "evidence": [],
+        "cannot_evaluate": true,
+        "evaluable_reason": "Continuous behavioural coverage is missing.",
+        "why_this_score": "The verified evidence is insufficient to assess this claim.",
+        "tier_for_age": null,
+        "benchmarks": {
+          "age_bracket": "U11-U12",
+          "position": "Winger",
+          "standard_club": "3-5",
+          "strong_club": "5-6.5",
+          "pro_academy": "6.5-8",
+          "elite_academy": "8-9"
+        },
+        "verdict": "The verified evidence is insufficient to assess this claim."
+      }
+    },
+    "scores": {
+      "technical": null,
+      "tactical": null,
+      "physical": null,
+      "mentality": null,
+      "overall_development": null
+    },
+    "scores_confidence": {
+      "technical": "Low",
+      "tactical": "Low",
+      "physical": "Low",
+      "mentality": "Low",
+      "overall_development": "Low"
+    },
+    "overall_benchmark": {
+      "tier": null,
+      "tier_label": "Insufficient verified evidence",
+      "percentile": null,
+      "evidence_status": "PARTIAL"
+    },
+    "evidence_quality_note": "This report contains partial verified evidence. Unconfirmed scoring claims and assessments without a verified player/action link have been withheld. Missing events do not establish zero shots, goals or assists, or a player weakness.",
+    "scout_view": {
+      "key_strengths": [
+        "Close touches and changes of direction help him carry near defenders.",
+        "Three verified passes lead to teammate goals, including a low ball across the goalkeeper.",
+        "He scores after his own dribble and has another attempt saved.",
+        "After one possession loss, he gets up and closes enough to challenge again."
+      ],
+      "areas_of_concern": [
+        "Ball protection is inconsistent: one shielding sequence ends in repeated stumbles and lost possession.",
+        "The partial sample does not establish whether his attacking strengths hold up across a full match."
+      ],
+      "development_priorities": [
+        "Protect the ball and find an exit from close pressure.",
+        "Build on his ability to choose between carrying and releasing.",
+        "Practise finishing after a controlled final dribble touch."
+      ],
+      "appropriate_next_level": "Continue challenging club football and review a full match with his coach before considering a stronger local training group.",
+      "positional_suitability": "His close carrying and chance-creating passes suit an attacking winger role; acceleration, run timing and use of both feet remain unassessed.",
+      "what_we_could_not_assess": [
+        "Weak-foot proficiency and reliable foot preference",
+        "Speed, acceleration and broader physical qualities",
+        "Scanning, positioning and timing of attacking runs",
+        "Sustained off-ball work and full-match consistency",
+        "General confidence, courage and long-term potential"
+      ]
+    },
+    "potential_assessment": {
+      "current_level": "Insufficient verified evidence to establish a playing level.",
+      "development_potential": "There is a useful attacking foundation to develop, but this partial packet cannot support a long-term ceiling.",
+      "recommended_next_step": "Ask his coach to observe a full match and several isolated winger duels, focusing on protection and release under pressure.",
+      "three_month_focus": "Make shielding, an exit touch and a timely pass more reliable while retaining his close-control attacking play."
+    },
+    "training_plan": {
+      "exercises": [
+        {
+          "name": "Protect and escape",
+          "description": "In a small square, protect the ball from a partner using light pressure. Turn through an open gate when space appears, keeping the ball within reach.",
+          "duration": "10 min"
+        },
+        {
+          "name": "One defender, two gates",
+          "description": "Attack two gates against one defender with close touches and a change of direction. Reset after each attempt and discuss which exit was available.",
+          "duration": "12 min"
+        },
+        {
+          "name": "Carry or release",
+          "description": "Play two attackers against one defender toward a small goal. The ball carrier chooses to continue or pass as the defender commits.",
+          "duration": "12 min"
+        },
+        {
+          "name": "Final touch and finish",
+          "description": "Dribble around a marker and take a final touch into a comfortable shooting position. Aim at a chosen part of the goal rather than simply striking harder.",
+          "duration": "10 min"
+        },
+        {
+          "name": "Next-action game",
+          "description": "Play a short three-against-three game with normal scoring. After losing the ball, reward a useful recovery action such as closing the carrier or covering a pass.",
+          "duration": "12 min"
+        }
+      ],
+      "weekly_focus": "Fit two short blocks into normal training: one on protection and escape, and one on carrying into a pass or shot; finish with a game so choices remain realistic.",
+      "thirty_day_plan": "Start with light pressure and progress to live one-against-one games, recording whether he keeps possession or finds an exit rather than counting only goals.",
+      "ninety_day_plan": "Progress to crowded small-sided games and compare full-match examples of shielding, releasing and finishing with the starting observations."
+    },
+    "parent_summary": {
+      "headline": "Your child shows promising close control and an ability to create chances for teammates.",
+      "paragraphs": [
+        "He carries with close touches and changes direction near defenders.",
+        "The clearest next step is keeping the ball secure when opponents crowd him. Practising protection and a simple exit can help him use his passing and dribbling more consistently."
+      ],
+      "good_news": "There are several useful attacking skills to build on. His recorded chase after losing possession is also a positive action worth praising."
+    },
+    "parent_tips": [
+      "Praise a useful pass or recovery action, not just a goal.",
+      "Keep home practice short and let him choose between two games.",
+      "Ask what he noticed when a defender came close rather than telling him every answer.",
+      "Use full-match observations with his coach before drawing conclusions about level or ability."
+    ],
+    "coach_notes": [
+      "Perfect role: An attacking winger encouraged to carry and combine, subject to fuller positional assessment.",
+      "Focus in training: Protect, find an exit touch and release under close pressure.",
+      "Use two-against-one games to build on the recorded goal-creating passes.",
+      "Reinforce the recovery response shown at 00:12.633 without treating one chase as a full work-rate profile.",
+      "Observe isolated winger duels, both feet and off-ball runs before setting further individual targets."
+    ],
+    "snapshot": {
+      "biggest_strength": "Close carrying and chance creation",
+      "biggest_development_area": "Ball protection under close pressure",
+      "hidden_talent": "Short releases through crowded gaps",
+      "next_milestone": "Protect and release more consistently",
+      "overall_progress_note": "A promising attacking foundation to keep building."
+    },
+    "development_roadmap": {
+      "now": "Practise protecting the ball and finding exits",
+      "three_months": "Link secure control with timely attacking releases",
+      "six_months": "Review these habits across complete competitive matches",
+      "twelve_months": "Choose further challenges using sustained match evidence"
+    },
+    "development_priorities_detailed": [
+      {
+        "name": "one_v_one",
+        "score": 5,
+        "issue": "Close challenges produce mixed results, including a shielding loss and a successful carry through contact.",
+        "how_to_improve": "Use one-against-one games with two exit gates, practising protection before a controlled escape touch."
+      },
+      {
+        "name": "ball_control",
+        "score": 6,
+        "issue": "Close touches are useful, but possession becomes less reliable in crowded contact.",
+        "how_to_improve": "Start with light-pressure shielding and progress to a live defender, adding a nearby teammate as a release option."
+      },
+      {
+        "name": "shooting",
+        "score": 6,
+        "issue": "One goal and one saved attempt provide too little evidence to establish consistent placement.",
+        "how_to_improve": "Repeat short dribbles into a controlled final touch and an aimed finish, varying the approach angle."
+      }
+    ],
+    "scout_outlook": {
+      "current_level_label": "Insufficient verified evidence",
+      "current_level_dots": null,
+      "potential_level_label": "Not established from partial observations",
+      "potential_level_dots": null,
+      "recruitment_readiness": "Further full-match observation needed",
+      "long_term_potential": "Developing",
+      "long_term_note": "His attacking examples justify continued development, not a prediction of future playing level."
+    },
+    "final_summary": "This winger shows close carrying, changes of direction and productive passing near goal. Three verified assists belong to him as the passer, while his own two recorded shots produce a save and a goal. More reliable protection under close pressure is the clearest development target. Full-match observation is needed before judging his wider game or next playing level.",
+    "parents_package": {
+      "home_drills": [
+        {
+          "name": "Protect your treasure",
+          "minutes": 8,
+          "equipment": "A ball and two markers",
+          "steps": [
+            "Make a small space with an exit gate.",
+            "Protect the ball while a parent applies gentle walking pressure without pushing.",
+            "Turn and carry through the gate when the route opens."
+          ],
+          "success_sign": "He can keep the ball within reach and leave the pressure under control.",
+          "targets": "Ball protection and an exit touch"
+        },
+        {
+          "name": "Pass through the gap",
+          "minutes": 8,
+          "equipment": "A ball, two markers and a partner",
+          "steps": [
+            "Place the markers as a passing gate.",
+            "Take a few close touches before passing through it to a partner.",
+            "Change the approach angle and try again."
+          ],
+          "success_sign": "The partner receives a controlled pass after the dribble.",
+          "targets": "Linking carrying and passing"
+        },
+        {
+          "name": "Touch then target",
+          "minutes": 8,
+          "equipment": "A ball and a safe target",
+          "steps": [
+            "Choose a small target in a safe playing area.",
+            "Dribble toward it and set the ball with a final touch.",
+            "Finish gently toward the target and repeat from another angle."
+          ],
+          "success_sign": "The final touch leaves him ready to aim without stretching for the ball.",
+          "targets": "Finishing after a controlled dribble"
+        }
+      ],
+      "watch_together": {
+        "intro": "If the source footage becomes available, revisit these source-time moments together and ask what he was trying to do.",
+        "moments": [
+          {
+            "timestamp": "00:12",
+            "say_this": "You got up and went after the ball again—that next action was useful.",
+            "proof_verified": false
+          },
+          {
+            "timestamp": "00:44",
+            "say_this": "You played through the gap for your teammate—what helped you choose that pass?",
+            "proof_verified": false
+          },
+          {
+            "timestamp": "00:56",
+            "say_this": "You sent the ball across the goalkeeper for your teammate—that was a useful way to share the chance.",
+            "proof_verified": false
+          }
+        ],
+        "avoid": [
+          "Avoid making the discussion only about goals.",
+          "Avoid treating one lost ball as proof of a weakness."
+        ]
+      },
+      "message_to_player": {
+        "greeting": "Hi there!",
+        "body": "At 00:27, you kept carrying through a close challenge and reached shooting range. At 00:44, you passed through a gap for a teammate. At 00:12, you got up after losing the ball and chased to challenge again. Keep practising how to protect the ball and find a way out when players crowd you. Keep enjoying both making chances and taking them.",
+        "signoff": "Keep learning and enjoying your football."
+      }
+    },
+    "next_match_missions": [
+      {
+        "mission": "Try protecting the ball before taking an exit touch when a defender gets close.",
+        "target": "3 opportunities",
+        "why": "This builds on your close touches while helping you keep possession."
+      },
+      {
+        "mission": "Look for a teammate to release to when a defender commits to you.",
+        "target": "3 opportunities",
+        "why": "Your passing can turn a carry into a chance for someone else."
+      },
+      {
+        "mission": "After losing the ball, take a useful next action by closing or covering.",
+        "target": "3 opportunities if they arise",
+        "why": "It repeats the helpful response you showed after your recorded loss."
+      }
+    ],
+    "parent_value_metrics": {
+      "involvement": {
+        "touches_observed": null,
+        "touches_per_minute": null,
+        "note": "The packet describes repeated involvements but does not provide a reliable individual touch count."
+      },
+      "bravery": {
+        "score": null,
+        "note": "He contests and carries the ball under challenge, but those actions alone do not establish bravery."
+      },
+      "reaction_after_mistake": {
+        "observed": true,
+        "rating": "strong",
+        "timestamp": "00:12",
+        "note": "After losing possession while shielding, he gets up and chases the opponent, closing enough to challenge again.",
+        "proof_verified": false
+      },
+      "off_ball_work": {
+        "score": null,
+        "note": "One recovery chase is described, but sustained support movement and defensive work remain unassessed."
+      },
+      "top_minutes": [
+        {
+          "from": "00:27",
+          "to": "00:32",
+          "why": "This sequence links a carry through a close challenge to his own goal."
+        },
+        {
+          "from": "00:41",
+          "to": "00:46",
+          "why": "This sequence shows direction changes followed by a verified pass through a gap for a teammate's goal."
+        }
+      ]
+    },
+    "grow_your_game": {
+      "lessons": [
+        {
+          "topic_id": "playing_under_pressure",
+          "evidence_strength": "strong",
+          "moments": [
+            {
+              "timestamp": "00:08.883",
+              "what": "He attempts to shield against successive opponents, stumbles and loses possession.",
+              "event_id": "88aa8bbdedbec570d4de",
+              "proof_verified": false
+            },
+            {
+              "timestamp": "00:27.882",
+              "what": "He withstands a close challenge and continues carrying into shooting range.",
+              "event_id": "1349b8676c1e07e88c00",
+              "proof_verified": false
+            }
+          ],
+          "what_scouts_look_for": "Coaches watch whether a player keeps the ball within reach while a defender challenges. They also look for a useful exit touch or release.",
+          "why_it_matters": "At 11, close control needs practice against realistic but manageable pressure. Keeping the ball secure gives a winger more chances to use a pass or dribble.",
+          "what_happened": "The player's first name was not supplied. At 00:08.883, his shielding sequence ends in a loss. At 00:27.882, he keeps going through a close challenge. These contrasting examples make protection a useful practice target rather than an established general weakness.",
+          "personal_advice": "Practise protecting against light pressure before turning through one of two gates. Add a teammate so you can also choose a short release instead of always escaping alone.",
+          "age_benchmark": "The mixed challenge outcomes support a cautious lower strong-club indication for a U11-U12 winger, not a measured peer ranking.",
+          "simple_explanation": "Protecting the ball is like keeping a toy within reach when someone tries to take it. The next step is finding a clear way out rather than staying trapped."
+        },
+        {
+          "topic_id": "decision_making",
+          "evidence_strength": "strong",
+          "moments": [
+            {
+              "timestamp": "00:49.615",
+              "what": "He releases a short ball through a crowded challenge for a teammate to finish directly.",
+              "event_id": "9a392fb19c052dfe6719",
+              "proof_verified": false
+            },
+            {
+              "timestamp": "00:56.264",
+              "what": "He passes low across the advancing goalkeeper for a teammate's close-range finish.",
+              "event_id": "9e9a8a68c1772db2614f",
+              "proof_verified": false
+            }
+          ],
+          "what_scouts_look_for": "Coaches watch how a player chooses between carrying, passing and shooting. A useful choice fits the available space and the defender's action.",
+          "why_it_matters": "Young wingers benefit from learning that carrying and passing work together. At this age, simple games with choices are more useful than prescribing the same move every time.",
+          "what_happened": "The player's first name was not supplied. At 00:49.615, he releases through a crowded challenge. At 00:56.264, he sends the ball across the goalkeeper. Both finishes belong to teammates, while his contribution is the pass.",
+          "personal_advice": "Play two attackers against one defender and choose whether to carry or release. Talk briefly about which option was open rather than judging only whether a goal followed.",
+          "age_benchmark": "These attacking choices support the supplied 7/10 decision-making grade within the U11-U12 pro-academy guide range, without establishing overall academy readiness.",
+          "simple_explanation": "Choosing a pass is like choosing the clearest route through a busy room. Sometimes moving yourself helps, and sometimes giving the ball to someone with more room works better."
+        },
+        {
+          "topic_id": "five_seconds_after_mistake",
+          "evidence_strength": "partial",
+          "moments": [
+            {
+              "timestamp": "00:12.633",
+              "what": "After the shielding loss, he gets up and chases the recovering opponent to challenge again.",
+              "event_id": "0fc666670ff612a8af2f",
+              "proof_verified": false
+            }
+          ],
+          "what_scouts_look_for": "Coaches watch the next useful action after possession is lost. That might be closing the carrier or covering a nearby option.",
+          "why_it_matters": "Mistakes are normal at 11. Practising a simple next action helps a child stay involved without dwelling on the outcome.",
+          "what_happened": "The player's first name was not supplied. He loses possession in the shielding sequence. At 00:12.633, he gets up and closes enough to challenge again. This is one positive response, not proof of a general mental trait.",
+          "personal_advice": "In small-sided games, practise choosing one useful recovery action after a loss. Praise the action rather than demanding that every chase wins the ball.",
+          "age_benchmark": "This is a constructive U11-U12 recovery example, although one sequence cannot establish a consistent habit.",
+          "simple_explanation": "It is like dropping something during a game and immediately helping put things right. The important part is doing something useful next, not pretending the mistake never happened."
+        }
+      ],
+      "homework_plan": [
+        {
+          "days": "Day 1-2",
+          "topic_id": "playing_under_pressure",
+          "drill": "For 10 minutes in a park, practise close turns and exit touches with a ball; alternate a short protection pause with moving into open space.",
+          "why": "This rehearses an exit from the kind of crowded control situation described at 00:08.883."
+        },
+        {
+          "days": "Day 3-4",
+          "topic_id": "decision_making",
+          "drill": "For 10 minutes with a partner, alternate short carries and passes as the partner changes receiving position.",
+          "why": "This links carrying and releasing, building on the short pass at 00:49.615."
+        },
+        {
+          "days": "Day 5-7",
+          "topic_id": "five_seconds_after_mistake",
+          "drill": "Play 10 minutes of gentle one-against-one with a partner, resetting after each change of possession and practising a controlled recovery approach.",
+          "why": "This repeats the next-action habit shown at 00:12.633 without requiring a win every time."
+        }
+      ]
+    },
+    "parent_corner": {
+      "size_and_potential": "Your child's first name and physical measurements were not supplied, so neither identity details nor size-based conclusions are added here. The useful evidence concerns his football actions. At 00:44.015, he passes through a defensive gap for a teammate to finish. Value that skill without comparing bodies or predicting adult potential.",
+      "development_takes_time": "Your child already has useful close-control and passing examples to build on. Protection under pressure is the clearest next practice theme. A lost ball in one sequence and a successful carry in another show why repeated observation matters. Look for gradual improvement across months rather than expecting every challenge to end well.",
+      "your_role_on_the_sideline": "At 00:12.633, he responds to a loss by chasing to challenge again. Praise that useful next action without shouting a stream of instructions. Let his coach guide the football decisions and ask him afterwards which moments he enjoyed.",
+      "how_to_support_mentally": "The packet shows his recovery chase at 00:12.633, but it does not tell us how he felt. Avoid assuming frustration, confidence or disappointment. Afterwards, ask what felt difficult and what he would like to try again. Praise specific effort and choices rather than only scoring. After a difficult performance, offer reassurance and let him help choose one small practice goal."
+    },
+    "analysis_authority": {
+      "output": "SEQUENCE_V1",
+      "source_video_sha256": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999"
+    },
+    "action_timeline": [
+      {
+        "event_id": "a8b5662ae46646b8f0ae",
+        "timestamp": "00:02",
+        "action_type": "dribble",
+        "title": "Dribble",
+        "description": "Receives and settles the ground pass, then advances with repeated close touches.",
+        "rating": null,
+        "outcome": "neutral",
+        "identity_confidence": "high",
+        "event_source": "sequence_v1",
+        "cross_verified": true,
+        "actor_spatial_verified": false,
+        "actor_spatial_reason": "ORIGINAL_SELECTION_SEQUENCE_CONTINUITY",
+        "event_start_ms": 1633,
+        "event_end_ms": 3750,
+        "canonical_event_type": "OTHER",
+        "canonical_action_type": "OTHER",
+        "canonical_result": "COMPLETED",
+        "outcome_visible": true,
+        "football_event_type": "DRIBBLE",
+        "football_action_type": "DRIBBLE",
+        "football_outcome": "COMPLETED",
+        "causal_verified": false,
+        "football_details": [
+          "Receives and settles the ground pass, then advances with repeated close touches. This is not a shot toward the small background goal."
+        ],
+        "foot": "UNKNOWN",
+        "pressure": {},
+        "sequence_id": null,
+        "source_sequence_ids": [
+          "sequence_001"
+        ],
+        "source_action_ids": [
+          "sequence_001:0:a3"
+        ],
+        "causal_chain": {
+          "target_contact_ms": null,
+          "goal_outcome_ms": 3750,
+          "receiver_visual_id": null,
+          "finisher_visual_id": null
+        },
+        "proof_window": {
+          "start_ms": 1633,
+          "end_ms": 3750
+        },
+        "actor_visual_verified": true,
+        "contact_ms": null,
+        "contact_interval_ms": null,
+        "stat_mapping_status": "CARRY_VS_TAKE_ON_UNRESOLVED",
+        "proof_verified": true
+      },
+      {
+        "event_id": "cc4cbad57d007f19ad01",
+        "timestamp": "00:04",
+        "action_type": "duel",
+        "title": "Duel",
+        "description": "P1 contests the ball with p3 and p4 while p5 runs alongside. Several touches are obscured. The ball's proximity to number 20 does not establish a separate controlled blue possession. The precise actor of the final releasing touch remains uncertain because the white players and number 20 overlap.",
+        "rating": null,
+        "outcome": "neutral",
+        "identity_confidence": "high",
+        "event_source": "sequence_v1",
+        "cross_verified": true,
+        "actor_spatial_verified": false,
+        "actor_spatial_reason": "ORIGINAL_SELECTION_SEQUENCE_CONTINUITY",
+        "event_start_ms": 3750,
+        "event_end_ms": 6500,
+        "canonical_event_type": "DUEL",
+        "canonical_action_type": "DUEL",
+        "canonical_result": "UNKNOWN",
+        "outcome_visible": false,
+        "football_event_type": "DUEL",
+        "football_action_type": "DUEL",
+        "football_outcome": "UNKNOWN",
+        "causal_verified": false,
+        "football_details": [
+          "P1 contests the ball with p3 and p4 while p5 runs alongside. Several touches are obscured. The ball's proximity to number 20 does not establish a separate controlled blue possession. The precise actor of the final releasing touch remains uncertain because the white players and number 20 overlap."
+        ],
+        "foot": "UNKNOWN",
+        "pressure": {},
+        "sequence_id": null,
+        "source_sequence_ids": [
+          "sequence_001"
+        ],
+        "source_action_ids": [
+          "sequence_001:0:a4"
+        ],
+        "causal_chain": {
+          "target_contact_ms": null,
+          "goal_outcome_ms": null,
+          "receiver_visual_id": null,
+          "finisher_visual_id": null
+        },
+        "proof_window": {
+          "start_ms": 3750,
+          "end_ms": 6500
+        },
+        "actor_visual_verified": true,
+        "contact_ms": null,
+        "contact_interval_ms": null,
+        "proof_verified": true
+      },
+      {
+        "event_id": "966c91c7243829d6fab0",
+        "timestamp": "00:08",
+        "action_type": "dribble",
+        "title": "Dribble",
+        "description": "Collects the ball, turns and uses close touches and body feints. The original supplier is not visible. This control phase leads directly into the duel, not a pass.",
+        "rating": null,
+        "outcome": "neutral",
+        "identity_confidence": "high",
+        "event_source": "sequence_v1",
+        "cross_verified": true,
+        "actor_spatial_verified": false,
+        "actor_spatial_reason": "ORIGINAL_SELECTION_SEQUENCE_CONTINUITY",
+        "event_start_ms": 7750,
+        "event_end_ms": 8750,
+        "canonical_event_type": "OTHER",
+        "canonical_action_type": "OTHER",
+        "canonical_result": "COMPLETED",
+        "outcome_visible": true,
+        "football_event_type": "DRIBBLE",
+        "football_action_type": "DRIBBLE",
+        "football_outcome": "COMPLETED",
+        "causal_verified": false,
+        "football_details": [
+          "Collects the ball, turns and uses close touches and body feints. The original supplier is not visible. This control phase leads directly into the duel, not a pass."
+        ],
+        "foot": "UNKNOWN",
+        "pressure": {},
+        "sequence_id": null,
+        "source_sequence_ids": [
+          "sequence_001",
+          "sequence_002"
+        ],
+        "source_action_ids": [
+          "sequence_001:1:a7",
+          "sequence_002:1:a2"
+        ],
+        "causal_chain": {
+          "target_contact_ms": 7750,
+          "goal_outcome_ms": 8750,
+          "receiver_visual_id": null,
+          "finisher_visual_id": null
+        },
+        "proof_window": {
+          "start_ms": 7500,
+          "end_ms": 8750
+        },
+        "actor_visual_verified": true,
+        "contact_ms": 7750,
+        "contact_interval_ms": [
+          7750,
+          7750
+        ],
+        "stat_mapping_status": "CARRY_VS_TAKE_ON_UNRESOLVED",
+        "proof_verified": true
+      },
+      {
+        "event_id": "88aa8bbdedbec570d4de",
+        "timestamp": "00:09",
+        "action_type": "duel",
+        "title": "Duel",
+        "description": "Attempts to shield and retain possession against number 9, then number 20. He stumbles repeatedly and loses possession. The crowded individual toe contacts are not all separable, but the subsequent controlled possession by number 20 is visible. No referee decision is shown.",
+        "rating": null,
+        "outcome": "neutral",
+        "identity_confidence": "high",
+        "event_source": "sequence_v1",
+        "cross_verified": true,
+        "actor_spatial_verified": false,
+        "actor_spatial_reason": "ORIGINAL_SELECTION_SEQUENCE_CONTINUITY",
+        "event_start_ms": 8883,
+        "event_end_ms": 12133,
+        "canonical_event_type": "DUEL",
+        "canonical_action_type": "DUEL",
+        "canonical_result": "INCOMPLETE",
+        "outcome_visible": true,
+        "football_event_type": "DUEL",
+        "football_action_type": "DUEL",
+        "football_outcome": "INCOMPLETE",
+        "causal_verified": false,
+        "football_details": [
+          "Attempts to shield and retain possession against number 9, then number 20. He stumbles repeatedly and loses possession. The crowded individual toe contacts are not all separable, but the subsequent controlled possession by number 20 is visible. No referee decision is shown."
+        ],
+        "foot": "UNKNOWN",
+        "pressure": {},
+        "sequence_id": null,
+        "source_sequence_ids": [
+          "sequence_002"
+        ],
+        "source_action_ids": [
+          "sequence_002:1:a3"
+        ],
+        "causal_chain": {
+          "target_contact_ms": null,
+          "goal_outcome_ms": 12133,
+          "receiver_visual_id": null,
+          "finisher_visual_id": null
+        },
+        "proof_window": {
+          "start_ms": 8750,
+          "end_ms": 12133
+        },
+        "actor_visual_verified": true,
+        "contact_ms": null,
+        "contact_interval_ms": null,
+        "proof_verified": true
+      },
+      {
+        "event_id": "0fc666670ff612a8af2f",
+        "timestamp": "00:13",
+        "action_type": "run",
+        "title": "Run",
+        "description": "Gets up and chases the opponent who recovered his ball, closing enough to challenge again.",
+        "rating": null,
+        "outcome": "neutral",
+        "identity_confidence": "high",
+        "event_source": "sequence_v1",
+        "cross_verified": true,
+        "actor_spatial_verified": false,
+        "actor_spatial_reason": "ORIGINAL_SELECTION_SEQUENCE_CONTINUITY",
+        "event_start_ms": 12633,
+        "event_end_ms": 14016,
+        "canonical_event_type": "RUN",
+        "canonical_action_type": "RUN",
+        "canonical_result": "COMPLETED",
+        "outcome_visible": true,
+        "football_event_type": "RUN",
+        "football_action_type": "RUN",
+        "football_outcome": "COMPLETED",
+        "causal_verified": false,
+        "football_details": [
+          "Gets up and chases the opponent who recovered his ball, closing enough to challenge again."
+        ],
+        "foot": "UNKNOWN",
+        "pressure": {},
+        "sequence_id": null,
+        "source_sequence_ids": [
+          "sequence_002"
+        ],
+        "source_action_ids": [
+          "sequence_002:1:a6"
+        ],
+        "causal_chain": {
+          "target_contact_ms": null,
+          "goal_outcome_ms": 14016,
+          "receiver_visual_id": null,
+          "finisher_visual_id": null
+        },
+        "proof_window": {
+          "start_ms": 12383,
+          "end_ms": 14016
+        },
+        "actor_visual_verified": true,
+        "contact_ms": null,
+        "contact_interval_ms": null,
+        "proof_verified": true
+      },
+      {
+        "event_id": "ae3dbc4f32a81b2bca84",
+        "timestamp": "00:20",
+        "action_type": "dribble",
+        "title": "Dribble",
+        "description": "Receives the approaching ground ball and advances with close touches, changing his body angle to negotiate the defenders. The end of this dribble becomes a contested sequence, not a demonstrated clean pass.",
+        "rating": null,
+        "outcome": "neutral",
+        "identity_confidence": "high",
+        "event_source": "sequence_v1",
+        "cross_verified": true,
+        "actor_spatial_verified": false,
+        "actor_spatial_reason": "ORIGINAL_SELECTION_SEQUENCE_CONTINUITY",
+        "event_start_ms": 20383,
+        "event_end_ms": 21582,
+        "canonical_event_type": "OTHER",
+        "canonical_action_type": "OTHER",
+        "canonical_result": "UNKNOWN",
+        "outcome_visible": false,
+        "football_event_type": "DRIBBLE",
+        "football_action_type": "DRIBBLE",
+        "football_outcome": "UNKNOWN",
+        "causal_verified": false,
+        "football_details": [
+          "Receives the approaching ground ball and advances with close touches, changing his body angle to negotiate the defenders. The opening goal-area view does not establish the originating pass. The end of this dribble becomes a contested sequence, not a demonstrated clean pass."
+        ],
+        "foot": "UNKNOWN",
+        "pressure": {},
+        "sequence_id": null,
+        "source_sequence_ids": [
+          "contact_review_002"
+        ],
+        "source_action_ids": [
+          "contact_review_002:0:a1"
+        ],
+        "causal_chain": {
+          "target_contact_ms": null,
+          "goal_outcome_ms": null,
+          "receiver_visual_id": null,
+          "finisher_visual_id": null
+        },
+        "proof_window": {
+          "start_ms": 19633,
+          "end_ms": 21582
+        },
+        "actor_visual_verified": true,
+        "contact_ms": null,
+        "contact_interval_ms": null,
+        "stat_mapping_status": "CARRY_VS_TAKE_ON_UNRESOLVED",
+        "proof_verified": true
+      },
+      {
+        "event_id": "dc2acb1e19ba55950e7f",
+        "timestamp": "00:24",
+        "action_type": "shot",
+        "title": "Shot attempt",
+        "description": "The selected player, not the partly hidden white teammate, makes the visible shooting swing. The exact boot-ball instant is bracketed.",
+        "rating": null,
+        "outcome": "neutral",
+        "identity_confidence": "high",
+        "event_source": "sequence_v1",
+        "cross_verified": true,
+        "actor_spatial_verified": false,
+        "actor_spatial_reason": "ORIGINAL_SELECTION_SEQUENCE_CONTINUITY",
+        "event_start_ms": 23666,
+        "event_end_ms": 25516,
+        "canonical_event_type": "SHOT",
+        "canonical_action_type": "SHOT",
+        "canonical_result": "SAVED",
+        "outcome_visible": true,
+        "football_event_type": "SHOT",
+        "football_action_type": "SHOT",
+        "football_outcome": "SAVED",
+        "causal_verified": true,
+        "football_details": [
+          "The selected player, not the partly hidden white teammate, makes the visible shooting swing. The exact boot-ball instant is bracketed. The keeper parries the airborne attempt and it drops and bounces outside/in front of the left side of goal. This is not a goal: the stationary ball already inside the net is a spare."
+        ],
+        "foot": "UNKNOWN",
+        "pressure": {},
+        "sequence_id": null,
+        "source_sequence_ids": [
+          "contact_review_002"
+        ],
+        "source_action_ids": [
+          "contact_review_002:0:a4"
+        ],
+        "causal_chain": {
+          "target_contact_ms": null,
+          "goal_outcome_ms": 25016,
+          "receiver_visual_id": null,
+          "finisher_visual_id": "p1"
+        },
+        "proof_window": {
+          "start_ms": 23499,
+          "end_ms": 25516
+        },
+        "actor_visual_verified": true,
+        "contact_ms": null,
+        "contact_interval_ms": [
+          23666,
+          23749
+        ],
+        "proof_verified": true
+      },
+      {
+        "event_id": "1349b8676c1e07e88c00",
+        "timestamp": "00:28",
+        "action_type": "dribble",
+        "title": "Dribble",
+        "description": "Recovers the loose ball, takes successive forward touches, withstands a close challenge from p3 and runs onto the ball into shooting range. No intervening controlled opponent possession or teammate pass is visible.",
+        "rating": null,
+        "outcome": "neutral",
+        "identity_confidence": "high",
+        "event_source": "sequence_v1",
+        "cross_verified": true,
+        "actor_spatial_verified": false,
+        "actor_spatial_reason": "ORIGINAL_SELECTION_SEQUENCE_CONTINUITY",
+        "event_start_ms": 27882,
+        "event_end_ms": 30765,
+        "canonical_event_type": "OTHER",
+        "canonical_action_type": "OTHER",
+        "canonical_result": "COMPLETED",
+        "outcome_visible": true,
+        "football_event_type": "DRIBBLE",
+        "football_action_type": "DRIBBLE",
+        "football_outcome": "COMPLETED",
+        "causal_verified": false,
+        "football_details": [
+          "Recovers the loose ball, takes successive forward touches, withstands a close challenge from p3 and runs onto the ball into shooting range. No intervening controlled opponent possession or teammate pass is visible."
+        ],
+        "foot": "UNKNOWN",
+        "pressure": {},
+        "sequence_id": null,
+        "source_sequence_ids": [
+          "contact_review_001"
+        ],
+        "source_action_ids": [
+          "contact_review_001:0:a2"
+        ],
+        "causal_chain": {
+          "target_contact_ms": null,
+          "goal_outcome_ms": 30765,
+          "receiver_visual_id": null,
+          "finisher_visual_id": null
+        },
+        "proof_window": {
+          "start_ms": 27766,
+          "end_ms": 30765
+        },
+        "actor_visual_verified": true,
+        "contact_ms": null,
+        "contact_interval_ms": null,
+        "stat_mapping_status": "CARRY_VS_TAKE_ON_UNRESOLVED",
+        "proof_verified": true
+      },
+      {
+        "event_id": "a512ae64e102f24b3383",
+        "timestamp": "00:31",
+        "action_type": "shot",
+        "title": "Goal",
+        "description": "Right-footed finish after his own dribble. The ball lifts toward goal as a separate defender slides behind the strike. Players and the post briefly obscure its passage through the goalmouth; the hidden trajectory and any goalkeeper brush cannot be specified. Its subsequent appearance inside the goal alongside the pre-existing spare establishes the goal, rather than the goalkeeper's movement or the shooter's reaction.",
+        "rating": null,
+        "outcome": "positive",
+        "identity_confidence": "high",
+        "event_source": "sequence_v1",
+        "cross_verified": true,
+        "actor_spatial_verified": false,
+        "actor_spatial_reason": "ORIGINAL_SELECTION_SEQUENCE_CONTINUITY",
+        "event_start_ms": 30915,
+        "event_end_ms": 32015,
+        "canonical_event_type": "GOAL",
+        "canonical_action_type": "SHOT",
+        "canonical_result": "SCORED",
+        "outcome_visible": true,
+        "football_event_type": "GOAL",
+        "football_action_type": "SHOT",
+        "football_outcome": "GOAL",
+        "causal_verified": true,
+        "football_details": [
+          "Right-footed finish after his own dribble. The ball lifts toward goal as a separate defender slides behind the strike. Players and the post briefly obscure its passage through the goalmouth; the hidden trajectory and any goalkeeper brush cannot be specified. Its subsequent appearance inside the goal alongside the pre-existing spare establishes the goal, rather than the goalkeeper's movement or the shooter's reaction."
+        ],
+        "foot": "UNKNOWN",
+        "pressure": {},
+        "sequence_id": null,
+        "source_sequence_ids": [
+          "contact_review_001"
+        ],
+        "source_action_ids": [
+          "contact_review_001:0:a6"
+        ],
+        "causal_chain": {
+          "target_contact_ms": 30915,
+          "goal_outcome_ms": 31982,
+          "receiver_visual_id": null,
+          "finisher_visual_id": "p1"
+        },
+        "proof_window": {
+          "start_ms": 30765,
+          "end_ms": 32015
+        },
+        "actor_visual_verified": true,
+        "contact_ms": 30915,
+        "contact_interval_ms": [
+          30915,
+          30915
+        ],
+        "proof_verified": true
+      },
+      {
+        "event_id": "d2fca2fa06ced87a1247",
+        "timestamp": "00:33",
+        "action_type": "run",
+        "title": "Run",
+        "description": "The continuous movement connects the shooter to the original r7 selection.",
+        "rating": null,
+        "outcome": "neutral",
+        "identity_confidence": "high",
+        "event_source": "sequence_v1",
+        "cross_verified": true,
+        "actor_spatial_verified": false,
+        "actor_spatial_reason": "ORIGINAL_SELECTION_SEQUENCE_CONTINUITY",
+        "event_start_ms": 32515,
+        "event_end_ms": 34015,
+        "canonical_event_type": "RUN",
+        "canonical_action_type": "RUN",
+        "canonical_result": "COMPLETED",
+        "outcome_visible": true,
+        "football_event_type": "RUN",
+        "football_action_type": "RUN",
+        "football_outcome": "COMPLETED",
+        "causal_verified": false,
+        "football_details": [
+          "Turns away and jogs out of the goal area after the shot. The continuous movement connects the shooter to the original r7 selection."
+        ],
+        "foot": "UNKNOWN",
+        "pressure": {},
+        "sequence_id": null,
+        "source_sequence_ids": [
+          "contact_review_001",
+          "sequence_005"
+        ],
+        "source_action_ids": [
+          "contact_review_001:0:a8",
+          "sequence_005:0:a1"
+        ],
+        "causal_chain": {
+          "target_contact_ms": null,
+          "goal_outcome_ms": 34015,
+          "receiver_visual_id": null,
+          "finisher_visual_id": null
+        },
+        "proof_window": {
+          "start_ms": 32015,
+          "end_ms": 34015
+        },
+        "actor_visual_verified": true,
+        "contact_ms": null,
+        "contact_interval_ms": null,
+        "proof_verified": true
+      },
+      {
+        "event_id": "cbdbbfbe0f1390d42b31",
+        "timestamp": "00:35",
+        "action_type": "pass",
+        "title": "Pass",
+        "description": "p1 approaches the loose ball, receives and adjusts it before passing right. p4 attempts to intercept and may brush the pass; neither he nor the pursuing p5 demonstrates settled possession or a separate deliberate pass. p6 receives, carries forward and shoots. p1 remains a separate player and leaves the left side of the view.",
+        "rating": null,
+        "outcome": "neutral",
+        "identity_confidence": "high",
+        "event_source": "sequence_v1",
+        "cross_verified": true,
+        "actor_spatial_verified": false,
+        "actor_spatial_reason": "ORIGINAL_SELECTION_SEQUENCE_CONTINUITY",
+        "event_start_ms": 35265,
+        "event_end_ms": 38132,
+        "canonical_event_type": "PASS",
+        "canonical_action_type": "PASS",
+        "canonical_result": "TEAMMATE_SHOT",
+        "outcome_visible": true,
+        "football_event_type": "PASS",
+        "football_action_type": "PASS",
+        "football_outcome": "TEAMMATE_SHOT",
+        "causal_verified": false,
+        "football_details": [
+          "p1 approaches the loose ball, receives and adjusts it before passing right. p4 attempts to intercept and may brush the pass; neither he nor the pursuing p5 demonstrates settled possession or a separate deliberate pass. p6 receives, carries forward and shoots. p1 remains a separate player and leaves the left side of the view."
+        ],
+        "foot": "UNKNOWN",
+        "pressure": {},
+        "sequence_id": null,
+        "source_sequence_ids": [
+          "sequence_005"
+        ],
+        "source_action_ids": [
+          "sequence_005:1:a3"
+        ],
+        "causal_chain": {
+          "target_contact_ms": null,
+          "goal_outcome_ms": 38132,
+          "receiver_visual_id": "p6",
+          "finisher_visual_id": "p6"
+        },
+        "proof_window": {
+          "start_ms": 34632,
+          "end_ms": 38132
+        },
+        "actor_visual_verified": true,
+        "contact_ms": null,
+        "contact_interval_ms": [
+          35265,
+          35382
+        ],
+        "proof_verified": true
+      },
+      {
+        "event_id": "421c340be60ca0a2d7d1",
+        "timestamp": "00:42",
+        "action_type": "dribble",
+        "title": "Dribble",
+        "description": "Collects the ball emerging from the duel, carries left across the area, checks near another defender, then turns inward and dribbles right before releasing. The selected identity remains with white 15, not white 17 or the blond teammate.",
+        "rating": null,
+        "outcome": "neutral",
+        "identity_confidence": "high",
+        "event_source": "sequence_v1",
+        "cross_verified": true,
+        "actor_spatial_verified": false,
+        "actor_spatial_reason": "ORIGINAL_SELECTION_SEQUENCE_CONTINUITY",
+        "event_start_ms": 41915,
+        "event_end_ms": 44015,
+        "canonical_event_type": "OTHER",
+        "canonical_action_type": "OTHER",
+        "canonical_result": "COMPLETED",
+        "outcome_visible": true,
+        "football_event_type": "DRIBBLE",
+        "football_action_type": "DRIBBLE",
+        "football_outcome": "COMPLETED",
+        "causal_verified": false,
+        "football_details": [
+          "Collects the ball emerging from the duel, carries left across the area, checks near another defender, then turns inward and dribbles right before releasing. The selected identity remains with white 15, not white 17 or the blond teammate."
+        ],
+        "foot": "UNKNOWN",
+        "pressure": {},
+        "sequence_id": null,
+        "source_sequence_ids": [
+          "sequence_006"
+        ],
+        "source_action_ids": [
+          "sequence_006:1:a6"
+        ],
+        "causal_chain": {
+          "target_contact_ms": null,
+          "goal_outcome_ms": 44015,
+          "receiver_visual_id": null,
+          "finisher_visual_id": null
+        },
+        "proof_window": {
+          "start_ms": 41632,
+          "end_ms": 44015
+        },
+        "actor_visual_verified": true,
+        "contact_ms": null,
+        "contact_interval_ms": null,
+        "stat_mapping_status": "CARRY_VS_TAKE_ON_UNRESOLVED",
+        "proof_verified": true
+      },
+      {
+        "event_id": "ec74209ace700fa49d2e",
+        "timestamp": "00:44",
+        "action_type": "pass",
+        "title": "Assist",
+        "description": "Plays through the defensive gap, then follows at a jog. The blue defender's attempted interception may brush the ball, but it continues beyond him without a visible controlled possession or intervening pass. White 15 remains behind the attack and is not the shooter.",
+        "rating": null,
+        "outcome": "positive",
+        "identity_confidence": "high",
+        "event_source": "sequence_v1",
+        "cross_verified": true,
+        "actor_spatial_verified": false,
+        "actor_spatial_reason": "ORIGINAL_SELECTION_SEQUENCE_CONTINUITY",
+        "event_start_ms": 44015,
+        "event_end_ms": 46631,
+        "canonical_event_type": "ASSIST",
+        "canonical_action_type": "PASS",
+        "canonical_result": "TEAMMATE_SCORED",
+        "outcome_visible": true,
+        "football_event_type": "ASSIST",
+        "football_action_type": "PASS",
+        "football_outcome": "TEAMMATE_GOAL",
+        "causal_verified": true,
+        "football_details": [
+          "Plays through the defensive gap, then follows at a jog. The blue defender's attempted interception may brush the ball, but it continues beyond him without a visible controlled possession or intervening pass. It is briefly obscured among the players before p8 emerges with it and finishes. White 15 remains behind the attack and is not the shooter."
+        ],
+        "foot": "UNKNOWN",
+        "pressure": {},
+        "sequence_id": null,
+        "source_sequence_ids": [
+          "sequence_006"
+        ],
+        "source_action_ids": [
+          "sequence_006:1:a7"
+        ],
+        "causal_chain": {
+          "target_contact_ms": null,
+          "goal_outcome_ms": 46131,
+          "receiver_visual_id": "p8",
+          "finisher_visual_id": "p8"
+        },
+        "proof_window": {
+          "start_ms": 43882,
+          "end_ms": 46631
+        },
+        "actor_visual_verified": true,
+        "contact_ms": null,
+        "contact_interval_ms": [
+          44015,
+          44132
+        ],
+        "proof_verified": true
+      },
+      {
+        "event_id": "60568022158b38c42589",
+        "timestamp": "00:49",
+        "action_type": "recovery",
+        "title": "Recovery",
+        "description": "The selected player recovers and controls the loose ball, then makes short controlling movements while p4, p5 and p6 converge. His control is separate from white 7's earlier possession.",
+        "rating": null,
+        "outcome": "neutral",
+        "identity_confidence": "high",
+        "event_source": "sequence_v1",
+        "cross_verified": true,
+        "actor_spatial_verified": false,
+        "actor_spatial_reason": "ORIGINAL_SELECTION_SEQUENCE_CONTINUITY",
+        "event_start_ms": 49198,
+        "event_end_ms": 49715,
+        "canonical_event_type": "RECOVERY",
+        "canonical_action_type": "RECOVERY",
+        "canonical_result": "POSSESSION_WON",
+        "outcome_visible": true,
+        "football_event_type": "RECOVERY",
+        "football_action_type": "RECOVERY",
+        "football_outcome": "COMPLETED",
+        "causal_verified": false,
+        "football_details": [
+          "The selected player recovers and controls the loose ball, then makes short controlling movements while p4, p5 and p6 converge. His control is separate from white 7's earlier possession."
+        ],
+        "foot": "UNKNOWN",
+        "pressure": {},
+        "sequence_id": null,
+        "source_sequence_ids": [
+          "contact_review_003"
+        ],
+        "source_action_ids": [
+          "contact_review_003:0:a3"
+        ],
+        "causal_chain": {
+          "target_contact_ms": 49198,
+          "goal_outcome_ms": 49381,
+          "receiver_visual_id": null,
+          "finisher_visual_id": null
+        },
+        "proof_window": {
+          "start_ms": 49115,
+          "end_ms": 49715
+        },
+        "actor_visual_verified": true,
+        "contact_ms": 49198,
+        "contact_interval_ms": [
+          49198,
+          49198
+        ],
+        "proof_verified": true
+      },
+      {
+        "event_id": "9a392fb19c052dfe6719",
+        "timestamp": "00:50",
+        "action_type": "pass",
+        "title": "Assist",
+        "description": "The bodies obscure the precise passing instant, but p1's low boot movement and the ball's emergence establish the release. The blue players converge and may brush the ball; none visibly settles it, turns with it or makes a controlled intervening pass. P1 then runs on and is not the finisher. No extra settled receiving touch is assigned to p2.",
+        "rating": null,
+        "outcome": "positive",
+        "identity_confidence": "high",
+        "event_source": "sequence_v1",
+        "cross_verified": true,
+        "actor_spatial_verified": false,
+        "actor_spatial_reason": "ORIGINAL_SELECTION_SEQUENCE_CONTINUITY",
+        "event_start_ms": 49615,
+        "event_end_ms": 52265,
+        "canonical_event_type": "ASSIST",
+        "canonical_action_type": "PASS",
+        "canonical_result": "TEAMMATE_SCORED",
+        "outcome_visible": true,
+        "football_event_type": "ASSIST",
+        "football_action_type": "PASS",
+        "football_outcome": "TEAMMATE_GOAL",
+        "causal_verified": true,
+        "football_details": [
+          "P1 releases a short ball through the crowded challenge to p2, who finishes directly. The bodies obscure the precise passing instant, but p1's low boot movement and the ball's emergence establish the release. The blue players converge and may brush the ball; none visibly settles it, turns with it or makes a controlled intervening pass. P1 then runs on and is not the finisher. No extra settled receiving touch is assigned to p2."
+        ],
+        "foot": "UNKNOWN",
+        "pressure": {},
+        "sequence_id": null,
+        "source_sequence_ids": [
+          "contact_review_003"
+        ],
+        "source_action_ids": [
+          "contact_review_003:0:a4"
+        ],
+        "causal_chain": {
+          "target_contact_ms": null,
+          "goal_outcome_ms": 51131,
+          "receiver_visual_id": "p2",
+          "finisher_visual_id": "p2"
+        },
+        "proof_window": {
+          "start_ms": 49615,
+          "end_ms": 52265
+        },
+        "actor_visual_verified": true,
+        "contact_ms": null,
+        "contact_interval_ms": [
+          49715,
+          50448
+        ],
+        "proof_verified": true
+      },
+      {
+        "event_id": "9e9a8a68c1772db2614f",
+        "timestamp": "00:56",
+        "action_type": "pass",
+        "title": "Assist",
+        "description": "White 13 runs near the ball but no intervening pass by him is visible. The ball continues beyond the goalkeeper rather than being held or visibly redirected into a save. The passer and finisher remain separate people.",
+        "rating": null,
+        "outcome": "positive",
+        "identity_confidence": "high",
+        "event_source": "sequence_v1",
+        "cross_verified": true,
+        "actor_spatial_verified": false,
+        "actor_spatial_reason": "ORIGINAL_SELECTION_SEQUENCE_CONTINUITY",
+        "event_start_ms": 56264,
+        "event_end_ms": 57264,
+        "canonical_event_type": "ASSIST",
+        "canonical_action_type": "PASS",
+        "canonical_result": "TEAMMATE_SCORED",
+        "outcome_visible": true,
+        "football_event_type": "ASSIST",
+        "football_action_type": "PASS",
+        "football_outcome": "TEAMMATE_GOAL",
+        "causal_verified": true,
+        "football_details": [
+          "The selected player sends a low ball across the advancing goalkeeper to white 10, who finishes at close range. White 13 runs near the ball but no intervening pass by him is visible. The ball continues beyond the goalkeeper rather than being held or visibly redirected into a save. The passer and finisher remain separate people."
+        ],
+        "foot": "UNKNOWN",
+        "pressure": {},
+        "sequence_id": null,
+        "source_sequence_ids": [
+          "sequence_008"
+        ],
+        "source_action_ids": [
+          "sequence_008:1:a7"
+        ],
+        "causal_chain": {
+          "target_contact_ms": null,
+          "goal_outcome_ms": 57264,
+          "receiver_visual_id": "p2",
+          "finisher_visual_id": "p2"
+        },
+        "proof_window": {
+          "start_ms": 56014,
+          "end_ms": 57264
+        },
+        "actor_visual_verified": true,
+        "contact_ms": null,
+        "contact_interval_ms": [
+          56264,
+          56514
+        ],
+        "proof_verified": true
+      },
+      {
+        "event_id": "48440ce52a030ec748cb",
+        "timestamp": "01:11",
+        "action_type": "pass",
+        "title": "Pass",
+        "description": "Runs onto the bouncing headed ball, takes it into range and volleys a high diagonal pass leftward before the defender can close. The receiving number 10 is not the selected player. The camera pan follows the same play.",
+        "rating": null,
+        "outcome": "neutral",
+        "identity_confidence": "high",
+        "event_source": "sequence_v1",
+        "cross_verified": true,
+        "actor_spatial_verified": false,
+        "actor_spatial_reason": "ORIGINAL_SELECTION_SEQUENCE_CONTINUITY",
+        "event_start_ms": 71014,
+        "event_end_ms": 72880,
+        "canonical_event_type": "PASS",
+        "canonical_action_type": "PASS",
+        "canonical_result": "COMPLETED",
+        "outcome_visible": true,
+        "football_event_type": "PASS",
+        "football_action_type": "PASS",
+        "football_outcome": "COMPLETED",
+        "causal_verified": false,
+        "football_details": [
+          "Runs onto the bouncing headed ball, takes it into range and volleys a high diagonal pass leftward before the defender can close. The receiving number 10 is not the selected player. The camera pan follows the same play. The recipient continues pursuing and controlling the bouncing ball near goal; this pass is not credited with a shot or goal."
+        ],
+        "foot": "UNKNOWN",
+        "pressure": {},
+        "sequence_id": null,
+        "source_sequence_ids": [
+          "sequence_010"
+        ],
+        "source_action_ids": [
+          "sequence_010:1:a6"
+        ],
+        "causal_chain": {
+          "target_contact_ms": null,
+          "goal_outcome_ms": 72880,
+          "receiver_visual_id": "p7",
+          "finisher_visual_id": null
+        },
+        "proof_window": {
+          "start_ms": 69381,
+          "end_ms": 76747
+        },
+        "actor_visual_verified": true,
+        "contact_ms": null,
+        "contact_interval_ms": [
+          71014,
+          71264
+        ],
+        "proof_verified": true
+      }
+    ],
+    "video_comments": [
+      {
+        "event_id": "9e9a8a68c1772db2614f",
+        "timestamp": "00:56",
+        "comment": "Verified assist by the selected player.",
+        "evidence_time_ms": 56264,
+        "source_frame_id": "s000056264",
+        "sequence_event_native": true,
+        "source_sequence_verified": true,
+        "source_video_sha256": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+        "event_source": "sequence_v1",
+        "proof_media_style": "SOURCE_UNANNOTATED",
+        "identity_confidence": "high",
+        "contact_ms": null,
+        "contact_interval_ms": [
+          56264,
+          56514
+        ],
+        "evidence_id": "evd_24cac1bfc04f",
+        "proof_verified": true
+      },
+      {
+        "event_id": "dc2acb1e19ba55950e7f",
+        "timestamp": "00:24",
+        "comment": "Verified shot attempt by the selected player.",
+        "evidence_time_ms": 23666,
+        "source_frame_id": "s000023666",
+        "sequence_event_native": true,
+        "source_sequence_verified": true,
+        "source_video_sha256": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+        "event_source": "sequence_v1",
+        "proof_media_style": "SOURCE_UNANNOTATED",
+        "identity_confidence": "high",
+        "contact_ms": null,
+        "contact_interval_ms": [
+          23666,
+          23749
+        ],
+        "evidence_id": "evd_aabf6a6b948d",
+        "proof_verified": true
+      },
+      {
+        "event_id": "a512ae64e102f24b3383",
+        "timestamp": "00:31",
+        "comment": "Verified goal by the selected player.",
+        "evidence_time_ms": 30915,
+        "source_frame_id": "s000030915",
+        "sequence_event_native": true,
+        "source_sequence_verified": true,
+        "source_video_sha256": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+        "event_source": "sequence_v1",
+        "proof_media_style": "SOURCE_UNANNOTATED",
+        "identity_confidence": "high",
+        "contact_ms": 30915,
+        "contact_interval_ms": [
+          30915,
+          30915
+        ],
+        "evidence_id": "evd_fc64e45e69e2",
+        "proof_verified": true
+      },
+      {
+        "event_id": "ec74209ace700fa49d2e",
+        "timestamp": "00:44",
+        "comment": "Verified assist by the selected player.",
+        "evidence_time_ms": 44015,
+        "source_frame_id": "s000044015",
+        "sequence_event_native": true,
+        "source_sequence_verified": true,
+        "source_video_sha256": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+        "event_source": "sequence_v1",
+        "proof_media_style": "SOURCE_UNANNOTATED",
+        "identity_confidence": "high",
+        "contact_ms": null,
+        "contact_interval_ms": [
+          44015,
+          44132
+        ],
+        "evidence_id": "evd_5c3a6b29a240",
+        "proof_verified": true
+      },
+      {
+        "event_id": "9a392fb19c052dfe6719",
+        "timestamp": "00:50",
+        "comment": "Verified assist by the selected player.",
+        "evidence_time_ms": 49615,
+        "source_frame_id": "s000049615",
+        "sequence_event_native": true,
+        "source_sequence_verified": true,
+        "source_video_sha256": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+        "event_source": "sequence_v1",
+        "proof_media_style": "SOURCE_UNANNOTATED",
+        "identity_confidence": "high",
+        "contact_ms": null,
+        "contact_interval_ms": [
+          49715,
+          50448
+        ],
+        "evidence_id": "evd_fa261dccb836",
+        "proof_verified": true
+      },
+      {
+        "event_id": "88aa8bbdedbec570d4de",
+        "timestamp": "00:09",
+        "comment": "Verified duel by the selected player.",
+        "evidence_time_ms": 8883,
+        "source_frame_id": "s000008883",
+        "sequence_event_native": true,
+        "source_sequence_verified": true,
+        "source_video_sha256": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+        "event_source": "sequence_v1",
+        "proof_media_style": "SOURCE_UNANNOTATED",
+        "identity_confidence": "high",
+        "contact_ms": null,
+        "contact_interval_ms": null,
+        "evidence_id": "evd_db2aeb8f6b2d",
+        "proof_verified": true
+      },
+      {
+        "event_id": "1349b8676c1e07e88c00",
+        "timestamp": "00:28",
+        "comment": "Verified dribble by the selected player.",
+        "evidence_time_ms": 27882,
+        "source_frame_id": "s000027882",
+        "sequence_event_native": true,
+        "source_sequence_verified": true,
+        "source_video_sha256": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+        "event_source": "sequence_v1",
+        "proof_media_style": "SOURCE_UNANNOTATED",
+        "identity_confidence": "high",
+        "contact_ms": null,
+        "contact_interval_ms": null,
+        "evidence_id": "evd_0a1d9d4b7760",
+        "proof_verified": true
+      },
+      {
+        "event_id": "a8b5662ae46646b8f0ae",
+        "timestamp": "00:02",
+        "comment": "Verified dribble by the selected player.",
+        "evidence_time_ms": 1633,
+        "source_frame_id": "s000001633",
+        "sequence_event_native": true,
+        "source_sequence_verified": true,
+        "source_video_sha256": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+        "event_source": "sequence_v1",
+        "proof_media_style": "SOURCE_UNANNOTATED",
+        "identity_confidence": "high",
+        "contact_ms": null,
+        "contact_interval_ms": null,
+        "evidence_id": "evd_74bdb6d4d263",
+        "proof_verified": true
+      }
+    ],
+    "authority_run_id": "82e840ca0514",
+    "evidence_authority_version": 1,
+    "verified_stats": {
+      "version": 1,
+      "source": "cross_verified_events",
+      "available": true,
+      "goals_assists_available": false,
+      "observed_counts": {
+        "goals": 1,
+        "assists": 3,
+        "shots": 2,
+        "shots_on_target": 2,
+        "key_passes": 3,
+        "passes_attempted": 5,
+        "passes_completed": 4,
+        "crosses_attempted": 0,
+        "crosses_completed": 0,
+        "dribbles_attempted": null,
+        "successful_dribbles": null,
+        "duels_contested": 0,
+        "duels_won": 0,
+        "tackles_attempted": 0,
+        "tackles_won": 0,
+        "interceptions": 0,
+        "recoveries": 1,
+        "total_actions": 17,
+        "defensive_actions": 1,
+        "first_touches": 0,
+        "runs": 2
+      },
+      "coverage_status": "PARTIAL",
+      "coverage_note": "Counts show verified actions only. Evidence gaps mean video totals may be incomplete.",
+      "scoring_scan": {
+        "performed": true,
+        "complete": false,
+        "coverage_status": "PARTIAL",
+        "physical_evidence_coverage": null,
+        "verified_goals": null,
+        "verified_assists": null,
+        "unresolved_goal_attempts": 0,
+        "unresolved_assist_candidates": 0
+      },
+      "stats_completeness": {
+        "goals_assists": "verified_observations_only",
+        "other_actions": "verified_timeline_events",
+        "duels": "only_resolved_outcomes_counted",
+        "dribbles": "carry_vs_take_on_unresolved"
+      },
+      "total_actions": 17,
+      "pass_completion_pct": null,
+      "defensive_actions": 1,
+      "first_touches": 0,
+      "runs": 2,
+      "counted_event_ids": {
+        "goals": [
+          "a512ae64e102f24b3383"
+        ],
+        "assists": [
+          "ec74209ace700fa49d2e",
+          "9a392fb19c052dfe6719",
+          "9e9a8a68c1772db2614f"
+        ],
+        "shots": [
+          "dc2acb1e19ba55950e7f",
+          "a512ae64e102f24b3383"
+        ],
+        "shots_on_target": [
+          "dc2acb1e19ba55950e7f",
+          "a512ae64e102f24b3383"
+        ],
+        "key_passes": [
+          "ec74209ace700fa49d2e",
+          "9a392fb19c052dfe6719",
+          "9e9a8a68c1772db2614f"
+        ],
+        "passes_attempted": [
+          "cbdbbfbe0f1390d42b31",
+          "ec74209ace700fa49d2e",
+          "9a392fb19c052dfe6719",
+          "9e9a8a68c1772db2614f",
+          "48440ce52a030ec748cb"
+        ],
+        "passes_completed": [
+          "ec74209ace700fa49d2e",
+          "9a392fb19c052dfe6719",
+          "9e9a8a68c1772db2614f",
+          "48440ce52a030ec748cb"
+        ],
+        "crosses_attempted": [],
+        "crosses_completed": [],
+        "dribbles_attempted": [],
+        "successful_dribbles": [],
+        "duels_contested": [],
+        "duels_won": [],
+        "tackles_attempted": [],
+        "tackles_won": [],
+        "interceptions": [],
+        "recoveries": [
+          "60568022158b38c42589"
+        ]
+      },
+      "goals": null,
+      "assists": null,
+      "shots": 2,
+      "shots_on_target": 2,
+      "key_passes": 3,
+      "passes_attempted": 5,
+      "passes_completed": 4,
+      "crosses_attempted": 0,
+      "crosses_completed": 0,
+      "dribbles_attempted": null,
+      "successful_dribbles": null,
+      "duels_contested": 0,
+      "duels_won": 0,
+      "tackles_attempted": 0,
+      "tackles_won": 0,
+      "interceptions": 0,
+      "recoveries": 1
+    },
+    "match_stats": {
+      "total_actions": 17,
+      "shots": 2,
+      "shots_on_target": 2,
+      "key_passes": 3,
+      "passes_attempted": 5,
+      "passes_completed": 4,
+      "pass_completion_pct": null,
+      "crosses_attempted": 0,
+      "crosses_completed": 0,
+      "dribbles_attempted": null,
+      "successful_dribbles": null,
+      "duels_contested": 0,
+      "duels_won": null,
+      "tackles_attempted": 0,
+      "tackles_won": 0,
+      "interceptions": 0,
+      "recoveries": 1,
+      "defensive_actions": 1,
+      "first_touches": 0,
+      "runs": 2,
+      "minutes_analysed": null,
+      "source": "verified_events",
+      "coverage_status": "PARTIAL",
+      "coverage_note": "Counts show verified actions only. Evidence gaps mean video totals may be incomplete.",
+      "observed_goals": 1,
+      "observed_assists": 3,
+      "goals_assists_source": "unavailable"
+    },
+    "report_fact_authority": {
+      "version": 2,
+      "authority": "CANONICAL_EVENTS",
+      "status": "REVIEW_REQUIRED",
+      "unsupported_claim_paths": [],
+      "unbound_skill_observations": 0,
+      "unrated_skills": [
+        "technical.weak_foot",
+        "tactical.positioning",
+        "tactical.off_ball_movement",
+        "tactical.scanning",
+        "tactical.timing_of_runs",
+        "tactical.game_understanding",
+        "physical.acceleration",
+        "physical.speed",
+        "physical.agility",
+        "physical.intensity",
+        "physical.body_control",
+        "mentality.confidence",
+        "mentality.work_rate",
+        "mentality.courage_in_duels",
+        "mentality.competitive_mindset",
+        "mentality.focus"
+      ],
+      "verified_event_ids": [
+        "a8b5662ae46646b8f0ae",
+        "cc4cbad57d007f19ad01",
+        "966c91c7243829d6fab0",
+        "88aa8bbdedbec570d4de",
+        "0fc666670ff612a8af2f",
+        "ae3dbc4f32a81b2bca84",
+        "dc2acb1e19ba55950e7f",
+        "1349b8676c1e07e88c00",
+        "a512ae64e102f24b3383",
+        "d2fca2fa06ced87a1247",
+        "cbdbbfbe0f1390d42b31",
+        "421c340be60ca0a2d7d1",
+        "ec74209ace700fa49d2e",
+        "60568022158b38c42589",
+        "9a392fb19c052dfe6719",
+        "9e9a8a68c1772db2614f",
+        "48440ce52a030ec748cb"
+      ]
+    }
+  }
+}
