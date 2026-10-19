@@ -34,7 +34,7 @@ jobs:
       github.event.pull_request.number == 39 &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.event.pull_request.head.ref == 'codex/sequence-pilot-foundation' &&
-      github.event.before == 'a3e919adab32b0dd8f6372ea689c0d3b8b99cfc1' &&
+      github.event.before == '9a5f2920ddc9b29cbf3c7a415103d884eb88fab8' &&
       github.run_attempt == 1
     runs-on: ubuntu-latest
     timeout-minutes: 25
@@ -73,7 +73,7 @@ jobs:
               expected, name = line.split(None, 1)
               with (target / name).open('rb') as stream:
                   assert hashlib.file_digest(stream, 'sha256').hexdigest() == expected
-          print('Original source and taps verified; no old report/model results loaded.')
+          print('Original source and taps verified; source observations will be replayed explicitly.')
           PY
       - name: Actual facts report and source proofs from retained verified observations
         env:

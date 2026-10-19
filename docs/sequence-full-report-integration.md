@@ -12,7 +12,7 @@ reconstruction, whole-video rediscovery or corrective identity reconstruction.
 Failure stays failed; it never falls back into those stages.
 
 Fresh visual sequence observations, native contact/outcome reviews and hashed
-model receipts supply the canonical events. A text-only Gemini 2.5 Pro call uses
+model receipts supply the canonical events. An explicitly selected text-only writer uses
 the existing report schema and assessment rubric. The new path uses the bounded
 standard-library transport already used by the sequence experiment, rather than
 the old report SDK. Neither report prose nor model-generated timeline/comments
@@ -91,3 +91,27 @@ uploaded Almin test07 videos. Their byte hashes differ, but all show the same
 39 sampled moments. These are encoding variants, not independent matches.
 Generalization testing still needs distinct match footage with original player
 selections and independently checked events.
+
+## Current actual report-stage evidence
+
+Fresh run 39187246868 completed source analysis in **518.498s (8m38.498s)**
+with thirteen completed requests. All five reference scoring actions matched.
+The persisted source checkpoint is `examples/sequence-report-source-checkpoint.json`.
+This duration is source analysis only, not a completed full-report duration.
+
+Report-only run 39188297174 replayed those observations and made a real Gemini
+2.5 Pro writer request. It failed with HTTP 429 after 62.343s (62.829s trial
+wall time). Run 39188665065 explicitly selected GPT-6 Astra, low reasoning,
+and failed at the 180s wall deadline (180.211s trial wall time). Neither trial
+wrote READY, generated a usable full report, or called legacy reconstruction.
+Their compact failure receipts are retained next to the source checkpoint.
+
+The writer now requests two bounded sections using the same report schema and
+rubric: assessment first, then family/coaching presentation with the returned
+assessment attached. Canonical facts, timeline, comments and statistics remain
+application-owned. Each section requests concise text (below 6000 tokens) with
+a 12288-token hard output ceiling and a 180s wall deadline. There is no automatic
+model fallback or network retry. Missing section keys and a failed second
+section prevent publication; both receipts remain available for diagnosis.
+This change still requires a successful actual report-stage run before claiming
+a complete new report or comparing full old/new report timings.

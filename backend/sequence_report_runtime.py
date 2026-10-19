@@ -87,13 +87,38 @@ def writer_model():
     return model
 
 
+WRITER_SECTIONS = (
+    ("player_type", "executive_summary", "content_analysis", "technical", "tactical",
+     "physical", "mentality", "scores", "scores_confidence", "overall_benchmark", "evidence_quality_note"),
+    ("scout_view", "potential_assessment", "training_plan", "parent_summary", "parent_tips",
+     "coach_notes", "snapshot", "development_roadmap", "development_priorities_detailed",
+     "scout_outlook", "final_summary", "parents_package", "next_match_missions",
+     "parent_value_metrics", "grow_your_game", "parent_corner"),
+)
+
+
 async def write_facts(prompt):
-    """Explicitly selected text writer; no automatic network/model fallback."""
+    """Two bounded text sections; presentation consumes the completed assessment.
+
+    No new perception, network retry or automatic model fallback. Canonical
+    timelines, comments and statistics are supplied by the application.
+    """
     model = writer_model()
-    receipts = []
-    for attempt in range(2):
-        jobs = [{"packet_id": f"report_facts_{attempt+1}", "max_output_tokens": 32768,
-                 "items": [{"type": "text", "text": prompt}]}]
+    receipts, report = [], {}
+    for section, keys in enumerate(WRITER_SECTIONS, 1):
+        section_prompt = prompt + (
+            "\nSECTION OUTPUT CONTRACT (overrides the full example's root fields): "
+            "Return ONLY these root keys: " + json.dumps(keys) + ". "
+            "Keep their nested schema. Keep text concise: at most one short sentence per notes, reason, "
+            "benchmark explanation or verdict field; at most two evidence rows per skill. "
+            "For unsupported skills use null score and a short honest missing-evidence reason; "
+            "do not pad the report with repeated prose. Keep the whole response below 6000 tokens. "
+            "Do not return action_timeline, video_comments or match_stats: the application supplies them.")
+        if section == 2:
+            section_prompt += ("\nCOMPLETED ASSESSMENT (authoritative for scores, uncertainty and advice): "
+                               + json.dumps(report, ensure_ascii=False, separators=(",", ":")))
+        jobs = [{"packet_id": f"report_section_{section}", "max_output_tokens": 12288,
+                 "items": [{"type": "text", "text": section_prompt}]}]
         if model == "gpt-6-astra":
             jobs[0]["reasoning_effort"] = "low"
         rows = await asyncio.to_thread(transport.run_jobs, jobs, "emergent", model,
@@ -107,14 +132,15 @@ async def write_facts(prompt):
             if text.startswith("```"):
                 text = "\n".join(text.splitlines()[1:-1])
             prose = json.loads(text)
-            if not isinstance(prose, dict) or not all(isinstance(prose.get(k), dict)
+            if not isinstance(prose, dict) or set(prose) != set(keys):
+                raise ValueError("REPORT_SECTION_KEYS_REQUIRED")
+            if section == 1 and not all(isinstance(prose.get(k), dict)
                     for k in ("technical", "tactical", "physical", "mentality", "scores")):
                 raise ValueError("REPORT_JSON_OBJECT_REQUIRED")
-            return {"report": prose, "receipts": receipts}
+            report.update(prose)
         except ValueError:
-            if attempt:
-                raise ReportWriterFailure("SEQUENCE_REPORT_WRITER_INVALID", receipts)
-            prompt = "Return ONLY one valid JSON object, without markdown.\n" + prompt
+            raise ReportWriterFailure("SEQUENCE_REPORT_WRITER_INVALID", receipts)
+    return {"report": report, "receipts": receipts}
 
 
 class ReportWriterFailure(RuntimeError):

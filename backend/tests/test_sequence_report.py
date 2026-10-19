@@ -96,10 +96,16 @@ def synthetic_report_worker(pipe, job, provider, model, timeout):
     assert provider == "emergent" and model in {"gemini-2.5-pro", "gpt-6-astra"} and timeout >= 179
     if model == "gpt-6-astra":
         assert job["reasoning_effort"] == "low"
-    assert job["max_output_tokens"] == 32768
+    assert job["max_output_tokens"] == 12288
+    section = int(job["packet_id"].rsplit("_", 1)[1])
+    prose = {k: {} for k in runtime.WRITER_SECTIONS[section-1]}
+    if section == 1:
+        prose["executive_summary"] = "Synthetic assessment; no model request"
+    else:
+        assert "COMPLETED ASSESSMENT" in job["items"][0]["text"]
+        assert "Synthetic assessment; no model request" in job["items"][0]["text"]
     pipe.send({"status": "COMPLETED", "packet_id": job["packet_id"],
-               "raw_response": json.dumps({"summary": "Synthetic transport boundary test",
-                    "technical": {}, "tactical": {}, "physical": {}, "mentality": {}, "scores": {}})})
+               "raw_response": json.dumps(prose)})
     pipe.close()
 
 
@@ -111,8 +117,9 @@ def test_writer_180_second_budget_reaches_owned_transport_without_network(monkey
         return real(jobs, provider, model, **kwargs, worker=synthetic_report_worker)
     monkeypatch.setattr(runtime.transport, "run_jobs", synthetic_jobs)
     result = asyncio.run(runtime.write_facts("Synthetic test; no model request"))
-    assert result["report"]["summary"] == "Synthetic transport boundary test"
-    assert len(result["receipts"]) == 1
+    assert result["report"]["executive_summary"] == "Synthetic assessment; no model request"
+    assert len(result["receipts"]) == 2
+    assert set(result["report"]) == set(sum(runtime.WRITER_SECTIONS, ()))
     with pytest.raises(ValueError, match="INVALID_EXECUTION_BUDGET"):
         real([], "emergent", "gemini-2.5-pro", deadline=time.monotonic()+1, per_call_s=211)
     _, payload, _ = runtime.transport.build_request("emergent", "gemini-2.5-pro",
@@ -120,6 +127,25 @@ def test_writer_180_second_budget_reaches_owned_transport_without_network(monkey
     assert json.loads(payload)["max_tokens"] == 32768
     with pytest.raises(ValueError, match="INVALID_OUTPUT_TOKEN_BUDGET"):
         runtime.transport.build_request("emergent", "gemini-2.5-pro", [], max_output_tokens=32769)
+
+
+@pytest.mark.parametrize("failure", ["ERROR", "MISSING_KEYS"])
+def test_second_writer_section_failure_retains_first_receipt_without_partial_report(monkeypatch, failure):
+    calls = []
+    def jobs(jobs, *args, **kwargs):
+        calls.append(jobs[0])
+        if len(calls) == 1:
+            prose = {k: {} for k in runtime.WRITER_SECTIONS[0]}
+            return [{"status": "COMPLETED", "raw_response": json.dumps(prose)}]
+        if failure == "ERROR":
+            return [{"status": "ERROR", "error": "MODEL_WALL_DEADLINE_EXCEEDED"}]
+        return [{"status": "COMPLETED", "raw_response": "{}"}]
+    monkeypatch.setattr(runtime.transport, "run_jobs", jobs)
+    with pytest.raises(runtime.ReportWriterFailure) as exc:
+        asyncio.run(runtime.write_facts("Synthetic test; no network"))
+    assert len(calls) == len(exc.value.receipts) == 2
+    assert exc.value.receipts[0]["status"] == "COMPLETED"
+    assert not hasattr(exc.value, "report")
 
 
 def test_writer_failure_keeps_paid_source_receipts_before_temp_cleanup(tmp_path, retained, monkeypatch):
