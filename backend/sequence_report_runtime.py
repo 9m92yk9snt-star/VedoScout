@@ -1,0 +1,205 @@
+"""Opt-in full-report engine, with a bounded, owned source-analysis process.
+
+The legacy detector/reconstruction is never called here, including on failure.
+All external persistence and the facts-only writer are injected by the server.
+"""
+import asyncio
+from copy import deepcopy
+import hashlib
+import json
+import os
+from pathlib import Path
+import signal
+import sys
+import tempfile
+import time
+
+import sequence_pilot as pilot
+import sequence_pilot_transport as transport
+import sequence_report_adapter as adapter
+from evidence_authority import attach_clip_authority, compute_proof_frame_verified
+from report_fact_authority import assessment_prompt
+
+
+def enabled():
+    return os.environ.get("FULL_REPORT_ENGINE", "legacy").strip().lower() == "sequence_v1"
+
+
+async def owned_process(args, *, timeout_s, log_path):
+    """Cancellation/timeout also kills model workers; never leave paid orphans."""
+    with Path(log_path).open("wb") as log:
+        process = await asyncio.create_subprocess_exec(*map(str, args), stdout=log, stderr=log,
+                                                       start_new_session=True)
+        try:
+            await asyncio.wait_for(process.wait(), timeout_s)
+        except BaseException:
+            if process.returncode is None:
+                try:
+                    os.killpg(process.pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+                await process.wait()
+            raise
+        if process.returncode:
+            # Do not expose provider output, filesystem paths or credentials.
+            raise RuntimeError("SEQUENCE_PROCESS_FAILED")
+
+
+async def discover(video, anchors_document, work):
+    started = time.monotonic()
+    root = Path(work)
+    inputs = root / "inputs"
+    (inputs / "video").mkdir(parents=True)
+    (inputs / "video" / "source.mp4").symlink_to(Path(video).resolve())
+    pilot.original_taps(anchors_document)  # preflight before any paid work
+    pilot.write_json(inputs / "anchors.json", anchors_document)
+    sums = [(pilot.digest(inputs / name), name) for name in ("video/source.mp4", "anchors.json")]
+    (inputs / "SHA256SUMS").write_text("".join(f"{sha}  {name}\n" for sha, name in sums))
+    script = Path(__file__).parent / "scripts" / "run_sequence_pilot.py"
+    prepared, output = root / "prepared", root / "observations"
+    await owned_process([sys.executable, script, "prepare", "--evidence-dir", inputs,
+                         "--output", prepared, "--scene-packets", "--max-edge", "1280"],
+                        timeout_s=75, log_path=root / "preparation.log")
+    budget = max(1, 900 - (time.monotonic() - started))
+    await owned_process([sys.executable, script, "run", "--prepared", prepared / "manifest.json",
+                         "--output", output, "--provider", "emergent", "--model", "gpt-6-astra",
+                         "--reasoning-effort", "medium", "--budget-s", str(budget), "--per-call-s", "120",
+                         "--max-initial", "12", "--max-followups", "6", "--fresh-originals",
+                         "--contact-reviews", "--automatic-outcomes", "--image-detail", "high"],
+                        timeout_s=budget + 10, log_path=root / "observations.log")
+    result = pilot.read_json(output / "result.json")
+    manifest = pilot.read_json(prepared / "manifest.json")
+    frames = {f["frame_id"]: f for f in manifest["frames"]}
+    for path in sorted(output.rglob("contact-review-manifest.json")):
+        review = pilot.read_json(path)
+        if review["source_video_sha256"] != manifest["source_video_sha256"]:
+            raise ValueError("SEQUENCE_REVIEW_SOURCE_CHANGED")
+        frames.update({f["frame_id"]: f for f in review["frames"]})
+    manifest["frames"] = sorted(frames.values(), key=lambda f: f["media_ms"])
+    receipts = [pilot.read_json(p) for p in sorted((output / "responses").glob("*.json"))]
+    return result, manifest, receipts
+
+
+async def write_facts(prompt):
+    """Same Gemini report model/schema; bounded text-only transport, no SDK state."""
+    receipts = []
+    for attempt in range(2):
+        jobs = [{"packet_id": f"report_facts_{attempt+1}", "items": [{"type": "text", "text": prompt}]}]
+        rows = await asyncio.to_thread(transport.run_jobs, jobs, "emergent", "gemini-2.5-pro",
+                                       deadline=time.monotonic()+195, per_call_s=180)
+        receipt = rows[0]
+        receipts.append(receipt)
+        if receipt.get("status") != "COMPLETED":
+            raise RuntimeError("SEQUENCE_REPORT_WRITER_FAILED")
+        try:
+            prose = pilot.parse_response(receipt["raw_response"])
+            if not isinstance(prose, dict) or not prose:
+                raise ValueError("REPORT_JSON_OBJECT_REQUIRED")
+            return {"report": prose, "receipts": receipts}
+        except ValueError:
+            if attempt:
+                raise ValueError("SEQUENCE_REPORT_WRITER_INVALID")
+            prompt = "Return ONLY one valid JSON object, without markdown.\n" + prompt
+
+
+async def generate(video, doc, *, template, writer=write_facts, discovery=discover):
+    started = time.monotonic()
+    if doc.get("anchor_time_offset") not in (None, 0, 0.):
+        raise ValueError("SEQUENCE_NONZERO_ANCHOR_OFFSET_NOT_VALIDATED")
+    # Raw original selection only; never re-use an inferred identity profile.
+    raw = doc.get("raw_marker_anchors")
+    if not raw:
+        raise ValueError("SEQUENCE_ORIGINAL_SELECTIONS_REQUIRED")
+    anchor_document = {"raw_marker_anchors": raw}
+    pilot.original_taps(anchor_document)
+    source = await asyncio.to_thread(pilot.digest, Path(video))
+    with tempfile.TemporaryDirectory(prefix="sequence-report-") as work:
+        result, manifest, receipts = await discovery(video, anchor_document, work)
+        if manifest["source_video_sha256"] != source:
+            raise ValueError("SEQUENCE_SOURCE_CHANGED")
+        bundle = adapter.canonical_bundle(result, manifest, receipts)
+        observed = time.monotonic()
+        prompt = assessment_prompt(template, bundle, doc.get("player_details"),
+                                   {"coverage_status": "PARTIAL", "engine": adapter.ENGINE})
+        written = await asyncio.wait_for(writer(prompt), timeout=420)
+        full = adapter.build_report(written["report"], bundle)
+        # Store replayable raw model receipts with the report, not ephemeral paths.
+        audit = {"result": result, "receipts": receipts, "writer_receipts": written["receipts"],
+                 "writer_prompt_sha256": hashlib.sha256(prompt.encode()).hexdigest(),
+                 "source_video_sha256": source,
+                 "original_taps_sha256": hashlib.sha256(json.dumps(anchor_document, sort_keys=True).encode()).hexdigest(),
+                 "source_frames": [{"frame_id": f["frame_id"], "media_ms": f["media_ms"]} for f in manifest["frames"]],
+                 "references": [{k: r[k] for k in ("reference_id", "media_ms", "sha256")} for r in manifest["references"]]}
+        if len(json.dumps(audit).encode()) > 4_000_000:
+            raise ValueError("SEQUENCE_AUDIT_TOO_LARGE")
+        return {"analysis_engine": adapter.ENGINE, "canonical_events": bundle,
+                "sequence_audit": audit, "full_report": full,
+                "sequence_timings": {"source_analysis_seconds": round(observed-started, 3),
+                                     "facts_writer_and_projection_seconds": round(time.monotonic()-observed, 3),
+                                     "before_assets_seconds": round(time.monotonic()-started, 3)}}
+
+
+def render_assets(video, full, bundle, directory):
+    """Actual source PTS and unannotated clips. Zero re-identification calls."""
+    import cv2
+    import subprocess
+    import video_timebase
+    from media_binaries import FFMPEG_BIN
+    directory = Path(directory)
+    directory.mkdir(parents=True, exist_ok=True)
+    if pilot.digest(Path(video)) != bundle["source_video_sha256"]:
+        raise ValueError("SEQUENCE_ASSET_SOURCE_CHANGED")
+    events = {e["event_id"]: e for e in bundle["events"]}
+    cap = cv2.VideoCapture(str(video))
+    assets = []
+    try:
+        for row in full.get("video_comments") or []:
+            event = events.get(row.get("event_id"))
+            if not event or not (row.get("sequence_event_native") is True
+                                 and row.get("source_video_sha256") == bundle["source_video_sha256"]
+                                 and row.get("evidence_time_ms") == event["proof"]["frame_ms"]
+                                 and row.get("source_frame_id") == event["proof"]["frame_id"]):
+                raise ValueError("SEQUENCE_ASSET_BINDING_INVALID")
+            requested = row["evidence_time_ms"]
+            ok, pixels, actual_s = video_timebase.read_frame_at(cap, requested / 1000.)
+            if not ok or round(actual_s * 1000) != requested:
+                raise ValueError("SEQUENCE_ACTUAL_FRAME_MISMATCH")
+            image = directory / (row["evidence_id"] + ".jpg")
+            if not cv2.imwrite(str(image), pixels):
+                raise RuntimeError("SEQUENCE_FRAME_WRITE_FAILED")
+            start = max(0, event["proof"]["proof_start_ms"] - 750) / 1000.
+            end = (event["proof"]["proof_end_ms"] + 750) / 1000.
+            clip = directory / (row["evidence_id"] + ".mp4")
+            subprocess.run([FFMPEG_BIN, "-v", "error", "-y", "-ss", str(start), "-i", str(video),
+                            "-t", str(end-start), "-an", "-vf", "scale=720:1280:force_original_aspect_ratio=decrease",
+                            "-c:v", "libx264", "-preset", "ultrafast", "-crf", "24", "-threads", "1",
+                            "-movflags", "+faststart", str(clip)], check=True, timeout=45,
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            row.update(frame_time_ms=round(actual_s*1000), frame_time_authority="ACTUAL_MEDIA_PTS",
+                       identity_verified=True, identity_verification_status="SEQUENCE_SOURCE_CONTINUITY",
+                       telestrated=False, tele_clip_start=start, tele_clip_end=end)
+            attach_clip_authority(row, start, end, {row["event_id"]: event["canonical_ms"]})
+            assets.append((row, image, clip))
+    finally:
+        cap.release()
+    return assets
+
+
+async def persist_assets(collection, doc, video, directory, publish):
+    started = time.monotonic()
+    full = deepcopy(doc["full_report"])
+    assets = await asyncio.to_thread(render_assets, video, full, doc["canonical_events"], directory)
+    for row, image, clip in assets:
+        row["frame_url"] = await publish(image, "image/jpeg")
+        row["tele_clip_url"] = await publish(clip, "video/mp4")
+        if not row["frame_url"] or not row["tele_clip_url"]:
+            raise RuntimeError("SEQUENCE_ASSET_PUBLISH_FAILED")
+        row["proof_frame_verified"] = compute_proof_frame_verified(row)
+        if not row["proof_frame_verified"]:
+            raise ValueError("SEQUENCE_PROOF_FRAME_NOT_VERIFIED")
+    timings = {**doc.get("sequence_timings", {}), "assets_seconds": round(time.monotonic()-started, 3)}
+    timings["total_processing_seconds"] = round(timings.get("before_assets_seconds", 0)+timings["assets_seconds"], 3)
+    await collection.update_one({"id": doc["id"]}, {"$set": {
+        "full_report": full, "sequence_timings": timings, "identity_gate_done": True,
+        "full_report_status": "finalizing"}})
+    return {"checked": len(assets), "hard_rejected": 0, "authority": adapter.ENGINE}

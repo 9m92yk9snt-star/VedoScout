@@ -1,0 +1,115 @@
+name: Sequence full-report integration
+
+on:
+  pull_request:
+    paths:
+      - 'backend/sequence_report_*.py'
+      - 'backend/scripts/run_sequence_report_trial.py'
+      - 'backend/tests/test_sequence_report.py'
+      - 'backend/evidence_authority.py'
+      - 'backend/server.py'
+      - '.github/workflows/sequence-report.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  offline_report_contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      PYTHONPATH: backend
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install 'numpy<3' 'opencv-python-headless<5' 'Pillow>=10,<15' 'pytest>=8,<10'
+      - run: python -m pytest backend/tests/test_sequence_report.py -q
+
+  cold_full_report:
+    if: >-
+      github.repository == '9m92yk9snt-star/VedoScout' &&
+      github.event.pull_request.number == 39 &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.head.ref == 'codex/sequence-pilot-foundation' &&
+      github.event.before == '69f62f7f1b4edc8fe34ed734db8d1e7d2e1320c8' &&
+      github.run_attempt == 1
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      PYTHONPATH: backend
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg
+          python -m pip install 'numpy<3' 'opencv-python-headless<5' 'Pillow>=10,<15'
+      - name: Reassemble verified original video and selections
+        run: |
+          python - <<'PY'
+          import hashlib, os, shutil
+          from pathlib import Path
+          source = Path('testdata/sequence-pilot-orman400')
+          target = Path(os.environ['RUNNER_TEMP']) / 'report-source'
+          (target / 'video').mkdir(parents=True)
+          parts = sorted((source / 'video-parts').glob('*.bin'))
+          assert [p.name for p in parts] == [f'{i:03}.bin' for i in range(43)]
+          with (target / 'video/source.mp4').open('wb') as output:
+              for part in parts:
+                  with part.open('rb') as stream:
+                      shutil.copyfileobj(stream, output)
+          for name in ('anchors.json', 'SHA256SUMS'):
+              shutil.copyfile(source / name, target / name)
+          for line in (target / 'SHA256SUMS').read_text().splitlines():
+              expected, name = line.split(None, 1)
+              with (target / name).open('rb') as stream:
+                  assert hashlib.file_digest(stream, 'sha256').hexdigest() == expected
+          print('Original source and taps verified; no old report/model results loaded.')
+          PY
+      - name: Actual source discovery, facts report, source proofs and READY
+        env:
+          EMERGENT_LLM_KEY: ${{ secrets.EMERGENT_LLM_KEY }}
+        run: >-
+          python -u backend/scripts/run_sequence_report_trial.py
+          --video "$RUNNER_TEMP/report-source/video/source.mp4"
+          --anchors "$RUNNER_TEMP/report-source/anchors.json"
+          --output "$RUNNER_TEMP/full-report-trial"
+      - name: Preserve actual report receipts and evaluate after generation
+        if: always()
+        run: |
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          import sequence_pilot as pilot
+          root = Path(os.environ['RUNNER_TEMP']) / 'full-report-trial'
+          path = root / 'report-document.json'
+          if not path.is_file():
+              raise SystemExit('No returned report document')
+          doc = json.loads(path.read_text())
+          print('BEGIN_ACTUAL_REPORT_DOCUMENT')
+          print(json.dumps(doc))
+          print('END_ACTUAL_REPORT_DOCUMENT')
+          result = (doc.get('sequence_audit') or {}).get('result')
+          if result:
+              evaluation = pilot.assess_reference_cases(pilot.read_json('docs/examples/five_action_reference_cases.json'), result)
+              (root / 'reference-evaluation.json').write_text(json.dumps(evaluation, indent=2))
+              print('BEGIN_REPORT_REFERENCE_EVALUATION')
+              print(json.dumps(evaluation))
+              print('END_REPORT_REFERENCE_EVALUATION')
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sequence-full-report-${{ github.run_id }}
+          path: ${{ runner.temp }}/full-report-trial/
+          retention-days: 14
+          if-no-files-found: warn
