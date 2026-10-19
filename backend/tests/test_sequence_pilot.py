@@ -151,6 +151,49 @@ def test_actual_unscoped_rebound_question_remains_blocking_and_keeps_its_text():
     assert q["scope"] == "ACTION" and q["question"] == question["question"]
 
 
+def actual_validated_shot():
+    saved = p.read_json(Path(__file__).resolve().parents[2] / "docs/examples/sequence-shot-filter-validation.json")
+    r = saved["result"]
+    receipt = r["receipt"]
+    assert receipt["origin"] == "LIVE_MODEL_REQUEST" and receipt["status"] == "COMPLETED"
+    assert hashlib.sha256(receipt["raw_response"].encode()).hexdigest() == receipt["response_sha256"]
+    assert receipt["payload_sha256"] == r["request_audit"]["payload_sha256"]
+    manifest = {"source_video_sha256": r["source_video_sha256"], "frames": r["source_frames"],
+                "references": r["references"]}
+    return r, manifest, p.parse_response(receipt["raw_response"])
+
+
+def test_actual_live_aftermath_question_preserves_selected_saved_shot():
+    r, manifest, raw = actual_validated_shot()
+    resolved = p.reconcile([p.resolve_response(raw, manifest, r["packet"],
+        {k: r["receipt"][k] for k in ("packet_id", "payload_sha256", "response_sha256", "origin")})])
+    assert resolved == r["resolved"]
+    shot = next(e for e in resolved["target_events"] if e["kind"] == "SHOT")
+    assert shot["selected_player"] is True and shot["outcome"] == "SAVED"
+    assert shot["contact_interval_ms"] == [23682, 23749]
+    assert shot["reference_ids"] == ["r5", "r6"]
+    assert shot["proof_eligible"] is True and shot["model_requested_clarification"] is False
+    assert len(resolved["questions"]) == 1 and resolved["questions"][0]["scope"] == "AFTERMATH"
+    assert r["model_calls"] == 1 and r["fresh_end_to_end_timing"] is False
+    assert r["expected_answers_used_as_input"] is False
+
+
+@pytest.mark.parametrize("change", [
+    lambda q, a: q.update(scope="ACTION"),
+    lambda q, a: q.update(after_frame="s000023682"),
+    lambda q, a: a.update(contact_actor_unique=False),
+    lambda q, a: a.update(same_active_ball=False),
+])
+def test_actual_live_shot_does_not_bypass_new_action_uncertainty(change):
+    r, manifest, raw = actual_validated_shot()
+    q = raw["plays"][0]["questions"][0]
+    action = next(a for a in raw["plays"][0]["actions"] if a["kind"] == "SHOT")
+    change(q, action)
+    resolved = p.resolve_response(raw, manifest, r["packet"], r["receipt"])
+    shot = next(e for e in resolved["events"] if e["kind"] == "SHOT")
+    assert shot["proof_eligible"] is False and shot["model_requested_clarification"] is True
+
+
 def test_structured_later_possession_question_keeps_saved_shot_and_unknown_aftermath():
     manifest, packet, raw, receipt, question = cold_saved_shot_question_fixture()
     question.update(scope="AFTERMATH", after_frame="s000025516")

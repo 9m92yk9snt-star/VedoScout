@@ -214,9 +214,43 @@ time was **79.199s**, exactly one model request. No new model observation or
 approval was obtained. Its complete request/selection hashes and error receipt
 are retained in `examples/sequence-question-scope-rate-limit.json`. Model calls
 stop here; no repeated quota retries, alternative credentials or model fallback
-are used. The structured scope contract remains offline-tested, awaiting actual
-model validation. The probe also checkpoints raw responses before parsing so a
+are used. At that point the structured scope contract was offline-tested,
+awaiting actual model validation. The probe also checkpoints raw responses before parsing so a
 malformed response cannot discard paid evidence.
+
+## Actual shot-filter validation succeeded
+
+Following the user's explicit request to validate the filter, run **39193772410**
+(commit `291c5fb1fd1f6878259612b957b8fd60e0d90e52`) made exactly **one** fresh
+GPT-6 Astra request using only the original video/selections and user-located
+19,266–25,631ms window. No historical answers or expected outcome were supplied.
+The model call completed in **56.214s**; total preparation/probe wall time was
+**80.355s**. This is single-window validation, not whole-source/report timing.
+
+The actual returned observation identifies the selected player from r5/r6 as
+the shooter, with contact bracket **23,682–23,749ms**. It identifies the nearby
+white teammate as a separate person, describes the goalkeeper's glove contact
+and changed active-ball motion, and returns **SAVED**. The ball bouncing outside
+the post is distinguished from the stationary spare ball inside the net.
+
+Crucially, the model itself returned the new structured question:
+`scope=AFTERMATH`, `after_frame=s000025516`, asking who next collects the loose
+ball after the established save. The live resolver retained this unanswered
+question while returning the selected shot with `proof_eligible=true` and
+`model_requested_clarification=false`. No scope metadata was added manually.
+
+The complete raw response, payload/response hashes, delivered source frame
+catalog and original-selection hashes are retained in
+`examples/sequence-shot-filter-validation.json`. Offline regression now
+reproduces the actual live resolved output exactly. Counterexamples changing
+the question to ACTION, giving an invalid aftermath boundary, removing unique
+contact support or breaking active-ball continuity still block approval.
+
+The explicitly authorized one-run PR trigger is removed again; ordinary PR
+checks and the CLI remain offline by default. No second model call, full-video
+analysis, report writing, merge or deployment was performed for this validation.
+The middle-assist anatomical-foot disagreement remains unresolved. A complete
+fresh source-to-READY report benchmark and distinct-match testing still remain.
 
 There is still no successful uninterrupted cold source-to-READY timing. The
 successful 192.669s report-stage replay and earlier 518.498s source run cannot
