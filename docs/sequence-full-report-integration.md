@@ -61,11 +61,19 @@ Retained real receipts from source run 39182857433 project to 1 observed goal,
 server orchestration completed eight exact source images and eight clips, with
 no new model calls. This is a replay/asset test, not fresh end-to-end timing.
 
-A separate fresh full-report run is started from commit
+A separate fresh full-report run started from commit
 `59b0e47257ac06d76c4493caff48a11fcd61c040` in Actions run 39186278770. It
 uses an isolated report store, real models and real source encoding. Emails and
 dashboard notifications are suppressed. The initial harness used a synthetic
 age of 12; its age-based grades are not accepted as this player's assessment.
+That run stopped after 569.373s at writer transport preflight, before a report
+model request: the writer requested 180s but the transport only accepted 150s.
+It never wrote READY or called legacy reconstruction. The transport now accepts
+up to 210s, with the sequence reader still requesting 120s. An owned-worker test
+exercises the writer's actual 180s configuration and report-object parsing
+without network calls. Source receipts/canonical events now checkpoint before
+writing, so a later writer failure cannot discard completed source evidence.
+
 The harness now accepts explicit metadata (the supplied report states age 11,
 position Winger). Production always forwards the stored player details.
 

@@ -92,8 +92,12 @@ async def write_facts(prompt):
         if receipt.get("status") != "COMPLETED":
             raise RuntimeError("SEQUENCE_REPORT_WRITER_FAILED")
         try:
-            prose = pilot.parse_response(receipt["raw_response"])
-            if not isinstance(prose, dict) or not prose:
+            text = receipt["raw_response"].strip()
+            if text.startswith("```"):
+                text = "\n".join(text.splitlines()[1:-1])
+            prose = json.loads(text)
+            if not isinstance(prose, dict) or not all(isinstance(prose.get(k), dict)
+                    for k in ("technical", "tactical", "physical", "mentality", "scores")):
                 raise ValueError("REPORT_JSON_OBJECT_REQUIRED")
             return {"report": prose, "receipts": receipts}
         except ValueError:
@@ -102,7 +106,7 @@ async def write_facts(prompt):
             prompt = "Return ONLY one valid JSON object, without markdown.\n" + prompt
 
 
-async def generate(video, doc, *, template, writer=write_facts, discovery=discover):
+async def generate(video, doc, *, template, writer=write_facts, discovery=discover, checkpoint=None):
     started = time.monotonic()
     if doc.get("anchor_time_offset") not in (None, 0, 0.):
         raise ValueError("SEQUENCE_NONZERO_ANCHOR_OFFSET_NOT_VALIDATED")
@@ -115,6 +119,18 @@ async def generate(video, doc, *, template, writer=write_facts, discovery=discov
     source = await asyncio.to_thread(pilot.digest, Path(video))
     with tempfile.TemporaryDirectory(prefix="sequence-report-") as work:
         result, manifest, receipts = await discovery(video, anchor_document, work)
+        # Persist paid observations before projection/writing can fail. A failed
+        # writer must never discard nine minutes of source-reading receipts.
+        audit = {"result": result, "receipts": receipts, "writer_receipts": [],
+                 "source_video_sha256": source,
+                 "original_taps_sha256": manifest.get("original_taps_sha256"),
+                 "original_selection_values_sha256": hashlib.sha256(json.dumps(anchor_document, sort_keys=True).encode()).hexdigest(),
+                 "source_frames": [{"frame_id": f["frame_id"], "media_ms": f["media_ms"]} for f in manifest["frames"]],
+                 "references": [{k: r[k] for k in ("reference_id", "media_ms", "sha256")} for r in manifest["references"]]}
+        if len(json.dumps(audit).encode()) > 4_000_000:
+            raise ValueError("SEQUENCE_AUDIT_TOO_LARGE")
+        if checkpoint:
+            await checkpoint({"sequence_audit": audit})
         if manifest["source_video_sha256"] != source:
             raise ValueError("SEQUENCE_SOURCE_CHANGED")
         bundle = adapter.canonical_bundle(result, manifest, receipts)
@@ -122,15 +138,14 @@ async def generate(video, doc, *, template, writer=write_facts, discovery=discov
         prompt = assessment_prompt(template, bundle, doc.get("player_details"),
                                    {"coverage_status": "PARTIAL", "engine": adapter.ENGINE,
                                     "anatomical_foot_side": "UNVERIFIED; do not grade weak foot or settle left/right"})
+        audit["writer_prompt_sha256"] = hashlib.sha256(prompt.encode()).hexdigest()
+        if checkpoint:
+            await checkpoint({"canonical_events": bundle, "sequence_audit": audit,
+                              "sequence_timings": {"source_analysis_seconds": round(observed-started, 3)}})
         written = await asyncio.wait_for(writer(prompt), timeout=420)
         full = adapter.build_report(written["report"], bundle)
         # Store replayable raw model receipts with the report, not ephemeral paths.
-        audit = {"result": result, "receipts": receipts, "writer_receipts": written["receipts"],
-                 "writer_prompt_sha256": hashlib.sha256(prompt.encode()).hexdigest(),
-                 "source_video_sha256": source,
-                 "original_taps_sha256": hashlib.sha256(json.dumps(anchor_document, sort_keys=True).encode()).hexdigest(),
-                 "source_frames": [{"frame_id": f["frame_id"], "media_ms": f["media_ms"]} for f in manifest["frames"]],
-                 "references": [{k: r[k] for k in ("reference_id", "media_ms", "sha256")} for r in manifest["references"]]}
+        audit["writer_receipts"] = written["receipts"]
         if len(json.dumps(audit).encode()) > 4_000_000:
             raise ValueError("SEQUENCE_AUDIT_TOO_LARGE")
         return {"analysis_engine": adapter.ENGINE, "canonical_events": bundle,

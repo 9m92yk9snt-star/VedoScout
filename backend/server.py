@@ -9145,7 +9145,10 @@ async def generate_full_report_task(report_id: str) -> None:
                 k: "" for k in ("gt_track", "player_track", "movement_map", "pace_metrics", "speed_metrics", "heatmap",
                                  "identity_timeline", "identity_timeline_compare", "sequence_audit",
                                  "sequence_timings", "canonical_events")}})
-            payload = await sequence_report_runtime.generate(file_path, doc, template=FULL_REPORT_PROMPT)
+            async def checkpoint_sequence_observations(values):
+                await db.reports.update_one({"id": report_id}, {"$set": values})
+            payload = await sequence_report_runtime.generate(file_path, doc, template=FULL_REPORT_PROMPT,
+                                                             checkpoint=checkpoint_sequence_observations)
             await db.reports.update_one({"id": report_id}, {"$set": {
                 **payload, "full_report_status": "verifying", "full_generated_at": now_iso()}})
             await _persist_video_frames(report_id, file_path)

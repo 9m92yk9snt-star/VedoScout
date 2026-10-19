@@ -21,6 +21,7 @@ KEY_ENV = {"gemini": "GEMINI_API_KEY", "emergent": "EMERGENT_LLM_KEY"}
 # Includes the entire encoded JSON body, below the existing 20 MB inline limit.
 MAX_REQUEST_BYTES = 19_500_000
 MAX_RESPONSE_BYTES = 2_000_000
+MAX_CALL_SECONDS = 210.
 
 
 def build_request(provider, model, items, *, reasoning_effort=None, image_detail=None):
@@ -169,7 +170,7 @@ def _stop(process):
 
 def run_jobs(jobs, provider, model, *, deadline, per_call_s=90., workers=2, worker=_worker):
     """Two owned children; a wall deadline stops actual work, including hung IO."""
-    if provider not in KEY_ENV or not 1 <= workers <= 2 or not 0 < per_call_s <= 150:
+    if provider not in KEY_ENV or not 1 <= workers <= 2 or not 0 < per_call_s <= MAX_CALL_SECONDS:
         raise ValueError("INVALID_EXECUTION_BUDGET")
     pending, active, results, abort = list(jobs), {}, [], False
     context = multiprocessing.get_context("spawn")

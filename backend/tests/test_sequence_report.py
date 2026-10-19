@@ -6,6 +6,7 @@ from pathlib import Path
 from types import SimpleNamespace
 import sys
 import subprocess
+import time
 
 import pytest
 
@@ -83,6 +84,46 @@ def test_empty_retained_proofs_prevent_ready_before_encoding(tmp_path):
         pytest.fail("Empty evidence must not publish or become ready")
     with pytest.raises(ValueError, match="SOURCE_PROOFS_MISSING"):
         asyncio.run(runtime.persist_assets(None, {"full_report": {}}, tmp_path / "absent.mp4", tmp_path, publish))
+
+
+def synthetic_report_worker(pipe, job, provider, model, timeout):
+    assert provider == "emergent" and model == "gemini-2.5-pro" and timeout >= 179
+    pipe.send({"status": "COMPLETED", "packet_id": job["packet_id"],
+               "raw_response": json.dumps({"summary": "Synthetic transport boundary test",
+                    "technical": {}, "tactical": {}, "physical": {}, "mentality": {}, "scores": {}})})
+    pipe.close()
+
+
+def test_writer_180_second_budget_reaches_owned_transport_without_network(monkeypatch):
+    real = runtime.transport.run_jobs
+    def synthetic_jobs(jobs, provider, model, **kwargs):
+        return real(jobs, provider, model, **kwargs, worker=synthetic_report_worker)
+    monkeypatch.setattr(runtime.transport, "run_jobs", synthetic_jobs)
+    result = asyncio.run(runtime.write_facts("Synthetic test; no model request"))
+    assert result["report"]["summary"] == "Synthetic transport boundary test"
+    assert len(result["receipts"]) == 1
+    with pytest.raises(ValueError, match="INVALID_EXECUTION_BUDGET"):
+        real([], "emergent", "gemini-2.5-pro", deadline=time.monotonic()+1, per_call_s=211)
+
+
+def test_writer_failure_keeps_paid_source_receipts_before_temp_cleanup(tmp_path, retained, monkeypatch):
+    raw = json.loads((ROOT / "testdata/sequence-pilot-orman400/anchors.json").read_text())["raw_marker_anchors"]
+    monkeypatch.setattr(runtime.pilot, "digest", lambda _: retained["source_video_sha256"])
+    async def discovery(*args):
+        return retained["result"], retained["replay_context"], retained["receipts"]
+    async def writer(prompt):
+        raise RuntimeError("SYNTHETIC_WRITER_FAILURE")
+    saved = []
+    async def checkpoint(values):
+        saved.append(deepcopy(values))
+    ns, _, _, _ = server_harness(tmp_path / "video.mp4", {"id": "test"}, tmp_path)
+    with pytest.raises(RuntimeError, match="SYNTHETIC_WRITER_FAILURE"):
+        asyncio.run(runtime.generate(tmp_path / "video.mp4", {"raw_marker_anchors": raw},
+                    template=ns["FULL_REPORT_PROMPT"], discovery=discovery, writer=writer, checkpoint=checkpoint))
+    assert len(saved) == 2
+    assert len(saved[-1]["sequence_audit"]["receipts"]) == 13
+    assert saved[-1]["canonical_events"]["events"]
+    assert "full_report" not in saved[-1]
 
 
 def test_unbound_comment_and_inexact_source_image_are_not_proof(retained):
