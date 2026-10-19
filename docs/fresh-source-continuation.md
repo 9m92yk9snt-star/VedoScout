@@ -164,3 +164,41 @@ CONTACT question is introduced. All five new continuation tests pass locally;
 with the 261 existing relevant tests, 266 local checks pass. An offline injected
 transport error also retained all four prior approvals and the unresolved shot
 without any model call. These are code validations, not extra perception calls.
+
+## Integrated cold-run preparation
+
+The next run starts from the exact original video and taps, loads no saved
+model receipt, and makes fresh discovery requests for all ten scene packets.
+The --automatic-outcomes mode requires fresh-original contact mode and rejects
+resume inputs. Initial reading, native contact reviews and at most one further
+outcome round share the same deadline and total follow-up cap (six). Source
+preparation is subtracted from the workflow's 900s source-processing allowance;
+per-call timeout stays 120s, worker count stays two, and there is no HTTP retry.
+The ordinary runner's 600s cap and legacy replay planner remain unchanged.
+
+A proposed optimization to skip every proof-eligible selected shot was rejected
+by retained-source testing: it would also skip the coarse false selected GOAL
+in the middle-assist play. The actor/control review is therefore retained. In
+the cold mode, a review of a non-goal shot now keeps recent control, strike and
+continuous aftermath together, with a 4.8s native-window cap. Direct terminal
+questions with a contact bracket include 100ms before the bracket and 1500ms
+after it. An explicit remaining selected-shot OUTCOME question can schedule
+a bounded second-round native reading without using any reference-case answer.
+Superseded observations and their unresolved questions remain in the audit; a
+failed review does not remove the previous active observations.
+
+Offline source preflight, using retained answers for navigation testing only,
+produces three image requests: goal 16,102,769 bytes / 187 images, control-to-shot
+14,997,290 bytes / 353 images, middle handoff 12,880,445 bytes / 180 images. The shot
+window now covers 20.466–25.266s, including the goalkeeper encounter, rather
+than stopping at 23.966s. All requests fit the unchanged 19.5 MB wire cap and keep
+all supplied source instants. These are preflight measurements, not new model
+results or an assurance that a provider will accept the requests.
+
+272 relevant offline checks pass, including synthetic three-stage success,
+second-round transport failure preserving uncertainty, a shared unchanged
+deadline across rounds, the total follow-up limit, refusal of resume in cold
+mode, and exact reconstruction of the previous successful outcome navigation.
+The final prior resumed-branch GitHub check (39181993193) passed 266 tests.
+Cold-run reference evaluation is performed only after all actual model calls.
+No merge or deployment.

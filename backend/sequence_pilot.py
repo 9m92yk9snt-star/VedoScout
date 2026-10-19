@@ -716,7 +716,7 @@ def reconcile(results, *, sampling_gap_ms=125):
             "questions": questions, "conflicts": conflicts}
 
 
-def plan_contact_reviews(manifest, resolved, *, limit=6, terminal_only=False):
+def plan_contact_reviews(manifest, resolved, *, limit=6, terminal_only=False, complete_terminal_context=False):
     """One focused review per source packet, only unresolved target releases."""
     events = {key: e for e in resolved["events"] for key in e["source_action_keys"]}
     candidates = []
@@ -747,7 +747,15 @@ def plan_contact_reviews(manifest, resolved, *, limit=6, terminal_only=False):
         detail_end = min(hi-1, focus+750)
         if _number(event.get("outcome_ms")) and focus < event["outcome_ms"] <= focus+2000:
             detail_end = min(hi-1, max(detail_end, event["outcome_ms"]))
-        candidates.append((priority, q, focus, base, lo, hi, max(lo, focus-750), detail_end,
+        detail_start = max(lo, focus-750)
+        if (complete_terminal_context and event["kind"] == "SHOT"
+                and event.get("contact_interval_ms")):
+            # A shot's release and outcome belong in the same native sequence,
+            # even when CONTACT sorts ahead of the separate OUTCOME question.
+            before, after = event["contact_interval_ms"]
+            focus = min(hi-1, after+750)
+            detail_start, detail_end = max(lo,before-100), min(hi-1,after+1500)
+        candidates.append((priority, q, focus, base, lo, hi, detail_start, detail_end,
                            [v["frame"] for v in event["outcome_evidence"]]))
     # A coarse reader can call a hidden release a run/duel or an apparent loss.
     # Preserve the whole play and inspect the transition into a later chance.
@@ -778,6 +786,12 @@ def plan_contact_reviews(manifest, resolved, *, limit=6, terminal_only=False):
         # A coarse "dribble" may hide a release inside that action, not only at
         # its end. Keep the final three seconds of control through the strike.
         ds = max(lo,control["start_ms"]-400,de-3000)
+        if (complete_terminal_context and terminal["kind"] == "SHOT"
+                and terminal["outcome"] != "GOAL" and terminal.get("contact_interval_ms")):
+            # Rechecking actor continuity must not replace dense keeper-outcome
+            # evidence with sparse aftermath. Retain control through departure.
+            de = min(hi-1,contact_end+1500)
+            ds = max(lo,control["start_ms"]-400,de-4800)
         q = {"reason": "CONTACT", "focus_ms": focus, "source_packet_id": base["packet_id"],
             "source_action_key": control["source_action_keys"][0], "target_related": True,
             "instruction": "Follow the selected player's last control into the later chance. Establish the actual release, "
@@ -793,6 +807,38 @@ def plan_contact_reviews(manifest, resolved, *, limit=6, terminal_only=False):
             "start_ms": lo, "end_ms": hi-1, "reference_ids": base["reference_ids"][:],
             "question": {**q, "focus_ms": focus}, "replaces_initial_packet_id": base["packet_id"],
             "detail_start_ms": ds, "detail_end_ms": de, "extra_detail_frame_ids": extra})
+    return jobs
+
+
+def plan_outcome_reviews(manifest, resolved, parents, *, limit=2):
+    """One second-round native reading per explicit selected-shot outcome gap."""
+    explicit = {q.get("source_action_key") for q in resolved["questions"]
+                if q["reason"] == "OUTCOME" and q.get("explicit_model_question")}
+    grouped = {}
+    for event in resolved["events"]:
+        if (event["kind"] != "SHOT" or event["selected_player"] is not True
+                or event["outcome"] != "UNKNOWN" or not event.get("contact_interval_ms")
+                or not explicit.intersection(event["source_action_keys"])):
+            continue
+        matches = [j for j in parents if j["packet_id"] in event["source_packet_ids"]]
+        if len(matches) == 1:
+            grouped.setdefault(matches[0]["packet_id"], []).append((event,matches[0]))
+    jobs = []
+    for candidates in grouped.values():
+        if len(candidates) != 1 or len(jobs) >= limit:
+            continue  # don't choose an arbitrary shot from an ambiguous packet
+        event, parent = candidates[0]
+        before, after = event["contact_interval_ms"]
+        jobs.append({"packet_id": f"outcome_review_{len(jobs)+1:03}", "phase": "FOLLOWUP", "round": 2,
+            "start_ms": parent["start_ms"], "end_ms": parent["end_ms"],
+            "reference_ids": parent["reference_ids"][:], "contact_sequence_evidence": True,
+            "replaces_review_packet_id": parent["packet_id"] if parent.get("replaces_initial_packet_id") else None,
+            "replaces_initial_packet_id": parent.get("replaces_initial_packet_id",parent["packet_id"]),
+            "detail_start_ms": max(parent["start_ms"],before-100),
+            "detail_end_ms": min(parent["end_ms"],after+1500),
+            "extra_detail_frame_ids": [v["frame"] for v in event["outcome_evidence"]],
+            "question": {"reason":"OUTCOME", "focus_ms":after+750,
+                "instruction":"Follow the active ball continuously from the physical striking contact through the terminal outcome. Establish the striker, any intervening touch and the ball's motion before and after it. Distinguish stationary spare balls. Keep specific contact, identity or outcome questions where images are insufficient."}})
     return jobs
 
 

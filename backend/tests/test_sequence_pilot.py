@@ -732,6 +732,87 @@ def test_fresh_resume_reproduces_request_hash_and_never_repeats_initial_calls(tm
     assert result["status"] == "EXPERIMENT_STOPPED" and result["error_code"] == "INITIAL_RECEIPT_INPUT_MISMATCH"
 
 
+def test_cold_terminal_planner_keeps_actor_review_and_continuous_keeper_outcome_together():
+    saved=p.read_json(Path(__file__).resolve().parents[2]/"docs/examples/fresh-whole-source-initial-receipts.json")
+    manifest=saved["replay_manifest"];packets={v["packet_id"]:v for v in manifest["packets"]}
+    observed=[p.resolve_response(p.parse_response(r["raw_response"]),manifest,packets[r["packet_id"]],
+                                {"origin":"RETAINED_ACTUAL_REPLY_REPLAY"}) for r in saved["receipts"]]
+    merged=p.reconcile(observed)
+    jobs=p.plan_contact_reviews(manifest,merged,terminal_only=True,complete_terminal_context=True)
+    assert {j["replaces_initial_packet_id"] for j in jobs} == {"sequence_003","sequence_004","sequence_007"}
+    review=next(j for j in jobs if j["replaces_initial_packet_id"] == "sequence_003")
+    shot=next(e for e in merged["events"] if e["selected_player"] is True and e["kind"] == "SHOT"
+              and e["outcome"] == "SAVED")
+    assert review["detail_start_ms"] < shot["contact_interval_ms"][0]
+    assert review["detail_end_ms"] >= shot["contact_interval_ms"][1]+1500
+    # Explicit uncertainty still demands a review even when the outcome said SAVED.
+    shot.update(proof_eligible=False,model_requested_clarification=True)
+    merged["questions"].append({"reason":"CONTACT","source_action_key":shot["source_action_keys"][0],
+        "source_packet_id":shot["source_packet_ids"][0],"explicit_model_question":True,"target_related":True})
+    jobs=p.plan_contact_reviews(manifest,merged,terminal_only=True,complete_terminal_context=True)
+    review=next(j for j in jobs if j["replaces_initial_packet_id"] == "sequence_003")
+    assert review["detail_start_ms"] <= shot["contact_interval_ms"][0]-100
+    assert review["detail_end_ms"] >= shot["contact_interval_ms"][1]+1500
+
+
+@pytest.mark.parametrize("max_followups,second_failure,expected_calls",[(2,False,3),(2,True,3),(1,False,2)])
+def test_cold_automatic_outcome_round_shares_budget_and_preserves_uncertainty_on_failure(
+        tmp_path,monkeypatch,max_followups,second_failure,expected_calls):
+    """Synthetic transport/control-flow test, never a perception trial."""
+    from scripts import run_sequence_pilot as runner
+    manifest,packet,data=fixture()
+    source=tmp_path/"source.bin";source.write_bytes(b"synthetic source checksum")
+    manifest.update(source_video=str(source),source_video_sha256=p.digest(source),references=[{"reference_id":"r1"}])
+    action=data["plays"][0]["actions"][0]
+    action.update(kind="SHOT",contact_frame=None,contact_before_frame="s000000750",contact_after_frame="s000001000",
+        contact_actor_unique=True,contact_evidence=[{"frame":"s000000750","fact":"before"},
+                                                  {"frame":"s000001000","fact":"departure"}],
+        end_frame="s000002500",outcome="UNKNOWN",receiver=None,receiver_frame=None,
+        receiver_is_teammate=None,finisher="passer",shot_frame=None)
+    data["plays"][0]["questions"]=[{"reason":"OUTCOME","action_id":"a1"}]
+    path=tmp_path/"manifest.json";p.write_json(path,manifest)
+    monkeypatch.setenv("EMERGENT_LLM_KEY","SYNTHETIC_NO_NETWORK_TEST")
+    monkeypatch.setattr(p,"packet_items",lambda m,j:[{"type":"text","text":json.dumps({
+        "packet_id":j["packet_id"],"question":j.get("question")})}])
+    monkeypatch.setattr(runner,"original_spatial_items",lambda *a:([],[]))
+    def prepare(m,jobs,*args,**kwargs):
+        return m,[{**j,"frame_ids":packet["frame_ids"]} for j in jobs]
+    monkeypatch.setattr(p,"prepare_contact_reviews",prepare)
+    calls=[]
+    def transport(jobs,provider,model,*,deadline,per_call_s):
+        calls.append((deepcopy(jobs),deadline))
+        assert len(jobs)==1 and "SAVED" not in json.dumps(jobs)
+        j=jobs[0]
+        receipt={"packet_id":j["packet_id"],"origin":"SYNTHETIC_TEST_ONLY","status":"COMPLETED",
+                 "payload_sha256":"synthetic-request","response_sha256":"synthetic-response"}
+        if len(calls)==3 and second_failure:
+            return [{**receipt,"status":"ERROR","error":"MODEL_QUOTA_OR_RATE_LIMIT"}]
+        reply=deepcopy(data)
+        if len(calls)==3:
+            reply["plays"][0]["actions"][0]["outcome"]="SAVED"
+            reply["plays"][0]["questions"]=[]
+        return [{**receipt,"raw_response":json.dumps(reply)}]
+    monkeypatch.setattr(t,"run_jobs",transport)
+    result=run(path,tmp_path/"result",provider="emergent",model="gpt-6-astra",fresh_originals=True,
+               contact_reviews=True,automatic_outcomes=True,max_followups=max_followups)
+    assert len(calls)==expected_calls and len({deadline for _,deadline in calls})==1
+    assert result["historical_action_results_used"] is False and result["fresh_end_to_end_run"] is True
+    if expected_calls==3 and not second_failure:
+        assert result["counts"]["SHOT"]==1 and result["questions"]==[]
+        assert result["superseded_review_packet_ids"]==["contact_review_001"]
+    else:
+        assert result["counts"].get("SHOT",0)==0 and result["questions"]
+    assert result["status"] == ("PARTIAL_MODEL_RUN" if second_failure else "MODEL_OBSERVATIONS_RETURNED")
+
+
+def test_automatic_outcomes_rejects_resume_or_nonfresh_mode_before_any_call(tmp_path):
+    manifest,_,_=fixture();path=tmp_path/"manifest.json";p.write_json(path,manifest)
+    for options in ({}, {"fresh_originals":True},
+                    {"fresh_originals":True,"contact_reviews":True,"resume_fresh_initial":"old.json"}):
+        with pytest.raises(ValueError,match="AUTOMATIC_OUTCOMES_REQUIRE_COLD_FRESH_CONTACT_RUN"):
+            run(path,tmp_path/"result",automatic_outcomes=True,**options)
+
+
 def test_actor_continuity_band_keeps_all_people_and_does_not_select_an_identity():
     from scripts.probe_actor_continuity import viewing_band
     box = viewing_band([[(.1, .4, .1, .1, .8)], [(.7, .45, .08, .2, .7)]], 1000, 2000)

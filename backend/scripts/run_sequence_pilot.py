@@ -43,12 +43,12 @@ def original_spatial_items(manifest, packet, output):
 def run(manifest_path, output_dir, *, provider="gemini", model="gemini-2.5-pro", budget_s=300., max_initial=4,
         max_followups=2, per_call_s=90., reasoning_effort=None, identity_profile=False, image_detail=None,
         identity_profile_receipt=None, contact_reviews=False, resume_initial_receipts=None, fresh_originals=False,
-        resume_fresh_initial=None):
+        resume_fresh_initial=None, automatic_outcomes=False):
     started, out = time.monotonic(), Path(output_dir).resolve()
     if out.exists() and any(out.iterdir()):
         raise ValueError("OUTPUT_MUST_BE_NEW_OR_EMPTY")
     manifest = pilot.read_json(manifest_path)
-    if not 1 <= budget_s <= 600 or not 0 <= max_followups <= 6 or not 1 <= max_initial <= 12:
+    if not 1 <= budget_s <= (900 if automatic_outcomes else 600) or not 0 <= max_followups <= 6 or not 1 <= max_initial <= 12:
         raise ValueError("INVALID_EXPERIMENT_BUDGET")
     if reasoning_effort not in {None, "low", "medium"}:
         raise ValueError("INVALID_REASONING_EFFORT")
@@ -56,6 +56,8 @@ def run(manifest_path, output_dir, *, provider="gemini", model="gemini-2.5-pro",
         raise ValueError("FRESH_ORIGINALS_CANNOT_REPLAY_MODEL_RESULTS")
     if resume_fresh_initial and not fresh_originals:
         raise ValueError("FRESH_RESUME_REQUIRES_ORIGINAL_SELECTION_MODE")
+    if automatic_outcomes and (not fresh_originals or not contact_reviews or resume_fresh_initial):
+        raise ValueError("AUTOMATIC_OUTCOMES_REQUIRE_COLD_FRESH_CONTACT_RUN")
     if fresh_originals:
         manifest = fresh_original_manifest(manifest)
     if provider not in transport.KEY_ENV:
@@ -71,6 +73,8 @@ def run(manifest_path, output_dir, *, provider="gemini", model="gemini-2.5-pro",
                "requested_reasoning_effort": reasoning_effort,
                "identity_mode":"FRESH_ORIGINAL_SELECTIONS" if fresh_originals else "EXISTING_REFERENCE_POLICY",
                "historical_action_results_used":bool(resume_initial_receipts or resume_fresh_initial),
+               "automatic_outcomes":automatic_outcomes,
+               "fresh_end_to_end_run":bool(fresh_originals and not resume_fresh_initial),
                "reference_policy": manifest.get("reference_policy"),
                "visual_packet_plan": manifest.get("visual_packet_plan"),
                "model_jobs": [], "events": [], "target_events": [], "counts": {}, "questions": [], "conflicts": []}
@@ -131,6 +135,7 @@ def run(manifest_path, output_dir, *, provider="gemini", model="gemini-2.5-pro",
                     {k: receipt[k] for k in ("packet_id", "payload_sha256", "response_sha256", "origin")})
                 result["packet_id"] = receipt["packet_id"]
                 result["replaces_initial_packet_id"] = by_id[receipt["packet_id"]].get("replaces_initial_packet_id")
+                result["replaces_review_packet_id"] = by_id[receipt["packet_id"]].get("replaces_review_packet_id")
                 resolved_results.append(result)
             except (ValueError, KeyError, TypeError):
                 receipts[-1].update(status="INVALID_OBSERVATION_RESPONSE")
@@ -206,21 +211,39 @@ def run(manifest_path, output_dir, *, provider="gemini", model="gemini-2.5-pro",
         access_failed = any(r.get("error") in {"MODEL_ACCESS_DENIED", "MODEL_KEY_NOT_CONFIGURED"} for r in receipts)
         planner = pilot.plan_contact_reviews if contact_reviews else pilot.followup_plan
         followups = [] if access_failed else planner(manifest, merged, limit=max_followups,
-            **({"terminal_only":True} if fresh_originals and contact_reviews else {}))
+            **({"terminal_only":True, "complete_terminal_context":automatic_outcomes}
+               if fresh_originals and contact_reviews else {}))
         if followups and time.monotonic() + 5 < deadline:
             preparer = pilot.prepare_contact_reviews if contact_reviews else pilot.prepare_followups
             owner_manifest, followups = preparer(manifest, followups, out,
                 timeout_s=min(30., max(1., deadline - time.monotonic() - 5)),
                 **({"native_detail_policy":"local_half_q50"} if fresh_originals and contact_reviews else {}))
             execute(followups, owner_manifest)
-        replaced = {r["replaces_initial_packet_id"] for r in resolved_results
-                    if r.get("replaces_initial_packet_id") and r["events"]}
-        active = [r for r in resolved_results if r.get("packet_id") not in replaced]
-        merged = pilot.reconcile(active, sampling_gap_ms=manifest["input_coverage"]["max_sample_gap_ms"])
-        summary["superseded_initial_packet_ids"] = sorted(replaced)
-        summary.update(merged)
+        def merge_active():
+            replaced = {r[key] for r in resolved_results if r["events"]
+                        for key in ("replaces_initial_packet_id","replaces_review_packet_id") if r.get(key)}
+            active = [r for r in resolved_results if r.get("packet_id") not in replaced]
+            summary["superseded_initial_packet_ids"] = sorted({r["replaces_initial_packet_id"]
+                for r in resolved_results if r["events"] and r.get("replaces_initial_packet_id")})
+            summary["superseded_review_packet_ids"] = sorted({r["replaces_review_packet_id"]
+                for r in resolved_results if r["events"] and r.get("replaces_review_packet_id")})
+            summary["superseded_observations"] = [r for r in resolved_results if r.get("packet_id") in replaced]
+            merged = pilot.reconcile(active, sampling_gap_ms=manifest["input_coverage"]["max_sample_gap_ms"])
+            summary.update(merged)
+            return merged
+        merged = merge_active()
+        outcome_followups = []
+        if automatic_outcomes and not access_failed:
+            outcome_followups = pilot.plan_outcome_reviews(manifest, merged, manifest["packets"]+followups,
+                                                           limit=max(0,max_followups-len(followups)))
+            summary["outcome_review_plan"] = deepcopy(outcome_followups)
+            if outcome_followups and time.monotonic()+5 < deadline:
+                owner_manifest,outcome_followups = pilot.prepare_contact_reviews(manifest,outcome_followups,out/"outcome-round",
+                    timeout_s=min(30.,max(1.,deadline-time.monotonic()-5)),native_detail_policy="local_half_q50")
+                execute(outcome_followups,owner_manifest)
+                merged = merge_active()
         initial_count = 0 if resume_initial_receipts or resume_fresh_initial else len(manifest["packets"])
-        complete = len([r for r in receipts if r.get("status") == "COMPLETED"]) == initial_count + len(followups)
+        complete = len([r for r in receipts if r.get("status") == "COMPLETED"]) == initial_count + len(followups)+len(outcome_followups)
         summary["status"] = "MODEL_OBSERVATIONS_RETURNED" if complete else "PARTIAL_MODEL_RUN"
         if access_failed:
             summary["status"] = "MODEL_ACCESS_DENIED"
@@ -265,6 +288,7 @@ def main():
     model.add_argument("--image-detail", choices=["high"], default=None, help="Request model-side high detail independently of JPEG size")
     model.add_argument("--identity-profile-receipt", type=Path, help="Reuse a source-and-reference-hash-matched identity receipt")
     model.add_argument("--contact-reviews", action="store_true", help="Inspect unresolved target contacts with native source pixels/rate")
+    model.add_argument("--automatic-outcomes", action="store_true", help="Cold fresh run: include terminal motion with contact reviews and automatically reread explicit unresolved shot outcomes within one shared budget (at most 900s)")
     model.add_argument("--resume-initial-receipts", type=Path, help="Reuse verified initial model receipts on identical source/reference/frame inputs")
     evaluate = commands.add_parser("evaluate", help="Offline matching; never passes expected answers to a model")
     evaluate.add_argument("--result", type=Path, required=True)
@@ -282,7 +306,7 @@ def main():
                      reasoning_effort=args.reasoning_effort, identity_profile=args.identity_profile, image_detail=args.image_detail,
                      identity_profile_receipt=args.identity_profile_receipt, contact_reviews=args.contact_reviews,
                      resume_initial_receipts=args.resume_initial_receipts, fresh_originals=args.fresh_originals,
-                     resume_fresh_initial=args.resume_fresh_initial)
+                     resume_fresh_initial=args.resume_fresh_initial,automatic_outcomes=args.automatic_outcomes)
         print(json.dumps({k: result.get(k) for k in ("status", "analysis_seconds", "model_jobs_completed", "counts")}, indent=2))
         return 0 if result["status"] == "MODEL_OBSERVATIONS_RETURNED" else 3
     else:

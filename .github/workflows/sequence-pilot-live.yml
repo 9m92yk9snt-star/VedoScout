@@ -1,4 +1,4 @@
-name: Resume outcome with continuous local source detail
+name: Cold whole-source discovery with automatic terminal reviews
 
 on:
   pull_request:
@@ -18,10 +18,10 @@ jobs:
       github.event.pull_request.number == 39 &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.event.pull_request.head.ref == 'codex/sequence-pilot-foundation' &&
-      github.event.before == '37d4c4f26045ce409fbe500ed692622ec730d06c' &&
+      github.event.before == 'e2313e34f36cded525f9bc4fb45244b76964989c' &&
       github.run_attempt == 1
     runs-on: ubuntu-latest
-    timeout-minutes: 14
+    timeout-minutes: 20
     env:
       PYTHONPATH: backend
       PYTHONDONTWRITEBYTECODE: '1'
@@ -37,11 +37,8 @@ jobs:
             /backend/player_selection.py
             /backend/cv_detect.py
             /backend/scripts/run_sequence_pilot.py
-            /backend/scripts/resume_fresh_outcome.py
             /backend/scripts/probe_native_play.py
             /docs/examples/five_action_reference_cases.json
-            /docs/examples/fresh-whole-source-initial-receipts.json
-            /docs/examples/fresh-whole-source-review-receipts.json
             /testdata/sequence-pilot-orman400/
       - uses: actions/setup-python@v5
         with:
@@ -87,10 +84,18 @@ jobs:
           (Path(os.environ['RUNNER_TEMP'])/'source-processing-start.txt').write_text(str(time.monotonic()))
           PYTHON
           python backend/scripts/run_sequence_pilot.py prepare --evidence-dir "$RUNNER_TEMP/sequence-pilot-input" --output "$RUNNER_TEMP/sequence-pilot-prepared" --scene-packets --max-edge 1280
-      - name: Verify thirteen previous requests and read one unresolved terminal outcome
+      - name: Discover all plays afresh and automatically resolve terminal questions
         env:
           EMERGENT_LLM_KEY: ${{ secrets.EMERGENT_LLM_KEY }}
-        run: python -u backend/scripts/resume_fresh_outcome.py --prepared "$RUNNER_TEMP/sequence-pilot-prepared/manifest.json" --output "$RUNNER_TEMP/sequence-pilot-result" --initial docs/examples/fresh-whole-source-initial-receipts.json --reviews docs/examples/fresh-whole-source-review-receipts.json --detail-policy local_half_q50
+        run: |
+          source_budget_s="$(python - <<'PY'
+          import os,time
+          from pathlib import Path
+          start=float((Path(os.environ['RUNNER_TEMP'])/'source-processing-start.txt').read_text())
+          print(max(1,900-(time.monotonic()-start)))
+          PY
+          )"
+          python -u backend/scripts/run_sequence_pilot.py run --prepared "$RUNNER_TEMP/sequence-pilot-prepared/manifest.json" --output "$RUNNER_TEMP/sequence-pilot-result" --provider emergent --model gpt-6-astra --reasoning-effort medium --budget-s "$source_budget_s" --per-call-s 120 --max-initial 12 --max-followups 6 --fresh-originals --contact-reviews --automatic-outcomes --image-detail high
       - name: Evaluate returned observations separately and print actual receipts
         if: always()
         run: |
@@ -106,15 +111,13 @@ jobs:
           returned = pilot.read_json(result)
           clock = root / 'source-processing-start.txt'
           if clock.is_file():
-              returned['continuation_source_processing_seconds'] = round(time.monotonic()-float(clock.read_text()),3)
-              returned['timing_scope'] = 'Outcome continuation preparation, exact verification of thirteen prior requests and one new model reading; excludes earlier readings and workflow setup'
+              returned['source_processing_seconds'] = round(time.monotonic()-float(clock.read_text()),3)
+              returned['timing_scope'] = 'Cold original-source preparation, all fresh model discovery calls and automatic source-derived terminal reviews; excludes workflow setup'
               pilot.write_json(result,returned)
           evaluation = pilot.assess_reference_cases(pilot.read_json('docs/examples/five_action_reference_cases.json'), returned)
-          evaluation['continuation_complete'] = returned.get('status') == 'COMPLETED'
-          evaluation['fresh_run_complete'] = False
-          evaluation['continued_observations_pass'] = bool(evaluation['continuation_complete'] and evaluation['all_reference_cases_matched'] and not evaluation['unexpected_scoring_event_ids'] and not returned.get('conflicts'))
-          evaluation['experiment_pass'] = False
-          evaluation['scope'] = 'Verified fresh initial results plus automatic new reviews; not a new cold end-to-end benchmark'
+          evaluation['fresh_run_complete'] = returned.get('status') == 'MODEL_OBSERVATIONS_RETURNED' and returned.get('fresh_end_to_end_run') is True and returned.get('historical_action_results_used') is False
+          evaluation['experiment_pass'] = bool(evaluation['fresh_run_complete'] and evaluation['all_reference_cases_matched'] and not evaluation['unexpected_scoring_event_ids'] and not returned.get('conflicts'))
+          evaluation['scope'] = 'One cold whole-source execution; reference cases loaded only after all model calls'
           pilot.write_json(root / 'sequence-pilot-result' / 'evaluation.json', evaluation)
           print('BEGIN_ACTUAL_MODEL_RESULT')
           print(json.dumps(returned, ensure_ascii=False))

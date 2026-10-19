@@ -15,7 +15,7 @@ def current_review():
     saved = json.loads((root/"docs/examples/fresh-whole-source-review-receipts.json").read_text())
     initial = json.loads((root/"docs/examples/fresh-whole-source-initial-receipts.json").read_text())
     jobs = [{"packet_id": f"contact_review_{i+1:03}", "replaces_initial_packet_id": packet,
-             "start_ms": p["start_ms"], "end_ms": p["end_ms"], "reference_ids": p["reference_ids"]}
+             "start_ms": p["core_start_ms"], "end_ms": p["core_end_ms"]-1, "reference_ids": p["reference_ids"]}
             for i, packet in enumerate(saved["result"]["superseded_initial_packet_ids"])
             for p in initial["replay_manifest"]["packets"] if p["packet_id"] == packet]
     # Review order is explicit in the actual response provenance, not chronological.
@@ -87,3 +87,15 @@ def test_actual_new_reply_cannot_approve_shot_with_an_explicit_target_contact_qu
     observed = p.resolve_response(data, saved["replay_context"], saved["result"]["job"],
         {k:saved["receipt"][k] for k in ("packet_id","payload_sha256","response_sha256","origin")})
     assert not next(e for e in observed["events"] if e["kind"] == "SHOT")["proof_eligible"]
+
+
+def test_generic_outcome_planner_reproduces_actual_successful_navigation_and_refuses_ambiguity():
+    from scripts.resume_fresh_outcome import p
+    saved, parents = current_review()
+    jobs = p.plan_outcome_reviews({}, saved["result"], parents)
+    assert len(jobs) == 1
+    actual = actual_outcome()["result"]["job"]
+    assert all(actual[k] == value for k,value in jobs[0].items())
+    assert p.plan_outcome_reviews({}, saved["result"], parents, limit=0) == []
+    assert p.plan_outcome_reviews({}, saved["result"], parents+parents) == []
+    assert p.plan_outcome_reviews({}, {**saved["result"],"questions":[]}, parents) == []
