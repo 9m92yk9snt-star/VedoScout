@@ -113,5 +113,18 @@ application-owned. Each section requests concise text (below 6000 tokens) with
 a 12288-token hard output ceiling and a 180s wall deadline. There is no automatic
 model fallback or network retry. Missing section keys and a failed second
 section prevent publication; both receipts remain available for diagnosis.
-This change still requires a successful actual report-stage run before claiming
-a complete new report or comparing full old/new report timings.
+Actual run 39189511045 completed the two-section report and assets in **192.669s
+(3m12.669s)**: 179.569s writing/projection and 12.976s asset generation.
+The actual server finalizer wrote READY with eight matching source frames and
+eight clips, zero production notifications and no legacy reconstruction.
+Source discovery was explicitly replayed, so this is not fresh end-to-end timing.
+Both completed raw writer receipts are retained in
+`examples/sequence-report-sections-receipts.json`.
+
+Content review found a stale provisional Strong Club label in presentation after
+the evidence authority withheld the aggregate tier. The presentation writer now
+consumes the reconciled assessment; deterministic final projection also removes
+current/potential level labels and recruitment dots when the tier is unavailable.
+Regression tests reproduce the inconsistency using the actual raw responses.
+The same-video cold source-to-READY trial is the remaining complete-run timing
+check. Distinct-match validation remains outstanding.

@@ -97,7 +97,7 @@ WRITER_SECTIONS = (
 )
 
 
-async def write_facts(prompt):
+async def write_facts(prompt, *, canonical=None):
     """Two bounded text sections; presentation consumes the completed assessment.
 
     No new perception, network retry or automatic model fallback. Canonical
@@ -138,6 +138,11 @@ async def write_facts(prompt):
                     for k in ("technical", "tactical", "physical", "mentality", "scores")):
                 raise ValueError("REPORT_JSON_OBJECT_REQUIRED")
             report.update(prose)
+            if section == 1 and canonical is not None:
+                # Presentation must consume the same checked assessment that
+                # will be published, including withheld scores and tiers.
+                checked = adapter.build_report(report, canonical)
+                report = {k: checked[k] for k in keys}
         except ValueError:
             raise ReportWriterFailure("SEQUENCE_REPORT_WRITER_INVALID", receipts)
     return {"report": report, "receipts": receipts}
@@ -188,7 +193,8 @@ async def generate(video, doc, *, template, writer=write_facts, discovery=discov
             await checkpoint({"canonical_events": bundle, "sequence_audit": audit,
                               "sequence_timings": {"source_analysis_seconds": round(observed-started, 3)}})
         try:
-            written = await asyncio.wait_for(writer(prompt), timeout=420)
+            operation = writer(prompt, canonical=bundle) if writer is write_facts else writer(prompt)
+            written = await asyncio.wait_for(operation, timeout=420)
         except ReportWriterFailure as exc:
             audit["writer_receipts"] = exc.receipts
             if checkpoint:

@@ -148,6 +148,46 @@ def test_second_writer_section_failure_retains_first_receipt_without_partial_rep
     assert not hasattr(exc.value, "report")
 
 
+def actual_section_reports():
+    actual = json.loads((ROOT / "docs/examples/sequence-report-sections-receipts.json").read_text())
+    checkpoint = json.loads((ROOT / "docs/examples/sequence-report-source-checkpoint.json").read_text())
+    return actual, checkpoint["canonical_events"]
+
+
+def test_actual_writer_presentation_cannot_retain_level_after_aggregate_withheld():
+    actual, canonical = actual_section_reports()
+    prose = {}
+    for receipt in actual["writer_receipts"]:
+        prose.update(json.loads(receipt["raw_response"]))
+    assert "Strong Club" in prose["scout_outlook"]["current_level_label"]
+    full = adapter.build_report(prose, canonical)
+    assert full["overall_benchmark"]["tier"] is None
+    assert full["potential_assessment"]["current_level"].startswith("Insufficient verified evidence")
+    assert full["scout_outlook"]["current_level_dots"] is None
+    assert full["scout_outlook"]["potential_level_dots"] is None
+    assert "Strong Club" not in full["scout_outlook"]["current_level_label"]
+    assert full["technical"]["weak_foot"]["score"] is None
+    assert full["match_stats"]["observed_assists"] == 3
+
+
+def test_presentation_writer_consumes_actual_reconciled_assessment(monkeypatch):
+    actual, canonical = actual_section_reports()
+    calls = []
+    def jobs(jobs, *args, **kwargs):
+        calls.append(jobs[0])
+        if len(calls) == 2:
+            checked = json.loads(jobs[0]["items"][0]["text"].split(
+                "COMPLETED ASSESSMENT (authoritative for scores, uncertainty and advice): ", 1)[1])
+            assert checked["overall_benchmark"]["tier"] is None
+            assert checked["scores"]["overall_development"] is None
+            assert checked["technical"]["weak_foot"]["cannot_evaluate"] is True
+        return [deepcopy(actual["writer_receipts"][len(calls)-1])]
+    monkeypatch.setattr(runtime.transport, "run_jobs", jobs)
+    result = asyncio.run(runtime.write_facts("Synthetic replay; no network", canonical=canonical))
+    assert len(calls) == 2
+    assert result["report"]["overall_benchmark"]["tier"] is None
+
+
 def test_writer_failure_keeps_paid_source_receipts_before_temp_cleanup(tmp_path, retained, monkeypatch):
     raw = json.loads((ROOT / "testdata/sequence-pilot-orman400/anchors.json").read_text())["raw_marker_anchors"]
     monkeypatch.setattr(runtime.pilot, "digest", lambda _: retained["source_video_sha256"])

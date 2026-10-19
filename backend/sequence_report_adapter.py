@@ -153,6 +153,17 @@ def build_report(prose, bundle):
                               "coverage_status": "PARTIAL", "authority": ENGINE}
     attach_event_evidence_authority(full)
     full = apply_verified_stats_authority(full)
+    if (full.get("overall_benchmark") or {}).get("tier") is None:
+        # A withheld aggregate cannot retain a recruitment/level label from
+        # presentation generated before reconciliation or an older writer.
+        potential = full.get("potential_assessment")
+        if isinstance(potential, dict):
+            potential["current_level"] = "Insufficient verified evidence to establish a playing level."
+        outlook = full.get("scout_outlook")
+        if isinstance(outlook, dict):
+            outlook.update(current_level_label="Insufficient verified evidence", current_level_dots=None,
+                           potential_level_label="Not established from partial observations",
+                           potential_level_dots=None, recruitment_readiness="Further full-match observation needed")
     by_event = {c["event_id"]: c for c in full["video_comments"]}
     for row in _iter_structured_rows(full):
         if not isinstance(row, dict):
