@@ -202,3 +202,60 @@ mode, and exact reconstruction of the previous successful outcome navigation.
 The final prior resumed-branch GitHub check (39181993193) passed 266 tests.
 Cold-run reference evaluation is performed only after all actual model calls.
 No merge or deployment.
+
+## Actual cold whole-source run: passed on this video
+
+Run 39182857433 (commit 9e10aebca7e3e585d2086dd243bb6e927bf143f5)
+started from original source/taps and completed all 13 fresh requests: ten
+initial packets and three automatic contact reviews. There was no receipt
+reuse, profile reuse, HTTP error, retry or second outcome-round call. The
+workflow sparse checkout contained no historical model-response file. All ten
+initial response IDs differ from the earlier run. Reference cases were loaded
+only after model execution. All five references matched, with no unexpected
+scoring event and no active identity/outcome conflict. fresh_run_complete and
+experiment_pass are both true. This is one passing cold trial on this source.
+
+Actual returned scoring observations:
+
+| Event | Source contact/bracket (seconds) |
+| --- | --- |
+| Selected SHOT/SAVED |23.682–23.749|
+| Selected GOAL |30.915 exact supplied frame|
+| First ASSIST |43.882–44.132|
+| Middle ASSIST |49.715–50.265|
+| Last ASSIST |56.264–56.381|
+
+These are this fresh trial's observations, including its broader/shifted pass
+brackets; prior separately approved times are not substituted. The shot review
+identifies the selected striker and follows the active ball to the keeper's
+raised glove, its checked/changed motion and its bounce outside the goal,
+separate from the stationary spare. The goal review identifies selected white 15
+at source 30.915s and distinguishes the subsequently arriving ball inside goal
+from the spare after the brief goalmouth occlusion. The middle review separates
+the selected releaser from the first-time finishing teammate. Unrelated open
+questions remain recorded. The middle assist's model LEFT/owner RIGHT
+anatomical-side dispute remains unresolved.
+
+Cold source processing took 551.297s (9m11.297s), of which the runner's
+analysis took 531.874s. This timing includes fresh image preparation and all
+initial/review work; checkout, dependency installation and source reassembly
+precede the clock and are excluded. The three review calls took 60.807s,
+82.882s and 74.644s. The integrated shot review retained 353 images and
+14,997,290 request bytes; the middle review actually used 202 images and
+14,620,764 bytes, differing from the old-answer preflight because its new
+navigation/evidence changed. All 13 requests succeeded below the unchanged
+wire cap. The result is still too slow for an interactive production flow;
+no production report integration, merge or deployment is claimed.
+
+All thirteen exact request payload hashes and all response hashes were
+reproduced locally from the actual new receipts and original source with zero
+model calls. Reconciliation of the complete active result also matched exactly.
+The retained bundle cold-whole-source-approval-receipts.json contains every
+raw receipt, combined result, separate evaluator result, actual packet
+metadata and a 1085-instant source-clock replay catalog. Superseded coarse
+observations remain in the result rather than being erased.
+
+273 relevant local checks pass, including the new entire-cold-result retained
+replay. The pre-result cold commit's GitHub standalone check 39182857558 passed
+272 tests. Replay checks are code/provenance checks, not additional model
+trials or independent proof of every visual statement.

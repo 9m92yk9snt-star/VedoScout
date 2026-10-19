@@ -99,3 +99,28 @@ def test_generic_outcome_planner_reproduces_actual_successful_navigation_and_ref
     assert p.plan_outcome_reviews({}, saved["result"], parents, limit=0) == []
     assert p.plan_outcome_reviews({}, saved["result"], parents+parents) == []
     assert p.plan_outcome_reviews({}, {**saved["result"],"questions":[]}, parents) == []
+
+
+def test_actual_cold_whole_source_run_replays_all_packets_and_preserves_its_complete_scope():
+    """Retained live-answer replay, not a new visual/model experiment."""
+    from scripts.resume_fresh_outcome import p
+    path=Path(__file__).resolve().parents[2]/"docs/examples/cold-whole-source-approval-receipts.json"
+    saved=json.loads(path.read_text())
+    observed=[]
+    receipts={r["packet_id"]:r for r in saved["receipts"]}
+    for packet in saved["replay_packets"]:
+        receipt=receipts[packet["packet_id"]]
+        row=checked_observation(receipt,saved["replay_context"],packet)
+        row.update(replaces_initial_packet_id=packet.get("replaces_initial_packet_id"),
+                   replaces_review_packet_id=packet.get("replaces_review_packet_id"))
+        observed.append(row)
+    replaced={r[key] for r in observed if r["events"]
+              for key in ("replaces_initial_packet_id","replaces_review_packet_id") if r.get(key)}
+    merged=p.reconcile([r for r in observed if r["packet_id"] not in replaced])
+    for key in ("events","target_events","counts","questions","conflicts"):
+        assert merged[key]==saved["result"][key],key
+    assert len(saved["receipts"])==13 and saved["result"]["model_jobs_completed"]==13
+    assert saved["result"]["historical_action_results_used"] is False
+    assert saved["result"]["fresh_end_to_end_run"] is True
+    assert saved["evaluation"]["fresh_run_complete"] is True and saved["evaluation"]["experiment_pass"] is True
+    assert saved["offline_verification"]["exact_payload_hashes_reproduced"]==13

@@ -1198,3 +1198,20 @@ the intervening HTTP 429 are preserved; no independent foot-side resolution
 is claimed. See `fresh-source-continuation.md` and
 `examples/fresh-outcome-approval-receipt.json`. This is a resumed result,
 not a cold full-run benchmark or production deployment.
+
+
+Cold whole-source trial 39182857433 now passes on the actual original video:
+ten fresh initial calls plus three automatic source-derived reviews, all
+successful, all five scoring references matched, no extra scoring event or
+active identity/outcome conflict. No historical reply/profile was loaded.
+Cold source processing 551.297s (9m11.297s), analysis 531.874s, excluding workflow
+setup and source reassembly. This establishes the single-source cold trial,
+not production-ready latency or report integration. The actual shot is
+selected SHOT/SAVED at 23.682–23.749s and goal contact is 30.915s. New pass
+brackets are retained as returned; foot-side disagreement remains unresolved.
+Every raw reply, request/response hash, active/superseded result, reference
+evaluation and source-clock replay metadata is retained in
+`examples/cold-whole-source-approval-receipts.json`. All 13 payload hashes and
+the entire active result were reproduced offline without model calls.
+See `fresh-source-continuation.md` for exact scope/timing. Draft only; no
+merge or deployment.
