@@ -661,6 +661,77 @@ def test_half_player_review_crop_preserves_instants_and_uses_original_geometry(t
     assert enriched["contact_review_delivery"]["source_instants_removed"] == 0
 
 
+def test_followup_spatial_reference_without_core_fields_uses_actual_packet_bounds(tmp_path):
+    from scripts.run_sequence_pilot import original_spatial_items
+    manifest=p.prepare(source_export(tmp_path),tmp_path/"prepared",fps=8)
+    packet={"packet_id":"review","start_ms":0,"end_ms":750}
+    items,audit=original_spatial_items(manifest,packet,tmp_path/"spatial")
+    assert items and audit
+    assert all(0 <= a["source_ms"] <= 750 for a in audit)
+
+
+def test_identity_context_citations_do_not_replace_in_action_evidence_or_shift_contact():
+    manifest,packet,data=fixture()
+    action=data["plays"][0]["actions"][0]
+    action["actor_evidence_frames"]=["s000000000","s000000500","s000001000"]
+    result=p.reconcile([p.resolve_response(data,manifest,packet,{})])
+    event=result["target_events"][0]
+    assert event["contact_ms"] == 1000 and event["actor_context_frames"] == ["s000000000"]
+    assert event["actor_evidence_frames"] == ["s000000500","s000001000"]
+    action["actor_evidence_frames"]=["s000000000"]
+    assert p.resolve_response(data,manifest,packet,{})["events"] == []
+    action["actor_evidence_frames"]=["s000000500","s000006000"]
+    assert p.resolve_response(data,manifest,packet,{})["events"] == []
+
+
+def test_actual_fresh_initial_replay_preserves_saved_shot_and_plans_full_control_handoff_review():
+    saved=p.read_json(Path(__file__).resolve().parents[2]/"docs/examples/fresh-whole-source-initial-receipts.json")
+    manifest=saved["replay_manifest"];packets={v["packet_id"]:v for v in manifest["packets"]}
+    results=[p.resolve_response(p.parse_response(r["raw_response"]),manifest,packets[r["packet_id"]],
+             {k:r[k] for k in ("packet_id","payload_sha256","response_sha256","origin")}) for r in saved["receipts"]]
+    merged=p.reconcile(results)
+    shots=[e for e in merged["target_events"] if e["event_type"] == "SHOT" and e["outcome"] == "SAVED"]
+    assert len(shots) == 1 and shots[0]["actor_context_frames"] == ["s000022016"]
+    jobs=p.plan_contact_reviews(manifest,merged,limit=6,terminal_only=True)
+    assert {j["replaces_initial_packet_id"] for j in jobs} == {"sequence_003","sequence_004","sequence_007"}
+    middle=next(j for j in jobs if j["replaces_initial_packet_id"] == "sequence_007")
+    control=next(e for e in merged["events"] if e["source_action_keys"] == [middle["question"]["source_action_key"]])
+    assert middle["detail_start_ms"] <= control["start_ms"] < control["end_ms"] <= middle["detail_end_ms"]
+    goal=next(j for j in jobs if j["replaces_initial_packet_id"] == "sequence_004")
+    assert (goal["detail_start_ms"],goal["detail_end_ms"]) == (31015,32515)
+    assert not any(j["replaces_initial_packet_id"] in {"sequence_006","sequence_008"} for j in jobs)
+
+
+def test_fresh_resume_reproduces_request_hash_and_never_repeats_initial_calls(tmp_path,monkeypatch):
+    from scripts.run_sequence_pilot import original_spatial_items,FRESH_IDENTITY_INSTRUCTION
+    original=p.prepare(source_export(tmp_path),tmp_path/"prepared",fps=8)
+    manifest=fresh_original_manifest(original);packet=manifest["packets"][0]
+    items=p.packet_items(manifest,packet);items.insert(1,{"type":"text","text":FRESH_IDENTITY_INSTRUCTION})
+    spatial,_=original_spatial_items(manifest,packet,tmp_path/"spatial")
+    prefix=len(p.packet_items(manifest,{**packet,"frame_ids":[]}))+1;items[prefix:prefix]=spatial
+    _,_,audit=t.build_request("emergent","gpt-6-astra",items,reasoning_effort="medium",image_detail="high")
+    raw='{"plays":[]}'
+    receipt={"packet_id":packet["packet_id"],"origin":"LIVE_MODEL_REQUEST","status":"COMPLETED",
+             "requested_model":"gpt-6-astra","raw_response":raw,"response_sha256":hashlib.sha256(raw.encode()).hexdigest(),
+             "payload_sha256":audit["payload_sha256"],"fixture_origin":"SYNTHETIC_TEST_ONLY"}
+    specs=[{k:v[k] for k in ("packet_id","start_ms","end_ms","frame_ids","reference_ids")} for v in manifest["packets"]]
+    saved={"identity_mode":"FRESH_ORIGINAL_SELECTIONS","source_video_sha256":manifest["source_video_sha256"],
+           "original_taps_sha256":manifest["original_taps_sha256"],"origin_run":1,"previous_run_analysis_seconds":1,
+           "packet_fingerprint":hashlib.sha256(json.dumps(specs,sort_keys=True,separators=(",",":")).encode()).hexdigest(),
+           "receipts":[receipt]}
+    path=tmp_path/"resume.json";p.write_json(path,saved)
+    def no_calls(*args,**kwargs): raise AssertionError("INITIAL_MODEL_CALL_REPEATED")
+    monkeypatch.setattr(t,"run_jobs",no_calls);monkeypatch.setenv("EMERGENT_LLM_KEY","SYNTHETIC_NO_NETWORK_TEST")
+    options=dict(provider="emergent",model="gpt-6-astra",reasoning_effort="medium",image_detail="high",
+                 fresh_originals=True,resume_fresh_initial=path,max_followups=0)
+    result=run(tmp_path/"prepared/manifest.json",tmp_path/"result",**options)
+    assert result["status"] == "MODEL_OBSERVATIONS_RETURNED" and result["reused_initial_model_jobs"] == 1
+    assert result["initial_requests_sent_in_this_run"] == 0 and result["fresh_end_to_end_run"] is False
+    receipt["payload_sha256"]="0"*64;p.write_json(path,saved)
+    result=run(tmp_path/"prepared/manifest.json",tmp_path/"bad-result",**options)
+    assert result["status"] == "EXPERIMENT_STOPPED" and result["error_code"] == "INITIAL_RECEIPT_INPUT_MISMATCH"
+
+
 def test_actor_continuity_band_keeps_all_people_and_does_not_select_an_identity():
     from scripts.probe_actor_continuity import viewing_band
     box = viewing_band([[(.1, .4, .1, .1, .8)], [(.7, .45, .08, .2, .7)]], 1000, 2000)

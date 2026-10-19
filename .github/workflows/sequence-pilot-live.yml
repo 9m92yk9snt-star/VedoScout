@@ -1,4 +1,4 @@
-name: One-off fresh whole-source acceptance experiment
+name: Resume verified fresh-source contact reviews
 
 on:
   pull_request:
@@ -18,7 +18,7 @@ jobs:
       github.event.pull_request.number == 39 &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.event.pull_request.head.ref == 'codex/sequence-pilot-foundation' &&
-      github.event.before == '4016183725fd0b3e1efa083ef6a02b5f4743906b' &&
+      github.event.before == '6d52ddfe39b9694f326ac00c0b4cc9c802a3020e' &&
       github.run_attempt == 1
     runs-on: ubuntu-latest
     timeout-minutes: 14
@@ -39,6 +39,7 @@ jobs:
             /backend/scripts/run_sequence_pilot.py
             /backend/scripts/probe_native_play.py
             /docs/examples/five_action_reference_cases.json
+            /docs/examples/fresh-whole-source-initial-receipts.json
             /testdata/sequence-pilot-orman400/
       - uses: actions/setup-python@v5
         with:
@@ -87,7 +88,7 @@ jobs:
       - name: Read all source plays and automatically inspect unresolved contacts
         env:
           EMERGENT_LLM_KEY: ${{ secrets.EMERGENT_LLM_KEY }}
-        run: python -u backend/scripts/run_sequence_pilot.py run --prepared "$RUNNER_TEMP/sequence-pilot-prepared/manifest.json" --output "$RUNNER_TEMP/sequence-pilot-result" --provider emergent --model gpt-6-astra --reasoning-effort medium --budget-s 540 --per-call-s 120 --max-initial 12 --max-followups 6 --fresh-originals --contact-reviews --image-detail high
+        run: python -u backend/scripts/run_sequence_pilot.py run --prepared "$RUNNER_TEMP/sequence-pilot-prepared/manifest.json" --output "$RUNNER_TEMP/sequence-pilot-result" --provider emergent --model gpt-6-astra --reasoning-effort medium --budget-s 300 --per-call-s 120 --max-initial 12 --max-followups 6 --fresh-originals --contact-reviews --image-detail high --resume-fresh-initial docs/examples/fresh-whole-source-initial-receipts.json
       - name: Evaluate returned observations separately and print actual receipts
         if: always()
         run: |
@@ -103,12 +104,15 @@ jobs:
           returned = pilot.read_json(result)
           clock = root / 'source-processing-start.txt'
           if clock.is_file():
-              returned['fresh_source_processing_seconds'] = round(time.monotonic()-float(clock.read_text()),3)
-              returned['timing_scope'] = 'Fresh source preparation plus model analysis; excludes checkout, dependency installation and source reassembly'
+              returned['continuation_source_processing_seconds'] = round(time.monotonic()-float(clock.read_text()),3)
+              returned['timing_scope'] = 'Continuation preparation, exact initial-request verification and new model reviews; excludes earlier initial reading and workflow setup'
               pilot.write_json(result,returned)
           evaluation = pilot.assess_reference_cases(pilot.read_json('docs/examples/five_action_reference_cases.json'), returned)
-          evaluation['fresh_run_complete'] = returned.get('status') == 'MODEL_OBSERVATIONS_RETURNED'
-          evaluation['experiment_pass'] = bool(evaluation['fresh_run_complete'] and evaluation['all_reference_cases_matched'] and not evaluation['unexpected_scoring_event_ids'] and not returned.get('conflicts'))
+          evaluation['continuation_complete'] = returned.get('status') == 'MODEL_OBSERVATIONS_RETURNED'
+          evaluation['fresh_run_complete'] = False
+          evaluation['continued_observations_pass'] = bool(evaluation['continuation_complete'] and evaluation['all_reference_cases_matched'] and not evaluation['unexpected_scoring_event_ids'] and not returned.get('conflicts'))
+          evaluation['experiment_pass'] = False
+          evaluation['scope'] = 'Verified fresh initial results plus automatic new reviews; not a new cold end-to-end benchmark'
           pilot.write_json(root / 'sequence-pilot-result' / 'evaluation.json', evaluation)
           print('BEGIN_ACTUAL_MODEL_RESULT')
           print(json.dumps(returned, ensure_ascii=False))

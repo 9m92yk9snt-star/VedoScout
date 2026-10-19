@@ -169,7 +169,8 @@ def retained_goal():
 def test_actual_goal_reply_accepts_selected_goal_and_keeps_unrelated_uncertainty():
     saved,context,packet,data = retained_goal()
     result=shot_replay(saved,context,packet,data)
-    assert result["target_events"] == saved["result"]["target_events"]
+    assert [e for e in result["target_events"] if e["event_type"] == "GOAL"] == [
+        e for e in saved["result"]["target_events"] if e["event_type"] == "GOAL"]
     goals=[e for e in result["target_events"] if e["event_type"] == "GOAL"]
     assert len(goals) == 1 and goals[0]["selected_player"] and goals[0]["proof_eligible"]
     assert goals[0]["contact_ms"] == 30915 and goals[0]["outcome_ms"] == 31982
@@ -177,8 +178,9 @@ def test_actual_goal_reply_accepts_selected_goal_and_keeps_unrelated_uncertainty
     assert not goals[0]["model_requested_clarification"]
     assert len(result["questions"]) == 1 and result["questions"][0]["target_related"] is False
     observed=p.resolve_response(data,context,packet,{})
-    assert observed["invalid_rows"] == ["ACTION_SOURCE_ORDER_INVALID"]
-    assert not any(e["kind"] == "RECOVERY" for e in result["events"])
+    assert observed["invalid_rows"] == []
+    recovery=next(e for e in result["target_events"] if e["kind"] == "RECOVERY")
+    assert recovery["actor_context_frames"] == ["s000027632"]
     # Actual-response replay is a regression, not an additional model trial.
 
 

@@ -550,7 +550,10 @@ def resolve_response(data, manifest, packet, receipt):
             evidence = cited(action.get("actor_evidence_frames"))
             if actor is None or astart is None or aend is None or not start <= astart <= aend <= end or not evidence:
                 invalid.append("ACTION_ACTOR_OR_SOURCE_EVIDENCE_MISSING"); continue
-            if any(not astart <= frames[f] <= aend for f in evidence) or (contact is not None and not astart <= contact <= aend):
+            context_evidence = [f for f in evidence if not astart <= frames[f] <= aend]
+            evidence = [f for f in evidence if astart <= frames[f] <= aend]
+            if (not evidence or any(not start <= frames[f] <= end for f in context_evidence)
+                    or (contact is not None and not astart <= contact <= aend)):
                 invalid.append("ACTION_SOURCE_ORDER_INVALID"); continue
             action_id = action.get("action_id", f"a{action_index}")
             contact_interval, contact_basis, contact_facts = contact_support(action)
@@ -617,6 +620,8 @@ def resolve_response(data, manifest, packet, receipt):
                 "proof_eligible": bool(actor["selected"] is True and
                     ((kind not in {"SHOT", "PASS", "CROSS"}) or (contact_interval is not None and reason in
                          {"VISIBLE_SHOT_OUTCOME", "VISIBLE_DIRECT_ASSIST", "VISIBLE_ACTION", "VISIBLE_OPPONENT_RECEIPT"})))}
+            if context_evidence:
+                event["actor_context_frames"] = context_evidence
             uncertain = action_id in unresolved_ids or (event_type == "ASSIST" and action.get("finisher") in uncertain_finishers)
             event["model_requested_clarification"] = uncertain
             if uncertain:
@@ -711,7 +716,7 @@ def reconcile(results, *, sampling_gap_ms=125):
             "questions": questions, "conflicts": conflicts}
 
 
-def plan_contact_reviews(manifest, resolved, *, limit=6):
+def plan_contact_reviews(manifest, resolved, *, limit=6, terminal_only=False):
     """One focused review per source packet, only unresolved target releases."""
     events = {key: e for e in resolved["events"] for key in e["source_action_keys"]}
     candidates = []
@@ -721,7 +726,14 @@ def plan_contact_reviews(manifest, resolved, *, limit=6):
             continue
         if q.get("target_related") is False or (event["selected_player"] is False and not q.get("target_related")):
             continue
+        terminal = event["kind"] == "SHOT" or event["outcome"] in {"GOAL", "SAVED", "TEAMMATE_GOAL", "TEAMMATE_SHOT"}
+        if terminal_only and not terminal:
+            continue
         focus = q.get("focus_ms")
+        # An unresolved shot outcome follows its release, rather than an arbitrary
+        # last aftermath frame chosen as outcome_frame by the coarse reader.
+        if q["reason"] == "OUTCOME" and event["kind"] == "SHOT" and event.get("contact_interval_ms"):
+            focus = event["contact_interval_ms"][1]+750
         if not _number(focus):
             focus = (event.get("outcome_ms") or event["end_ms"]) if q["reason"] == "OUTCOME" else (
                 event.get("contact_ms") or event["end_ms"])
@@ -731,7 +743,6 @@ def plan_contact_reviews(manifest, resolved, *, limit=6):
         lo, hi = base.get("core_start_ms", base["start_ms"]), base.get("core_end_ms", base["end_ms"])
         if not lo <= focus < hi:
             continue
-        terminal = event["kind"] == "SHOT" or event["outcome"] in {"GOAL", "SAVED", "TEAMMATE_GOAL", "TEAMMATE_SHOT"}
         priority = (not terminal, not q.get("explicit_model_question"), {"CONTACT": 0, "RECEIVER": 1, "OUTCOME": 2, "IDENTITY": 3}.get(q["reason"], 4), lo)
         detail_end = min(hi-1, focus+750)
         if _number(event.get("outcome_ms")) and focus < event["outcome_ms"] <= focus+2000:
@@ -745,6 +756,10 @@ def plan_contact_reviews(manifest, resolved, *, limit=6):
     for terminal in rows:
         if terminal["kind"] not in {"SHOT", "OTHER"} or not terminal.get("outcome_evidence"):
             continue
+        if any(e["actor_scope"] == terminal["actor_scope"] and e.get("proof_eligible")
+               and e["event_type"] == "ASSIST" and e.get("finisher") == terminal.get("actor")
+               for e in rows):
+            continue  # an affirmative distinct passer/finisher link already exists
         controls = [e for e in rows if e["actor_scope"] == terminal["actor_scope"]
             and e["selected_player"] is True and e["kind"] in {"CARRY", "DRIBBLE", "RECOVERY", "DUEL"}
             and 0 <= terminal["start_ms"]-e["end_ms"] <= 5000]
@@ -758,9 +773,11 @@ def plan_contact_reviews(manifest, resolved, *, limit=6):
         focus = round((control["end_ms"]+terminal["start_ms"])/2)
         if not lo <= focus < hi:
             continue
-        ds, de = max(lo, control["end_ms"]-400), min(hi-1, terminal["start_ms"]+400)
-        if de-ds > 3000:
-            ds, de = max(lo, focus-750), min(hi-1, focus+750)
+        contact_end = (terminal.get("contact_interval_ms") or [terminal["start_ms"]])[-1]
+        de = min(hi-1,max(terminal["start_ms"]+400,contact_end+200))
+        # A coarse "dribble" may hide a release inside that action, not only at
+        # its end. Keep the final three seconds of control through the strike.
+        ds = max(lo,control["start_ms"]-400,de-3000)
         q = {"reason": "CONTACT", "focus_ms": focus, "source_packet_id": base["packet_id"],
             "source_action_key": control["source_action_keys"][0], "target_related": True,
             "instruction": "Follow the selected player's last control into the later chance. Establish the actual release, "
@@ -803,7 +820,9 @@ def prepare_contact_reviews(manifest, jobs, output_dir, *, timeout_s=30., native
             top = max(0, min(r["box"]["y"]-r["box"]["h"] for r in anchors))
             bottom = min(1, max(r["box"]["y"]+2*r["box"]["h"] for r in anchors))
         elif native_detail_policy == "local_half_q50":
-            margin = .5*max(r["box"]["h"] for r in anchors)
+            # A temporally neighbouring selection can come from a different
+            # camera framing. Keep wider vertical context when no local tap exists.
+            margin = (.5 if local else 1.5)*max(r["box"]["h"] for r in anchors)
             top = max(0,min(r["box"]["y"] for r in anchors)-margin)
             bottom = min(1,max(r["box"]["y"]+r["box"]["h"] for r in anchors)+margin)
         j["source_crop_box"] = [0, int(top*height), width, int(bottom*height)]

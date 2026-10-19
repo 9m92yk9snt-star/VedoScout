@@ -1175,3 +1175,7 @@ extra selected scoring event may appear, all planned reads must complete and
 observed conflicts must remain absent. Matching still needs source inspection.
 The separate five successful receipts are retained unchanged for comparison,
 not injected into this trial. No merge or deployment.
+
+Actual run 39179116053 failed during review preparation after ten completed
+model calls. See `fresh-source-continuation.md` for the original failed result,
+the exact-input continuation, parser/source-clock correction and timing limits.

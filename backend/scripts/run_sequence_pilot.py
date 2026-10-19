@@ -19,6 +19,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import sequence_pilot as pilot
 import sequence_pilot_transport as transport
 
+FRESH_IDENTITY_INSTRUCTION = "Read all original selections afresh; no inferred appearance profile or past action answer is supplied. A local original point locates the intended physical player at that instant. Connect identity by readable numbers and continuous movement, not guessed facial hair or shadow. At every candidate release distinguish that person's body/boot movement from nearby players. Compare before and after occlusion. A separate teammate can finish first time: the receiving and striking contact may be the same action. Do not invent an extra settled touch or conflate the releaser with the receiver. Keep opposing brushes distinct from controlled possession. If contacts or actors remain ambiguous, retain a specific question. Return the actual result, including unsuccessful actions. No expected answers or target count is supplied."
+
 
 def fresh_original_manifest(manifest):
     """No inferred identity description or historical action receipt enters this run."""
@@ -35,12 +37,13 @@ def original_spatial_items(manifest, packet, output):
     from scripts.probe_native_play import spatial_reference_items
     lo,hi=packet.get("core_start_ms",packet["start_ms"]),packet.get("core_end_ms",packet["end_ms"]+1)
     local=[r for r in manifest["references"] if lo <= r["media_ms"] < hi]
-    return spatial_reference_items(manifest,packet,local,output)
+    return spatial_reference_items(manifest,{**packet,"core_start_ms":lo,"core_end_ms":hi},local,output)
 
 
 def run(manifest_path, output_dir, *, provider="gemini", model="gemini-2.5-pro", budget_s=300., max_initial=4,
         max_followups=2, per_call_s=90., reasoning_effort=None, identity_profile=False, image_detail=None,
-        identity_profile_receipt=None, contact_reviews=False, resume_initial_receipts=None, fresh_originals=False):
+        identity_profile_receipt=None, contact_reviews=False, resume_initial_receipts=None, fresh_originals=False,
+        resume_fresh_initial=None):
     started, out = time.monotonic(), Path(output_dir).resolve()
     if out.exists() and any(out.iterdir()):
         raise ValueError("OUTPUT_MUST_BE_NEW_OR_EMPTY")
@@ -51,6 +54,8 @@ def run(manifest_path, output_dir, *, provider="gemini", model="gemini-2.5-pro",
         raise ValueError("INVALID_REASONING_EFFORT")
     if fresh_originals and (identity_profile or identity_profile_receipt or resume_initial_receipts):
         raise ValueError("FRESH_ORIGINALS_CANNOT_REPLAY_MODEL_RESULTS")
+    if resume_fresh_initial and not fresh_originals:
+        raise ValueError("FRESH_RESUME_REQUIRES_ORIGINAL_SELECTION_MODE")
     if fresh_originals:
         manifest = fresh_original_manifest(manifest)
     if provider not in transport.KEY_ENV:
@@ -65,7 +70,7 @@ def run(manifest_path, output_dir, *, provider="gemini", model="gemini-2.5-pro",
                "model_jobs_completed": 0, "independent_visual_correctness_verified": False,
                "requested_reasoning_effort": reasoning_effort,
                "identity_mode":"FRESH_ORIGINAL_SELECTIONS" if fresh_originals else "EXISTING_REFERENCE_POLICY",
-               "historical_action_results_used":bool(resume_initial_receipts),
+               "historical_action_results_used":bool(resume_initial_receipts or resume_fresh_initial),
                "reference_policy": manifest.get("reference_policy"),
                "visual_packet_plan": manifest.get("visual_packet_plan"),
                "model_jobs": [], "events": [], "target_events": [], "counts": {}, "questions": [], "conflicts": []}
@@ -88,16 +93,7 @@ def run(manifest_path, output_dir, *, provider="gemini", model="gemini-2.5-pro",
             items = pilot.packet_items(current_manifest, packet)
             spatial_audit=[]
             if fresh_originals:
-                items.insert(1,{"type":"text","text":
-                    "Read all original selections afresh; no inferred appearance profile or past action answer is supplied. "
-                    "A local original point locates the intended physical player at that instant. Connect identity by "
-                    "readable numbers and continuous movement, not guessed facial hair or shadow. "
-                    "At every candidate release distinguish that person's body/boot movement from nearby players. "
-                    "Compare before and after occlusion. A separate teammate can finish first time: the receiving and "
-                    "striking contact may be the same action. Do not invent an extra settled touch or conflate "
-                    "the releaser with the receiver. Keep opposing brushes distinct from controlled possession. "
-                    "If contacts or actors remain ambiguous, retain a specific question. "
-                    "Return the actual result, including unsuccessful actions. No expected answers or target count is supplied."})
+                items.insert(1,{"type":"text","text":FRESH_IDENTITY_INSTRUCTION})
                 spatial,spatial_audit=original_spatial_items(current_manifest,packet,out/"spatial"/packet["packet_id"])
                 prefix = len(pilot.packet_items(current_manifest,{**packet,"frame_ids":[]}))+1
                 items[prefix:prefix] = spatial
@@ -163,8 +159,8 @@ def run(manifest_path, output_dir, *, provider="gemini", model="gemini-2.5-pro",
             manifest = pilot.apply_identity_profile(manifest, json.loads(profile_receipt["raw_response"]))
             owner_manifest = manifest
             summary["identity_profile"] = manifest["identity_profile"]
-        if resume_initial_receipts:
-            saved = pilot.read_json(resume_initial_receipts)
+        if resume_initial_receipts or resume_fresh_initial:
+            saved = pilot.read_json(resume_initial_receipts or resume_fresh_initial)
             specs = [{k: packet[k] for k in ("packet_id", "start_ms", "end_ms", "frame_ids", "reference_ids")} for packet in manifest["packets"]]
             fingerprint = hashlib.sha256(json.dumps(specs, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
             if (saved["source_video_sha256"] != manifest["source_video_sha256"]
@@ -178,6 +174,20 @@ def run(manifest_path, output_dir, *, provider="gemini", model="gemini-2.5-pro",
                     or r["requested_model"] != model
                     or hashlib.sha256(r["raw_response"].encode()).hexdigest() != r["response_sha256"]):
                     raise ValueError("INITIAL_RECEIPT_INPUT_MISMATCH")
+                if resume_fresh_initial:
+                    if saved.get("identity_mode") != "FRESH_ORIGINAL_SELECTIONS":
+                        raise ValueError("INITIAL_RECEIPT_INPUT_MISMATCH")
+                    packet=by_id[r["packet_id"]]
+                    # Reproduce the original fresh request before reusing its answer.
+                    current=pilot.packet_items(manifest,packet)
+                    extra={"type":"text","text":FRESH_IDENTITY_INSTRUCTION}
+                    current.insert(1,extra)
+                    spatial,_=original_spatial_items(manifest,packet,out/"resume-spatial"/packet["packet_id"])
+                    prefix=len(pilot.packet_items(manifest,{**packet,"frame_ids":[]}))+1
+                    current[prefix:prefix]=spatial
+                    _,_,audit=transport.build_request(provider,model,current,reasoning_effort=reasoning_effort,image_detail=image_detail)
+                    if audit["payload_sha256"] != r["payload_sha256"]:
+                        raise ValueError("INITIAL_RECEIPT_INPUT_MISMATCH")
                 pilot.write_json(out / "responses" / (r["packet_id"]+".json"), {**r, "reused_in_this_run": True})
                 observed = pilot.resolve_response(pilot.parse_response(r["raw_response"]), manifest, by_id[r["packet_id"]],
                     {k: r[k] for k in ("packet_id", "payload_sha256", "response_sha256", "origin")})
@@ -185,13 +195,18 @@ def run(manifest_path, output_dir, *, provider="gemini", model="gemini-2.5-pro",
                 resolved_results.append(observed)
             summary.update(reused_initial_run_id=saved["origin_run"], reused_initial_model_jobs=len(saved["receipts"]),
                            previous_run_analysis_seconds=saved["previous_run_analysis_seconds"], completed_initial_requests_replayed=False)
+            if resume_fresh_initial:
+                summary.update(fresh_end_to_end_run=False,initial_requests_sent_in_this_run=0,
+                               resume_scope="EXACT_HASH_VERIFIED_FRESH_INITIAL_REQUESTS",
+                               previous_run_source_processing_seconds=saved.get("previous_run_source_processing_seconds"))
         else:
             execute(manifest["packets"], manifest)
         merged = pilot.reconcile(resolved_results, sampling_gap_ms=manifest["input_coverage"]["max_sample_gap_ms"])
         summary.update(merged)  # preserve completed observations if later work fails
         access_failed = any(r.get("error") in {"MODEL_ACCESS_DENIED", "MODEL_KEY_NOT_CONFIGURED"} for r in receipts)
         planner = pilot.plan_contact_reviews if contact_reviews else pilot.followup_plan
-        followups = [] if access_failed else planner(manifest, merged, limit=max_followups)
+        followups = [] if access_failed else planner(manifest, merged, limit=max_followups,
+            **({"terminal_only":True} if fresh_originals and contact_reviews else {}))
         if followups and time.monotonic() + 5 < deadline:
             preparer = pilot.prepare_contact_reviews if contact_reviews else pilot.prepare_followups
             owner_manifest, followups = preparer(manifest, followups, out,
@@ -204,12 +219,12 @@ def run(manifest_path, output_dir, *, provider="gemini", model="gemini-2.5-pro",
         merged = pilot.reconcile(active, sampling_gap_ms=manifest["input_coverage"]["max_sample_gap_ms"])
         summary["superseded_initial_packet_ids"] = sorted(replaced)
         summary.update(merged)
-        initial_count = 0 if resume_initial_receipts else len(manifest["packets"])
+        initial_count = 0 if resume_initial_receipts or resume_fresh_initial else len(manifest["packets"])
         complete = len([r for r in receipts if r.get("status") == "COMPLETED"]) == initial_count + len(followups)
         summary["status"] = "MODEL_OBSERVATIONS_RETURNED" if complete else "PARTIAL_MODEL_RUN"
         if access_failed:
             summary["status"] = "MODEL_ACCESS_DENIED"
-    except (ValueError, TimeoutError, OSError) as exc:
+    except (ValueError, TimeoutError, OSError, KeyError, TypeError) as exc:
         # Exception text is intentionally not persisted: providers may include secrets.
         safe_codes = {"REQUEST_IMAGE_BUDGET_EXCEEDED", "PREPARED_IMAGE_CHANGED", "SOURCE_VIDEO_CHANGED",
                       "DETAIL_PREPARATION_TIME_BUDGET_EXHAUSTED", "INVALID_EXECUTION_BUDGET", "IDENTITY_PROFILE_UNRESOLVED", "INITIAL_RECEIPT_INPUT_MISMATCH"}
@@ -245,6 +260,7 @@ def main():
     model.add_argument("--max-initial", type=int, default=4)
     model.add_argument("--reasoning-effort", choices=["low","medium"], default=None)
     model.add_argument("--fresh-originals", action="store_true", help="Fresh all-reference identity per play; no historical model reuse")
+    model.add_argument("--resume-fresh-initial", type=Path, help="Resume exact fresh-run requests after input/payload verification; not fresh end-to-end timing")
     model.add_argument("--identity-profile", action="store_true", help="Infer one shared identity from original crops before reading plays")
     model.add_argument("--image-detail", choices=["high"], default=None, help="Request model-side high detail independently of JPEG size")
     model.add_argument("--identity-profile-receipt", type=Path, help="Reuse a source-and-reference-hash-matched identity receipt")
@@ -265,7 +281,8 @@ def main():
                      per_call_s=args.per_call_s, max_followups=args.max_followups, max_initial=args.max_initial,
                      reasoning_effort=args.reasoning_effort, identity_profile=args.identity_profile, image_detail=args.image_detail,
                      identity_profile_receipt=args.identity_profile_receipt, contact_reviews=args.contact_reviews,
-                     resume_initial_receipts=args.resume_initial_receipts, fresh_originals=args.fresh_originals)
+                     resume_initial_receipts=args.resume_initial_receipts, fresh_originals=args.fresh_originals,
+                     resume_fresh_initial=args.resume_fresh_initial)
         print(json.dumps({k: result.get(k) for k in ("status", "analysis_seconds", "model_jobs_completed", "counts")}, indent=2))
         return 0 if result["status"] == "MODEL_OBSERVATIONS_RETURNED" else 3
     else:
