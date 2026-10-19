@@ -1,6 +1,16 @@
 name: Sequence full-report integration
 
 on:
+  workflow_dispatch:
+    inputs:
+      run_model_probe:
+        description: 'Send exactly one model request; false runs offline preflight only'
+        type: boolean
+        default: false
+      focus_ms:
+        description: 'User-located source instant in milliseconds'
+        type: string
+        default: '23680'
   pull_request:
     paths:
       - 'backend/sequence_report_*.py'
@@ -31,11 +41,9 @@ jobs:
 
   question_scope_probe:
     if: >-
+      github.event_name == 'workflow_dispatch' &&
       github.repository == '9m92yk9snt-star/VedoScout' &&
-      github.event.pull_request.number == 39 &&
-      github.event.pull_request.head.repo.full_name == github.repository &&
-      github.event.pull_request.head.ref == 'codex/sequence-pilot-foundation' &&
-      github.event.before == '9028dd383d7a9e6b4d8152fda5cac158aa3369a1' &&
+      github.ref == 'refs/heads/codex/sequence-pilot-foundation' &&
       github.run_attempt == 1
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -45,7 +53,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ github.sha }}
           persist-credentials: false
       - uses: actions/setup-python@v5
         with:
@@ -76,14 +84,18 @@ jobs:
                   assert hashlib.file_digest(stream, 'sha256').hexdigest() == expected
           print('Original source and taps verified; no historical report or model observations supplied.')
           PY
-      - name: One fresh source-window question-scope validation
+      - name: Offline preflight unless a model request is explicitly selected
         env:
-          EMERGENT_LLM_KEY: ${{ secrets.EMERGENT_LLM_KEY }}
-        run: >-
-          python -u backend/scripts/probe_question_scope.py
-          --evidence-dir "$RUNNER_TEMP/report-source"
-          --output "$RUNNER_TEMP/question-scope-trial"
-          --focus-ms 23680
+          EMERGENT_LLM_KEY: ${{ inputs.run_model_probe && secrets.EMERGENT_LLM_KEY || '' }}
+          RUN_MODEL_PROBE: ${{ inputs.run_model_probe }}
+          FOCUS_MS: ${{ inputs.focus_ms }}
+        run: |
+          args=(--evidence-dir "$RUNNER_TEMP/report-source"
+                --output "$RUNNER_TEMP/question-scope-trial" --focus-ms "$FOCUS_MS")
+          if [ "$RUN_MODEL_PROBE" = "true" ]; then
+            args+=(--run-model)
+          fi
+          python -u backend/scripts/probe_question_scope.py "${args[@]}"
       - name: Preserve bounded probe receipt
         if: always()
         run: |

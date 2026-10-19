@@ -16,7 +16,7 @@ import sequence_pilot_transport as transport
 from scripts.run_sequence_pilot import fresh_original_manifest, original_spatial_items, FRESH_IDENTITY_INSTRUCTION
 
 
-def run(evidence_dir, output, focus_ms, *, preflight_only=False):
+def run(evidence_dir, output, focus_ms, *, preflight_only=True):
     started = time.monotonic()
     output = Path(output)
     if output.exists():
@@ -74,7 +74,9 @@ if __name__ == "__main__":
     cli.add_argument("--evidence-dir", required=True)
     cli.add_argument("--output", required=True)
     cli.add_argument("--focus-ms", type=int, required=True)
-    cli.add_argument("--preflight-only", action="store_true")
+    mode = cli.add_mutually_exclusive_group()
+    mode.add_argument("--preflight-only", action="store_true", help="Default; no model calls")
+    mode.add_argument("--run-model", action="store_true", help="Explicitly send one model request")
     args = cli.parse_args()
-    result = run(args.evidence_dir, args.output, args.focus_ms, preflight_only=args.preflight_only)
+    result = run(args.evidence_dir, args.output, args.focus_ms, preflight_only=not args.run_model)
     raise SystemExit(0 if result["status"] in {"COMPLETED", "PREFLIGHT_ONLY"} else 3)

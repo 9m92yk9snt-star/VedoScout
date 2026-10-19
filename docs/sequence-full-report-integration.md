@@ -4,6 +4,27 @@
 `generate_full_report_task`. The default remains `legacy`. No merge, deployment
 or production switch is part of this change.
 
+## Model-call economy and offline defaults
+
+Ordinary PR checks run offline. The source-window probe is available only by
+manual workflow dispatch on the draft branch, with `run_model_probe=false` by
+default. The CLI/function also defaults to preflight-only; an actual request
+requires `--run-model`. Offline validation, hashes, deterministic projection,
+statistics, asset encoding and error inspection do not need a model call.
+
+A quota/rate error now stops queued requests and prevents later contact/outcome
+rounds. Already-sent remote work cannot be recalled, but pending calls are marked
+NOT_SENT. No automatic retry, provider change or alternate credential is used.
+Tests simulate quota failure in the initial, contact and outcome rounds and
+exercise the owned process scheduler without network requests.
+
+The retained old HTTP 429 receipts contain neither an upstream error code nor
+Retry-After, so their quota-versus-rate cause cannot be recovered offline. Future
+402/429 errors retain only allowlisted structured categories and a bounded
+numeric Retry-After value. Unknown detail stays UNSPECIFIED; raw messages,
+response bodies, credentials and general headers are never persisted. This
+diagnostic change does not itself send any requests or retry a failed call.
+
 `SEQUENCE_REPORT_WRITER_MODEL` explicitly selects `gemini-2.5-pro` (default) or
 `gpt-6-astra`. Actual successful section-writing tests use GPT-6 Astra with low
 reasoning; source discovery uses GPT-6 Astra with medium reasoning. There is no

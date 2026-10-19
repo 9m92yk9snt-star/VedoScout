@@ -208,7 +208,7 @@ def run(manifest_path, output_dir, *, provider="gemini", model="gemini-2.5-pro",
             execute(manifest["packets"], manifest)
         merged = pilot.reconcile(resolved_results, sampling_gap_ms=manifest["input_coverage"]["max_sample_gap_ms"])
         summary.update(merged)  # preserve completed observations if later work fails
-        access_failed = any(r.get("error") in {"MODEL_ACCESS_DENIED", "MODEL_KEY_NOT_CONFIGURED"} for r in receipts)
+        access_failed = any(r.get("error") in transport.STOP_ERRORS for r in receipts)
         planner = pilot.plan_contact_reviews if contact_reviews else pilot.followup_plan
         followups = [] if access_failed else planner(manifest, merged, limit=max_followups,
             **({"terminal_only":True, "complete_terminal_context":automatic_outcomes}
@@ -233,7 +233,7 @@ def run(manifest_path, output_dir, *, provider="gemini", model="gemini-2.5-pro",
             return merged
         merged = merge_active()
         outcome_followups = []
-        if automatic_outcomes and not access_failed:
+        if automatic_outcomes and not any(r.get("error") in transport.STOP_ERRORS for r in receipts):
             outcome_followups = pilot.plan_outcome_reviews(manifest, merged, manifest["packets"]+followups,
                                                            limit=max(0,max_followups-len(followups)))
             summary["outcome_review_plan"] = deepcopy(outcome_followups)
@@ -245,8 +245,10 @@ def run(manifest_path, output_dir, *, provider="gemini", model="gemini-2.5-pro",
         initial_count = 0 if resume_initial_receipts or resume_fresh_initial else len(manifest["packets"])
         complete = len([r for r in receipts if r.get("status") == "COMPLETED"]) == initial_count + len(followups)+len(outcome_followups)
         summary["status"] = "MODEL_OBSERVATIONS_RETURNED" if complete else "PARTIAL_MODEL_RUN"
-        if access_failed:
+        if any(r.get("error") in {"MODEL_ACCESS_DENIED", "MODEL_KEY_NOT_CONFIGURED"} for r in receipts):
             summary["status"] = "MODEL_ACCESS_DENIED"
+        if any(r.get("error") == "MODEL_QUOTA_OR_RATE_LIMIT" for r in receipts):
+            summary["error_code"] = "MODEL_QUOTA_OR_RATE_LIMIT"
     except (ValueError, TimeoutError, OSError, KeyError, TypeError) as exc:
         # Exception text is intentionally not persisted: providers may include secrets.
         safe_codes = {"REQUEST_IMAGE_BUDGET_EXCEEDED", "PREPARED_IMAGE_CHANGED", "SOURCE_VIDEO_CHANGED",

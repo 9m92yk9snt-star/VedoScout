@@ -22,6 +22,39 @@ KEY_ENV = {"gemini": "GEMINI_API_KEY", "emergent": "EMERGENT_LLM_KEY"}
 MAX_REQUEST_BYTES = 19_500_000
 MAX_RESPONSE_BYTES = 2_000_000
 MAX_CALL_SECONDS = 210.
+STOP_ERRORS = frozenset({"MODEL_ACCESS_DENIED", "MODEL_KEY_NOT_CONFIGURED", "MODEL_QUOTA_OR_RATE_LIMIT"})
+
+
+def limit_diagnostics(exc):
+    """Retain only known error categories and a bounded numeric retry delay.
+
+    Never persist arbitrary messages, response bodies or general headers.
+    Missing/unknown provider detail remains unknown, rather than guessing quota.
+    """
+    result = {"limit_kind": "UNSPECIFIED"}
+    known = {"insufficient_quota": "QUOTA_EXHAUSTED", "quota_exceeded": "QUOTA_EXHAUSTED",
+             "billing_hard_limit_reached": "QUOTA_EXHAUSTED", "insufficient_credits": "QUOTA_EXHAUSTED",
+             "rate_limit_exceeded": "RATE_LIMITED", "rate_limit_error": "RATE_LIMITED",
+             "too_many_requests": "RATE_LIMITED"}
+    try:
+        delay = (exc.headers or {}).get("Retry-After", "")
+        if isinstance(delay, str) and re.fullmatch(r"\d{1,5}(?:\.\d{1,3})?", delay.strip()):
+            seconds = float(delay)
+            if seconds <= 86400:
+                result["retry_after_seconds"] = seconds
+        raw = exc.read(4097)
+        if len(raw) <= 4096:
+            data = json.loads(raw)
+            error = data.get("error") if isinstance(data, dict) else None
+            if isinstance(error, dict):
+                for field in ("code", "type"):
+                    code = error.get(field)
+                    if isinstance(code, str) and code in known:
+                        result.update(limit_kind=known[code], provider_error_code=code)
+                        break
+    except (ValueError, TypeError, OSError):
+        pass
+    return result
 
 
 def build_request(provider, model, items, *, reasoning_effort=None, image_detail=None, max_output_tokens=None):
@@ -146,7 +179,9 @@ def _worker(connection, job, provider, model, timeout_s):
         audit.update(status="ERROR", http_status=exc.code,
                      error="MODEL_ACCESS_DENIED" if exc.code in {401, 403} else
                            "MODEL_QUOTA_OR_RATE_LIMIT" if exc.code in {402, 429} else "MODEL_HTTP_ERROR")
-        exc.close()  # never log headers, credentials or upstream error bodies
+        if exc.code in {402, 429}:
+            audit.update(limit_diagnostics(exc))
+        exc.close()
     except (urllib.error.URLError, TimeoutError, OSError):
         audit.update(status="ERROR", error="MODEL_CONNECTION_FAILED")
     except (ValueError, KeyError, TypeError, json.JSONDecodeError) as exc:
@@ -201,7 +236,7 @@ def run_jobs(jobs, provider, model, *, deadline, per_call_s=90., workers=2, work
                               "error": "MODEL_ACCESS_STOPPED" if abort else "MODEL_WALL_DEADLINE_EXCEEDED"}
                 if result is not None:
                     results.append(result)
-                    abort = abort or result.get("error") in {"MODEL_ACCESS_DENIED", "MODEL_KEY_NOT_CONFIGURED"}
+                    abort = abort or result.get("error") in STOP_ERRORS
                     pipe.close(); _stop(process); del active[pid]
             if (now >= deadline or abort) and not active:
                 for job in pending:

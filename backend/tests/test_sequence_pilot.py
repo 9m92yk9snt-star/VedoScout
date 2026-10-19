@@ -557,6 +557,50 @@ def test_access_denied_stops_queued_work_without_alternate_route():
     assert result[1]["status"] == "NOT_SENT"
 
 
+def quota_worker(connection, job, provider, model, timeout_s):
+    connection.send({"packet_id": job["packet_id"], "status": "ERROR", "http_status": 429,
+                     "error": "MODEL_QUOTA_OR_RATE_LIMIT"})
+    connection.close()
+
+
+def test_quota_failure_stops_every_queued_request_without_retry():
+    result = t.run_jobs([{"packet_id": str(i)} for i in range(4)], "emergent", "gpt-6-astra",
+                       deadline=time.monotonic()+5, workers=1, worker=quota_worker)
+    assert result[0]["http_status"] == 429
+    assert all(r["status"] == "NOT_SENT" for r in result[1:])
+    assert all(r["error"] == "MODEL_ACCESS_STOPPED" for r in result[1:])
+
+
+@pytest.mark.parametrize("payload,header,kind", [
+    ({"error": {"code": "insufficient_quota", "message": "secret-token-do-not-save"}}, "30", "QUOTA_EXHAUSTED"),
+    ({"error": {"type": "rate_limit_error", "message": "secret-token-do-not-save"}}, "1.5", "RATE_LIMITED"),
+    ({"error": {"code": "unknown-private-code", "message": "secret-token-do-not-save"}}, "bad-private-header", "UNSPECIFIED"),
+    ({"error": {"code": ["rate_limit_error"]}}, "99999", "UNSPECIFIED"),
+])
+def test_limit_diagnostics_only_keeps_allowlisted_categories(payload, header, kind):
+    import io
+    import urllib.error
+    body = io.BytesIO(json.dumps(payload).encode())
+    error = urllib.error.HTTPError("https://synthetic.invalid", 429, "synthetic", {"Retry-After": header,
+                                  "Authorization": "secret-token-do-not-save"}, body)
+    result = t.limit_diagnostics(error)
+    assert result["limit_kind"] == kind
+    assert "secret-token" not in json.dumps(result) and "unknown-private-code" not in json.dumps(result)
+    if header in {"30", "1.5"}:
+        assert result["retry_after_seconds"] == float(header)
+    else:
+        assert "retry_after_seconds" not in result
+
+
+def test_oversized_error_body_stays_unknown_without_retaining_it():
+    import io
+    import urllib.error
+    stream = io.BytesIO(b'x'*10000)
+    error = urllib.error.HTTPError("https://synthetic.invalid", 429, "synthetic", {}, stream)
+    assert t.limit_diagnostics(error) == {"limit_kind": "UNSPECIFIED"}
+    assert stream.tell() == 4097
+
+
 def test_wall_deadline_kills_real_worker_process():
     before = {c.pid for c in multiprocessing.active_children()}
     started = time.monotonic()
@@ -820,9 +864,9 @@ def test_cold_terminal_planner_keeps_actor_review_and_continuous_keeper_outcome_
     assert review["detail_end_ms"] >= shot["contact_interval_ms"][1]+1500
 
 
-@pytest.mark.parametrize("max_followups,second_failure,expected_calls",[(2,False,3),(2,True,3),(1,False,2)])
+@pytest.mark.parametrize("max_followups,failure_call,expected_calls",[(2,0,3),(2,3,3),(1,0,2),(2,2,2),(2,1,1)])
 def test_cold_automatic_outcome_round_shares_budget_and_preserves_uncertainty_on_failure(
-        tmp_path,monkeypatch,max_followups,second_failure,expected_calls):
+        tmp_path,monkeypatch,max_followups,failure_call,expected_calls):
     """Synthetic transport/control-flow test, never a perception trial."""
     from scripts import run_sequence_pilot as runner
     manifest,packet,data=fixture()
@@ -850,7 +894,7 @@ def test_cold_automatic_outcome_round_shares_budget_and_preserves_uncertainty_on
         j=jobs[0]
         receipt={"packet_id":j["packet_id"],"origin":"SYNTHETIC_TEST_ONLY","status":"COMPLETED",
                  "payload_sha256":"synthetic-request","response_sha256":"synthetic-response"}
-        if len(calls)==3 and second_failure:
+        if len(calls)==failure_call:
             return [{**receipt,"status":"ERROR","error":"MODEL_QUOTA_OR_RATE_LIMIT"}]
         reply=deepcopy(data)
         if len(calls)==3:
@@ -862,12 +906,16 @@ def test_cold_automatic_outcome_round_shares_budget_and_preserves_uncertainty_on
                contact_reviews=True,automatic_outcomes=True,max_followups=max_followups)
     assert len(calls)==expected_calls and len({deadline for _,deadline in calls})==1
     assert result["historical_action_results_used"] is False and result["fresh_end_to_end_run"] is True
-    if expected_calls==3 and not second_failure:
+    if expected_calls==3 and not failure_call:
         assert result["counts"]["SHOT"]==1 and result["questions"]==[]
         assert result["superseded_review_packet_ids"]==["contact_review_001"]
     else:
-        assert result["counts"].get("SHOT",0)==0 and result["questions"]
-    assert result["status"] == ("PARTIAL_MODEL_RUN" if second_failure else "MODEL_OBSERVATIONS_RETURNED")
+        assert result["counts"].get("SHOT",0)==0
+        if failure_call != 1:
+            assert result["questions"]
+    assert result["status"] == ("PARTIAL_MODEL_RUN" if failure_call else "MODEL_OBSERVATIONS_RETURNED")
+    if failure_call:
+        assert result["error_code"] == "MODEL_QUOTA_OR_RATE_LIMIT"
 
 
 def test_automatic_outcomes_rejects_resume_or_nonfresh_mode_before_any_call(tmp_path):
