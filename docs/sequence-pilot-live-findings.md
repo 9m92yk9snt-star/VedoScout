@@ -1136,3 +1136,42 @@ remain visible. The three previous assist receipts and selected SAVED shot
 are unchanged. All five reference scoring actions now have separate accepted
 bounded model experiments. This is not fresh whole-video discovery, combined
 latency or production-report integration verification. No merge or deployment.
+
+
+## Fresh whole-source acceptance trial
+
+Read the newly prepared complete source, using all ten image-derived packets
+and all 622 sampled source instants. No approved action receipts, old native
+observations, inferred identity profile, reference event times or desired
+results enter the model process. All ten original identity selections are
+available in every packet, with original in-play spatial points where present.
+A human-original reference scope prevents different physical people in one
+play from both being positively credited as the selected person, without
+reintroducing the disputed inferred appearance profile.
+
+Use GPT-6-astra medium, high image detail, maximum two workers, a 540s analysis
+budget and a 120s per-request limit. Ten initial model reads cover the complete
+source. Up to six contact reviews are selected by the NEW initial observations'
+own missing links and control-to-chance transitions, without manual event
+navigation. Those reviews preserve the complete 8-fps overview and add native
+source-rate detail using the original local selection union plus half a player
+height, JPEG quality 50 and full source width. Byte limits and explicit identity,
+contact, receiver and active-ball requirements remain enforced. No model request
+is automatically repeated after a transport error.
+
+Local initial preflight retained all 622 distinct sampled instants across the
+ten packets. Image payloads before the short additional identity instruction
+range from 6.778 to 15.158 MB, below the 19.5 MB cap. Local source-based preflight
+is not a model reading. 257 relevant local offline tests pass, including
+prohibition of historical-result replay in fresh mode and preservation of
+source instants in the smaller review bands. A test is not model acceptance.
+
+The workflow prepares source images afresh and separately records elapsed time
+from source decoding through model analysis. That time excludes checkout,
+dependency installation and source-part reassembly; it is not upload-to-live-
+report latency. Reference cases are read only by the AFTERWARD evaluator. A
+workflow completion alone is not a pass: all reference cases must match, no
+extra selected scoring event may appear, all planned reads must complete and
+observed conflicts must remain absent. Matching still needs source inspection.
+The separate five successful receipts are retained unchanged for comparison,
+not injected into this trial. No merge or deployment.

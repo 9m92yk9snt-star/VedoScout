@@ -527,7 +527,7 @@ def resolve_response(data, manifest, packet, receipt):
                 selected = None
             people[pid] = {"selected": selected, "reference_ids": ref_support, "evidence_frames": support}
         identity_conflicts.update(positive_identity_conflicts(people,
-            (manifest.get("identity_profile") or {}).get("canonical_reference_ids", [])))
+            (manifest.get("identity_profile") or {}).get("canonical_reference_ids", manifest.get("identity_reference_scope", []))))
         selected_ids = [pid for pid, p in people.items() if p["selected"] is True]
         if len(selected_ids) > 1:
             identity_conflicts.update(selected_ids)
@@ -782,7 +782,7 @@ def plan_contact_reviews(manifest, resolved, *, limit=6):
 def prepare_contact_reviews(manifest, jobs, output_dir, *, timeout_s=30., native_detail_policy="median_q60"):
     """One shared decode for native contact detail; retain all overview instants."""
     import cv2
-    if native_detail_policy not in {"median_q60", "local_span_q80"}:
+    if native_detail_policy not in {"median_q60", "local_span_q80", "local_half_q50"}:
         raise ValueError("INVALID_NATIVE_DETAIL_POLICY")
     if digest(manifest["source_video"]) != manifest["source_video_sha256"]:
         raise ValueError("SOURCE_VIDEO_CHANGED")
@@ -802,6 +802,10 @@ def prepare_contact_reviews(manifest, jobs, output_dir, *, timeout_s=30., native
         if native_detail_policy == "local_span_q80":
             top = max(0, min(r["box"]["y"]-r["box"]["h"] for r in anchors))
             bottom = min(1, max(r["box"]["y"]+2*r["box"]["h"] for r in anchors))
+        elif native_detail_policy == "local_half_q50":
+            margin = .5*max(r["box"]["h"] for r in anchors)
+            top = max(0,min(r["box"]["y"] for r in anchors)-margin)
+            bottom = min(1,max(r["box"]["y"]+r["box"]["h"] for r in anchors)+margin)
         j["source_crop_box"] = [0, int(top*height), width, int(bottom*height)]
         j.setdefault("detail_start_ms", max(j["start_ms"], focus-750))
         j.setdefault("detail_end_ms", min(j["end_ms"], focus+750))
@@ -830,7 +834,8 @@ def prepare_contact_reviews(manifest, jobs, output_dir, *, timeout_s=30., native
                 if j["detail_start_ms"] <= ms <= j["detail_end_ms"] or ms in j["extra_detail_frame_ms"]:
                     box = j["source_crop_box"]
                     crop = _save_image(Path(output_dir) / j["packet_id"] / f"s{ms:09}.jpg",
-                        pixels[box[1]:box[3], :], 1280, 80 if native_detail_policy == "local_span_q80" else 60)
+                        pixels[box[1]:box[3], :], 1280,
+                        {"local_span_q80":80,"local_half_q50":50,"median_q60":60}[native_detail_policy])
                     crop["source_crop_box"] = box
                     if ms in by_ms:
                         by_ms[ms]["zoom_view"] = crop
@@ -844,7 +849,7 @@ def prepare_contact_reviews(manifest, jobs, output_dir, *, timeout_s=30., native
         j["frame_ids"] = [f["frame_id"] for f in enriched["frames"] if j["start_ms"] <= f["media_ms"] <= j["end_ms"]]
     enriched["contact_review_preparation_seconds"] = round(time.monotonic()-started, 3)
     enriched["contact_review_delivery"] = {"overview_max_edge": 768, "overview_jpeg_quality": 70,
-        "native_crop_max_edge": 1280, "native_crop_jpeg_quality": 80 if native_detail_policy == "local_span_q80" else 60,
+        "native_crop_max_edge": 1280, "native_crop_jpeg_quality": {"local_span_q80":80,"local_half_q50":50,"median_q60":60}[native_detail_policy],
         "native_detail_policy": native_detail_policy, "source_instants_removed": 0}
     write_json(Path(output_dir) / "contact-review-manifest.json", enriched)
     return enriched, jobs

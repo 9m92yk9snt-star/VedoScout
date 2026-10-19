@@ -7,6 +7,7 @@ its normal environment variable. No secrets are accepted as CLI arguments.
 from __future__ import annotations
 
 import argparse
+from copy import deepcopy
 import hashlib
 import json
 import os
@@ -19,17 +20,39 @@ import sequence_pilot as pilot
 import sequence_pilot_transport as transport
 
 
+def fresh_original_manifest(manifest):
+    """No inferred identity description or historical action receipt enters this run."""
+    updated = deepcopy(manifest)
+    updated.pop("identity_profile", None)
+    refs = [r["reference_id"] for r in updated["references"]]
+    updated["identity_reference_scope"] = refs[:]
+    for packet in updated["packets"]:
+        packet.update(reference_ids=refs[:],contact_sequence_evidence=True)
+    return updated
+
+
+def original_spatial_items(manifest, packet, output):
+    from scripts.probe_native_play import spatial_reference_items
+    lo,hi=packet.get("core_start_ms",packet["start_ms"]),packet.get("core_end_ms",packet["end_ms"]+1)
+    local=[r for r in manifest["references"] if lo <= r["media_ms"] < hi]
+    return spatial_reference_items(manifest,packet,local,output)
+
+
 def run(manifest_path, output_dir, *, provider="gemini", model="gemini-2.5-pro", budget_s=300., max_initial=4,
         max_followups=2, per_call_s=90., reasoning_effort=None, identity_profile=False, image_detail=None,
-        identity_profile_receipt=None, contact_reviews=False, resume_initial_receipts=None):
+        identity_profile_receipt=None, contact_reviews=False, resume_initial_receipts=None, fresh_originals=False):
     started, out = time.monotonic(), Path(output_dir).resolve()
     if out.exists() and any(out.iterdir()):
         raise ValueError("OUTPUT_MUST_BE_NEW_OR_EMPTY")
     manifest = pilot.read_json(manifest_path)
     if not 1 <= budget_s <= 600 or not 0 <= max_followups <= 6 or not 1 <= max_initial <= 12:
         raise ValueError("INVALID_EXPERIMENT_BUDGET")
-    if reasoning_effort not in {None, "low"}:
+    if reasoning_effort not in {None, "low", "medium"}:
         raise ValueError("INVALID_REASONING_EFFORT")
+    if fresh_originals and (identity_profile or identity_profile_receipt or resume_initial_receipts):
+        raise ValueError("FRESH_ORIGINALS_CANNOT_REPLAY_MODEL_RESULTS")
+    if fresh_originals:
+        manifest = fresh_original_manifest(manifest)
     if provider not in transport.KEY_ENV:
         raise ValueError("INVALID_MODEL_PROVIDER")
     summary = {"version": pilot.VERSION, "status": "NOT_STARTED", "provider": provider, "model": model,
@@ -41,6 +64,8 @@ def run(manifest_path, output_dir, *, provider="gemini", model="gemini-2.5-pro",
                "production_pipeline_changed": False, "expected_answers_used_as_input": False,
                "model_jobs_completed": 0, "independent_visual_correctness_verified": False,
                "requested_reasoning_effort": reasoning_effort,
+               "identity_mode":"FRESH_ORIGINAL_SELECTIONS" if fresh_originals else "EXISTING_REFERENCE_POLICY",
+               "historical_action_results_used":bool(resume_initial_receipts),
                "reference_policy": manifest.get("reference_policy"),
                "visual_packet_plan": manifest.get("visual_packet_plan"),
                "model_jobs": [], "events": [], "target_events": [], "counts": {}, "questions": [], "conflicts": []}
@@ -58,7 +83,24 @@ def run(manifest_path, output_dir, *, provider="gemini", model="gemini-2.5-pro",
     def execute(packets, current_manifest):
         jobs = []
         for packet in packets:
+            if fresh_originals:
+                packet["contact_sequence_evidence"] = True
             items = pilot.packet_items(current_manifest, packet)
+            spatial_audit=[]
+            if fresh_originals:
+                items.insert(1,{"type":"text","text":
+                    "Read all original selections afresh; no inferred appearance profile or past action answer is supplied. "
+                    "A local original point locates the intended physical player at that instant. Connect identity by "
+                    "readable numbers and continuous movement, not guessed facial hair or shadow. "
+                    "At every candidate release distinguish that person's body/boot movement from nearby players. "
+                    "Compare before and after occlusion. A separate teammate can finish first time: the receiving and "
+                    "striking contact may be the same action. Do not invent an extra settled touch or conflate "
+                    "the releaser with the receiver. Keep opposing brushes distinct from controlled possession. "
+                    "If contacts or actors remain ambiguous, retain a specific question. "
+                    "Return the actual result, including unsuccessful actions. No expected answers or target count is supplied."})
+                spatial,spatial_audit=original_spatial_items(current_manifest,packet,out/"spatial"/packet["packet_id"])
+                prefix = len(pilot.packet_items(current_manifest,{**packet,"frame_ids":[]}))+1
+                items[prefix:prefix] = spatial
             # Validate the complete wire request before starting any paid job.
             try:
                 _url, _payload, request_audit = transport.build_request(provider, model, items,
@@ -73,6 +115,7 @@ def run(manifest_path, output_dir, *, provider="gemini", model="gemini-2.5-pro",
                 continue
             pilot.write_json(out / "requests" / (packet["packet_id"] + ".json"),
                 {**packet, "image_delivery": request_audit,
+                 "spatial_reference_audit":spatial_audit,
                  "prompt_sha256": hashlib.sha256("\n".join(x["text"] for x in items if x["type"] == "text").encode()).hexdigest()})
             jobs.append({"packet_id": packet["packet_id"], "items": items,
                          "reasoning_effort": reasoning_effort, "image_detail": image_detail})
@@ -152,7 +195,8 @@ def run(manifest_path, output_dir, *, provider="gemini", model="gemini-2.5-pro",
         if followups and time.monotonic() + 5 < deadline:
             preparer = pilot.prepare_contact_reviews if contact_reviews else pilot.prepare_followups
             owner_manifest, followups = preparer(manifest, followups, out,
-                timeout_s=min(30., max(1., deadline - time.monotonic() - 5)))
+                timeout_s=min(30., max(1., deadline - time.monotonic() - 5)),
+                **({"native_detail_policy":"local_half_q50"} if fresh_originals and contact_reviews else {}))
             execute(followups, owner_manifest)
         replaced = {r["replaces_initial_packet_id"] for r in resolved_results
                     if r.get("replaces_initial_packet_id") and r["events"]}
@@ -199,7 +243,8 @@ def main():
     model.add_argument("--per-call-s", type=float, default=90.)
     model.add_argument("--max-followups", type=int, default=2)
     model.add_argument("--max-initial", type=int, default=4)
-    model.add_argument("--reasoning-effort", choices=["low"], default=None)
+    model.add_argument("--reasoning-effort", choices=["low","medium"], default=None)
+    model.add_argument("--fresh-originals", action="store_true", help="Fresh all-reference identity per play; no historical model reuse")
     model.add_argument("--identity-profile", action="store_true", help="Infer one shared identity from original crops before reading plays")
     model.add_argument("--image-detail", choices=["high"], default=None, help="Request model-side high detail independently of JPEG size")
     model.add_argument("--identity-profile-receipt", type=Path, help="Reuse a source-and-reference-hash-matched identity receipt")
@@ -220,7 +265,7 @@ def main():
                      per_call_s=args.per_call_s, max_followups=args.max_followups, max_initial=args.max_initial,
                      reasoning_effort=args.reasoning_effort, identity_profile=args.identity_profile, image_detail=args.image_detail,
                      identity_profile_receipt=args.identity_profile_receipt, contact_reviews=args.contact_reviews,
-                     resume_initial_receipts=args.resume_initial_receipts)
+                     resume_initial_receipts=args.resume_initial_receipts, fresh_originals=args.fresh_originals)
         print(json.dumps({k: result.get(k) for k in ("status", "analysis_seconds", "model_jobs_completed", "counts")}, indent=2))
         return 0 if result["status"] == "MODEL_OBSERVATIONS_RETURNED" else 3
     else:

@@ -13,6 +13,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import sequence_pilot as p
 import sequence_pilot_transport as t
 from scripts.run_sequence_pilot import run
+from scripts.run_sequence_pilot import fresh_original_manifest
 
 
 def fixture():
@@ -51,6 +52,36 @@ def test_shared_profile_cannot_invent_references_or_change_source_frames():
         p.apply_identity_profile(manifest, profile)
     with pytest.raises(ValueError, match="IDENTITY_PROFILE_UNRESOLVED"):
         p.apply_identity_profile(manifest, [profile, profile])
+
+
+def test_fresh_whole_source_input_removes_inferred_profile_without_dropping_source_or_originals():
+    manifest,packet,_=fixture()
+    manifest["references"]=[{"reference_id":"r1"},{"reference_id":"r2"}]
+    manifest["identity_profile"]={"appearance":"old disputed appearance","canonical_reference_ids":["r1"]}
+    fresh=fresh_original_manifest(manifest)
+    assert "identity_profile" not in fresh and "identity_profile" in manifest
+    assert fresh["frames"] == manifest["frames"] and fresh["references"] == manifest["references"]
+    assert fresh["packets"][0]["frame_ids"] == packet["frame_ids"]
+    assert fresh["packets"][0]["reference_ids"] == ["r1","r2"]
+    assert fresh["packets"][0]["contact_sequence_evidence"] is True
+
+
+def test_fresh_original_reference_scope_does_not_allow_two_physical_selected_people():
+    manifest,_,data=fixture()
+    manifest["references"]=[{"reference_id":"r1"},{"reference_id":"r2"}]
+    fresh=fresh_original_manifest(manifest)
+    data["plays"][0]["people"][1].update(selected=True,reference_ids=["r2"])
+    resolved=p.resolve_response(data,fresh,fresh["packets"][0],{})
+    assert any(q["reason"] == "IDENTITY_CONFLICT" for q in resolved["questions"])
+    assert p.reconcile([resolved])["target_events"] == []
+
+
+@pytest.mark.parametrize("reuse", [{"identity_profile":True},{"identity_profile_receipt":"old.json"},
+                                   {"resume_initial_receipts":"old.json"}])
+def test_fresh_full_source_mode_cannot_replay_old_model_answers(tmp_path,reuse):
+    manifest,_,_=fixture();p.write_json(tmp_path/"manifest.json",manifest)
+    with pytest.raises(ValueError,match="FRESH_ORIGINALS_CANNOT_REPLAY_MODEL_RESULTS"):
+        run(tmp_path/"manifest.json",tmp_path/"result",fresh_originals=True,**reuse)
 
 
 def test_unclear_identity_profile_does_not_silently_choose_a_player():
@@ -614,6 +645,20 @@ def test_restored_native_detail_changes_only_crop_delivery_not_timestamps_or_ove
     initial = {f["frame_id"] for f in manifest["frames"]}
     assert [f["sha256"] for f in low["frames"] if f["frame_id"] in initial] == [
         f["sha256"] for f in restored["frames"] if f["frame_id"] in initial]
+
+
+def test_half_player_review_crop_preserves_instants_and_uses_original_geometry(tmp_path):
+    manifest=p.prepare(source_export(tmp_path),tmp_path/"prepared",fps=8)
+    job={"packet_id":"review","phase":"FOLLOWUP","start_ms":0,"end_ms":750,
+         "reference_ids":["r1"],"question":{"focus_ms":350}}
+    before=deepcopy(manifest)
+    enriched,jobs=p.prepare_contact_reviews(manifest,[job],tmp_path/"review",native_detail_policy="local_half_q50")
+    assert manifest == before
+    assert jobs[0]["native_crop_count"] == 16
+    assert {f["frame_id"] for f in manifest["frames"]} <= set(jobs[0]["frame_ids"])
+    assert jobs[0]["source_crop_box"][::2] == [0,96]
+    assert enriched["contact_review_delivery"]["native_crop_jpeg_quality"] == 50
+    assert enriched["contact_review_delivery"]["source_instants_removed"] == 0
 
 
 def test_actor_continuity_band_keeps_all_people_and_does_not_select_an_identity():
