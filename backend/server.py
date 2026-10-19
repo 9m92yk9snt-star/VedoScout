@@ -5794,7 +5794,7 @@ async def get_report_status(report_id: str, user=Depends(get_current_user)):
     `status` remains the legacy preview status. `analysis_complete` is scoped
     to this report's entitlement; a paid preview is never a completed dossier.
     """
-    doc = await db.reports.find_one({"id": report_id})
+    doc = await db.reports.find_one({"id": report_id}, {"sequence_audit": 0})
     if not doc:
         raise HTTPException(status_code=404, detail="Report not found.")
     # Allow the owner or admin to poll
@@ -7044,7 +7044,7 @@ async def _ensure_report_video_local(report_id: str) -> Optional[Path]:
 async def my_reports(user=Depends(get_current_user)):
     docs = await db.reports.find(
         {"user_id": user["id"]},
-        {"_id": 0, "full_report": 0},
+        {"_id": 0, "full_report": 0, "sequence_audit": 0},
     ).sort("created_at", -1).to_list(100)
     for d in docs:
         d["video_url"] = _resolve_video_url(d)
@@ -7459,7 +7459,7 @@ async def get_demo_report():
 
 @api_router.get("/reports/{report_id}")
 async def get_report(report_id: str, user=Depends(get_current_user)):
-    doc = await db.reports.find_one({"id": report_id}, {"_id": 0})
+    doc = await db.reports.find_one({"id": report_id}, {"_id": 0, "sequence_audit": 0})
     if not doc:
         raise HTTPException(status_code=404, detail="Report not found")
     if doc["user_id"] != user["id"] and user["role"] != "admin":
@@ -9861,7 +9861,7 @@ async def admin_agent_queue(_=Depends(get_current_admin_or_scout)):
     """All unlocked reports with their agent review state — oldest pending first."""
     cursor = db.reports.find(
         {"$or": [{"is_paid": True}, {"manually_unlocked": True}]},
-        {"_id": 0, "full_report": 0, "preview": 0},
+        {"_id": 0, "full_report": 0, "preview": 0, "sequence_audit": 0},
     ).sort("paid_at", 1)
     out = []
     async for d in cursor:
@@ -15254,7 +15254,7 @@ async def admin_delete_contact(msg_id: str, _=Depends(get_current_admin)):
 
 @api_router.get("/admin/reports")
 async def admin_reports(_=Depends(get_current_admin)):
-    docs = await db.reports.find({}, {"_id": 0, "full_report": 0}).sort("created_at", -1).to_list(500)
+    docs = await db.reports.find({}, {"_id": 0, "full_report": 0, "sequence_audit": 0}).sort("created_at", -1).to_list(500)
     for d in docs:
         d["video_url"] = _resolve_video_url(d)
         d["poster_url"] = _resolve_poster_url(d)

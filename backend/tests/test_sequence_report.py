@@ -1,5 +1,6 @@
 """Real retained model evidence + orchestration failure boundaries, no model spend."""
 import asyncio
+import ast
 from copy import deepcopy
 import json
 from pathlib import Path
@@ -124,6 +125,30 @@ def test_writer_failure_keeps_paid_source_receipts_before_temp_cleanup(tmp_path,
     assert len(saved[-1]["sequence_audit"]["receipts"]) == 13
     assert saved[-1]["canonical_events"]["events"]
     assert "full_report" not in saved[-1]
+
+
+def test_normal_report_lists_omit_bulk_model_receipts():
+    doc = {"id": "test", "user_id": "owner", "full_report": {"summary": "ready"},
+           "sequence_audit": {"raw_response": "x"*1_000_000}}
+    class Cursor:
+        def __init__(self, projection):
+            self.projection = projection
+        def sort(self, *args):
+            return self
+        async def to_list(self, _):
+            return [{k: v for k, v in doc.items() if self.projection.get(k) != 0}]
+    collection = SimpleNamespace(find=lambda query, projection: Cursor(projection))
+    tree = ast.parse((ROOT / "backend/server.py").read_text())
+    selected = [n for n in tree.body if isinstance(n, ast.AsyncFunctionDef) and n.name in {"my_reports", "admin_reports"}]
+    for node in selected:
+        node.decorator_list = []
+        node.args.defaults = [ast.Constant(None)]
+    ns = {"db": SimpleNamespace(reports=collection), "_resolve_video_url": lambda _: "/video",
+          "_resolve_poster_url": lambda _: "/poster"}
+    exec(compile(ast.fix_missing_locations(ast.Module(body=selected, type_ignores=[])), "report-list-routes", "exec"), ns)
+    for rows in (asyncio.run(ns["my_reports"]({"id": "owner"})), asyncio.run(ns["admin_reports"]())):
+        assert rows[0]["id"] == "test" and rows[0]["video_url"] == "/video"
+        assert "sequence_audit" not in rows[0] and "full_report" not in rows[0]
 
 
 def test_unbound_comment_and_inexact_source_image_are_not_proof(retained):
