@@ -91,3 +91,31 @@ one GPT-6-astra medium request, with a 120s per-call limit. Its result replaces
 the prior terminal review only in the active view; prior observations and raw
 receipts remain available. This is still a continuation, not a cold end-to-end
 benchmark. 261 prior checks and three new navigation/refusal tests pass.
+
+## Outcome transport rejection and smaller evidence delivery
+
+Run 39181338773 verified all thirteen prior requests and sent the new outcome
+request. The provider returned HTTP 429 / MODEL_QUOTA_OR_RATE_LIMIT after
+65.464s, with no response text. Source processing took 105.488s. The raw
+transport receipt is retained in fresh-outcome-rate-limit-receipt.json. This
+adds no visual conclusion; the active previous result remains four of five.
+The original failed probe output omitted prior events, so its zero-match
+evaluation must not be interpreted as invalidating earlier observations. The
+continuation now initializes its result with the verified prior observations
+before attempting transport, preserving them on failure.
+
+The bounded retry uses the original local selection band rather than the wider
+all-selection union, with the same native times, overview instants and original
+identity references. Actual source inspection confirmed that both the keeper
+encounter and goal are inside that local band. This reduces image area and
+request size; it does not supply a desired answer or delete intervening instants.
+HTTP 429 does not identify its precise cause, so this is a smaller evidence
+delivery attempt, not a claim to have diagnosed or bypassed a provider limit.
+
+The smaller preflight retains exactly the same frame IDs, native window, 103
+native images including two extra cited instants, and 166 total images. The
+local source band is [0,704,1080,1098]; request size is 7,861,799 bytes, 55.2%
+smaller. Full-source overviews remain. Source inspection at the strike, keeper
+encounter, departure and descending ball confirms the relevant motion stays
+inside the local strip. This delivery, unlike the first review's early control
+window, includes all native instants through the keeper encounter.

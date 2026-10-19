@@ -119,14 +119,16 @@ def execute(args):
             raise ValueError("REVIEW_REPLAY_RESULT_MISMATCH")
     job = outcome_job(manifest, merged, previous_jobs)
     enriched, jobs = p.prepare_contact_reviews(manifest, [job], out/"outcome",
-                                             native_detail_policy="source_union_q50")
+                                             native_detail_policy=args.detail_policy)
     packet = jobs[0]
     items = items_for(enriched, packet, out/"outcome-spatial")
     _, _, audit = t.build_request("emergent", "gpt-6-astra", items,
                                  reasoning_effort="medium", image_detail="high")
-    result = {"status": "PREFLIGHT_ONLY", "source_video_sha256": manifest["source_video_sha256"],
+    # A failed new transport cannot erase the previously verified observations.
+    result = {**merged, "status": "PREFLIGHT_ONLY", "source_video_sha256": manifest["source_video_sha256"],
         "fresh_end_to_end_run": False, "initial_requests_sent_in_this_run": 0,
-        "previous_review_requests_sent_in_this_run": 0, "verified_reused_requests": 13,
+        "previous_review_requests_sent_in_this_run": 0,
+        "verified_reused_requests": len(initial["receipts"])+len(saved["receipts"]),
         "expected_answers_used_as_input": False, "production_pipeline_changed": False,
         "independent_visual_correctness_verified": False,
         "navigation_origin_run": saved["origin_run"], "request_audit": audit, "job": packet,
@@ -159,6 +161,8 @@ if __name__ == "__main__":
     for name in ("prepared", "initial", "reviews", "output"):
         cli.add_argument("--"+name, required=True)
     cli.add_argument("--preflight-only", action="store_true")
+    cli.add_argument("--detail-policy", choices=("source_union_q50", "local_half_q50"),
+                     default="source_union_q50")
     args = cli.parse_args()
     result = execute(args)
     raise SystemExit(0 if args.preflight_only or result["status"] == "COMPLETED" else 3)

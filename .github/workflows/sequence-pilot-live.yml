@@ -1,4 +1,4 @@
-name: Resume one unresolved fresh-source outcome
+name: Resume outcome with continuous local source detail
 
 on:
   pull_request:
@@ -18,7 +18,7 @@ jobs:
       github.event.pull_request.number == 39 &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.event.pull_request.head.ref == 'codex/sequence-pilot-foundation' &&
-      github.event.before == '039815cf5aba44498cc9ac211ac680df5f759d11' &&
+      github.event.before == '37d4c4f26045ce409fbe500ed692622ec730d06c' &&
       github.run_attempt == 1
     runs-on: ubuntu-latest
     timeout-minutes: 14
@@ -90,7 +90,7 @@ jobs:
       - name: Verify thirteen previous requests and read one unresolved terminal outcome
         env:
           EMERGENT_LLM_KEY: ${{ secrets.EMERGENT_LLM_KEY }}
-        run: python -u backend/scripts/resume_fresh_outcome.py --prepared "$RUNNER_TEMP/sequence-pilot-prepared/manifest.json" --output "$RUNNER_TEMP/sequence-pilot-result" --initial docs/examples/fresh-whole-source-initial-receipts.json --reviews docs/examples/fresh-whole-source-review-receipts.json
+        run: python -u backend/scripts/resume_fresh_outcome.py --prepared "$RUNNER_TEMP/sequence-pilot-prepared/manifest.json" --output "$RUNNER_TEMP/sequence-pilot-result" --initial docs/examples/fresh-whole-source-initial-receipts.json --reviews docs/examples/fresh-whole-source-review-receipts.json --detail-policy local_half_q50
       - name: Evaluate returned observations separately and print actual receipts
         if: always()
         run: |
