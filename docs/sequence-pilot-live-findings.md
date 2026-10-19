@@ -1179,3 +1179,11 @@ not injected into this trial. No merge or deployment.
 Actual run 39179116053 failed during review preparation after ten completed
 model calls. See `fresh-source-continuation.md` for the original failed result,
 the exact-input continuation, parser/source-clock correction and timing limits.
+
+
+Fresh continuation update: run 39180556938 returned goal + three assists, no
+extra scoring event, but the selected shot's keeper touch was UNKNOWN: 4/5.
+The three raw new receipts and result are retained in
+`examples/fresh-whole-source-review-receipts.json`. See
+`fresh-source-continuation.md` for measured timing, sparse outcome coverage and
+the bounded second continuation. No merge or deployment.

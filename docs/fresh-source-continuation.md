@@ -55,3 +55,39 @@ and refusal after a payload-hash change. These are code tests, not new model
 approvals. The continuation has a 300s budget and at most six new calls; the
 current plan has three. The prior 455.956s and continuation timing remain
 separate. No merge or deployment.
+
+## Actual continuation: four of five, not a pass
+
+Run 39180556938 completed three new reviews (57.731, 80.639 and 91.717s),
+with zero repeated initial calls. Analysis took 161.277s; continuation source
+processing took 175.232s. It matched the selected goal and all three assists,
+removed the erroneous middle selected-player goal, and retained no extra scoring
+events or identity conflicts. The middle release bracket is 49.631–50.265s;
+this broader actual bracket is not replaced with the earlier separate trial's
+more precise result. The finisher is a distinct white teammate, number unreadable.
+The earlier left/right-foot disagreement remains unresolved.
+
+The saved-shot review identifies selected #15 as the shooter but says UNKNOWN
+for the outcome and explicitly asks CONTACT and OUTCOME. The previous initial
+SAVED answer remains in the audit; the newer uncertainty is not suppressed.
+Inspection shows the goalkeeper and goal are inside the delivered local strip:
+a claim that the crop removed the goalkeeper would be incorrect. However, the
+native continuous detail ends at 23.966s, before the keeper encounter, followed
+by sparse aftermath images. Missing temporal detail is a plausible limitation,
+not a proven cause of the model's disagreement. Raw receipts, result and separate
+reference evaluation are in fresh-whole-source-review-receipts.json.
+
+A bounded second continuation verifies all ten initial and three review request
+payload hashes and raw-response hashes, reproduces the exact four-of-five result,
+then derives one new request from the unique explicit selected-shot OUTCOME gap.
+It includes every native source instant from contact-before minus 100ms through
+contact-after plus 1500ms (23.566–25.249s in this actual navigation), full-play
+overviews and all original selections. The wider vertical band is computed from
+the union of original selections, not the known goalkeeper location. Previous
+answers, human event timestamps and evaluator cases are absent from the new
+request. Offline preflight reproduces all thirteen prior payloads, gives 166
+images / 17,558,067 request bytes, and sends no calls. The new run permits only
+one GPT-6-astra medium request, with a 120s per-call limit. Its result replaces
+the prior terminal review only in the active view; prior observations and raw
+receipts remain available. This is still a continuation, not a cold end-to-end
+benchmark. 261 prior checks and three new navigation/refusal tests pass.
