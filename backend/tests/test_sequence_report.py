@@ -93,7 +93,9 @@ def test_empty_retained_proofs_prevent_ready_before_encoding(tmp_path):
 
 
 def synthetic_report_worker(pipe, job, provider, model, timeout):
-    assert provider == "emergent" and model == "gemini-2.5-pro" and timeout >= 179
+    assert provider == "emergent" and model in {"gemini-2.5-pro", "gpt-6-astra"} and timeout >= 179
+    if model == "gpt-6-astra":
+        assert job["reasoning_effort"] == "low"
     assert job["max_output_tokens"] == 32768
     pipe.send({"status": "COMPLETED", "packet_id": job["packet_id"],
                "raw_response": json.dumps({"summary": "Synthetic transport boundary test",
@@ -101,7 +103,9 @@ def synthetic_report_worker(pipe, job, provider, model, timeout):
     pipe.close()
 
 
-def test_writer_180_second_budget_reaches_owned_transport_without_network(monkeypatch):
+@pytest.mark.parametrize("model", ["gemini-2.5-pro", "gpt-6-astra"])
+def test_writer_180_second_budget_reaches_owned_transport_without_network(monkeypatch, model):
+    monkeypatch.setenv("SEQUENCE_REPORT_WRITER_MODEL", model)
     real = runtime.transport.run_jobs
     def synthetic_jobs(jobs, provider, model, **kwargs):
         return real(jobs, provider, model, **kwargs, worker=synthetic_report_worker)
@@ -178,6 +182,21 @@ def test_unbound_comment_and_inexact_source_image_are_not_proof(retained):
     assert not row["proof_verified"]
 
 
+def test_verified_skill_uses_exact_event_id_despite_rounded_display_time(retained):
+    b = bundle(retained)
+    event = next(e for e in b["events"] if e["canonical_event_type"] == "ASSIST")
+    prose = {"summary": "Actions", "technical": {"passing": {"score": 7, "evidence": [
+        {"event_id": event["event_id"], "timestamp": "00:44", "what": "Assist"}]}},
+        "snapshot_moments": [{"event_id": event["event_id"], "timestamp": "00:44", "what": "Invented",
+                              "canonical_event_ids": [event["event_id"]], "identity_verified": True}]}
+    f = adapter.build_report(prose, b)
+    row = f["technical"]["passing"]["evidence"][0]
+    image = next(c for c in f["video_comments"] if c["event_id"] == event["event_id"])
+    assert row["evidence_id"] == image["evidence_id"] and row["proof_verified"] is True
+    assert row["evidence_time_ms"] == image["evidence_time_ms"]
+    assert f["snapshot_moments"][0]["proof_verified"] is False
+
+
 @pytest.mark.parametrize("fail_assets", [False, True])
 def test_actual_server_bypasses_legacy_and_never_readies_failed_assets(tmp_path, retained, monkeypatch, fail_assets):
     monkeypatch.setenv("FULL_REPORT_ENGINE", "sequence_v1")
@@ -230,6 +249,14 @@ def test_missing_original_taps_stops_before_discovery(tmp_path):
     async def forbidden(*args):
         pytest.fail("No model calls without original positive selections")
     with pytest.raises(ValueError, match="ORIGINAL_SELECTIONS_REQUIRED"):
+        asyncio.run(runtime.generate(tmp_path / "none.mp4", {}, template="unused", discovery=forbidden))
+
+
+def test_unknown_writer_configuration_stops_before_paid_source_work(tmp_path, monkeypatch):
+    monkeypatch.setenv("SEQUENCE_REPORT_WRITER_MODEL", "unapproved-model")
+    async def forbidden(*args):
+        pytest.fail("Invalid writer configuration must stop before discovery")
+    with pytest.raises(ValueError, match="WRITER_MODEL_NOT_VALIDATED"):
         asyncio.run(runtime.generate(tmp_path / "none.mp4", {}, template="unused", discovery=forbidden))
 
 

@@ -80,13 +80,23 @@ async def discover(video, anchors_document, work):
     return result, manifest, receipts
 
 
+def writer_model():
+    model = os.environ.get("SEQUENCE_REPORT_WRITER_MODEL", "gemini-2.5-pro").strip()
+    if model not in {"gemini-2.5-pro", "gpt-6-astra"}:
+        raise ValueError("SEQUENCE_REPORT_WRITER_MODEL_NOT_VALIDATED")
+    return model
+
+
 async def write_facts(prompt):
-    """Same Gemini report model/schema; bounded text-only transport, no SDK state."""
+    """Explicitly selected text writer; no automatic network/model fallback."""
+    model = writer_model()
     receipts = []
     for attempt in range(2):
         jobs = [{"packet_id": f"report_facts_{attempt+1}", "max_output_tokens": 32768,
                  "items": [{"type": "text", "text": prompt}]}]
-        rows = await asyncio.to_thread(transport.run_jobs, jobs, "emergent", "gemini-2.5-pro",
+        if model == "gpt-6-astra":
+            jobs[0]["reasoning_effort"] = "low"
+        rows = await asyncio.to_thread(transport.run_jobs, jobs, "emergent", model,
                                        deadline=time.monotonic()+195, per_call_s=180)
         receipt = rows[0]
         receipts.append(receipt)
@@ -115,6 +125,8 @@ class ReportWriterFailure(RuntimeError):
 
 async def generate(video, doc, *, template, writer=write_facts, discovery=discover, checkpoint=None):
     started = time.monotonic()
+    if writer is write_facts:
+        writer_model()  # reject unknown configuration before paid discovery
     if doc.get("anchor_time_offset") not in (None, 0, 0.):
         raise ValueError("SEQUENCE_NONZERO_ANCHOR_OFFSET_NOT_VALIDATED")
     # Raw original selection only; never re-use an inferred identity profile.

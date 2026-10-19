@@ -4,10 +4,11 @@ Contact brackets remain brackets. Visual actor attribution is never presented
 as a measured player box. Completed calls do not establish exhaustive coverage.
 """
 from copy import deepcopy
+from collections import Counter
 import hashlib
 
 from canonical_output_authority import project_event
-from evidence_authority import attach_event_evidence_authority, apply_fail_closed_proof_authority
+from evidence_authority import attach_event_evidence_authority, apply_fail_closed_proof_authority, _iter_structured_rows
 from verified_stats import apply_verified_stats_authority
 
 ENGINE = "SEQUENCE_V1"
@@ -107,6 +108,10 @@ def build_report(prose, bundle):
     if not isinstance(prose, dict) or not prose:
         raise ValueError("SEQUENCE_REPORT_WRITER_INVALID")
     full = deepcopy(prose)
+    for row in _iter_structured_rows(full):
+        if isinstance(row, dict):
+            for key in ("evidence_id", "proof_verified", "identity_verified", "canonical_event_ids"):
+                row.pop(key, None)
     weak_foot = (full.get("technical") or {}).get("weak_foot")
     if isinstance(weak_foot, dict):
         # The sequence contract has no verified anatomical side. A writer's
@@ -141,11 +146,24 @@ def build_report(prose, bundle):
         })
     priority = {e["event_id"]: (0 if e["canonical_event_type"] in {"GOAL", "ASSIST", "SHOT"} else 1)
                 for e in bundle["events"]}
-    full["video_comments"] = sorted(full["video_comments"], key=lambda c: (priority[c["event_id"]], c["evidence_time_ms"]))[:8]
+    mentions = Counter(row.get("event_id") for row in _iter_structured_rows(full) if isinstance(row, dict))
+    full["video_comments"] = sorted(full["video_comments"],
+        key=lambda c: (priority[c["event_id"]], -mentions[c["event_id"]], c["evidence_time_ms"]))[:8]
     full["_scoring_scan"] = {"performed": True, "coverage_complete": False,
                               "coverage_status": "PARTIAL", "authority": ENGINE}
     attach_event_evidence_authority(full)
     full = apply_verified_stats_authority(full)
+    by_event = {c["event_id"]: c for c in full["video_comments"]}
+    for row in _iter_structured_rows(full):
+        if not isinstance(row, dict):
+            continue
+        row.pop("evidence_id", None)  # a rounded timestamp is not a semantic join
+        event_id = row.get("event_id")
+        if (event_id in by_event and row.get("canonical_event_ids") == [event_id]
+                and row.get("identity_verified") is True):
+            evidence = by_event[event_id]
+            row.update(evidence_id=evidence["evidence_id"], evidence_time_ms=evidence["evidence_time_ms"],
+                       timestamp=evidence["timestamp"])
     if any(e["canonical_action_type"] == "PASS" and e["canonical_outcome"] not in
            {"COMPLETED", "INCOMPLETE", "TEAMMATE_GOAL"} for e in bundle["events"]):
         # An observed attempt with an unseen result is not a failed pass.

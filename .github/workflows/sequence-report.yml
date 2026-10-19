@@ -28,13 +28,13 @@ jobs:
       - run: python -m pip install 'numpy<3' 'opencv-python-headless<5' 'Pillow>=10,<15' 'pytest>=8,<10' 'python-dotenv>=1,<2'
       - run: python -m pytest backend/tests/test_sequence_report.py -q
 
-  checkpoint_report_completion:
+  gpt_report_completion:
     if: >-
       github.repository == '9m92yk9snt-star/VedoScout' &&
       github.event.pull_request.number == 39 &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.event.pull_request.head.ref == 'codex/sequence-pilot-foundation' &&
-      github.event.before == '48f905ffa843bd3b722318d28bba31f189dc3686' &&
+      github.event.before == 'a3e919adab32b0dd8f6372ea689c0d3b8b99cfc1' &&
       github.run_attempt == 1
     runs-on: ubuntu-latest
     timeout-minutes: 25
@@ -78,6 +78,7 @@ jobs:
       - name: Actual facts report and source proofs from retained verified observations
         env:
           EMERGENT_LLM_KEY: ${{ secrets.EMERGENT_LLM_KEY }}
+          SEQUENCE_REPORT_WRITER_MODEL: gpt-6-astra
         run: >-
           python -u backend/scripts/run_sequence_report_trial.py
           --video "$RUNNER_TEMP/report-source/video/source.mp4"
