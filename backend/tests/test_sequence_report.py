@@ -40,6 +40,11 @@ def test_real_receipts_preserve_scoring_roles_brackets_and_partial_coverage(reta
     assert f["verified_stats"]["goals_assists_available"] is False
     assert f["match_stats"]["coverage_status"] == "PARTIAL"
     assert "speed_metrics" not in f
+    assert f["match_stats"]["dribbles_attempted"] is None
+    assert f["match_stats"]["successful_dribbles"] is None
+    assert f["match_stats"]["recoveries"] == 1
+    assert f["match_stats"]["pass_completion_pct"] is None
+    assert f["match_stats"]["duels_won"] is None
     assert all(c["sequence_event_native"] and c["proof_verified"] for c in f["video_comments"])
     assert not any(e["actor_spatial_verified"] for e in f["action_timeline"])
     shot = next(e for e in b["events"] if e["canonical_outcome"] == "SAVED")
@@ -89,6 +94,7 @@ def test_empty_retained_proofs_prevent_ready_before_encoding(tmp_path):
 
 def synthetic_report_worker(pipe, job, provider, model, timeout):
     assert provider == "emergent" and model == "gemini-2.5-pro" and timeout >= 179
+    assert job["max_output_tokens"] == 32768
     pipe.send({"status": "COMPLETED", "packet_id": job["packet_id"],
                "raw_response": json.dumps({"summary": "Synthetic transport boundary test",
                     "technical": {}, "tactical": {}, "physical": {}, "mentality": {}, "scores": {}})})
@@ -105,6 +111,11 @@ def test_writer_180_second_budget_reaches_owned_transport_without_network(monkey
     assert len(result["receipts"]) == 1
     with pytest.raises(ValueError, match="INVALID_EXECUTION_BUDGET"):
         real([], "emergent", "gemini-2.5-pro", deadline=time.monotonic()+1, per_call_s=211)
+    _, payload, _ = runtime.transport.build_request("emergent", "gemini-2.5-pro",
+        [{"type": "text", "text": "Synthetic report"}], max_output_tokens=32768)
+    assert json.loads(payload)["max_tokens"] == 32768
+    with pytest.raises(ValueError, match="INVALID_OUTPUT_TOKEN_BUDGET"):
+        runtime.transport.build_request("emergent", "gemini-2.5-pro", [], max_output_tokens=32769)
 
 
 def test_writer_failure_keeps_paid_source_receipts_before_temp_cleanup(tmp_path, retained, monkeypatch):
@@ -113,7 +124,8 @@ def test_writer_failure_keeps_paid_source_receipts_before_temp_cleanup(tmp_path,
     async def discovery(*args):
         return retained["result"], retained["replay_context"], retained["receipts"]
     async def writer(prompt):
-        raise RuntimeError("SYNTHETIC_WRITER_FAILURE")
+        raise runtime.ReportWriterFailure("SYNTHETIC_WRITER_FAILURE", [
+            {"status": "ERROR", "error": "MODEL_QUOTA_OR_RATE_LIMIT", "http_status": 429}])
     saved = []
     async def checkpoint(values):
         saved.append(deepcopy(values))
@@ -121,9 +133,10 @@ def test_writer_failure_keeps_paid_source_receipts_before_temp_cleanup(tmp_path,
     with pytest.raises(RuntimeError, match="SYNTHETIC_WRITER_FAILURE"):
         asyncio.run(runtime.generate(tmp_path / "video.mp4", {"raw_marker_anchors": raw},
                     template=ns["FULL_REPORT_PROMPT"], discovery=discovery, writer=writer, checkpoint=checkpoint))
-    assert len(saved) == 2
+    assert len(saved) == 3
     assert len(saved[-1]["sequence_audit"]["receipts"]) == 13
-    assert saved[-1]["canonical_events"]["events"]
+    assert any(s.get("canonical_events", {}).get("events") for s in saved)
+    assert saved[-1]["sequence_audit"]["writer_receipts"][0]["http_status"] == 429
     assert "full_report" not in saved[-1]
 
 

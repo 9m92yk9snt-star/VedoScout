@@ -24,12 +24,15 @@ MAX_RESPONSE_BYTES = 2_000_000
 MAX_CALL_SECONDS = 210.
 
 
-def build_request(provider, model, items, *, reasoning_effort=None, image_detail=None):
+def build_request(provider, model, items, *, reasoning_effort=None, image_detail=None, max_output_tokens=None):
     if provider not in KEY_ENV or not re.fullmatch(r"[A-Za-z0-9_./-]+", model):
         raise ValueError("INVALID_MODEL_PROVIDER")
     gemini3 = model.removeprefix("gemini/").startswith("gemini-3")
     if image_detail not in {None, "high"}:
         raise ValueError("INVALID_IMAGE_DETAIL")
+    if max_output_tokens is not None and (type(max_output_tokens) is not int or not 1024 <= max_output_tokens <= 32768):
+        raise ValueError("INVALID_OUTPUT_TOKEN_BUDGET")
+    output_limit = max_output_tokens if max_output_tokens is not None else 16384
     parts, content, image_audit, video_audit = [], [], [], []
     for item in items:
         if item["type"] == "text":
@@ -63,14 +66,14 @@ def build_request(provider, model, items, *, reasoning_effort=None, image_detail
     if provider == "gemini":
         url = "https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent"
         body = {"contents": [{"role": "user", "parts": parts}], "generationConfig": {
-            "temperature": 0, "responseMimeType": "application/json", "maxOutputTokens": 16384}}
+            "temperature": 0, "responseMimeType": "application/json", "maxOutputTokens": output_limit}}
         if image_detail:
             body["generationConfig"]["mediaResolution"] = "MEDIA_RESOLUTION_HIGH"
     else:
         url = "https://integrations.emergentagent.com/llm/chat/completions"
         wire_model = "gemini/" + model if model.startswith("gemini-") else model
         body = {"model": wire_model, "messages": [{"role": "user", "content": content}],
-                "temperature": 0, "response_format": {"type": "json_object"}, "max_tokens": 16384}
+                "temperature": 0, "response_format": {"type": "json_object"}, "max_tokens": output_limit}
     if gemini3:
         # Google recommends its default temperature for Gemini 3 reasoning.
         (body["generationConfig"] if provider == "gemini" else body).pop("temperature", None)
@@ -124,7 +127,8 @@ def _worker(connection, job, provider, model, timeout_s):
         if not key:
             raise ValueError("MODEL_KEY_NOT_CONFIGURED")
         url, payload, prepared = build_request(provider, model, job["items"],
-            reasoning_effort=job.get("reasoning_effort"), image_detail=job.get("image_detail"))
+            reasoning_effort=job.get("reasoning_effort"), image_detail=job.get("image_detail"),
+            max_output_tokens=job.get("max_output_tokens"))
         audit["requested_reasoning_effort"] = job.get("reasoning_effort")
         audit.update(prepared)
         headers = {"Content-Type": "application/json"}

@@ -69,18 +69,38 @@ def server_harness(video, doc, directory, *, runtime=sequence_report_runtime):
     return namespace, store, trace, notifications
 
 
-async def trial(video, anchors, output, *, player_details=None):
+async def trial(video, anchors, output, *, player_details=None, source_receipts=None):
     output.mkdir(parents=True, exist_ok=False)
     os.environ["FULL_REPORT_ENGINE"] = "sequence_v1"
     doc = {"id": "sequence-full-report-trial", "raw_marker_anchors": anchors["raw_marker_anchors"],
            "anchors": [], "player_details": player_details or {}, "is_paid": False}
-    ns, store, trace, suppressed = server_harness(video, doc, output)
+    if source_receipts:
+        import hashlib
+        retained = json.loads(source_receipts.read_text())
+        audit = retained["sequence_audit"]
+        selection_sha = hashlib.sha256(json.dumps({"raw_marker_anchors": anchors["raw_marker_anchors"]}, sort_keys=True).encode()).hexdigest()
+        if audit.get("original_selection_values_sha256") != selection_sha:
+            raise ValueError("REPLAY_ORIGINAL_SELECTIONS_CHANGED")
+        async def replay_source(*args):
+            manifest = {"source_video_sha256": audit["source_video_sha256"],
+                        "original_taps_sha256": audit["original_taps_sha256"],
+                        "frames": audit["source_frames"], "references": audit["references"]}
+            return deepcopy(audit["result"]), manifest, deepcopy(audit["receipts"])
+        async def generate_from_checkpoint(*args, **kwargs):
+            return await sequence_report_runtime.generate(*args, **kwargs, discovery=replay_source)
+        engine = SimpleNamespace(enabled=sequence_report_runtime.enabled, generate=generate_from_checkpoint,
+                                 persist_assets=sequence_report_runtime.persist_assets)
+    else:
+        engine = sequence_report_runtime
+    ns, store, trace, suppressed = server_harness(video, doc, output, runtime=engine)
     started = time.monotonic()
     await ns["generate_full_report_task"](doc["id"])
     wall = round(time.monotonic()-started, 3)
     (output / "report-document.json").write_text(json.dumps(store.doc, indent=2))
     full = store.doc.get("full_report") or {}
     summary = {"status": store.doc.get("full_report_status"), "total_wall_seconds": wall,
+               "source_discovery_replayed": bool(source_receipts),
+               "fresh_end_to_end_timing": not bool(source_receipts),
                "timings": store.doc.get("sequence_timings"), "states": store.states,
                "source_video_sha256": (store.doc.get("canonical_events") or {}).get("source_video_sha256"),
                "verified_stats": full.get("verified_stats"), "match_stats": full.get("match_stats"),
@@ -104,6 +124,8 @@ if __name__ == "__main__":
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--age", type=int)
     parser.add_argument("--position")
+    parser.add_argument("--source-receipts", type=Path, help="Sandbox report-stage replay only; never fresh end-to-end timing")
     args = parser.parse_args()
     details = {k: v for k, v in {"age": args.age, "position": args.position}.items() if v is not None}
-    asyncio.run(trial(args.video, json.loads(args.anchors.read_text()), args.output, player_details=details))
+    asyncio.run(trial(args.video, json.loads(args.anchors.read_text()), args.output, player_details=details,
+                      source_receipts=args.source_receipts))

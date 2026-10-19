@@ -28,13 +28,13 @@ jobs:
       - run: python -m pip install 'numpy<3' 'opencv-python-headless<5' 'Pillow>=10,<15' 'pytest>=8,<10' 'python-dotenv>=1,<2'
       - run: python -m pytest backend/tests/test_sequence_report.py -q
 
-  cold_full_report:
+  checkpoint_report_completion:
     if: >-
       github.repository == '9m92yk9snt-star/VedoScout' &&
       github.event.pull_request.number == 39 &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.event.pull_request.head.ref == 'codex/sequence-pilot-foundation' &&
-      github.event.before == '9e14e38103f5e721501efebef8bbe6ab8e26f184' &&
+      github.event.before == '48f905ffa843bd3b722318d28bba31f189dc3686' &&
       github.run_attempt == 1
     runs-on: ubuntu-latest
     timeout-minutes: 25
@@ -75,7 +75,7 @@ jobs:
                   assert hashlib.file_digest(stream, 'sha256').hexdigest() == expected
           print('Original source and taps verified; no old report/model results loaded.')
           PY
-      - name: Actual source discovery, facts report, source proofs and READY
+      - name: Actual facts report and source proofs from retained verified observations
         env:
           EMERGENT_LLM_KEY: ${{ secrets.EMERGENT_LLM_KEY }}
         run: >-
@@ -84,6 +84,7 @@ jobs:
           --anchors "$RUNNER_TEMP/report-source/anchors.json"
           --output "$RUNNER_TEMP/full-report-trial"
           --age 11 --position Winger
+          --source-receipts docs/examples/sequence-report-source-checkpoint.json
       - name: Preserve actual report receipts and evaluate after generation
         if: always()
         run: |

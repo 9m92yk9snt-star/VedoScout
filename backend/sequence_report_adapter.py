@@ -122,6 +122,13 @@ def build_report(prose, bundle):
         row = project_event(e)
         row.update(event_source="sequence_v1", actor_spatial_verified=False, actor_visual_verified=True,
                    contact_ms=e["contact_ms"], contact_interval_ms=e["contact_interval_ms"])
+        if e["canonical_action_type"] == "DRIBBLE":
+            # Pilot DRIBBLE includes uncontested carries. Neither a completed
+            # carry nor missing take-on evidence establishes a won/lost 1v1.
+            row.update(canonical_action_type="OTHER", canonical_event_type="OTHER",
+                       stat_mapping_status="CARRY_VS_TAKE_ON_UNRESOLVED")
+        if e["canonical_action_type"] == "RECOVERY" and e["canonical_outcome"] == "COMPLETED":
+            row["canonical_result"] = "POSSESSION_WON"
         full["action_timeline"].append(row)
         full["video_comments"].append({
             "event_id": e["event_id"], "timestamp": row["timestamp"],
@@ -139,4 +146,19 @@ def build_report(prose, bundle):
                               "coverage_status": "PARTIAL", "authority": ENGINE}
     attach_event_evidence_authority(full)
     full = apply_verified_stats_authority(full)
+    if any(e["canonical_action_type"] == "PASS" and e["canonical_outcome"] not in
+           {"COMPLETED", "INCOMPLETE", "TEAMMATE_GOAL"} for e in bundle["events"]):
+        # An observed attempt with an unseen result is not a failed pass.
+        full["match_stats"]["pass_completion_pct"] = None
+        full["verified_stats"]["pass_completion_pct"] = None
+    if any(e["canonical_action_type"] == "DUEL" and e["canonical_outcome"] not in
+           {"WON", "LOST"} for e in bundle["events"]):
+        full["match_stats"]["duels_won"] = None
+        full["verified_stats"]["stats_completeness"]["duels"] = "only_resolved_outcomes_counted"
+    if any(e["canonical_action_type"] == "DRIBBLE" for e in bundle["events"]):
+        for key in ("dribbles_attempted", "successful_dribbles"):
+            full["match_stats"][key] = None
+            full["verified_stats"][key] = None
+            full["verified_stats"]["observed_counts"][key] = None
+        full["verified_stats"]["stats_completeness"]["dribbles"] = "carry_vs_take_on_unresolved"
     return apply_fail_closed_proof_authority(full)

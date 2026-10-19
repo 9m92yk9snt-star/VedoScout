@@ -84,13 +84,14 @@ async def write_facts(prompt):
     """Same Gemini report model/schema; bounded text-only transport, no SDK state."""
     receipts = []
     for attempt in range(2):
-        jobs = [{"packet_id": f"report_facts_{attempt+1}", "items": [{"type": "text", "text": prompt}]}]
+        jobs = [{"packet_id": f"report_facts_{attempt+1}", "max_output_tokens": 32768,
+                 "items": [{"type": "text", "text": prompt}]}]
         rows = await asyncio.to_thread(transport.run_jobs, jobs, "emergent", "gemini-2.5-pro",
                                        deadline=time.monotonic()+195, per_call_s=180)
         receipt = rows[0]
         receipts.append(receipt)
         if receipt.get("status") != "COMPLETED":
-            raise RuntimeError("SEQUENCE_REPORT_WRITER_FAILED")
+            raise ReportWriterFailure("SEQUENCE_REPORT_WRITER_FAILED", receipts)
         try:
             text = receipt["raw_response"].strip()
             if text.startswith("```"):
@@ -102,8 +103,14 @@ async def write_facts(prompt):
             return {"report": prose, "receipts": receipts}
         except ValueError:
             if attempt:
-                raise ValueError("SEQUENCE_REPORT_WRITER_INVALID")
+                raise ReportWriterFailure("SEQUENCE_REPORT_WRITER_INVALID", receipts)
             prompt = "Return ONLY one valid JSON object, without markdown.\n" + prompt
+
+
+class ReportWriterFailure(RuntimeError):
+    def __init__(self, code, receipts):
+        super().__init__(code)
+        self.receipts = receipts
 
 
 async def generate(video, doc, *, template, writer=write_facts, discovery=discover, checkpoint=None):
@@ -142,7 +149,13 @@ async def generate(video, doc, *, template, writer=write_facts, discovery=discov
         if checkpoint:
             await checkpoint({"canonical_events": bundle, "sequence_audit": audit,
                               "sequence_timings": {"source_analysis_seconds": round(observed-started, 3)}})
-        written = await asyncio.wait_for(writer(prompt), timeout=420)
+        try:
+            written = await asyncio.wait_for(writer(prompt), timeout=420)
+        except ReportWriterFailure as exc:
+            audit["writer_receipts"] = exc.receipts
+            if checkpoint:
+                await checkpoint({"sequence_audit": audit})
+            raise
         full = adapter.build_report(written["report"], bundle)
         # Store replayable raw model receipts with the report, not ephemeral paths.
         audit["writer_receipts"] = written["receipts"]
