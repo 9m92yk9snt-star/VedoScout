@@ -116,11 +116,11 @@ UPLOAD_DIR.mkdir(exist_ok=True)
 # Bump this whenever PDF rendering changes (new sections, layout shifts, etc.).
 # Each PDF is cached on disk keyed by report_id + this version, so a bump
 # invalidates every stale PDF without losing the current ones.
-PDF_RENDER_VERSION = 27  # Remove template markers; show evidence coverage and score availability.
+PDF_RENDER_VERSION = 28  # Shared publication facts, observed scores and complete evidence appendix.
 
 
-def _pdf_cache_path(report_id: str, shared: bool = False) -> Path:
-    suffix = ".shared" if shared else ""
+def _pdf_cache_path(report_id: str, shared: bool = False, revision: str | None = None) -> Path:
+    suffix = (f".{revision}" if revision else "") + (".shared" if shared else "")
     return PDF_DIR / f"{report_id}.v{PDF_RENDER_VERSION}{suffix}.pdf"
 
 
@@ -7445,6 +7445,10 @@ async def _serialize_report(doc: dict, include_full: bool) -> dict:
         # Generate share card lazily — use enriched archetype for the card.
         share_doc = {**doc, "archetype": out.get("archetype")}
         out["share_card_url"] = ensure_share_card(share_doc)
+    if include_full:
+        from report_publication import publish_report
+        out = publish_report({**out, **{key: doc.get(key) for key in (
+            "analysis_engine", "canonical_events", "video_duration_sec", "full_generated_at", "full_report_run_finished_at")}})
     return out
 
 
@@ -12180,8 +12184,11 @@ def _ensure_report_pdf(doc: dict, shared: bool = False) -> Path:
     """Build (or reuse) the cached V2 PDF for a report doc. Shared by the
     authenticated download, the public sample and public share links.
     shared=True renders the variant with the marketing strip on page 3."""
+    from report_publication import publish_report
+    doc = publish_report(doc)
     report_id = doc["id"]
-    pdf_path = _pdf_cache_path(report_id, shared=shared)
+    revision = (doc.get("report_publication") or {}).get("content_sha256", "")[:12] or None
+    pdf_path = _pdf_cache_path(report_id, shared=shared, revision=revision)
     if pdf_path.exists():
         return pdf_path
     _purge_stale_pdfs(report_id)
@@ -12313,11 +12320,13 @@ async def download_player_card(report_id: str, user=Depends(get_current_user)):
 
 # ============== SHAREABLE SNAPSHOT MOMENT CARD (PNG, 1080x1350) ==============
 
-SNAP_CARD_VERSION = 2  # Render evidence labels instead of position-based skill claims.
+SNAP_CARD_VERSION = 3  # Render evidence labels instead of position-based skill claims.
 _SNAP_KEYS = {"strength", "noticed", "hidden", "develop"}
 
 
 async def _build_snapshot_card_file(doc: dict, key: str) -> Path:
+    from report_publication import publish_report
+    doc = publish_report(doc)
     path = CARDS_DIR / f"{doc['id']}.snap.{key}.v{SNAP_CARD_VERSION}.png"
     if not path.exists():
         from snapshot_card import build_snapshot_card

@@ -49,21 +49,21 @@ export function MatchStatsCard({ matchStats, coverageNote }) {
   );
 }
 
-export function AgeComparisonCard({ ageComparison, ageBracket }) {
+export function AgeComparisonCard({ ageComparison, ageBracket, rubric = false }) {
   if (!ageComparison?.length) return null;
   return (
     <V2Card testid="v2-age-comparison-card">
-      <V2Title icon={Medal}>Comparison To Players Your Age{ageBracket ? ` (${ageBracket})` : ""}</V2Title>
+      <V2Title icon={Medal}>{rubric ? "Academy rubric reference" : "Comparison To Players Your Age"}{ageBracket ? ` (${ageBracket})` : ""}</V2Title>
       {ageComparison.map((c, i) => (
         <div key={i} className={`flex items-center gap-3 py-[10px] ${i < ageComparison.length - 1 ? "border-b border-[#EFEADB]" : ""}`}>
           <div className="text-[13px] font-semibold w-[130px] shrink-0 truncate">{c.name}</div>
           <div className="flex-1 h-[6px] bg-[#EDE8DA] rounded-full overflow-hidden">
             <div className="h-full rounded-full bg-gradient-to-r from-[#7BA05B] to-[#12402A]" style={{ width: `${c.width}%` }} />
           </div>
-          <div className="text-[13px] font-extrabold text-[#12402A] w-[64px] text-right">{c.label}</div>
+          <div className="text-[13px] font-extrabold text-[#12402A] w-[100px] text-right">{c.label}</div>
         </div>
       ))}
-      <div className="text-[10.5px] text-[#93A08F] mt-2.5">These bars show how your child compares to other players his age.</div>
+      <div className="text-[10.5px] text-[#93A08F] mt-2.5">{rubric ? "Bars show scores on the coaching rubric, not population percentiles." : "These bars show how your child compares to other players his age."}</div>
     </V2Card>
   );
 }

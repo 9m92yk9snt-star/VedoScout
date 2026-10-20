@@ -35,6 +35,8 @@ CONFIG_KEYS = ("FULL_REPORT_ENGINE", "IDENTITY_TIMELINE_ENABLED", "IDENTITY_TIME
                "FIX10A_SUPPORT_VISION_MODEL", "FIX10A_MAX_JERSEY_READS", "FIX10A_MAX_ROLE_TRACKS",
                "FIX10A_MAX_ROLE_FRAMES", "FIX10A_MAX_GOAL_FRAMES", "FIX15_MAX_DENSE_GOAL_FRAMES")
 SOURCE_MODULES = (
+    "report_publication.py", "pdf_v2.py", "score_meaning.py", "score_context.py", "snapshot_card.py", "progression.py",
+    "scripts/review_report_publication.py",
     "sequence_report_adapter.py", "sequence_report_runtime.py", "sequence_pilot.py", "sequence_pilot_transport.py",
     "scripts/run_sequence_pilot.py",
     "source_frame_cache.py", "analysis_jobs.py", "ordered_vision_reviews.py",
@@ -292,6 +294,15 @@ def build_export(doc, output, *, upload_dir, source_root, environment="unspecifi
                 add_stream(name, io.BytesIO(payload), len(payload), compressed=True)
 
             add_json("report.json", cleaned)
+            if doc.get("analysis_engine") == "SEQUENCE_V1":
+                from report_publication import publish_report
+                published = publish_report(cleaned)
+                if published.get("report_publication"):
+                    add_json("publication/current.json", {
+                        "note": "Read-only projection using code at export; not a historical stored model response. Raw report.json is retained unchanged.",
+                        "report_publication": published["report_publication"],
+                        "full_report": published["full_report"], "score_meaning": published.get("score_meaning"),
+                    })
             add_json("anchors.json", {"raw_marker_anchors": cleaned.get("raw_marker_anchors"),
                 "raw_marker_box": cleaned.get("raw_marker_box"),
                 "marker_timestamp": cleaned.get("marker_timestamp"), "anchors": cleaned.get("anchors"),

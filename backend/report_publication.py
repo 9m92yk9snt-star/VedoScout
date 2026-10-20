@@ -1,0 +1,381 @@
+"""Read-only publication of Sequence reports. No perception, persistence or model calls.
+
+The observed score averages retained, event-bound assessment grades; it does not
+turn a highlight clip into a full-match grade or an empirical percentile.
+"""
+from copy import deepcopy
+from datetime import datetime
+from decimal import Decimal, ROUND_HALF_UP
+import hashlib
+import json
+import math
+import re
+from zoneinfo import ZoneInfo
+
+VERSION = 1
+CATEGORIES = ('technical', 'tactical', 'physical', 'mentality')
+EXPECTED_SKILLS = {
+    'technical': ('first_touch', 'ball_control', 'dribbling', 'passing', 'shooting', 'weak_foot', 'one_v_one'),
+    'tactical': ('positioning', 'off_ball_movement', 'scanning', 'decision_making', 'timing_of_runs', 'game_understanding'),
+    'physical': ('acceleration', 'speed', 'balance', 'agility', 'intensity', 'body_control'),
+    'mentality': ('confidence', 'work_rate', 'courage_in_duels', 'response_to_mistakes', 'competitive_mindset', 'focus'),
+}
+LABELS = {'one_v_one': '1v1 Attacking', 'competitive_mindset': 'Competitive Mindset'}
+EMPHASIS = {
+    'goalkeeper': {'positioning', 'decision_making', 'focus', 'body_control', 'courage_in_duels'},
+    'centre-back': {'positioning', 'courage_in_duels', 'decision_making'},
+    'full-back': {'speed', 'acceleration', 'intensity', 'off_ball_movement', 'passing'},
+    'wing-back': {'speed', 'acceleration', 'intensity', 'off_ball_movement', 'passing'},
+    'defensive midfielder': {'scanning', 'decision_making', 'passing', 'positioning', 'work_rate'},
+    'central midfielder': {'passing', 'first_touch', 'scanning', 'decision_making', 'weak_foot'},
+    'attacking midfielder': {'passing', 'first_touch', 'scanning', 'decision_making', 'weak_foot'},
+    'winger': {'dribbling', 'acceleration', 'one_v_one', 'weak_foot', 'timing_of_runs'},
+    'striker': {'first_touch', 'shooting', 'one_v_one', 'off_ball_movement', 'courage_in_duels'},
+}
+METHOD = ('Observed skills only; position priorities carry weight 2, other skills weight 1. '
+          'Unrated skills are excluded, never scored zero. This is an assessment of this clip, '
+          'not a full-match grade or a measurement of academy readiness.')
+ACADEMY_NOTE = ('ScoutMePlay coaching rubric, version 1; age-band reference ranges from the '
+                'existing assessment rubric. These are editorial criteria, not measured peer percentiles '
+                'or evidence of academy selection. Position affects weighting, not the range thresholds.')
+
+
+def number(v):
+    return isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v)
+
+
+def dict_rows(value):
+    return [row for row in value if isinstance(row, dict)] if isinstance(value, list) else []
+
+
+def rounded(v):
+    return float(Decimal(str(v)).quantize(Decimal('.1'), rounding=ROUND_HALF_UP))
+
+
+def timestamp(ms):
+    sec = int(math.floor(ms / 1000 + .5))
+    return f'{sec // 60:02d}:{sec % 60:02d}'
+
+
+def excerpt(text):
+    first = re.split(r'(?<=[.!?])\s+', str(text or ''), maxsplit=1)[0]
+    return first
+
+
+def label(key):
+    return LABELS.get(key, key.replace('_', ' ').title())
+
+
+def rubric(age):
+    if not number(age) or age < 11:
+        return None
+    if age <= 12:
+        return ('U11-U12', [('Standard Club', 3, 5), ('Strong Club', 5, 6.5), ('Academy', 6.5, 8), ('Elite Academy', 8, 9)])
+    if age <= 14:
+        return ('U13-U14', [('Standard Club', 4, 5.5), ('Strong Club', 5.5, 7), ('Academy', 7, 8.5), ('Elite Academy', 8.5, 10)])
+    if age <= 16:
+        return ('U15-U16', [('Standard Club', 4, 6), ('Strong Club', 6, 7.5), ('Academy', 7.5, 9), ('Elite Academy', 9, 10)])
+    if age <= 18:
+        return ('U17-U18', [('Standard Club', 5, 6.5), ('Strong Club', 6.5, 8), ('Academy', 8, 9), ('Elite Academy', 9, 10)])
+    if age <= 21:
+        return ('U19-U21', [('Standard Club', 5.5, 7), ('Strong Club', 7, 8), ('Academy', 8, 9.5), ('Elite Academy', 9, 10)])
+    return ('Senior 22+', [('Standard Club', 6, 7.5), ('Strong Club', 7.5, 8.5), ('Academy', 8, 9.5), ('Elite Academy', 9, 10)])
+
+
+def comparison(score, age):
+    ref = rubric(age)
+    if not ref or not number(score):
+        return None
+    bracket, bands = ref
+    # Published ranges overlap in the retained rubric. Prefer the highest
+    # threshold reached and disclose all ranges rather than claiming precision.
+    band = next((name for name, lo, _ in reversed(bands) if score >= lo), 'Below club reference')
+    return {'label': band, 'bracket': bracket, 'ranges': [
+        {'label': name, 'min': lo, 'max': hi} for name, lo, hi in bands], 'note': ACADEMY_NOTE}
+
+
+def _public_text(text, name, jersey, actor=None, teammates=()):
+    value = str(text or '')
+    value = re.sub(rf'\b(?:white\s+(?:number\s+)?|number\s+|#){re.escape(str(jersey))}\b', lambda _: name, value, flags=re.I)
+    value = re.sub(rf'(?<!\w)#{re.escape(str(jersey))}\b', lambda _: name, value)
+    value = re.sub(r'\bthe (?:selected|target) player\b', lambda _: name, value, flags=re.I)
+    if actor:
+        value = re.sub(rf'\b{re.escape(actor)}\b', lambda _: name, value, flags=re.I)
+    for teammate in teammates:
+        if teammate and teammate != actor:
+            value = re.sub(rf'\b{re.escape(teammate)}\b', 'a teammate', value, flags=re.I)
+    value = re.sub(r'\bp\d+\b', 'another player', value, flags=re.I)
+    value = re.sub(r'\bs(\d{9})\b', lambda m: f'{int(m[1]) / 1000:.3f} s', value)
+    value = value.replace('packet ends', 'video segment ends').replace('supplied frames', 'video frames')
+    value = value.replace('selected-player', name).replace('the selected passer', name)
+    return value
+
+
+def publish_report(document):
+    """Same pure entry point for API, PDF, share cards and offline review."""
+    doc = deepcopy(document)
+    if doc.get('analysis_engine') != 'SEQUENCE_V1' and (doc.get('full_report') or {}).get('analysis_authority', {}).get('output') != 'SEQUENCE_V1':
+        return doc
+    full = doc.get('full_report') or {}
+    bundle = doc.get('canonical_events') or {}
+    events = [e for e in dict_rows(bundle.get('events')) if e.get('global_target_id') == 'GLOBAL_TARGET'
+              and (e.get('proof') or {}).get('proof_eligible') is True and number(e.get('canonical_ms'))]
+    events.sort(key=lambda e: (e['canonical_ms'], e['event_id']))
+    if not events:
+        return doc
+    pd = doc.get('player_details') or {}
+    name, jersey = str(pd.get('player_name') or 'Player'), pd.get('jersey_number') or '__UNSPECIFIED__'
+    by_id = {e['event_id']: e for e in events}
+    comments = {c.get('event_id'): c for c in dict_rows(full.get('video_comments'))}
+    # Do not weaken the retained source/PTS media binding when projecting copy.
+    source = bundle.get('source_video_sha256')
+    for event in events:
+        comment = comments.get(event['event_id'])
+        if not comment:
+            continue
+        proof = event.get('proof') or {}
+        matches = bool(source and event.get('source_video_sha256') == source
+            and comment.get('source_video_sha256') == source
+            and comment.get('evidence_time_ms') == proof.get('frame_ms') == event['canonical_ms']
+            and comment.get('source_frame_id') == proof.get('frame_id'))
+        if not matches:
+            comment['proof_verified'] = False
+        if not matches or comment.get('frame_time_ms') != proof.get('frame_ms'):
+            comment['proof_frame_verified'] = False
+    # Strip presentation state before deriving again: idempotent for API/PDF paths.
+    doc.pop('report_publication', None)
+    for e in events:
+        e['_display_description'] = _public_text(' '.join(e.get('details') or []), name, jersey,
+                                                  str(e.get('actor_visual_id') or '').rsplit(':', 1)[-1],
+                                                  teammates=[(e.get('causal_chain') or {}).get('receiver_visual_id'),
+                                                             (e.get('causal_chain') or {}).get('finisher_visual_id')])
+    def bound(e):
+        c = comments.get(e['event_id'], {})
+        return {'event_id': e['event_id'], 'timestamp': timestamp(e['canonical_ms']),
+                'evidence_time_ms': e['canonical_ms'], 'evidence_id': c.get('evidence_id'),
+                'proof_verified': c.get('proof_verified') is True,
+                'identity_verified': True, 'canonical_event_ids': [e['event_id']]}
+
+    titles = {'SHOT': 'Saved shot', 'GOAL': 'Goal', 'ASSIST': 'Assist', 'DRIBBLE': 'Dribble',
+              'DUEL': 'Duel', 'RUN': 'Run', 'RECOVERY': 'Recovery', 'PASS': 'Pass'}
+    timeline = []
+    for e in events:
+        row = next((deepcopy(a) for a in full.get('action_timeline', []) if a.get('event_id') == e['event_id']), {})
+        kind = e['canonical_event_type']
+        title = titles.get(kind, kind.title())
+        if kind == 'SHOT' and e.get('canonical_outcome') != 'SAVED':
+            title = 'Shot attempt'
+        row.update(bound(e), title=title, description=e['_display_description'],
+                   identity_confidence='high', canonical_ms=e['canonical_ms'])
+        timeline.append(row)
+        if e['event_id'] in comments:
+            comments[e['event_id']].update(bound(e), comment=f'{name}: {title.lower()}.')
+    full['action_timeline'] = timeline
+    full['video_comments'] = list(comments.values())
+    all_skills, skills, weighted_total, total_weight = [], [], 0, 0
+    emphasized = EMPHASIS.get(str(pd.get('position') or '').lower(), set())
+    for cat in CATEGORIES:
+        full[cat] = full.get(cat) if isinstance(full.get(cat), dict) else {}
+        for key in EXPECTED_SKILLS[cat]:
+            full[cat].setdefault(key, {'score': None, 'cannot_evaluate': True, 'evidence': []})
+        for key, sk in full[cat].items():
+            if not isinstance(sk, dict) or 'score' not in sk:
+                continue
+            weight = 2 if key in emphasized else 1
+            total_weight += weight
+            all_skills.append(key)
+            evs = []
+            for ev in dict_rows(sk.get('evidence')):
+                e = by_id.get(ev.get('event_id'))
+                if e and ev.get('identity_verified') is True and ev.get('canonical_event_ids') == [e['event_id']]:
+                    evs.append({**bound(e), 'what': e['_display_description']})
+            if key == 'weak_foot' and not any(e.get('foot') in {'LEFT', 'RIGHT'} for e in events):
+                evs = []
+            sk['evidence'] = evs
+            if sk.get('cannot_evaluate') or not number(sk.get('score')) or not 1 <= sk['score'] <= 10 or not evs:
+                sk.update(score=None, cannot_evaluate=True)
+                continue
+            weighted_total += weight
+            # Display the underlying observed facts rather than templated peer claims.
+            sk['notes'] = evs[0]['what']
+            sk['tier_for_age'] = None
+            skills.append({'key': key, 'category': cat, 'label': label(key), 'score': sk['score'],
+                           'weight': weight, 'evidence': evs, 'comparison': comparison(sk['score'], pd.get('age'))})
+    unique_events = {ev['event_id'] for s in skills for ev in s['evidence']}
+    enough = len(skills) >= 4 and len(unique_events) >= 3 and len({s['category'] for s in skills}) >= 2
+    overall = rounded(sum(s['score'] * s['weight'] for s in skills) / weighted_total) if enough else None
+    score_info = {'label': 'Overall Observed Score', 'value': overall, 'method': METHOD,
+                  'rated_skills': len(skills), 'total_skills': len(all_skills),
+                  'weighted_coverage_pct': rounded(weighted_total / total_weight * 100) if total_weight else 0,
+                  'unique_events': len(unique_events), 'status': 'PROVISIONAL_CLIP_ASSESSMENT' if enough else 'INSUFFICIENT_EVIDENCE',
+                  'weights': {s['key']: s['weight'] for s in skills},
+                  'comparison': comparison(overall, pd.get('age'))}
+    for cat in CATEGORIES:
+        rows = [s for s in skills if s['category'] == cat]
+        full.setdefault('scores', {})[cat] = rounded(sum(s['score'] * s['weight'] for s in rows) / sum(s['weight'] for s in rows)) if rows else None
+    full['scores']['overall_development'] = overall
+    full['observed_score'] = score_info
+    counts = {k: sum(e['canonical_event_type'] == k for e in events) for k in titles}
+    shots = counts['SHOT'] + counts['GOAL']
+    ms = full.setdefault('match_stats', {})
+    ms.update(observed_goals=counts['GOAL'], observed_assists=counts['ASSIST'], shots=shots,
+              total_actions=len(events), duels_contested=counts['DUEL'], duels_won=None,
+              key_passes=None, goals=None, assists=None, coverage_status='PARTIAL')
+    # In football key passes conventionally exclude assists. Keep them separate.
+    ms['goals_assists_source'] = 'canonical_verified_observations'
+    ms['first_touches'] = None
+    ms['key_passes'] = sum(e['canonical_event_type'] == 'PASS' and e['canonical_outcome'] == 'TEAMMATE_SHOT' for e in events)
+    stats = full.setdefault('verified_stats', {})
+    stats.update(observed_counts={**stats.get('observed_counts', {}), 'goals': counts['GOAL'],
+        'assists': counts['ASSIST'], 'shots': shots, 'total_actions': len(events), 'duels_contested': counts['DUEL'],
+        'key_passes': ms['key_passes']}, goals=None, assists=None, goals_assists_available=False)
+    stats['counted_event_ids'] = {**stats.get('counted_event_ids', {}),
+        'goals': [e['event_id'] for e in events if e['canonical_event_type'] == 'GOAL'],
+        'assists': [e['event_id'] for e in events if e['canonical_event_type'] == 'ASSIST'],
+        'key_passes': [e['event_id'] for e in events if e['canonical_event_type'] == 'PASS' and e['canonical_outcome'] == 'TEAMMATE_SHOT'],
+        'duels_contested': [e['event_id'] for e in events if e['canonical_event_type'] == 'DUEL']}
+    stats['goals_assists_observed_available'] = True
+    stats['first_touches'] = None
+    stats['observed_counts']['first_touches'] = None
+    for k in ('shots', 'total_actions', 'duels_contested', 'key_passes'):
+        stats[k] = ms[k]
+    duration = doc.get('video_duration_sec')
+    duration_label = timestamp(duration * 1000) if number(duration) and duration >= 0 else 'Not available'
+    summary = (f'{name}: {counts["GOAL"]} verified goal' + ('s' if counts['GOAL'] != 1 else '')
+               + f', {counts["ASSIST"]} verified assist' + ('s' if counts['ASSIST'] != 1 else '')
+               + f' and {shots} shot' + ('s' if shots != 1 else '') + ' in this clip.')
+    limitation = 'Counts cover verified observations; the edited clip does not establish full-match totals or long-term potential.'
+    full['parent_summary'] = {'headline': f'{name}: the documented moments', 'paragraphs': [summary, limitation],
+                              'good_news': 'Use the linked actions to review decisions, execution and the next training focus.'}
+    full['executive_summary'] = summary + ' ' + limitation
+    full['final_summary'] = full['executive_summary']
+    full['snapshot'] = {'biggest_strength': 'Documented attacking contributions', 'hidden_talent': 'Review the linked action',
+        'biggest_development_area': 'Training focus from observed skills', 'overall_progress_note': 'Starting point for future comparison; progress requires another comparable video.'}
+    key_events = [e for e in events if e['canonical_event_type'] in {'GOAL', 'ASSIST', 'SHOT'}]
+    # Four snapshot cards are editorial selections of actual events, never token joins.
+    chosen = sorted(key_events, key=lambda e: (e['canonical_event_type'] != 'GOAL', e['canonical_ms']))[:4]
+    full['snapshot_moments'] = []
+    for key, e in zip(('strength', 'noticed', 'hidden', 'develop'), chosen):
+        c = comments.get(e['event_id'], {})
+        full['snapshot_moments'].append({**bound(e), 'key': key, 'label': 'Verified action',
+            'title': f'{name}: {titles[e["canonical_event_type"]].lower()}', 'desc': excerpt(e['_display_description']),
+            'frame_url': c.get('frame_url') if c.get('proof_frame_verified') is True else None})
+    full['snapshot_moments_authority'] = True
+    full['coach_notes'] = [summary, 'Review the evidence before choosing a training focus.']
+    full['scout_outlook'] = {'current_level_label': 'Full playing level not assessed', 'current_level_dots': 0,
+        'potential_level_label': 'Not assessed', 'potential_level_dots': 0, 'recruitment_readiness': 'Not assessed',
+        'long_term_potential': 'Not assessed', 'long_term_note': limitation}
+    # Preserve the conservative overall playing-level authority. A rubric comparison
+    # of observed skills must not manufacture a placement on the recruitment ladder.
+    full['overall_benchmark'] = {'tier': None, 'tier_label': 'Full playing level not assessed', 'percentile': None}
+    full['parent_value_metrics'] = {'involvement': {'actions_observed': len(events),
+        'note': 'Verified action segments; this is not a count of individual ball touches.'}, 'top_minutes': []}
+    full['parent_corner'] = None
+    # Retain education, removing the unsupported population comparison.
+    if isinstance(full.get('grow_your_game'), dict):
+        for lesson in full['grow_your_game'].get('lessons', []):
+            lesson['age_benchmark'] = None
+            for field in ('what_happened', 'what_happened_in_match', 'personal_advice'):
+                if isinstance(lesson.get(field), str):
+                    lesson[field] = lesson[field].replace('absolutely elite reaction', 'immediate recovery effort')
+    # Keep useful drills but replace personal deficit claims with cited observations.
+    priorities = sorted(skills, key=lambda s: (s['score'], s['key']))[:3]
+    full['development_priorities_detailed'] = [{'name': s['label'], 'score': s['score'],
+        'issue': 'Training focus from the observed clip: ' + excerpt(s['evidence'][0]['what']),
+        'how_to_improve': {'first_touch': 'Receive and move into space before the next pass.',
+            'body_control': 'Practise controlled turns and shielding in gentle, game-like pressure.',
+            'one_v_one': 'Practise changing speed and direction against an active defender.'}.get(s['key'], 'Repeat this action in a small-sided practice and review the next video.'),
+        'event_id': s['evidence'][0]['event_id'], 'evidence': s['evidence']} for s in priorities]
+    full['development_roadmap'] = {'now': 'Review the documented actions and select one training focus.',
+        'three_months': 'Reassess the same skills using comparable match footage.',
+        'six_months': 'Review progress across several observations.', 'twelve_months': 'Set the next goals with the player and coach.'}
+    package = full.get('parents_package') or {}
+    if package.get('message_to_player'):
+        package['message_to_player']['body'] = f'{name}, review your goal, assists and saved shot with your coach. Choose one action to practise and keep enjoying your football.'
+    full['parents_package'] = package
+    # Name replacement applies only to public copy, never identity IDs or proof hashes.
+    def names(value, field=''):
+        if isinstance(value, dict):
+            return {k: names(v, k) for k, v in value.items()}
+        if isinstance(value, list):
+            return [names(v, field) for v in value]
+        if isinstance(value, str) and field in {'comment', 'description', 'what', 'notes', 'issue', 'body', 'text', 'why', 'verdict', 'why_this_score'}:
+            return _public_text(value, name, jersey)
+        return value
+    full = names(full)
+    doc['full_report'] = full
+    stamp = doc.get('full_generated_at') or doc.get('full_report_run_finished_at') or doc.get('paid_at') or doc.get('created_at')
+    try:
+        dt = datetime.fromisoformat(str(stamp).replace('Z', '+00:00'))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=ZoneInfo('UTC'))
+        date_label = dt.astimezone(ZoneInfo('Europe/Copenhagen')).strftime('%d %B %Y').upper()
+    except (ValueError, TypeError):
+        date_label = 'DATE UNAVAILABLE'
+    meanings = []
+    for s in sorted(skills, key=lambda s: (-s['score'], s['key'])):
+        ev = s['evidence'][0]
+        comp = s['comparison']
+        meanings.append({'key': s['key'], 'category': s['category'], 'label': s['label'], 'score': s['score'],
+            'lines': [excerpt(ev['what'])], 'evidence': {**ev, 'verified': True},
+            'angles': {}, 'comparison': comp, 'looks_for': METHOD, 'scale': None,
+            'next_level': 'Reassess with more comparable match observations.',
+            'position_why': f'Weight {s["weight"]} in the observed score for {pd.get("position") or "this position"}.'})
+    doc['score_meaning'] = {'skills': meanings, 'position': pd.get('position'), 'position_line': ACADEMY_NOTE, 'discovery': None}
+    doc['score_context'] = {'overall': {'score': overall, 'line': METHOD}, 'bracket': (rubric(pd.get('age')) or ('Age unavailable',))[0]}
+    evidence_rows = [{**bound(e), 'title': titles[e['canonical_event_type']], 'description': e['_display_description'],
+        'contact_interval_ms': e.get('contact_interval_ms'), 'outcome_ms': (e.get('proof') or {}).get('outcome_ms'),
+        'clip_url': comments.get(e['event_id'], {}).get('tele_clip_url')} for e in key_events]
+    review = doc.get('agent_review') or {}
+    delivered = review.get('status') == 'delivered' and bool(review.get('review_text'))
+    review_info = {'analysis_status': 'Automated analysis complete',
+        'human_status': 'Scout review delivered' if delivered else 'Scout review awaiting delivery',
+        'sla_hours': 48, 'submitted_at': review.get('created_at'), 'delivered_at': review.get('delivered_at')}
+    def facts(value):
+        if isinstance(value, dict):
+            return {k: facts(v) for k, v in value.items() if not k.endswith('_url')}
+        if isinstance(value, list):
+            return [facts(v) for v in value]
+        return value
+    signature = hashlib.sha256(json.dumps(facts({'full': full, 'date': date_label,
+        'review': review_info, 'version': VERSION}), sort_keys=True, default=str).encode()).hexdigest()
+    sorted_skills = sorted(skills, key=lambda s: (-s['score'], s['key']))
+    view = {
+        'overall': overall, 'stars': int(overall / 2 + .5) if overall is not None else 0,
+        'topStrengths': [], 'snapshotMoments': [], 'actionTimeline': [],
+        'devPriorities': [{'name': p['name'], 'score': p['score'], 'issue': p['issue'],
+            'howTo': p['how_to_improve']} for p in full['development_priorities_detailed']],
+        'scoutOutlook': {'currentLabel': 'Not assessed from this clip', 'currentDots': 0,
+            'potentialLabel': 'Not assessed', 'potentialDots': 0, 'readiness': 'Not assessed',
+            'longTerm': 'Not assessed', 'longTermNote': limitation},
+        'ageComparison': [{'name': s['label'], 'label': s['comparison']['label'], 'width': s['score'] * 10}
+                          for s in sorted_skills[:6] if s['comparison']],
+        'ageBracket': (rubric(pd.get('age')) or (None,))[0],
+        'parentSummary': {'headline': full['parent_summary']['headline'],
+            'paragraphs': full['parent_summary']['paragraphs'], 'goodNews': full['parent_summary']['good_news']},
+        'matchStats': [{'label': k, 'value': v, 'pct': 0} for k, v in [
+            ('Verified Goals', counts['GOAL']), ('Verified Assists', counts['ASSIST']),
+            ('Total Actions', len(events)), ('Key Passes (excluding assists)', ms['key_passes']),
+            ('Shots (including goals)', shots), ('Duels Observed', counts['DUEL']), ('Video Analysed', duration_label)]],
+    }
+    for s in sorted_skills[:4]:
+        ev = s['evidence'][0]
+        c = comments.get(ev['event_id'], {})
+        view['topStrengths'].append({'name': s['label'], 'score': s['score'], 'category': s['category'],
+            'note': excerpt(ev['what']), 'timestamp': ev['timestamp'], 'eventId': ev['event_id'],
+            'evidenceId': ev.get('evidence_id'), 'proofable': ev['proof_verified'],
+            'thumb': c.get('frame_url') if c.get('proof_frame_verified') is True else None,
+            'thumbVerified': c.get('proof_frame_verified') is True})
+    for m in full['snapshot_moments']:
+        view['snapshotMoments'].append({'key': m['key'], 'label': m['label'], 'title': m['title'],
+            'desc': m['desc'], 'timestamp': m['timestamp'], 'thumb': m['frame_url'], 'annot': 'circle',
+            'eventId': m['event_id'], 'evidenceId': m.get('evidence_id')})
+    for row in timeline:
+        view['actionTimeline'].append({'timestamp': row['timestamp'], 'title': row['title'],
+            'description': row['description'], 'outcome': 'neutral', 'tracked': False,
+            'eventId': row['event_id'], 'proofVerified': row['proof_verified'], 'proofable': row['proof_verified']})
+    doc['report_publication'] = {'version': VERSION, 'view': view, 'review': review_info, 'date': date_label, 'score': score_info,
+        'duration': duration_label, 'key_actions': evidence_rows, 'assessment_note': limitation,
+        'stats_definitions': 'Shots include goals. Key passes lead to a teammate shot without a goal; assists are counted separately. Actions are segments, not ball touches.',
+        'content_sha256': signature}
+    return doc

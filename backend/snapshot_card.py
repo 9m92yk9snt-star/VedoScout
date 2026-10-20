@@ -131,7 +131,7 @@ def build_snapshot_card(report_doc: dict, key: str, output_path: str, image_reso
     card = Image.new("RGB", (CW_, CH_), CARD_BG)
     cd = ImageDraw.Draw(card)
 
-    g1, g2 = HEADERS.get(key, HEADERS["noticed"])
+    g1, g2 = HEADERS["strength"] if moment.get("label") == "Verified action" else HEADERS.get(key, HEADERS["noticed"])
     card.paste(_hgrad(CW_, HB, g1, g2), (0, 0))
     _icon(cd, key, 62, HB // 2)
     f_lab = _font("Barlow-Bold.ttf", 36)

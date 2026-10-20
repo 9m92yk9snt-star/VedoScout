@@ -365,7 +365,6 @@ export function deriveV2(report) {
   const actionTimeline = (Array.isArray(full.action_timeline) ? full.action_timeline : [])
     .filter((a) => a && a.timestamp && (a.title || a.description)
       && String(a.identity_confidence || "").toLowerCase() !== "low")
-    .slice(0, 15)
     .map((a) => {
       const oc = String(a.outcome || "").toLowerCase();
       return {
@@ -447,5 +446,6 @@ export function deriveV2(report) {
     matchStats, matchStatsCoverage, videoHighlight, identityNote, actionTimeline, parentsPackage, missions,
     evidenceQualityNote: full.evidence_quality_note || null,
     parentMetrics, growYourGame, parentCorner, crossVerification,
+    ...(report?.report_publication?.view || {}),
   };
 }

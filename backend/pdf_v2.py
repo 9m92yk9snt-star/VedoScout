@@ -180,6 +180,8 @@ def _frame_lookup(full):
 
 
 def derive_v2(report):
+    from report_publication import publish_report
+    report = publish_report(report)
     full = report.get("full_report") or {}
     pd = report.get("player_details") or {}
     skills = _collect_skills(full)
@@ -455,7 +457,7 @@ def derive_v2(report):
     overall = full.get("scores", {}).get("overall_development")
     overall = overall if isinstance(overall, (int, float)) else None
 
-    return {
+    derived = {
         "playerType": full.get("player_type") or "",
         "overall": overall,
         "ageBracket": ob.get("age_bracket_used"),
@@ -476,6 +478,10 @@ def derive_v2(report):
         "missions": [m for m in (full.get("next_match_missions") or [])
                      if isinstance(m, dict) and m.get("mission")][:3],
     }
+    derived["publication"] = report.get("report_publication")
+    derived.update((report.get("report_publication") or {}).get("view") or {})
+    return derived
+
 
 
 def _parent_metrics(full):
@@ -526,7 +532,7 @@ def _action_timeline(full):
             "outcome": oc if oc in ("positive", "neutral", "negative") else "neutral",
             "tracked": bool(a.get("tracking_verified")),
         })
-    return out[:15]
+    return out
 
 
 def _identity_note(report):
@@ -790,7 +796,7 @@ def _overall_score_card(c, d, x, y, w, h, ctx=None, bracket=None):
     ty = y + h - PAD - 4
     c.setFillColor(FOREST)
     c.setFont(F_BOLD, 8.8)
-    c.drawCentredString(cx, ty - 8, "OVERALL DEVELOPMENT")
+    c.drawCentredString(cx, ty - 8, "OVERALL OBSERVED" if d.get("publication") else "OVERALL DEVELOPMENT")
     c.drawCentredString(cx, ty - 19, "SCORE")
     overall = d["overall"]
     pct = (overall / 10 * 100) if overall is not None else 0
@@ -872,7 +878,7 @@ def _snapshot_moment_card(c, m, x, y, w, h, resolve):
     TXT = 72.0  # text block under the photo
     card(c, x, y, w, h, fill=HexColor("#FBFAF2"), r=10)
     # header bar (rounded top corners via card clip)
-    g1, g2 = SNAP_HEADER_COLORS.get(m.get("key"), SNAP_HEADER_COLORS["noticed"])
+    g1, g2 = SNAP_HEADER_COLORS["strength"] if m.get("label") == "Verified action" else SNAP_HEADER_COLORS.get(m.get("key"), SNAP_HEADER_COLORS["noticed"])
     c.saveState()
     p = c.beginPath()
     p.roundRect(x, y, w, h, 10)
@@ -1029,11 +1035,11 @@ def _match_stats_card(c, stats, x, y, w, h, coverage_note=None):
                  _style(F_BODY, 5.6, MUTED, leading=7), max_h=21)
 
 
-def _age_comparison_card(c, comp, bracket, x, y, w, h):
+def _age_comparison_card(c, comp, bracket, x, y, w, h, rubric=False):
     card(c, x, y, w, h)
     ty = y + h - PAD
     title_w = w - 2 * PAD
-    ty -= card_title(c, x + PAD, ty, "Vs. Players Same Age", title_w)
+    ty -= card_title(c, x + PAD, ty, "Academy Rubric Reference" if rubric else "Vs. Players Same Age", title_w)
     if bracket:
         c.saveState()
         bw = c.stringWidth(str(bracket).upper(), F_BOLD, 5.4) + 10
@@ -1047,7 +1053,9 @@ def _age_comparison_card(c, comp, bracket, x, y, w, h):
         draw_par(c, esc("Not enough benchmarked skills in this clip."), x + PAD, ty - 4,
                  w - 2 * PAD, _style(F_BODY, 7.2, MUTED, leading=10))
         return
-    row_h = (ty - y - 8) / max(1, len(comp))
+    row_h = (ty - y - (28 if rubric else 8)) / max(1, len(comp))
+    if rubric:
+        draw_par(c, "Coaching rubric, not peer percentiles. Ranges and evidence follow.", x + PAD, y + 20, w - 2 * PAD, _style(F_BODY, 6.2, MUTED, leading=8))
     for r in comp:
         c.setFillColor(BODY)
         c.setFont(F_BODY, 7.2)
@@ -1198,7 +1206,7 @@ def _parent_tips_card(c, tips, x, y, w, h):
 def _action_timeline_card(c, actions, x, y, w, h):
     card(c, x, y, w, h)
     ty = y + h - PAD
-    ty -= card_title(c, x + PAD, ty, "Action Timeline", w - 2 * PAD)
+    ty -= card_title(c, x + PAD, ty, "Action Timeline Preview - Full Log Follows", w - 2 * PAD)
     row_h = (ty - y - 4) / max(1, len(actions))
     lx = x + PAD + 5
     c.saveState()
@@ -1313,7 +1321,8 @@ def _scout_outlook_card(c, so, x, y, w, h):
         c.setFillColor(INK)
         c.setFont(F_BOLD, 8.6)
         c.drawString(x + PAD, ty - 19, str(so[val_key]))
-        draw_dots(c, x + w - PAD - 5 * (2 * 3.4 + 4.6), ty - 18.5, int(so[dots_key] or 0))
+        if so.get(dots_key):
+            draw_dots(c, x + w - PAD - 5 * (2 * 3.4 + 4.6), ty - 18.5, int(so[dots_key]))
         ty -= 30
     c.saveState()
     c.setFillColor(SOFT)
@@ -2307,7 +2316,7 @@ def _score_meaning_page(c, sm, player_name, page_no, total_pages):
         max_rows = max(1, int((avail - 30) / row_h))
         n_show = min(len(rest), max_rows * 2)
         rows_used = (n_show + 1) // 2
-        h_sk = rows_used * row_h + 32
+        h_sk = rows_used * row_h + 48
         card(c, M, yy - h_sk, CW, h_sk)
         ty2 = yy - PAD
         ty2 -= card_title(c, M + PAD, ty2, "Every Other Number — A New Angle, Never A Repeat", CW - 2 * PAD)
@@ -2466,7 +2475,7 @@ def _parent_metrics_strip(c, pm, x, y, w, h):
     inv = pm.get("involvement") or {}
     if inv:
         per = inv.get("touches_per_minute")
-        chips.append((str(inv.get("touches_observed", "—")), "TOUCHES",
+        chips.append((str(inv.get("actions_observed", inv.get("touches_observed", "—"))), "ACTIONS" if "actions_observed" in inv else "TOUCHES",
                       f"≈{per}/MIN" if per is not None else "INVOLVEMENT"))
     br = pm.get("bravery") or {}
     if br:
@@ -2683,7 +2692,7 @@ def _diploma_page(c, d, pd, report_date, tracked=False, prog=None):
     c.setFillColor(BODY)
     c.setFont(F_BODY, 10.5)
     c.drawCentredString(W / 2, H - 332,
-                        "has completed a full ScoutMe Pro Benchmarked Analysis as " + ", ".join(b for b in bits if b))
+                        ("has completed a clip-based ScoutMe Pro Analysis as " if d.get("publication") else "has completed a full ScoutMe Pro Benchmarked Analysis as ") + ", ".join(b for b in bits if b))
     if prog:
         ov = next((cat for cat in (prog.get("categories") or []) if cat.get("key") == "overall_development"), None)
         line = f"{_ordinal(prog.get('analysis_number', 2))} ANALYSIS"
@@ -2707,6 +2716,9 @@ def _diploma_page(c, d, pd, report_date, tracked=False, prog=None):
     c.setFillColor(MUTED)
     c.setFont(F_BOLD, 8)
     c.drawCentredString(W / 2, dcy - 24, "/10")
+    if d.get("publication"):
+        c.setFont(F_BOLD, 7)
+        c.drawCentredString(W / 2, dcy - 64, "PROVISIONAL SCORE - OBSERVED SKILLS")
     draw_stars_row(c, W / 2, dcy - 84, int(d.get("stars") or 0), r=7, gap=6)
     if d.get("playerType"):
         c.setFillColor(INK)
@@ -2855,7 +2867,14 @@ def _gyg_page(c, gyg, player_name, page_no, total_pages):
     yy -= 44 + GAP
     lessons = (gyg.get("lessons") or [])[:3]
     hw = (gyg.get("homework_plan") or [])[:4]
-    h_hw = (30 + 22 * len(hw)) if hw else 0
+    h_hw = 0
+    if hw:
+        heights = []
+        for item in hw:
+            text = str(item.get("drill", "")) + (f" — {item['why']}" if item.get("why") else "")
+            paragraph = Paragraph(esc(text), _style(F_BODY, 6.6, BODY, leading=8.6))
+            heights.append(paragraph.wrap(CW - 2 * PAD - 54, H)[1])
+        h_hw = 40 + sum(max(height, 10) + 6 for height in heights)
     avail = yy - M - 24 - ((h_hw + GAP) if hw else 0)
     lh = avail / max(1, len(lessons)) - GAP
     for i, les in enumerate(lessons):
@@ -2867,9 +2886,82 @@ def _gyg_page(c, gyg, player_name, page_no, total_pages):
     c.showPage()
 
 
+
+def _publication_layout(report):
+    """Paginate authoritative copy with measured Paragraph heights, never slice rows."""
+    pub = report.get("report_publication")
+    if not pub:
+        return []
+    from urllib.parse import quote
+    blocks = []
+    def add(text, heading=False):
+        style = _style(F_BOLD if heading else F_BODY, 11 if heading else 8.3,
+                       FOREST if heading else BODY, leading=14 if heading else 11.5)
+        blocks.append(Paragraph(text, style))
+    score = pub["score"]
+    add("SCORE, ACADEMY REFERENCE &amp; EVIDENCE", True)
+    add(f"<b>{esc(score['label'])}: {score['value'] if score['value'] is not None else 'Not assessed'}/10</b> - provisional clip assessment")
+    add(f"{score['rated_skills']}/{score['total_skills']} skills rated; {score['weighted_coverage_pct']}% of rubric weight covered; {score['unique_events']} distinct supporting actions.")
+    add(esc(score['method']))
+    comp = score.get("comparison")
+    if comp:
+        add(esc(comp['bracket'] + ' - ' + comp['label'] + ' reference for observed skills'), True)
+        add(esc(' | '.join(f"{r['label']}: {r['min']}-{r['max']}" for r in comp['ranges'])))
+        add(esc(comp['note']))
+    add(esc(pub['stats_definitions']))
+    add(esc(pub["review"]["analysis_status"] + " - " + pub["review"]["human_status"]))
+    add("DOCUMENTED KEY ACTIONS", True)
+    report_id = quote(str(report.get('id') or ''), safe='')
+    for action in pub['key_actions']:
+        event = quote(action['event_id'], safe='')
+        url = f"https://scoutmeplay.com/report/{report_id}#event-{event}"
+        add(f"<b>{esc(action['timestamp'])} - {esc(action['title'])}</b>")
+        add(esc(action['description']))
+        interval = action.get('contact_interval_ms')
+        if interval:
+            add(esc(f"Contact window: {interval[0]/1000:.3f}-{interval[1]/1000:.3f} s. Foot side is not established."))
+        add(f"Evidence reference: {esc(action['event_id'])} - <link href='{url}' color='#12402A'><u>Open report evidence (account access may be required)</u></link>")
+    add("OBSERVED SKILL GRADES &amp; SUPPORTING ACTIONS", True)
+    for skill in (report.get('score_meaning') or {}).get('skills', []):
+        ref = skill.get('comparison') or {}
+        ev = skill.get('evidence') or {}
+        add(esc(f"{skill['label']}: {skill['score']:.1f}/10 - {ref.get('label', 'No age reference')} - {ev.get('timestamp', '')}"))
+        add(esc(' '.join(skill.get('lines') or [])))
+        add(esc('Evidence reference: ' + str(ev.get('event_id') or 'Unavailable')))
+    add("COMPLETE ACTION TIMELINE", True)
+    for action in pub['view']['actionTimeline']:
+        add(f"<b>{esc(action['timestamp'])} - {esc(action['title'])}</b> - {esc(action['description'])}")
+        add(esc('Evidence reference: ' + action['eventId']))
+    add(esc(pub['assessment_note']))
+    available = H - 2 * M - 66
+    pages, current, used = [], [], 0
+    for index, block in enumerate(blocks):
+        _, height = block.wrap(CW - 20, available)
+        # Keep action headings with at least the following description.
+        if block.text.startswith('<b>') and index + 1 < len(blocks):
+            following_height = blocks[index + 1].wrap(CW - 20, available)[1]
+            if current and used + height + following_height + 18 > available:
+                pages.append(current)
+                current, used = [], 0
+        # A paragraph longer than a page is split by ReportLab, preserving text.
+        pieces = block.split(CW - 20, available) if height > available else [block]
+        for piece in pieces:
+            _, height = piece.wrap(CW - 20, available)
+            if current and used + height + 9 > available:
+                pages.append(current)
+                current, used = [], 0
+            current.append((piece, height))
+            used += height + 9
+    if current:
+        pages.append(current)
+    return pages
+
+
 def build_pdf_v2(report_doc: dict, output_path: str, image_resolver=None, promo: bool = False):
     """Render the Premium Report V2 card layout to a 3-page A4 PDF.
     promo=True adds the shared-link marketing strip (QR + CTA) on page 3."""
+    from report_publication import publish_report
+    report_doc = publish_report(report_doc)
     resolve = image_resolver or (lambda _u: None)
     d = derive_v2(report_doc)
     pd = report_doc.get("player_details") or {}
@@ -2894,14 +2986,15 @@ def build_pdf_v2(report_doc: dict, output_path: str, image_resolver=None, promo:
     gyg = (report_doc.get("full_report") or {}).get("grow_your_game")
     gyg = gyg if isinstance(gyg, dict) and (gyg.get("lessons") or []) else None
     has_p4 = bool(mm.get("trail") or fifa_lens or prog)
-    total_pages = 5 + (1 if has_p4 else 0) + (1 if (sm or sctx) else 0) + (1 if gyg else 0) + (1 if pp else 0) + (1 if has_print else 0)
+    publication_pages = _publication_layout(report_doc)
+    total_pages = len(publication_pages) + 5 + (1 if has_p4 else 0) + (1 if (sm or sctx) else 0) + (1 if gyg else 0) + (1 if pp else 0) + (1 if has_print else 0)
 
     date_src = report_doc.get("full_generated_at") or report_doc.get("paid_at") or report_doc.get("created_at")
     try:
         dt = datetime.fromisoformat(str(date_src).replace("Z", "+00:00")) if date_src else datetime.now(timezone.utc)
     except Exception:
         dt = datetime.now(timezone.utc)
-    report_date = dt.strftime("%d %B %Y").upper()
+    report_date = (report_doc.get("report_publication") or {}).get("date") or dt.strftime("%d %B %Y").upper()
 
     c = rl_canvas.Canvas(output_path, pagesize=A4)
     c.setTitle(f"ScoutMePlay Premium Report — {player_name}")
@@ -2924,7 +3017,7 @@ def build_pdf_v2(report_doc: dict, output_path: str, image_resolver=None, promo:
     if d["matchStats"]:
         cw2 = (CW - GAP) / 2
         _match_stats_card(c, d["matchStats"], M, row2_top - h2, cw2, h2, d.get("matchStatsCoverage"))
-        _age_comparison_card(c, d["ageComparison"], d["ageBracket"], M + cw2 + GAP, row2_top - h2, cw2, h2)
+        _age_comparison_card(c, d["ageComparison"], d["ageBracket"], M + cw2 + GAP, row2_top - h2, cw2, h2, rubric=bool(d.get("publication")))
     else:
         _age_comparison_card(c, d["ageComparison"], d["ageBracket"], M, row2_top - h2, CW, h2)
 
@@ -3107,6 +3200,16 @@ def build_pdf_v2(report_doc: dict, output_path: str, image_resolver=None, promo:
                                     ((report_doc.get("full_report") or {}).get("training_plan") or {}).get("weekly_focus"),
                                     M, yy - h_wp, CW, h_wp)
         _page_footer(c, 5 + (1 if has_p4 else 0) + (1 if (sm or sctx) else 0) + (1 if gyg else 0) + (1 if pp else 0), total_pages)
+        c.showPage()
+
+    for offset, paragraphs in enumerate(publication_pages):
+        _page_bg(c)
+        hh = _mini_header(c, player_name)
+        yy = H - M - hh - 14
+        for paragraph, height in paragraphs:
+            paragraph.drawOn(c, M + 10, yy - height)
+            yy -= height + 9
+        _page_footer(c, total_pages - len(publication_pages) + offset, total_pages)
         c.showPage()
 
     # ── FINAL PAGE — printable certificate / diploma ──

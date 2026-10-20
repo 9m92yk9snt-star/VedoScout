@@ -85,8 +85,8 @@ export default function ScoutReview({ reportId }) {
   /* =================== PENDING STATE =================== */
   if (review.status === "pending") {
     const daysSince = daysAgo(review.created_at);
-    const daysLeft = Math.max(0, 5 - daysSince);
-    const progressPct = Math.min(100, Math.max(0, (daysSince / 5) * 100));
+    const daysLeft = Math.max(0, 2 - daysSince);
+    const progressPct = Math.min(100, Math.max(0, (daysSince / 2) * 100));
 
     return (
       <div data-testid="scout-review-pending" className="bg-surface border border-volt/30 p-6 md:p-8 relative overflow-hidden">
@@ -98,11 +98,11 @@ export default function ScoutReview({ reportId }) {
             <span className="text-volt text-[11px] uppercase tracking-[0.25em] font-bold">Bonus included</span>
           </div>
           <h3 className="font-barlow font-black uppercase text-3xl md:text-4xl tracking-tighter leading-[0.95] text-ink">
-            Your scout review is in progress
+            Your scout review is pending
           </h3>
           <p className="mt-3 text-ink/70 text-sm md:text-base max-w-2xl leading-relaxed">
-            On top of your player report, a real scout from our team is now reviewing your video personally. You'll receive their
-            written feedback here within <span className="text-volt font-bold">5 days</span>, and you'll be able to chat
+            On top of your player report, your video is awaiting a personal review by a scout from our team. You'll receive their
+            written feedback here within <span className="text-volt font-bold">48 hours</span>, and you'll be able to chat
             with them directly to ask follow-up questions.
           </p>
 
@@ -112,7 +112,7 @@ export default function ScoutReview({ reportId }) {
                 <Clock className="w-3.5 h-3.5 text-volt" />
                 <span className="text-[10px] uppercase tracking-widest font-bold text-ink/50">Status</span>
               </div>
-              <div className="font-barlow font-black text-volt text-xl uppercase">In review</div>
+              <div className="font-barlow font-black text-volt text-xl uppercase">Awaiting review</div>
             </div>
             <div className="bg-deepnavy p-4">
               <div className="text-[10px] uppercase tracking-widest font-bold text-ink/50">Submitted</div>
@@ -123,7 +123,7 @@ export default function ScoutReview({ reportId }) {
             <div className="bg-deepnavy p-4">
               <div className="text-[10px] uppercase tracking-widest font-bold text-ink/50">Estimated arrival</div>
               <div className="font-barlow font-black text-ink text-xl">
-                {daysLeft < 1 ? "Today / soon" : `≤ ${Math.ceil(daysLeft)} days`}
+                {daysSince >= 2 ? "Delivery overdue" : daysLeft < 1 ? "Within 24 hours" : `≤ ${Math.ceil(daysLeft)} days`}
               </div>
             </div>
           </div>
@@ -135,7 +135,7 @@ export default function ScoutReview({ reportId }) {
             </div>
             <div className="flex justify-between mt-2 text-[10px] uppercase tracking-widest font-bold text-ink/50">
               <span>Day 0</span>
-              <span>Day 5</span>
+              <span>48 hours</span>
             </div>
           </div>
 

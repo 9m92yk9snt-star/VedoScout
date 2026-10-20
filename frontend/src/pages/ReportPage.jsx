@@ -2042,7 +2042,7 @@ export default function ReportPage() {
       <div className="min-h-screen bg-[#F2EDE2] pb-16">
         <Navigation />
         <div className="pt-24 md:pt-28 px-4 md:px-8">
-          <div className="analysis-ready-note" role="status"><CheckCircle2 size={18} /> Your report is ready · Review complete</div>
+          <div className="analysis-ready-note" role="status"><CheckCircle2 size={18} /> Your report is ready · Automated analysis complete</div>
           <div className="max-w-[1440px] mx-auto mb-4 flex flex-wrap items-center gap-3">
             <button
               onClick={() => navigate("/dashboard")}

@@ -42,7 +42,7 @@ function SnapCard({ moment, onShare, sharing }) {
   const meta = SNAP_CARD_META[moment.key] || SNAP_CARD_META.noticed;
   return (
     <div data-testid={`snapshot-card-${moment.key}`} className="rounded-[16px] overflow-hidden border border-[#E5DFCE] bg-[#FBFAF2] shadow-[0_3px_14px_rgba(30,50,35,0.08)] flex flex-col">
-      <div className="flex items-center gap-2.5 px-4 h-[44px] text-white shrink-0" style={{ background: meta.header }}>
+      <div className="flex items-center gap-2.5 px-4 h-[44px] text-white shrink-0" style={{ background: moment.label === "Verified action" ? SNAP_CARD_META.strength.header : meta.header }}>
         <meta.Icon className="w-4 h-4 shrink-0" />
         <span className="text-[11.5px] md:text-[12px] font-extrabold tracking-[0.07em] uppercase truncate" data-testid={`snapshot-badge-${moment.key}`}>{moment.label || meta.label}</span>
         {moment.timestamp && (
