@@ -21,6 +21,7 @@ on:
       - 'backend/server.py'
       - 'backend/report_publication.py'
       - 'backend/pdf_v2.py'
+      - 'backend/pdf_sequence.py'
       - 'backend/tests/test_report_publication.py'
       - '.github/workflows/sequence-report.yml'
 

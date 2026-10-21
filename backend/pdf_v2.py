@@ -2963,6 +2963,9 @@ def build_pdf_v2(report_doc: dict, output_path: str, image_resolver=None, promo:
     from report_publication import publish_report
     report_doc = publish_report(report_doc)
     resolve = image_resolver or (lambda _u: None)
+    if report_doc.get('report_publication'):
+        from pdf_sequence import build_sequence_pdf
+        return build_sequence_pdf(report_doc, output_path, resolve)
     d = derive_v2(report_doc)
     pd = report_doc.get("player_details") or {}
     player_name = pd.get("player_name") or "Player"

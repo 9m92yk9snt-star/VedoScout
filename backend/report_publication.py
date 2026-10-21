@@ -12,7 +12,7 @@ import math
 import re
 from zoneinfo import ZoneInfo
 
-VERSION = 1
+VERSION = 2
 CATEGORIES = ('technical', 'tactical', 'physical', 'mentality')
 EXPECTED_SKILLS = {
     'technical': ('first_touch', 'ball_control', 'dribbling', 'passing', 'shooting', 'weak_foot', 'one_v_one'),
@@ -59,6 +59,23 @@ def timestamp(ms):
 
 def excerpt(text):
     first = re.split(r'(?<=[.!?])\s+', str(text or ''), maxsplit=1)[0]
+    return first
+
+
+def reader_summary(event, text, name):
+    """Short editorial copy from retained facts; full wording stays in the appendix."""
+    first = excerpt(text)
+    first = re.sub(r'^' + re.escape(name) + r'\s+', '', first, flags=re.I)
+    first = first[:1].upper() + first[1:]
+    kind = event.get('canonical_event_type')
+    if kind == 'SHOT' and event.get('canonical_outcome') == 'SAVED':
+        return 'Shoots through a crowded challenge; the goalkeeper saves the attempt.' if 'crowd' in text.lower() else 'The goalkeeper saves the shot.'
+    if kind == 'GOAL':
+        return first + ' The ball finishes inside the goal.'
+    if kind == 'ASSIST':
+        if first.endswith('to a teammate.'):
+            return first[:-1] + ', who scores.'
+        return first + ' A teammate finishes the move.'
     return first
 
 
@@ -149,6 +166,7 @@ def publish_report(document):
                                                   str(e.get('actor_visual_id') or '').rsplit(':', 1)[-1],
                                                   teammates=[(e.get('causal_chain') or {}).get('receiver_visual_id'),
                                                              (e.get('causal_chain') or {}).get('finisher_visual_id')])
+        e['_reader_summary'] = reader_summary(e, e['_display_description'], name)
     def bound(e):
         c = comments.get(e['event_id'], {})
         return {'event_id': e['event_id'], 'timestamp': timestamp(e['canonical_ms']),
@@ -241,12 +259,15 @@ def publish_report(document):
         stats[k] = ms[k]
     duration = doc.get('video_duration_sec')
     duration_label = timestamp(duration * 1000) if number(duration) and duration >= 0 else 'Not available'
-    summary = (f'{name}: {counts["GOAL"]} verified goal' + ('s' if counts['GOAL'] != 1 else '')
-               + f', {counts["ASSIST"]} verified assist' + ('s' if counts['ASSIST'] != 1 else '')
-               + f' and {shots} shot' + ('s' if shots != 1 else '') + ' in this clip.')
+    goals_copy = 'a goal' if counts['GOAL'] == 1 else f'{counts["GOAL"]} goals'
+    assists_copy = {0: 'no assists', 1: 'an assist', 2: 'two assists', 3: 'three assists'}.get(
+        counts['ASSIST'], f'{counts["ASSIST"]} assists')
+    summary = (f'{name} contributes {goals_copy} and {assists_copy} in this video.'
+               if counts['GOAL'] or counts['ASSIST'] else
+               f'The report follows {name}\'s involvement across {len(events)} action segments.')
     limitation = 'Counts cover verified observations; the edited clip does not establish full-match totals or long-term potential.'
-    full['parent_summary'] = {'headline': f'{name}: the documented moments', 'paragraphs': [summary, limitation],
-                              'good_news': 'Use the linked actions to review decisions, execution and the next training focus.'}
+    full['parent_summary'] = {'headline': 'The performance at a glance', 'paragraphs': [summary],
+                              'good_news': 'Watch the key actions together, then choose one thing to practise.'}
     full['executive_summary'] = summary + ' ' + limitation
     full['final_summary'] = full['executive_summary']
     full['snapshot'] = {'biggest_strength': 'Documented attacking contributions', 'hidden_talent': 'Review the linked action',
@@ -258,7 +279,7 @@ def publish_report(document):
     for key, e in zip(('strength', 'noticed', 'hidden', 'develop'), chosen):
         c = comments.get(e['event_id'], {})
         full['snapshot_moments'].append({**bound(e), 'key': key, 'label': 'Verified action',
-            'title': f'{name}: {titles[e["canonical_event_type"]].lower()}', 'desc': excerpt(e['_display_description']),
+            'title': titles[e["canonical_event_type"]], 'desc': e['_reader_summary'],
             'frame_url': c.get('frame_url') if c.get('proof_frame_verified') is True else None})
     full['snapshot_moments_authority'] = True
     full['coach_notes'] = [summary, 'Review the evidence before choosing a training focus.']
@@ -280,12 +301,18 @@ def publish_report(document):
                     lesson[field] = lesson[field].replace('absolutely elite reaction', 'immediate recovery effort')
     # Keep useful drills but replace personal deficit claims with cited observations.
     priorities = sorted(skills, key=lambda s: (s['score'], s['key']))[:3]
-    full['development_priorities_detailed'] = [{'name': s['label'], 'score': s['score'],
-        'issue': 'Training focus from the observed clip: ' + excerpt(s['evidence'][0]['what']),
+    used_priority_events = set()
+    full['development_priorities_detailed'] = []
+    for s in priorities:
+        ev = next((e for e in s['evidence'] if e['event_id'] not in used_priority_events), s['evidence'][0])
+        used_priority_events.add(ev['event_id'])
+        full['development_priorities_detailed'].append({'name': s['label'], 'score': s['score'],
+        'issue': reader_summary(by_id[ev['event_id']], ev['what'], name),
         'how_to_improve': {'first_touch': 'Receive and move into space before the next pass.',
             'body_control': 'Practise controlled turns and shielding in gentle, game-like pressure.',
+            'dribbling': 'Keep the ball close, then change pace as you move past a defender.',
             'one_v_one': 'Practise changing speed and direction against an active defender.'}.get(s['key'], 'Repeat this action in a small-sided practice and review the next video.'),
-        'event_id': s['evidence'][0]['event_id'], 'evidence': s['evidence']} for s in priorities]
+        'event_id': ev['event_id'], 'evidence': s['evidence']})
     full['development_roadmap'] = {'now': 'Review the documented actions and select one training focus.',
         'three_months': 'Reassess the same skills using comparable match footage.',
         'six_months': 'Review progress across several observations.', 'twelve_months': 'Set the next goals with the player and coach.'}
@@ -324,6 +351,7 @@ def publish_report(document):
     doc['score_meaning'] = {'skills': meanings, 'position': pd.get('position'), 'position_line': ACADEMY_NOTE, 'discovery': None}
     doc['score_context'] = {'overall': {'score': overall, 'line': METHOD}, 'bracket': (rubric(pd.get('age')) or ('Age unavailable',))[0]}
     evidence_rows = [{**bound(e), 'title': titles[e['canonical_event_type']], 'description': e['_display_description'],
+        'summary': e['_reader_summary'],
         'contact_interval_ms': e.get('contact_interval_ms'), 'outcome_ms': (e.get('proof') or {}).get('outcome_ms'),
         'clip_url': comments.get(e['event_id'], {}).get('tele_clip_url')} for e in key_events]
     review = doc.get('agent_review') or {}
@@ -354,7 +382,7 @@ def publish_report(document):
         'parentSummary': {'headline': full['parent_summary']['headline'],
             'paragraphs': full['parent_summary']['paragraphs'], 'goodNews': full['parent_summary']['good_news']},
         'matchStats': [{'label': k, 'value': v, 'pct': 0} for k, v in [
-            ('Verified Goals', counts['GOAL']), ('Verified Assists', counts['ASSIST']),
+            ('Goals', counts['GOAL']), ('Assists', counts['ASSIST']),
             ('Total Actions', len(events)), ('Key Passes (excluding assists)', ms['key_passes']),
             ('Shots (including goals)', shots), ('Duels Observed', counts['DUEL']), ('Video Analysed', duration_label)]],
     }

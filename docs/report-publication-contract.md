@@ -46,8 +46,12 @@ withheld even when an observed aggregate can be calculated.
   text remain in raw evidence. Contact brackets remain brackets, not invented
   exact contact instants or foot-side conclusions.
 - All key scoring actions and the complete chronological event log are retained.
-  PDF front pages can show a preview; the measured-height appendix includes the
-  full log, skill evidence and stable links back to the authenticated report.
+  The PDF groups the overview, all key actions, all four skill categories with
+  their academy reference, and development/training in consecutive sections.
+  Images retain the complete source aspect ratio; a full match frame replaces
+  an enlarged identity crop on the cover. Short shared editorial summaries
+  appear in the main report; the measured-height appendix preserves the full
+  log, skill evidence and stable links back to the authenticated report.
 - Shots include goals. Key passes are explicitly defined here as teammate-shot
   passes without a goal, with assists counted separately. Observed duels are
   distinguished from wins. Action segments are not ball touches.
@@ -70,9 +74,9 @@ python backend/scripts/review_report_publication.py \
 ```
 
 This checks stored proof-frame PTS against the exported canonical video, extracts
-local review images, and renders the PDF. A review portrait is a crop from the
-original marked frame, not a recovered historical portrait file. No new analysis,
-model requests, merge or deployment is performed.
+local review images, and renders the PDF. Sequence reports use whole, bound
+match frames and do not enlarge the low-resolution identity portrait. No new
+analysis, model requests, merge or deployment is performed.
 
 Tests cover projection immutability/idempotence, invalid grades, missing evidence,
 unknown foot, date/age references, exact frame joins, complete logs, PDF/shared-view

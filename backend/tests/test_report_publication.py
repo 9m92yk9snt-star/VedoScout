@@ -83,7 +83,7 @@ def test_names_exact_snapshot_joins_complete_timeline_and_no_touch_counts():
     assert 'touches_observed' not in r['full_report']['parent_value_metrics']['involvement']
     for m in p['view']['snapshotMoments']:
         assert m['thumb'] == '/frames/'+m['eventId']+'.jpg'
-        assert 'Test Player' in m['desc']
+        assert 'Test Player' not in m['title']  # the section already identifies the player
         assert '15' not in m['desc'] and 'P1' not in m['desc']
     r['full_report']['video_comments'][0]['proof_frame_verified'] = False
     out = publish_report(r)
@@ -116,6 +116,22 @@ def test_pdf_consumes_identical_shared_view_and_all_events(tmp_path):
     assert all(e['event_id'] in text for e in r['canonical_events']['events'])
     assert 'Stronger than' not in text and 'None\'' not in text
     assert 'full ScoutMe Pro Benchmarked Analysis' not in text
+    skills_page = next(p.extract_text() for p in reader.pages if 'Skills & academy reference' in p.extract_text())
+    assert all(label in skills_page for label in ('Technique', 'Game understanding', 'Physical', 'Mentality', 'Academy reference'))
+    first_page = reader.pages[0].extract_text()
+    assert 'OVERALL SCORE' in first_page and 'COMPLETE ACTION TIMELINE' not in first_page
+    assert 'Contact window' not in '\n'.join(p.extract_text() for p in reader.pages[:5])
+
+
+def test_pdf_images_keep_entire_frame_aspect_ratio(tmp_path):
+    from PIL import Image
+    from pdf_sequence import fitted_image
+    source = tmp_path / 'wide-frame.jpg'
+    Image.new('RGB', (1600, 900)).save(source)
+    rendered = fitted_image(source, 300, 100)
+    assert rendered.drawWidth / rendered.drawHeight == pytest.approx(1600 / 900)
+    assert rendered.drawWidth <= 300 and rendered.drawHeight <= 100
+    assert fitted_image(None, 300, 100).getPlainText().startswith('Image unavailable')
 
 
 def test_non_sequence_reports_keep_existing_contract():
