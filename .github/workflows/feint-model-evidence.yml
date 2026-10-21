@@ -13,7 +13,7 @@ jobs:
       github.repository == '9m92yk9snt-star/VedoScout' &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.event.pull_request.head.ref == 'experiment/feint-model-evidence' &&
-      (github.event.action == 'opened' || github.event.before == 'f92f64414fb5e08740bf53db07f516a6b6ba4f0a') &&
+      (github.event.action == 'opened' || github.event.before == 'a02d46d1f528594ec1e54db3f7f908c8865cc9ec') &&
       github.run_attempt == 1
     runs-on: ubuntu-latest
     timeout-minutes: 14
