@@ -1,0 +1,73 @@
+name: Isolated feint model evidence experiment
+on:
+  pull_request:
+    types: [opened, synchronize]
+    paths:
+      - 'backend/scripts/probe_feint_evidence.py'
+      - '.github/workflows/feint-model-evidence.yml'
+permissions:
+  contents: read
+jobs:
+  model_evidence:
+    if: >-
+      github.repository == '9m92yk9snt-star/VedoScout' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.head.ref == 'experiment/feint-model-evidence' &&
+      (github.event.action == 'opened' || github.event.before == 'a146f9c736a8759141cbf705b276647d9194448f') &&
+      github.run_attempt == 1
+    runs-on: ubuntu-latest
+    timeout-minutes: 14
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install video preparation dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg fonts-dejavu-core
+          python -m pip install 'numpy<3' 'opencv-python-headless<5' 'Pillow>=10,<15' 'pytest>=8,<10' 'python-dotenv>=1,<2'
+      - name: Check evidence contracts without a model
+        env:
+          PYTHONPATH: backend
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: '1'
+        run: python -m pytest backend/tests/test_feint_evidence_probe.py backend/tests/test_feint_context.py -q
+      - name: Reassemble existing source; preserve its original identity selections
+        run: |
+          python - <<'PY'
+          import hashlib, os, shutil
+          from pathlib import Path
+          source=Path('testdata/sequence-pilot-orman400')
+          target=Path(os.environ['RUNNER_TEMP'])/'feint-source'
+          (target/'video').mkdir(parents=True)
+          parts=sorted((source/'video-parts').glob('*.bin'))
+          assert [x.name for x in parts]==[f'{i:03}.bin' for i in range(43)]
+          with (target/'video/source.mp4').open('wb') as out:
+              for part in parts:
+                  with part.open('rb') as stream:shutil.copyfileobj(stream,out)
+          shutil.copyfile(source/'anchors.json',target/'anchors.json')
+          for line in (source/'SHA256SUMS').read_text().splitlines():
+              digest,name=line.split(None,1)
+              assert hashlib.sha256((target/name).read_bytes()).hexdigest()==digest
+          print('Verified repository encoding and original selections; no report or expected action times loaded.')
+          PY
+      - name: Recheck model-returned uncertain movements with extended source context (one call)
+        env:
+          EMERGENT_LLM_KEY: ${{ secrets.EMERGENT_LLM_KEY }}
+        run: >-
+          python -u backend/scripts/recheck_uncertain_feints.py
+          --video "$RUNNER_TEMP/feint-source/video/source.mp4"
+          --anchors "$RUNNER_TEMP/feint-source/anchors.json"
+          --previous docs/examples/feint-source-sheet-receipts.json
+          --output "$RUNNER_TEMP/feint-result" --run-model
+      - name: Preserve returned evidence and receipts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: feint-uncertainty-context-${{ github.run_id }}
+          path: ${{ runner.temp }}/feint-result/
+          retention-days: 14
+          if-no-files-found: warn

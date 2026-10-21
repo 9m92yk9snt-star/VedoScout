@@ -1,0 +1,2753 @@
+{
+  "workflow_run_id": 39611370114,
+  "code_commit": "aa370f1161fd204f892ef00a06ab8b867f4c7809",
+  "result": {
+    "schema": "FEINT_PROBE_V1",
+    "source_video_sha256": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+    "anchors_sha256": "95ec65ff36e5d3441a32fe053854f646f6bcbbfe14f88090e7aa98eebe550446",
+    "duration_s": 76.763596,
+    "detail_crop_xywh": [
+      0,
+      464,
+      1080,
+      1248
+    ],
+    "identity_references": [
+      {
+        "reference_id": "r1",
+        "requested_ms": 3070,
+        "box": {
+          "x": 0.4098,
+          "y": 0.5002,
+          "w": 0.1467,
+          "h": 0.1127
+        },
+        "target_point": {
+          "x": 0.4449678749970295,
+          "y": 0.5506545696050069
+        },
+        "selection_hints": {
+          "target_point": {
+            "x": 0.4449678749970295,
+            "y": 0.5506545696050069
+          }
+        },
+        "source_ms": 3067,
+        "image_sha256": "2deeb83a61c3de2696069757fb179eb8bb2776a0b4fbd6ffb963e6417d431dca"
+      },
+      {
+        "reference_id": "r2",
+        "requested_ms": 41910,
+        "box": {
+          "x": 0.2287,
+          "y": 0.5403,
+          "w": 0.2055,
+          "h": 0.1511
+        },
+        "target_point": {
+          "x": 0.26874435411020775,
+          "y": 0.6158536585365855
+        },
+        "selection_hints": {
+          "target_point": {
+            "x": 0.26874435411020775,
+            "y": 0.6158536585365855
+          }
+        },
+        "source_ms": 41915,
+        "image_sha256": "d2ac40f60be62779e0d544074809a79c1c0d9d225f8f78c71d30a372c94db183"
+      },
+      {
+        "reference_id": "r3",
+        "requested_ms": 71010,
+        "box": {
+          "x": 0.5271,
+          "y": 0.5086,
+          "w": 0.1745,
+          "h": 0.1298
+        },
+        "target_point": {
+          "x": 0.5618908035533222,
+          "y": 0.5555535803171444
+        },
+        "selection_hints": {
+          "target_point": {
+            "x": 0.5618908035533222,
+            "y": 0.5555535803171444
+          }
+        },
+        "source_ms": 71014,
+        "image_sha256": "c4a33cf6bdc29b7ff5c2ed4aa66c3c4d6d4f61485ff221d432a79480e33e9a4a"
+      },
+      {
+        "reference_id": "r4",
+        "requested_ms": 15350,
+        "box": {
+          "x": 0.3469,
+          "y": 0.4608,
+          "w": 0.1582,
+          "h": 0.1707
+        },
+        "target_point": {
+          "x": 0.38686868686868686,
+          "y": 0.5363636363636364
+        },
+        "selection_hints": {
+          "target_point": {
+            "x": 0.38686868686868686,
+            "y": 0.5363636363636364
+          }
+        },
+        "source_ms": 15349,
+        "image_sha256": "077375be887414bc1eb104eff67df1901d02f7d10904e2f486fe739079b4b641"
+      },
+      {
+        "reference_id": "r5",
+        "requested_ms": 21480,
+        "box": {
+          "x": 0.5639,
+          "y": 0.4182,
+          "w": 0.0852,
+          "h": 0.1026
+        },
+        "target_point": {
+          "x": 0.5898194775745796,
+          "y": 0.45775907765703683
+        },
+        "selection_hints": {
+          "target_point": {
+            "x": 0.5898194775745796,
+            "y": 0.45775907765703683
+          },
+          "visible_mask": {
+            "width": 96,
+            "height": 192,
+            "runs": [
+              1111,
+              16,
+              79,
+              18,
+              78,
+              20,
+              75,
+              23,
+              72,
+              25,
+              71,
+              26,
+              69,
+              28,
+              68,
+              29,
+              67,
+              30,
+              65,
+              31,
+              65,
+              32,
+              64,
+              32,
+              64,
+              32,
+              64,
+              33,
+              61,
+              35,
+              61,
+              35,
+              61,
+              35,
+              61,
+              35,
+              60,
+              36,
+              60,
+              36,
+              59,
+              37,
+              56,
+              40,
+              53,
+              42,
+              53,
+              43,
+              51,
+              45,
+              50,
+              46,
+              49,
+              47,
+              48,
+              48,
+              47,
+              49,
+              47,
+              50,
+              45,
+              51,
+              44,
+              52,
+              44,
+              52,
+              43,
+              53,
+              42,
+              54,
+              42,
+              55,
+              40,
+              56,
+              40,
+              56,
+              40,
+              57,
+              38,
+              59,
+              37,
+              62,
+              34,
+              64,
+              31,
+              68,
+              28,
+              69,
+              27,
+              69,
+              25,
+              72,
+              24,
+              72,
+              24,
+              72,
+              23,
+              73,
+              23,
+              73,
+              23,
+              73,
+              22,
+              73,
+              23,
+              73,
+              22,
+              73,
+              22,
+              74,
+              22,
+              37,
+              2,
+              35,
+              21,
+              37,
+              5,
+              32,
+              21,
+              37,
+              6,
+              32,
+              21,
+              38,
+              4,
+              32,
+              21,
+              75,
+              20,
+              75,
+              21,
+              75,
+              20,
+              75,
+              20,
+              76,
+              20,
+              75,
+              7,
+              2,
+              11,
+              76,
+              7,
+              4,
+              8,
+              76,
+              8,
+              4,
+              7,
+              77,
+              8,
+              4,
+              7,
+              76,
+              9,
+              5,
+              6,
+              75,
+              10,
+              4,
+              7,
+              75,
+              21,
+              75,
+              21,
+              75,
+              21,
+              74,
+              22,
+              74,
+              22,
+              74,
+              22,
+              74,
+              21,
+              75,
+              21,
+              75,
+              21,
+              75,
+              21,
+              75,
+              21,
+              76,
+              20,
+              76,
+              20,
+              76,
+              20,
+              76,
+              20,
+              76,
+              19,
+              77,
+              19,
+              77,
+              19,
+              77,
+              19,
+              76,
+              20,
+              76,
+              20,
+              75,
+              20,
+              76,
+              20,
+              75,
+              21,
+              74,
+              22,
+              74,
+              22,
+              73,
+              22,
+              74,
+              22,
+              75,
+              21,
+              75,
+              21,
+              75,
+              21,
+              76,
+              19,
+              77,
+              19,
+              28,
+              8,
+              41,
+              19,
+              26,
+              19,
+              33,
+              17,
+              24,
+              26,
+              30,
+              15,
+              24,
+              28,
+              30,
+              13,
+              24,
+              29,
+              31,
+              11,
+              24,
+              31,
+              30,
+              9,
+              24,
+              33,
+              30,
+              9,
+              24,
+              34,
+              29,
+              9,
+              22,
+              36,
+              30,
+              8,
+              21,
+              37,
+              30,
+              8,
+              20,
+              38,
+              31,
+              7,
+              19,
+              40,
+              30,
+              7,
+              17,
+              42,
+              30,
+              7,
+              16,
+              43,
+              31,
+              6,
+              14,
+              45,
+              31,
+              6,
+              13,
+              47,
+              31,
+              5,
+              10,
+              50,
+              31,
+              5,
+              9,
+              52,
+              30,
+              5,
+              7,
+              55,
+              30,
+              4,
+              5,
+              57,
+              30,
+              4,
+              4,
+              59,
+              29,
+              4,
+              3,
+              60,
+              30,
+              3,
+              2,
+              62,
+              30,
+              66,
+              30,
+              67,
+              30,
+              66,
+              30,
+              67,
+              30,
+              66,
+              30,
+              66,
+              30,
+              66,
+              30,
+              66,
+              30,
+              67,
+              29,
+              67,
+              29,
+              67,
+              29,
+              67,
+              29,
+              67,
+              29,
+              67,
+              29,
+              67,
+              29,
+              67,
+              29,
+              68,
+              28,
+              69,
+              27,
+              69,
+              27,
+              70,
+              26,
+              70,
+              26,
+              71,
+              25,
+              74,
+              21,
+              3073
+            ],
+            "method": "native_person_instance"
+          }
+        },
+        "source_ms": 21482,
+        "image_sha256": "f58d1dd43674b2c46e35ae5f7ff60feb7a6de354f19b48fc7ef847d75a8550c4"
+      },
+      {
+        "reference_id": "r6",
+        "requested_ms": 27630,
+        "box": {
+          "x": 0.4065,
+          "y": 0.5484,
+          "w": 0.1083,
+          "h": 0.1719
+        },
+        "target_point": {
+          "x": 0.4196042053184911,
+          "y": 0.6171150278293135
+        },
+        "selection_hints": {
+          "target_point": {
+            "x": 0.4196042053184911,
+            "y": 0.6171150278293135
+          },
+          "visible_mask": {
+            "width": 96,
+            "height": 192,
+            "runs": [
+              2208,
+              9,
+              87,
+              9,
+              87,
+              10,
+              86,
+              10,
+              86,
+              10,
+              86,
+              10,
+              86,
+              10,
+              86,
+              11,
+              85,
+              11,
+              85,
+              11,
+              85,
+              11,
+              85,
+              11,
+              85,
+              11,
+              85,
+              11,
+              85,
+              11,
+              85,
+              13,
+              83,
+              14,
+              82,
+              14,
+              82,
+              15,
+              81,
+              17,
+              79,
+              17,
+              79,
+              17,
+              79,
+              17,
+              79,
+              17,
+              79,
+              17,
+              79,
+              16,
+              80,
+              16,
+              80,
+              15,
+              81,
+              14,
+              82,
+              14,
+              82,
+              13,
+              83,
+              12,
+              84,
+              11,
+              85,
+              10,
+              86,
+              10,
+              86,
+              10,
+              86,
+              10,
+              86,
+              9,
+              87,
+              9,
+              87,
+              9,
+              87,
+              9,
+              87,
+              9,
+              87,
+              9,
+              87,
+              9,
+              87,
+              10,
+              86,
+              10,
+              86,
+              10,
+              86,
+              10,
+              86,
+              11,
+              85,
+              11,
+              85,
+              11,
+              85,
+              13,
+              83,
+              13,
+              83,
+              13,
+              83,
+              14,
+              82,
+              14,
+              82,
+              14,
+              82,
+              14,
+              82,
+              14,
+              82,
+              13,
+              83,
+              13,
+              83,
+              13,
+              83,
+              13,
+              83,
+              13,
+              83,
+              12,
+              84,
+              12,
+              84,
+              11,
+              85,
+              10,
+              86,
+              10,
+              86,
+              10,
+              86,
+              10,
+              86,
+              9,
+              87,
+              9,
+              87,
+              8,
+              88,
+              8,
+              88,
+              8,
+              88,
+              7,
+              89,
+              6,
+              90,
+              6,
+              90,
+              5,
+              91,
+              5,
+              91,
+              5,
+              91,
+              5,
+              91,
+              5,
+              91,
+              5,
+              91,
+              5,
+              91,
+              5,
+              91,
+              3,
+              93,
+              3,
+              93,
+              2,
+              94,
+              2,
+              94,
+              2,
+              94,
+              2,
+              94,
+              1,
+              16,
+              1,
+              78,
+              1,
+              13,
+              5,
+              77,
+              1,
+              13,
+              5,
+              91,
+              5,
+              93,
+              2,
+              6894
+            ],
+            "method": "native_person_instance"
+          }
+        },
+        "source_ms": 27632,
+        "image_sha256": "3a6182d7fa67f17274de16d5a3b147a973b45f61de821ec61492bb40b87f0ecd"
+      },
+      {
+        "reference_id": "r7",
+        "requested_ms": 33770,
+        "box": {
+          "x": 0.4657,
+          "y": 0.4266,
+          "w": 0.1657,
+          "h": 0.1849
+        },
+        "target_point": {
+          "x": 0.5061842918985776,
+          "y": 0.5023191094619666
+        },
+        "selection_hints": {
+          "target_point": {
+            "x": 0.5061842918985776,
+            "y": 0.5023191094619666
+          },
+          "visible_mask": {
+            "width": 96,
+            "height": 192,
+            "runs": [
+              2515,
+              13,
+              83,
+              14,
+              82,
+              15,
+              81,
+              15,
+              81,
+              16,
+              79,
+              17,
+              79,
+              17,
+              79,
+              17,
+              79,
+              18,
+              78,
+              18,
+              77,
+              19,
+              77,
+              19,
+              77,
+              18,
+              20,
+              1,
+              57,
+              18,
+              20,
+              2,
+              56,
+              18,
+              20,
+              1,
+              58,
+              17,
+              79,
+              16,
+              80,
+              16,
+              80,
+              15,
+              82,
+              14,
+              82,
+              14,
+              82,
+              14,
+              83,
+              14,
+              82,
+              15,
+              81,
+              16,
+              80,
+              17,
+              79,
+              18,
+              78,
+              18,
+              78,
+              19,
+              76,
+              21,
+              75,
+              22,
+              74,
+              23,
+              72,
+              25,
+              71,
+              25,
+              71,
+              26,
+              70,
+              26,
+              71,
+              26,
+              70,
+              27,
+              69,
+              28,
+              68,
+              29,
+              67,
+              30,
+              67,
+              30,
+              66,
+              33,
+              63,
+              31,
+              65,
+              30,
+              66,
+              29,
+              67,
+              29,
+              67,
+              29,
+              67,
+              28,
+              68,
+              28,
+              68,
+              28,
+              68,
+              28,
+              68,
+              28,
+              68,
+              28,
+              68,
+              28,
+              68,
+              28,
+              68,
+              29,
+              68,
+              28,
+              68,
+              28,
+              68,
+              29,
+              67,
+              29,
+              67,
+              30,
+              66,
+              30,
+              66,
+              30,
+              66,
+              30,
+              66,
+              31,
+              65,
+              31,
+              65,
+              32,
+              64,
+              32,
+              64,
+              32,
+              63,
+              34,
+              62,
+              34,
+              62,
+              34,
+              62,
+              34,
+              62,
+              34,
+              62,
+              34,
+              62,
+              34,
+              62,
+              34,
+              62,
+              33,
+              63,
+              33,
+              63,
+              33,
+              63,
+              33,
+              63,
+              32,
+              63,
+              32,
+              64,
+              32,
+              64,
+              32,
+              64,
+              32,
+              64,
+              32,
+              64,
+              32,
+              64,
+              36,
+              60,
+              40,
+              57,
+              42,
+              54,
+              46,
+              50,
+              50,
+              46,
+              55,
+              41,
+              14,
+              3,
+              39,
+              40,
+              13,
+              5,
+              39,
+              39,
+              13,
+              6,
+              38,
+              38,
+              14,
+              7,
+              38,
+              37,
+              14,
+              9,
+              36,
+              37,
+              14,
+              10,
+              35,
+              37,
+              14,
+              13,
+              33,
+              35,
+              15,
+              17,
+              30,
+              34,
+              15,
+              18,
+              29,
+              34,
+              16,
+              17,
+              29,
+              33,
+              17,
+              17,
+              30,
+              32,
+              17,
+              18,
+              29,
+              32,
+              17,
+              18,
+              29,
+              33,
+              17,
+              18,
+              28,
+              35,
+              15,
+              33,
+              13,
+              37,
+              13,
+              37,
+              9,
+              39,
+              11,
+              40,
+              5,
+              41,
+              10,
+              41,
+              4,
+              41,
+              10,
+              86,
+              10,
+              86,
+              10,
+              86,
+              10,
+              85,
+              11,
+              85,
+              12,
+              83,
+              13,
+              83,
+              13,
+              82,
+              14,
+              82,
+              13,
+              82,
+              14,
+              82,
+              14,
+              82,
+              13,
+              83,
+              12,
+              84,
+              11,
+              3712
+            ],
+            "method": "native_person_instance"
+          }
+        },
+        "source_ms": 33765,
+        "image_sha256": "69f82b65e6fbd75e2b040f61c1a61daf33a248f37c357b5f765b8b956b53e2e5"
+      },
+      {
+        "reference_id": "r8",
+        "requested_ms": 56050,
+        "box": {
+          "x": 0.3525,
+          "y": 0.5272,
+          "w": 0.1685,
+          "h": 0.1062
+        },
+        "target_point": {
+          "x": 0.3925111170009129,
+          "y": 0.5770275642724623
+        },
+        "selection_hints": {
+          "target_point": {
+            "x": 0.3925111170009129,
+            "y": 0.5770275642724623
+          }
+        },
+        "source_ms": 56048,
+        "image_sha256": "0610ad635d0f3c6c1c41d014442521fc969bafa7158778f8cb2017e4768f8d65"
+      },
+      {
+        "reference_id": "r9",
+        "requested_ms": 55760,
+        "box": {
+          "x": 0.3971,
+          "y": 0.5461,
+          "w": 0.1217,
+          "h": 0.1027
+        },
+        "target_point": {
+          "x": 0.4595959595959596,
+          "y": 0.6204545454545455
+        },
+        "selection_hints": {
+          "target_point": {
+            "x": 0.4595959595959596,
+            "y": 0.6204545454545455
+          }
+        },
+        "source_ms": 55764,
+        "image_sha256": "9a6889c679db6168384ea427fb07a563ddb1f5011ef875abea88c6916b70781c"
+      },
+      {
+        "reference_id": "r10",
+        "requested_ms": 64300,
+        "box": {
+          "x": 0.4476,
+          "y": 0.5508,
+          "w": 0.1482,
+          "h": 0.1104
+        },
+        "target_point": {
+          "x": 0.4823305945754925,
+          "y": 0.5969056453750331
+        },
+        "selection_hints": {
+          "target_point": {
+            "x": 0.4823305945754925,
+            "y": 0.5969056453750331
+          }
+        },
+        "source_ms": 64297,
+        "image_sha256": "b50d4818b23fcce786c533de8467bdf1fefe3d3c23eb68de2048bbed369b8820"
+      }
+    ],
+    "discovery_payload": {
+      "payload_sha256": "5d3551bfdb917ac86ad38b09b2dec5ac95f16225426a98fb35ea7cb2907aeb48",
+      "payload_bytes": 12862924,
+      "explicit_image_count": 10,
+      "images": [
+        {
+          "sha256": "2deeb83a61c3de2696069757fb179eb8bb2776a0b4fbd6ffb963e6417d431dca",
+          "bytes": 97581
+        },
+        {
+          "sha256": "d2ac40f60be62779e0d544074809a79c1c0d9d225f8f78c71d30a372c94db183",
+          "bytes": 153441
+        },
+        {
+          "sha256": "c4a33cf6bdc29b7ff5c2ed4aa66c3c4d6d4f61485ff221d432a79480e33e9a4a",
+          "bytes": 93653
+        },
+        {
+          "sha256": "077375be887414bc1eb104eff67df1901d02f7d10904e2f486fe739079b4b641",
+          "bytes": 145591
+        },
+        {
+          "sha256": "f58d1dd43674b2c46e35ae5f7ff60feb7a6de354f19b48fc7ef847d75a8550c4",
+          "bytes": 152080
+        },
+        {
+          "sha256": "3a6182d7fa67f17274de16d5a3b147a973b45f61de821ec61492bb40b87f0ecd",
+          "bytes": 149341
+        },
+        {
+          "sha256": "69f82b65e6fbd75e2b040f61c1a61daf33a248f37c357b5f765b8b956b53e2e5",
+          "bytes": 179461
+        },
+        {
+          "sha256": "0610ad635d0f3c6c1c41d014442521fc969bafa7158778f8cb2017e4768f8d65",
+          "bytes": 142132
+        },
+        {
+          "sha256": "9a6889c679db6168384ea427fb07a563ddb1f5011ef875abea88c6916b70781c",
+          "bytes": 147751
+        },
+        {
+          "sha256": "b50d4818b23fcce786c533de8467bdf1fefe3d3c23eb68de2048bbed369b8820",
+          "bytes": 125661
+        }
+      ],
+      "frame_sampling_in_provider_metadata": true,
+      "videos": [
+        {
+          "sha256": "89f63119e4639bb64f34505abde7dcc47383ebba4287b2de92f768621c72b1f1",
+          "bytes": 2464791,
+          "requested_fps": 4
+        },
+        {
+          "sha256": "20b57454695f70fcfc5e8d22c4dd8e5100ee6f23b5ecf5c267258eca96d7c4e9",
+          "bytes": 5786639,
+          "requested_fps": 12
+        }
+      ],
+      "requested_image_detail": "high"
+    },
+    "expected_answers_used": false,
+    "historical_observations_used": false,
+    "production_report_modified": false,
+    "status": "MODEL_REVIEW_COMPLETED",
+    "max_model_calls": 2,
+    "limits": "Native discovery times approximate. Model observations require independent evaluation; not ground truth.",
+    "discovered_candidates": [
+      {
+        "start_s": 5,
+        "move_s": 9,
+        "end_s": 12,
+        "type": "OTHER",
+        "identity_evidence": "Player in white pushing back against blue player (#9).",
+        "before": "White player shields the ball from #9.",
+        "movement": "White player holds position and fends off #9, but is fouled.",
+        "opponent_response": "#9 pulls the white player back and kicks his leg out.",
+        "after": "White player falls to the ground due to foul.",
+        "outcome": "LOSES",
+        "uncertainty": "Resulting possession after foul is unclear.",
+        "candidate_id": "c1"
+      },
+      {
+        "start_s": 22,
+        "move_s": 23,
+        "end_s": 25,
+        "type": "OTHER",
+        "identity_evidence": "Player in white receives a pass.",
+        "before": "White player runs onto a pass.",
+        "movement": "White player shoots at goal.",
+        "opponent_response": "Goalkeeper dives to block the shot.",
+        "after": "Ball deflects off goalkeeper and goes wide.",
+        "outcome": "LOSES",
+        "uncertainty": "",
+        "candidate_id": "c2"
+      },
+      {
+        "start_s": 35,
+        "move_s": 37,
+        "end_s": 39,
+        "type": "OTHER",
+        "identity_evidence": "Player in white receives pass, then shoots.",
+        "before": "White player receives pass on right side of field.",
+        "movement": "White player takes a touch to control the ball, then shoots towards the right side of the goal.",
+        "opponent_response": "Goalkeeper positions himself to block the shot.",
+        "after": "Ball enters the right side of the goal.",
+        "outcome": "PASSES",
+        "uncertainty": "",
+        "candidate_id": "c3"
+      },
+      {
+        "start_s": 54,
+        "move_s": 56,
+        "end_s": 58,
+        "type": "OTHER",
+        "identity_evidence": "Player in white receiving the ball.",
+        "before": "White player running onto a pass.",
+        "movement": "White player kicks the ball towards goal.",
+        "opponent_response": "Goalkeeper slides to intercept the ball.",
+        "after": "Goalkeeper deflects the ball.",
+        "outcome": "LOSES",
+        "uncertainty": "Player identity partially obscured by other players.",
+        "candidate_id": "c4"
+      },
+      {
+        "start_s": 64,
+        "move_s": 65,
+        "end_s": 67,
+        "type": "DIRECTION_CHANGE",
+        "identity_evidence": "Player in white, furthest left.",
+        "before": "Player runs forward to meet the ball.",
+        "movement": "Player changes direction to the right.",
+        "opponent_response": "Blue player attempts to tackle.",
+        "after": "Player shoots the ball towards goal.",
+        "outcome": "PASSES",
+        "uncertainty": "Not sure if the player passes or scores.",
+        "candidate_id": "c5"
+      },
+      {
+        "start_s": 71,
+        "move_s": 72,
+        "end_s": 74,
+        "type": "OTHER",
+        "identity_evidence": "Player in white attempting to head the ball.",
+        "before": "Player in white jumping up to meet the ball in the air.",
+        "movement": "Player in white kicks the ball while it's in the air.",
+        "opponent_response": "Goalkeeper attempts to save the ball.",
+        "after": "The ball enters the goal.",
+        "outcome": "PASSES",
+        "uncertainty": "",
+        "candidate_id": "c6"
+      }
+    ],
+    "verification_candidates": [
+      {
+        "start_s": 5,
+        "move_s": 9,
+        "end_s": 12,
+        "type": "OTHER",
+        "identity_evidence": "Player in white pushing back against blue player (#9).",
+        "before": "White player shields the ball from #9.",
+        "movement": "White player holds position and fends off #9, but is fouled.",
+        "opponent_response": "#9 pulls the white player back and kicks his leg out.",
+        "after": "White player falls to the ground due to foul.",
+        "outcome": "LOSES",
+        "uncertainty": "Resulting possession after foul is unclear.",
+        "candidate_id": "c1"
+      },
+      {
+        "start_s": 22,
+        "move_s": 23,
+        "end_s": 25,
+        "type": "OTHER",
+        "identity_evidence": "Player in white receives a pass.",
+        "before": "White player runs onto a pass.",
+        "movement": "White player shoots at goal.",
+        "opponent_response": "Goalkeeper dives to block the shot.",
+        "after": "Ball deflects off goalkeeper and goes wide.",
+        "outcome": "LOSES",
+        "uncertainty": "",
+        "candidate_id": "c2"
+      },
+      {
+        "start_s": 35,
+        "move_s": 37,
+        "end_s": 39,
+        "type": "OTHER",
+        "identity_evidence": "Player in white receives pass, then shoots.",
+        "before": "White player receives pass on right side of field.",
+        "movement": "White player takes a touch to control the ball, then shoots towards the right side of the goal.",
+        "opponent_response": "Goalkeeper positions himself to block the shot.",
+        "after": "Ball enters the right side of the goal.",
+        "outcome": "PASSES",
+        "uncertainty": "",
+        "candidate_id": "c3"
+      },
+      {
+        "start_s": 54,
+        "move_s": 56,
+        "end_s": 58,
+        "type": "OTHER",
+        "identity_evidence": "Player in white receiving the ball.",
+        "before": "White player running onto a pass.",
+        "movement": "White player kicks the ball towards goal.",
+        "opponent_response": "Goalkeeper slides to intercept the ball.",
+        "after": "Goalkeeper deflects the ball.",
+        "outcome": "LOSES",
+        "uncertainty": "Player identity partially obscured by other players.",
+        "candidate_id": "c4"
+      },
+      {
+        "start_s": 64,
+        "move_s": 65,
+        "end_s": 67,
+        "type": "DIRECTION_CHANGE",
+        "identity_evidence": "Player in white, furthest left.",
+        "before": "Player runs forward to meet the ball.",
+        "movement": "Player changes direction to the right.",
+        "opponent_response": "Blue player attempts to tackle.",
+        "after": "Player shoots the ball towards goal.",
+        "outcome": "PASSES",
+        "uncertainty": "Not sure if the player passes or scores.",
+        "candidate_id": "c5"
+      },
+      {
+        "start_s": 71,
+        "move_s": 72,
+        "end_s": 74,
+        "type": "OTHER",
+        "identity_evidence": "Player in white attempting to head the ball.",
+        "before": "Player in white jumping up to meet the ball in the air.",
+        "movement": "Player in white kicks the ball while it's in the air.",
+        "opponent_response": "Goalkeeper attempts to save the ball.",
+        "after": "The ball enters the goal.",
+        "outcome": "PASSES",
+        "uncertainty": "",
+        "candidate_id": "c6"
+      }
+    ],
+    "unreviewed_candidates": [],
+    "reviews": [
+      {
+        "candidate_id": "c1",
+        "decision": "SUPPORTED",
+        "type": "SHIELD_TURN",
+        "identity_frames": [
+          "c1_f00",
+          "c1_f01",
+          "c1_f11"
+        ],
+        "before_frame": "c1_f07",
+        "movement_frames": [
+          "c1_f08",
+          "c1_f09",
+          "c1_f10",
+          "c1_f11"
+        ],
+        "after_frame": "c1_f15",
+        "visible_movement": "The short-haired white player rotates from facing blue #9 to placing his back and hip between #9 and the ball, keeping it within reach.",
+        "opponent_response": "Blue #9 steps across and maintains close upper-body contact from behind rather than being beaten.",
+        "outcome": "RETAINS",
+        "reason": "A protective turn and immediate retention are visible in distinct frames. The later frame shows the white player down and the ball loose, not a successful escape.",
+        "uncertainty": "Overlapping legs obscure exact touches. The gap before c1_f17 prevents establishing the cause of the fall or a foul decision."
+      },
+      {
+        "candidate_id": "c2",
+        "decision": "REJECTED",
+        "type": "OTHER",
+        "identity_frames": [
+          "c2_f01",
+          "c2_f02",
+          "c2_f13"
+        ],
+        "before_frame": "c2_f02",
+        "movement_frames": [
+          "c2_f06",
+          "c2_f10",
+          "c2_f13",
+          "c2_f14",
+          "c2_f15"
+        ],
+        "after_frame": "c2_f16",
+        "visible_movement": "The selected short-haired white player runs rightward alongside retreating blue players and then swings through the ball, sending it airborne.",
+        "opponent_response": "Blue players run back alongside and ahead of him; no distinct wrong-way commitment is visible.",
+        "outcome": "UNKNOWN",
+        "reason": "The sequence supports a running attacking action and kick, not a feint or evasive change. A goalkeeper deflection cannot be established from the supplied frames.",
+        "uncertainty": "Players overlap around the ball during the run. The shot's final result and any goalkeeper contact are not continuously shown."
+      },
+      {
+        "candidate_id": "c3",
+        "decision": "REJECTED",
+        "type": "OTHER",
+        "identity_frames": [
+          "c3_f00",
+          "c3_f03",
+          "c3_f13"
+        ],
+        "before_frame": "c3_f01",
+        "movement_frames": [
+          "c3_f03",
+          "c3_f04",
+          "c3_f06",
+          "c3_f13",
+          "c3_f14"
+        ],
+        "after_frame": "c3_f15",
+        "visible_movement": "A white player in bright boots controls and carries rightward, then swings at the ball near goal.",
+        "opponent_response": "Blue defenders pursue and one stays close behind; the goalkeeper sets in front of goal.",
+        "outcome": "UNKNOWN",
+        "reason": "Visible control, forward carrying and shooting do not establish a feint. The shooter is visibly #7, so the hypothesis also does not securely tie this action to the originally selected short-haired player.",
+        "uncertainty": "The gap after c3_f00 prevents a continuous identity link to the receiver. Neither a goal nor a pass is established by the immediate shooting frames."
+      },
+      {
+        "candidate_id": "c4",
+        "decision": "REJECTED",
+        "type": "OTHER",
+        "identity_frames": [
+          "c4_f06",
+          "c4_f09",
+          "c4_f10"
+        ],
+        "before_frame": "c4_f07",
+        "movement_frames": [
+          "c4_f09",
+          "c4_f10",
+          "c4_f11",
+          "c4_f12"
+        ],
+        "after_frame": "c4_f16",
+        "visible_movement": "The selected smaller white player, behind teammates #13 and #10, runs toward goal and extends a leg through the ball's path.",
+        "opponent_response": "A blue defender chases from behind. The goalkeeper comes forward and subsequently goes low as the ball moves across the goal area.",
+        "outcome": "UNKNOWN",
+        "reason": "This is a direct running and kicking sequence, without visible deceptive movement or an evasive change. The goalkeeper's action alone does not support a feint.",
+        "uncertainty": "Teammates obscure several ball contacts. A specific goalkeeper deflection and subsequent possession cannot be confirmed."
+      },
+      {
+        "candidate_id": "c5",
+        "decision": "REJECTED",
+        "type": "OTHER",
+        "identity_frames": [
+          "c5_f02",
+          "c5_f03",
+          "c5_f06"
+        ],
+        "before_frame": "c5_f01",
+        "movement_frames": [
+          "c5_f02",
+          "c5_f03",
+          "c5_f05",
+          "c5_f06"
+        ],
+        "after_frame": "c5_f07",
+        "visible_movement": "The selected short-haired white player carries the ball screen-left past the position of white #12, continuing along the same general route.",
+        "opponent_response": "The blue player in orange boots pursues from behind and to the side; no clear tackle-induced reversal or wrong-way response is visible.",
+        "outcome": "PROGRESSES",
+        "reason": "The supplied close sequence shows a carry, not the hypothesized rightward direction change. White #12 is a teammate, not the selected player or an opponent being beaten.",
+        "uncertainty": "White #12 briefly obscures the ball. The abrupt scene change at c5_f08 prevents linking the later distant play to a pass or shot by the selected player."
+      },
+      {
+        "candidate_id": "c6",
+        "decision": "REJECTED",
+        "type": "OTHER",
+        "identity_frames": [
+          "c6_f00",
+          "c6_f01",
+          "c6_f02"
+        ],
+        "before_frame": "c6_f00",
+        "movement_frames": [
+          "c6_f01",
+          "c6_f02"
+        ],
+        "after_frame": "c6_f03",
+        "visible_movement": "The selected white player raises and swings a leg at an airborne ball, sending it high toward screen-left.",
+        "opponent_response": "The nearby blue defender closes and lifts toward the ball after the kick; no deceptive response is visible.",
+        "outcome": "PASSES",
+        "reason": "The visible action is an airborne delivery, not a feint. Subsequent frames follow the ball toward a different white player, so that player's later attacking action cannot be attributed to the selection.",
+        "uncertainty": "Exact foot contact is blurred. Completion of the delivery and the later goal claim are not established by the immediate before-and-after evidence."
+      }
+    ],
+    "source_frames": [
+      {
+        "id": "c1_f00",
+        "candidate_id": "c1",
+        "source_ms": 4700,
+        "sha256": "7f8919d8e68cd5c922740cbf6d845992a523fcc7f06c4d43a7918381ce5cc4e1"
+      },
+      {
+        "id": "c1_f01",
+        "candidate_id": "c1",
+        "source_ms": 8066,
+        "sha256": "4285aae0b07e1ce8fe6dda087df7615dcffe56704627d99e12056fd257051555"
+      },
+      {
+        "id": "c1_f02",
+        "candidate_id": "c1",
+        "source_ms": 8183,
+        "sha256": "c2706ccb46d925265d7aef6f397b08513422f98aa620babf3a713425704800b6"
+      },
+      {
+        "id": "c1_f03",
+        "candidate_id": "c1",
+        "source_ms": 8316,
+        "sha256": "c9d8010a0067ca9a5a7f1f099489a6e361918d56ade9dbbc93270d6ef0f73022"
+      },
+      {
+        "id": "c1_f04",
+        "candidate_id": "c1",
+        "source_ms": 8433,
+        "sha256": "9144a72d355aecc392260356add8d16cba177c6bf0b78642dd5f73226d3a96b5"
+      },
+      {
+        "id": "c1_f05",
+        "candidate_id": "c1",
+        "source_ms": 8566,
+        "sha256": "14235c501f42de8cba653300fa29354aaa31ee80a4ac212627ff95dcd8e95976"
+      },
+      {
+        "id": "c1_f06",
+        "candidate_id": "c1",
+        "source_ms": 8683,
+        "sha256": "8a5a3c5e1cb3e586669b86e4a952d2737aae052b4335b5e2513d7dd7b2343534"
+      },
+      {
+        "id": "c1_f07",
+        "candidate_id": "c1",
+        "source_ms": 8816,
+        "sha256": "05dbdcc678aee69dd3a803cab98d1c818b622f2fe30d6caf240d16673b34cc76"
+      },
+      {
+        "id": "c1_f08",
+        "candidate_id": "c1",
+        "source_ms": 8933,
+        "sha256": "0cdc5d940a04de7f395b2676913db72e7c53fa7f962394c6e50e76dbf24dbacb"
+      },
+      {
+        "id": "c1_f09",
+        "candidate_id": "c1",
+        "source_ms": 9066,
+        "sha256": "607e1d3a15047a2f3910769ae907ebe190dacc2a75b048a08191d6cc158d8284"
+      },
+      {
+        "id": "c1_f10",
+        "candidate_id": "c1",
+        "source_ms": 9183,
+        "sha256": "f68b5822630807c10203849878978737671bfaba2f6d38703af51b619a225d25"
+      },
+      {
+        "id": "c1_f11",
+        "candidate_id": "c1",
+        "source_ms": 9316,
+        "sha256": "9b12f122d51f0ca8080a95de6ae5c059a7f05e9d6ed2b212e19cc7432747fa52"
+      },
+      {
+        "id": "c1_f12",
+        "candidate_id": "c1",
+        "source_ms": 9433,
+        "sha256": "9604a1e4ea17a16456482d7a1ed09f7b1f97474c5d3b827e8cf008d29bc27bb2"
+      },
+      {
+        "id": "c1_f13",
+        "candidate_id": "c1",
+        "source_ms": 9566,
+        "sha256": "e95bb9b138e3e87b9d704622fde687b4f577556bbb50628c64f8f2d9ce156929"
+      },
+      {
+        "id": "c1_f14",
+        "candidate_id": "c1",
+        "source_ms": 9683,
+        "sha256": "eaec8f22b08e1b7bc9d23320fc7df9724eb0085c597709b9e2f6e2499d2a9577"
+      },
+      {
+        "id": "c1_f15",
+        "candidate_id": "c1",
+        "source_ms": 9816,
+        "sha256": "791d066deffb0a75a40d7ae519d0bb819fe36b85d8a7bd6f9fd1d4b80f15b355"
+      },
+      {
+        "id": "c1_f16",
+        "candidate_id": "c1",
+        "source_ms": 9933,
+        "sha256": "fce8e99b11418925bb3747869696a7284ea206d0be090efa84a6b92823aaf84f"
+      },
+      {
+        "id": "c1_f17",
+        "candidate_id": "c1",
+        "source_ms": 12300,
+        "sha256": "d7b488363ac65b12719c0278d9e70729749767fa5695d2913796d15aedd93fc3"
+      },
+      {
+        "id": "c2_f00",
+        "candidate_id": "c2",
+        "source_ms": 21699,
+        "sha256": "cd1a9d8581d620ec2268bfd4960977bb3e09a51dcd5d68b625c8a7fcd787f89f"
+      },
+      {
+        "id": "c2_f01",
+        "candidate_id": "c2",
+        "source_ms": 22066,
+        "sha256": "6687660ee8161ab547d6eb5e3e9e6f9326ea925d3b2d3d50103c426c80c5b415"
+      },
+      {
+        "id": "c2_f02",
+        "candidate_id": "c2",
+        "source_ms": 22182,
+        "sha256": "46053e686c2879ec5add86645122cd1ac862cebb1c08440183284f06207638db"
+      },
+      {
+        "id": "c2_f03",
+        "candidate_id": "c2",
+        "source_ms": 22316,
+        "sha256": "8cff2bf02e69a8795f56420384cbcdd70ab7e1975c08404e5408ce53da97cda3"
+      },
+      {
+        "id": "c2_f04",
+        "candidate_id": "c2",
+        "source_ms": 22432,
+        "sha256": "19b54581fbbe5cd241eaef91d5022852915845e0fdc5c358ab7927647cc19027"
+      },
+      {
+        "id": "c2_f05",
+        "candidate_id": "c2",
+        "source_ms": 22566,
+        "sha256": "cb2d4e066af3143a1013e4ce9bf7104b482151af1b49203444b84fce4abd3326"
+      },
+      {
+        "id": "c2_f06",
+        "candidate_id": "c2",
+        "source_ms": 22682,
+        "sha256": "014d076ef4aa40f1f8e87b377ca654bfd3e10e9e71386aba7da862b5e5d2c872"
+      },
+      {
+        "id": "c2_f07",
+        "candidate_id": "c2",
+        "source_ms": 22816,
+        "sha256": "83fcb5b5c9917573a87e130d118bb3d620a87ef4ce4b2281e6865207193eaa4b"
+      },
+      {
+        "id": "c2_f08",
+        "candidate_id": "c2",
+        "source_ms": 22932,
+        "sha256": "884a711af57de5e1d97c1e372c16b5a5ed36e2f11bac9e33630e5f6a84ec9415"
+      },
+      {
+        "id": "c2_f09",
+        "candidate_id": "c2",
+        "source_ms": 23066,
+        "sha256": "b7ea7043c60589c8a9a0cd9d0987f30794673a4a3bbc7c780b3bd581ad407c73"
+      },
+      {
+        "id": "c2_f10",
+        "candidate_id": "c2",
+        "source_ms": 23182,
+        "sha256": "c605a8d78189b2110f01de586c9196cc35723517f28aef4a76a0fbcf4bce2d11"
+      },
+      {
+        "id": "c2_f11",
+        "candidate_id": "c2",
+        "source_ms": 23316,
+        "sha256": "9f035adc3dd8da5a6bf94367688b490227cf063476387992e8c6c9b15962b3d9"
+      },
+      {
+        "id": "c2_f12",
+        "candidate_id": "c2",
+        "source_ms": 23432,
+        "sha256": "e32c01b4c2da761a16d1eab42371b46ddccdd88f8dedae0287f5890b6a7c9041"
+      },
+      {
+        "id": "c2_f13",
+        "candidate_id": "c2",
+        "source_ms": 23566,
+        "sha256": "1bb72e4a8fb70c9c6710a1a80b1ecb0b6a00c4712482217363ffe8993fac4cba"
+      },
+      {
+        "id": "c2_f14",
+        "candidate_id": "c2",
+        "source_ms": 23682,
+        "sha256": "1df3f824cc57fa7d17bf775c1184dd743cfaf85d02d098f59b162e1751b20d98"
+      },
+      {
+        "id": "c2_f15",
+        "candidate_id": "c2",
+        "source_ms": 23816,
+        "sha256": "7b750b7ce3a7bb4b1283f900cff0955f927f1a551280186a670c51a9e185e31c"
+      },
+      {
+        "id": "c2_f16",
+        "candidate_id": "c2",
+        "source_ms": 23932,
+        "sha256": "a9ffd72a93db8bb3020fa09eaaa7c7f8c6b3f8b7ab63a94cbff353237f927714"
+      },
+      {
+        "id": "c2_f17",
+        "candidate_id": "c2",
+        "source_ms": 25299,
+        "sha256": "c442231908d0833bcb124619379967ae4da73ca3057a8d8bad8a3b6bec9a8c43"
+      },
+      {
+        "id": "c3_f00",
+        "candidate_id": "c3",
+        "source_ms": 34699,
+        "sha256": "7e25cce9e5b0d2a714322d56b70f76a0fbaf4393ee18e698eea05b401db461ff"
+      },
+      {
+        "id": "c3_f01",
+        "candidate_id": "c3",
+        "source_ms": 36065,
+        "sha256": "a24de7783da54838ce51ed2bde3d7788ac24a19c7781cf2ddb6ac1061b824bca"
+      },
+      {
+        "id": "c3_f02",
+        "candidate_id": "c3",
+        "source_ms": 36182,
+        "sha256": "ad075735145306a1aad3d886539820e103807cc8641c56d3879209c5079c14cd"
+      },
+      {
+        "id": "c3_f03",
+        "candidate_id": "c3",
+        "source_ms": 36315,
+        "sha256": "44bb2420648a45648d467a1fe526d99e6057250644ddef200564c7e081321b0b"
+      },
+      {
+        "id": "c3_f04",
+        "candidate_id": "c3",
+        "source_ms": 36432,
+        "sha256": "e4101567aa01d4e789f76dcc34edc5f3b852e3650c4bace49490d3fd0a1aa8cb"
+      },
+      {
+        "id": "c3_f05",
+        "candidate_id": "c3",
+        "source_ms": 36565,
+        "sha256": "86d73ae1b44aeadee3b754e39c17c8d245515d6790d1232f6a867c9c7c9cf0cf"
+      },
+      {
+        "id": "c3_f06",
+        "candidate_id": "c3",
+        "source_ms": 36682,
+        "sha256": "b5bcdfe18f307aa3dab3bca856e148332fd54f40231b799effbeb231cc5c1fbf"
+      },
+      {
+        "id": "c3_f07",
+        "candidate_id": "c3",
+        "source_ms": 36815,
+        "sha256": "69f18c70c60f51b72957ac91a28650a605297e333a57ebe55bf6a5b0d7610926"
+      },
+      {
+        "id": "c3_f08",
+        "candidate_id": "c3",
+        "source_ms": 36932,
+        "sha256": "baa98a7c750c110f205c51c8baea8d0988fedceeff530b45cea9f6062111970c"
+      },
+      {
+        "id": "c3_f09",
+        "candidate_id": "c3",
+        "source_ms": 37065,
+        "sha256": "25b32e250764165e6dccfc62f48addbb120e7210ab13debc0467eb455eb11aec"
+      },
+      {
+        "id": "c3_f10",
+        "candidate_id": "c3",
+        "source_ms": 37182,
+        "sha256": "7f52ea57b38da787a7850c49366cdf7c3985136c3495ccdba2b75ce96289866e"
+      },
+      {
+        "id": "c3_f11",
+        "candidate_id": "c3",
+        "source_ms": 37315,
+        "sha256": "1024297383a2b5a5246f33df6fb3caea3a5e32afac6672233d90e8ef0dc041e0"
+      },
+      {
+        "id": "c3_f12",
+        "candidate_id": "c3",
+        "source_ms": 37432,
+        "sha256": "acf0a7acde3ca98fa99a82e46ffe2bde0b3657f2b57dc8f6841a712f5f2f3a7f"
+      },
+      {
+        "id": "c3_f13",
+        "candidate_id": "c3",
+        "source_ms": 37565,
+        "sha256": "bf96d3e30e161129d6f27076ba38cc7641008fe14f48e0223adc67ecda0598d0"
+      },
+      {
+        "id": "c3_f14",
+        "candidate_id": "c3",
+        "source_ms": 37682,
+        "sha256": "d28d31f7816ff839b68cc96510c9222ee88b252cc8e1a1f7568838a9733c02e2"
+      },
+      {
+        "id": "c3_f15",
+        "candidate_id": "c3",
+        "source_ms": 37815,
+        "sha256": "1fe87a49fe15e459e5d64a61190ea3c4b439dca3f562bf10af89a773ad509d51"
+      },
+      {
+        "id": "c3_f16",
+        "candidate_id": "c3",
+        "source_ms": 37932,
+        "sha256": "9312941e045a77b16ade5ad8660aef51736de00a07bb55f67c5b7ba1fa568623"
+      },
+      {
+        "id": "c3_f17",
+        "candidate_id": "c3",
+        "source_ms": 39298,
+        "sha256": "1ad63a9a524aebc5106e288b1e1a720a98ba9b0710e66cbf520a44fa2cc3c871"
+      },
+      {
+        "id": "c4_f00",
+        "candidate_id": "c4",
+        "source_ms": 53698,
+        "sha256": "3e3f3ad719ee9c1da77731b21526c0bc9321e4f9c62b5f83882e7ce2e837580d"
+      },
+      {
+        "id": "c4_f01",
+        "candidate_id": "c4",
+        "source_ms": 55064,
+        "sha256": "94f7343335917cf315d74678391fefe3b1c6b5100f928aca7afe355ec10c07cb"
+      },
+      {
+        "id": "c4_f02",
+        "candidate_id": "c4",
+        "source_ms": 55181,
+        "sha256": "82b95907af285beec21e14031cbd824c9437af015ab88a0d9d65eee7b1cbe1cc"
+      },
+      {
+        "id": "c4_f03",
+        "candidate_id": "c4",
+        "source_ms": 55314,
+        "sha256": "2fb961d933b257b4f2cadb7ee7c6619003d57fb97c203906d5a61f964114cdc5"
+      },
+      {
+        "id": "c4_f04",
+        "candidate_id": "c4",
+        "source_ms": 55431,
+        "sha256": "f3a4e234d147a8bb9ffb43c9b8d7f09baccd4ad50b9715a56ce4622760752b50"
+      },
+      {
+        "id": "c4_f05",
+        "candidate_id": "c4",
+        "source_ms": 55564,
+        "sha256": "00444f3d50fbd9800afc358400db6878f9f4b7a83b3ce4aaa91c728f80c5b0ff"
+      },
+      {
+        "id": "c4_f06",
+        "candidate_id": "c4",
+        "source_ms": 55681,
+        "sha256": "e4bf77b72b35331cc0841bdafae592e879c0f8ac8fb9093cfba198924332706c"
+      },
+      {
+        "id": "c4_f07",
+        "candidate_id": "c4",
+        "source_ms": 55814,
+        "sha256": "9da8946c1fb3aca62ee9a1f9e3bd6c1e5db94a5982c609c08e4d48303cb52b1e"
+      },
+      {
+        "id": "c4_f08",
+        "candidate_id": "c4",
+        "source_ms": 55931,
+        "sha256": "f8f9b4b94e8f4a279c1845af17e29e3643c66b9be9f1bbe11d7212abab77c42d"
+      },
+      {
+        "id": "c4_f09",
+        "candidate_id": "c4",
+        "source_ms": 56064,
+        "sha256": "a07e65210df6ff2937248c637c96c441112592646f1d587628fb838a8a8f0e82"
+      },
+      {
+        "id": "c4_f10",
+        "candidate_id": "c4",
+        "source_ms": 56181,
+        "sha256": "3810b93dda25d40cafae8325cb8c01f36ee0c8ec42ce127488742448e08e7e01"
+      },
+      {
+        "id": "c4_f11",
+        "candidate_id": "c4",
+        "source_ms": 56314,
+        "sha256": "11c3abd74e0e5ac700927db053f36246ae2e0ace551b5bfc2b5e292b0cd64ec7"
+      },
+      {
+        "id": "c4_f12",
+        "candidate_id": "c4",
+        "source_ms": 56431,
+        "sha256": "998c946971eb4317670afbab81c6bd3fdb515ff48339e231ed99c30333ce02c2"
+      },
+      {
+        "id": "c4_f13",
+        "candidate_id": "c4",
+        "source_ms": 56564,
+        "sha256": "edd93a8a067b8d5001a07e5d346495a7c5cb5d0ae688debc2969d646622a5f24"
+      },
+      {
+        "id": "c4_f14",
+        "candidate_id": "c4",
+        "source_ms": 56681,
+        "sha256": "e16b6384e3719291ef0c0cd01e1a81129979116991b999a8bcb07d8e949a9ec8"
+      },
+      {
+        "id": "c4_f15",
+        "candidate_id": "c4",
+        "source_ms": 56814,
+        "sha256": "6d8cb7ba05720276a1d88421a45a377e9ea9ad313d226e82cef9d194138016f1"
+      },
+      {
+        "id": "c4_f16",
+        "candidate_id": "c4",
+        "source_ms": 56931,
+        "sha256": "3fffbefcf4eb3f50e882d66e28bd41740be9c981ce54e277ec5f99bb20aec67a"
+      },
+      {
+        "id": "c4_f17",
+        "candidate_id": "c4",
+        "source_ms": 58298,
+        "sha256": "5479fc5adb567b7f596521ba34db90e3ea3a5ced20d969cdb7676b5a609a1c57"
+      },
+      {
+        "id": "c5_f00",
+        "candidate_id": "c5",
+        "source_ms": 63697,
+        "sha256": "0e7a276ed929ad390967d10bb6e68e3790548cea40f477b305d564f4c3515ad8"
+      },
+      {
+        "id": "c5_f01",
+        "candidate_id": "c5",
+        "source_ms": 64064,
+        "sha256": "d7b9c8377935e0d5cbf17e9249dd0b2b72bd0321dce2c0bb5f8e5d464fa173de"
+      },
+      {
+        "id": "c5_f02",
+        "candidate_id": "c5",
+        "source_ms": 64181,
+        "sha256": "781274a9ace37ee8e831efc4bd5c4e7c0b858cd6e5ac3d5635ae1cb7632ef1b0"
+      },
+      {
+        "id": "c5_f03",
+        "candidate_id": "c5",
+        "source_ms": 64314,
+        "sha256": "125da32e5ed9ee1883f1f4c7c5bd16ee1e3cf160047921e4f307d21b7a689ff5"
+      },
+      {
+        "id": "c5_f04",
+        "candidate_id": "c5",
+        "source_ms": 64431,
+        "sha256": "9070669f721df89d80853a1e1f5e8d5354856da6657be6ce4186cb5b88c57c31"
+      },
+      {
+        "id": "c5_f05",
+        "candidate_id": "c5",
+        "source_ms": 64564,
+        "sha256": "44eb7dc1e2045596993a9fb48bc720c27268bf50e9295dfbe65038cf7f51b4c6"
+      },
+      {
+        "id": "c5_f06",
+        "candidate_id": "c5",
+        "source_ms": 64681,
+        "sha256": "a119f521a1637b5633af27709752a8a50222e3d0e442ae5b96d2bd015211166e"
+      },
+      {
+        "id": "c5_f07",
+        "candidate_id": "c5",
+        "source_ms": 64814,
+        "sha256": "ceb421d901a6dfcc68d563b70da55c4a20447a18d272a5dfc419b0e8ed6561d6"
+      },
+      {
+        "id": "c5_f08",
+        "candidate_id": "c5",
+        "source_ms": 64931,
+        "sha256": "5e0fded4ea9b8dc1715f237585cbba9b8f6422229d98c79ecb69a8f8106a3a47"
+      },
+      {
+        "id": "c5_f09",
+        "candidate_id": "c5",
+        "source_ms": 65064,
+        "sha256": "7f01806e913bc586dcaa34849bdec9178e387dda2213493c5a755a96265144b6"
+      },
+      {
+        "id": "c5_f10",
+        "candidate_id": "c5",
+        "source_ms": 65181,
+        "sha256": "7999e432029f0f7480839d3dfc41b8af7fac744b0340f4ab569b04e1399e3034"
+      },
+      {
+        "id": "c5_f11",
+        "candidate_id": "c5",
+        "source_ms": 65314,
+        "sha256": "393457293f8b4dc3d6550f401bc12e7e0c57c89857a5dace3f49446891e63217"
+      },
+      {
+        "id": "c5_f12",
+        "candidate_id": "c5",
+        "source_ms": 65431,
+        "sha256": "884a02a7f15fa487b62908e8be154ca763c81bebeb3db4af21fbd4699fb175d8"
+      },
+      {
+        "id": "c5_f13",
+        "candidate_id": "c5",
+        "source_ms": 65564,
+        "sha256": "5a9c16b9982b14d7f52ed96d35ca2694d9251966e444f1aaafb4ce6c5b9790f6"
+      },
+      {
+        "id": "c5_f14",
+        "candidate_id": "c5",
+        "source_ms": 65681,
+        "sha256": "9508feec179d00d9945ec93759bfad3eac3fd5a7f009f16b3b5e9dd7f3d1ce42"
+      },
+      {
+        "id": "c5_f15",
+        "candidate_id": "c5",
+        "source_ms": 65814,
+        "sha256": "94f6e3363587311513832f178376f3f7b849dbfeaf816e016264e68fdf0472f8"
+      },
+      {
+        "id": "c5_f16",
+        "candidate_id": "c5",
+        "source_ms": 65931,
+        "sha256": "2a0500d87eae9998c913fc3ad6ade59a6d2516448350748175098163c2286777"
+      },
+      {
+        "id": "c5_f17",
+        "candidate_id": "c5",
+        "source_ms": 67297,
+        "sha256": "6a857cf1cfaa9b03569ee9563388dc4affd8bab553740160ed05a6e5df72fa6e"
+      },
+      {
+        "id": "c6_f00",
+        "candidate_id": "c6",
+        "source_ms": 70697,
+        "sha256": "ba659d3077f20ff8d46fad0609337426fca032defc739f63a1020b4a71ee3ffc"
+      },
+      {
+        "id": "c6_f01",
+        "candidate_id": "c6",
+        "source_ms": 71064,
+        "sha256": "22319017ba03fe0fd2fb0e6499a34b60fec79473af84aab3a2774abd643d8f74"
+      },
+      {
+        "id": "c6_f02",
+        "candidate_id": "c6",
+        "source_ms": 71180,
+        "sha256": "895d89aafacc47be3599b2061a50b4be3747fbb3cc42e142facd5b23a40cd26c"
+      },
+      {
+        "id": "c6_f03",
+        "candidate_id": "c6",
+        "source_ms": 71314,
+        "sha256": "613769da504dfc21b84b849dfe47b7cbea8651bf9b4a4781ce999778f5859c3c"
+      },
+      {
+        "id": "c6_f04",
+        "candidate_id": "c6",
+        "source_ms": 71430,
+        "sha256": "ee1505ec91e27d9f6897075f1aae37c7b963c83345ff00231ce31bc26c3c30b1"
+      },
+      {
+        "id": "c6_f05",
+        "candidate_id": "c6",
+        "source_ms": 71564,
+        "sha256": "76b861797939a2a65e8d9bf6bb7d097f54262db2819a04b9a1329b2d18b59790"
+      },
+      {
+        "id": "c6_f06",
+        "candidate_id": "c6",
+        "source_ms": 71680,
+        "sha256": "86006d0c6918fb169cda39add64eec5f180f6a8be26b12c3c8d66ace45df4269"
+      },
+      {
+        "id": "c6_f07",
+        "candidate_id": "c6",
+        "source_ms": 71814,
+        "sha256": "8ea31525abf0dbabe8133dfe72a809b6b42bec18985fb5d0f21443e73dbbc12d"
+      },
+      {
+        "id": "c6_f08",
+        "candidate_id": "c6",
+        "source_ms": 71930,
+        "sha256": "f890915f15868d9e9bedd2e7a1c94e95630f903a1419255083059b494a276acb"
+      },
+      {
+        "id": "c6_f09",
+        "candidate_id": "c6",
+        "source_ms": 72064,
+        "sha256": "5a4deb30aa4f8005cdac623c194a93fa3ed016f5cba9edc26bb42903213429bf"
+      },
+      {
+        "id": "c6_f10",
+        "candidate_id": "c6",
+        "source_ms": 72180,
+        "sha256": "bfd13eda7890a5806d94b41ebb8f926ddc4ba28472e8fddc7d1f491ff0c93645"
+      },
+      {
+        "id": "c6_f11",
+        "candidate_id": "c6",
+        "source_ms": 72314,
+        "sha256": "df791b814c05399270c10687846aa0dfea03a42efae8f60dc1e403aaac13c29f"
+      },
+      {
+        "id": "c6_f12",
+        "candidate_id": "c6",
+        "source_ms": 72430,
+        "sha256": "f77935d1f5949b2868db7604d2f532704a4b3f5319b48550c10bb78b2987ac43"
+      },
+      {
+        "id": "c6_f13",
+        "candidate_id": "c6",
+        "source_ms": 72564,
+        "sha256": "807693acaa122b7c5e7ee2372c7c7e116022d7df132c440f5deaad1efcc4a1d3"
+      },
+      {
+        "id": "c6_f14",
+        "candidate_id": "c6",
+        "source_ms": 72680,
+        "sha256": "ba0810e37c557db3030db7de64e6123ade094977940e06270b0e207565caaf6f"
+      },
+      {
+        "id": "c6_f15",
+        "candidate_id": "c6",
+        "source_ms": 72814,
+        "sha256": "7ac916c418198206763ff3ef7a4c9f4d9dd62843882eeba9b685f93c84aba574"
+      },
+      {
+        "id": "c6_f16",
+        "candidate_id": "c6",
+        "source_ms": 72930,
+        "sha256": "fb4ae0d09cfd938120e77a777e9b61e54f21f2c31c74ab8314b55c27ccbdac9d"
+      },
+      {
+        "id": "c6_f17",
+        "candidate_id": "c6",
+        "source_ms": 74297,
+        "sha256": "e62959e5e1d9e88522b8b6f1b3b42d152a04d67559dc265002ccdd20dee14a02"
+      }
+    ],
+    "independent_generalisation_tested": false,
+    "production_ready": false
+  },
+  "receipts": [
+    {
+      "packet_id": "discovery",
+      "provider": "emergent",
+      "requested_model": "gemini-3.1-pro-preview",
+      "origin": "LIVE_MODEL_REQUEST",
+      "status": "COMPLETED",
+      "requested_reasoning_effort": "low",
+      "payload_sha256": "4409bde569b88ca18703b769b4a6cd8ef169ca2bebf54745a93b6adc102f9f49",
+      "payload_bytes": 12862924,
+      "explicit_image_count": 10,
+      "images": [
+        {
+          "sha256": "2deeb83a61c3de2696069757fb179eb8bb2776a0b4fbd6ffb963e6417d431dca",
+          "bytes": 97581
+        },
+        {
+          "sha256": "d2ac40f60be62779e0d544074809a79c1c0d9d225f8f78c71d30a372c94db183",
+          "bytes": 153441
+        },
+        {
+          "sha256": "c4a33cf6bdc29b7ff5c2ed4aa66c3c4d6d4f61485ff221d432a79480e33e9a4a",
+          "bytes": 93653
+        },
+        {
+          "sha256": "077375be887414bc1eb104eff67df1901d02f7d10904e2f486fe739079b4b641",
+          "bytes": 145591
+        },
+        {
+          "sha256": "f58d1dd43674b2c46e35ae5f7ff60feb7a6de354f19b48fc7ef847d75a8550c4",
+          "bytes": 152080
+        },
+        {
+          "sha256": "3a6182d7fa67f17274de16d5a3b147a973b45f61de821ec61492bb40b87f0ecd",
+          "bytes": 149341
+        },
+        {
+          "sha256": "69f82b65e6fbd75e2b040f61c1a61daf33a248f37c357b5f765b8b956b53e2e5",
+          "bytes": 179461
+        },
+        {
+          "sha256": "0610ad635d0f3c6c1c41d014442521fc969bafa7158778f8cb2017e4768f8d65",
+          "bytes": 142132
+        },
+        {
+          "sha256": "9a6889c679db6168384ea427fb07a563ddb1f5011ef875abea88c6916b70781c",
+          "bytes": 147751
+        },
+        {
+          "sha256": "b50d4818b23fcce786c533de8467bdf1fefe3d3c23eb68de2048bbed369b8820",
+          "bytes": 125661
+        }
+      ],
+      "frame_sampling_in_provider_metadata": true,
+      "videos": [
+        {
+          "sha256": "89f63119e4639bb64f34505abde7dcc47383ebba4287b2de92f768621c72b1f1",
+          "bytes": 2464791,
+          "requested_fps": 4
+        },
+        {
+          "sha256": "20b57454695f70fcfc5e8d22c4dd8e5100ee6f23b5ecf5c267258eca96d7c4e9",
+          "bytes": 5786639,
+          "requested_fps": 12
+        }
+      ],
+      "requested_image_detail": "high",
+      "model_version": "gemini/gemini-3.1-pro-preview",
+      "response_id": "MsPYarn1IeKWjMcP_MKU4AQ",
+      "usage": {
+        "completion_tokens": 937,
+        "prompt_tokens": 333515,
+        "total_tokens": 334452,
+        "completion_tokens_details": {
+          "text_tokens": 937
+        },
+        "prompt_tokens_details": {
+          "text_tokens": 6612,
+          "image_tokens": 11000,
+          "video_tokens": 315903
+        }
+      },
+      "raw_response": "{\n  \"observations\": [\n    {\n      \"start_s\": 5,\n      \"move_s\": 9,\n      \"end_s\": 12,\n      \"type\": \"OTHER\",\n      \"identity_evidence\": \"Player in white pushing back against blue player (#9).\",\n      \"before\": \"White player shields the ball from #9.\",\n      \"movement\": \"White player holds position and fends off #9, but is fouled.\",\n      \"opponent_response\": \"#9 pulls the white player back and kicks his leg out.\",\n      \"after\": \"White player falls to the ground due to foul.\",\n      \"outcome\": \"LOSES\",\n      \"uncertainty\": \"Resulting possession after foul is unclear.\"\n    },\n    {\n      \"start_s\": 22,\n      \"move_s\": 23,\n      \"end_s\": 25,\n      \"type\": \"OTHER\",\n      \"identity_evidence\": \"Player in white receives a pass.\",\n      \"before\": \"White player runs onto a pass.\",\n      \"movement\": \"White player shoots at goal.\",\n      \"opponent_response\": \"Goalkeeper dives to block the shot.\",\n      \"after\": \"Ball deflects off goalkeeper and goes wide.\",\n      \"outcome\": \"LOSES\",\n      \"uncertainty\": \"\"\n    },\n    {\n      \"start_s\": 35,\n      \"move_s\": 37,\n      \"end_s\": 39,\n      \"type\": \"OTHER\",\n      \"identity_evidence\": \"Player in white receives pass, then shoots.\",\n      \"before\": \"White player receives pass on right side of field.\",\n      \"movement\": \"White player takes a touch to control the ball, then shoots towards the right side of the goal.\",\n      \"opponent_response\": \"Goalkeeper positions himself to block the shot.\",\n      \"after\": \"Ball enters the right side of the goal.\",\n      \"outcome\": \"PASSES\",\n      \"uncertainty\": \"\"\n    },\n    {\n      \"start_s\": 54,\n      \"move_s\": 56,\n      \"end_s\": 58,\n      \"type\": \"OTHER\",\n      \"identity_evidence\": \"Player in white receiving the ball.\",\n      \"before\": \"White player running onto a pass.\",\n      \"movement\": \"White player kicks the ball towards goal.\",\n      \"opponent_response\": \"Goalkeeper slides to intercept the ball.\",\n      \"after\": \"Goalkeeper deflects the ball.\",\n      \"outcome\": \"LOSES\",\n      \"uncertainty\": \"Player identity partially obscured by other players.\"\n    },\n    {\n      \"start_s\": 64,\n      \"move_s\": 65,\n      \"end_s\": 67,\n      \"type\": \"DIRECTION_CHANGE\",\n      \"identity_evidence\": \"Player in white, furthest left.\",\n      \"before\": \"Player runs forward to meet the ball.\",\n      \"movement\": \"Player changes direction to the right.\",\n      \"opponent_response\": \"Blue player attempts to tackle.\",\n      \"after\": \"Player shoots the ball towards goal.\",\n      \"outcome\": \"PASSES\",\n      \"uncertainty\": \"Not sure if the player passes or scores.\"\n    },\n    {\n      \"start_s\": 71,\n      \"move_s\": 72,\n      \"end_s\": 74,\n      \"type\": \"OTHER\",\n      \"identity_evidence\": \"Player in white attempting to head the ball.\",\n      \"before\": \"Player in white jumping up to meet the ball in the air.\",\n      \"movement\": \"Player in white kicks the ball while it's in the air.\",\n      \"opponent_response\": \"Goalkeeper attempts to save the ball.\",\n      \"after\": \"The ball enters the goal.\",\n      \"outcome\": \"PASSES\",\n      \"uncertainty\": \"\"\n    }\n  ],\n  \"limitations\": [\n    \"Resolution and distance make it difficult to see small body faints.\",\n    \"Multiple players wearing the same uniform makes tracking the target player difficult at times.\"\n  ]\n}",
+      "response_sha256": "d61f12580b46398227c7f6e682200db4a7f655ff5b9d924ce3af97b14ce11c91",
+      "elapsed_seconds": 47.579
+    },
+    {
+      "packet_id": "verification",
+      "provider": "emergent",
+      "requested_model": "gpt-6-astra",
+      "origin": "LIVE_MODEL_REQUEST",
+      "status": "COMPLETED",
+      "requested_reasoning_effort": "low",
+      "payload_sha256": "2bd6e47c3555c3cbcb8c7f849bd339a0445190153176ee319413ad4746d72bf6",
+      "payload_bytes": 13853117,
+      "explicit_image_count": 118,
+      "images": [
+        {
+          "sha256": "2deeb83a61c3de2696069757fb179eb8bb2776a0b4fbd6ffb963e6417d431dca",
+          "bytes": 97581
+        },
+        {
+          "sha256": "d2ac40f60be62779e0d544074809a79c1c0d9d225f8f78c71d30a372c94db183",
+          "bytes": 153441
+        },
+        {
+          "sha256": "c4a33cf6bdc29b7ff5c2ed4aa66c3c4d6d4f61485ff221d432a79480e33e9a4a",
+          "bytes": 93653
+        },
+        {
+          "sha256": "077375be887414bc1eb104eff67df1901d02f7d10904e2f486fe739079b4b641",
+          "bytes": 145591
+        },
+        {
+          "sha256": "f58d1dd43674b2c46e35ae5f7ff60feb7a6de354f19b48fc7ef847d75a8550c4",
+          "bytes": 152080
+        },
+        {
+          "sha256": "3a6182d7fa67f17274de16d5a3b147a973b45f61de821ec61492bb40b87f0ecd",
+          "bytes": 149341
+        },
+        {
+          "sha256": "69f82b65e6fbd75e2b040f61c1a61daf33a248f37c357b5f765b8b956b53e2e5",
+          "bytes": 179461
+        },
+        {
+          "sha256": "0610ad635d0f3c6c1c41d014442521fc969bafa7158778f8cb2017e4768f8d65",
+          "bytes": 142132
+        },
+        {
+          "sha256": "9a6889c679db6168384ea427fb07a563ddb1f5011ef875abea88c6916b70781c",
+          "bytes": 147751
+        },
+        {
+          "sha256": "b50d4818b23fcce786c533de8467bdf1fefe3d3c23eb68de2048bbed369b8820",
+          "bytes": 125661
+        },
+        {
+          "sha256": "7f8919d8e68cd5c922740cbf6d845992a523fcc7f06c4d43a7918381ce5cc4e1",
+          "bytes": 48344
+        },
+        {
+          "sha256": "4285aae0b07e1ce8fe6dda087df7615dcffe56704627d99e12056fd257051555",
+          "bytes": 79071
+        },
+        {
+          "sha256": "c2706ccb46d925265d7aef6f397b08513422f98aa620babf3a713425704800b6",
+          "bytes": 82219
+        },
+        {
+          "sha256": "c9d8010a0067ca9a5a7f1f099489a6e361918d56ade9dbbc93270d6ef0f73022",
+          "bytes": 82599
+        },
+        {
+          "sha256": "9144a72d355aecc392260356add8d16cba177c6bf0b78642dd5f73226d3a96b5",
+          "bytes": 78671
+        },
+        {
+          "sha256": "14235c501f42de8cba653300fa29354aaa31ee80a4ac212627ff95dcd8e95976",
+          "bytes": 83232
+        },
+        {
+          "sha256": "8a5a3c5e1cb3e586669b86e4a952d2737aae052b4335b5e2513d7dd7b2343534",
+          "bytes": 81713
+        },
+        {
+          "sha256": "05dbdcc678aee69dd3a803cab98d1c818b622f2fe30d6caf240d16673b34cc76",
+          "bytes": 82926
+        },
+        {
+          "sha256": "0cdc5d940a04de7f395b2676913db72e7c53fa7f962394c6e50e76dbf24dbacb",
+          "bytes": 78465
+        },
+        {
+          "sha256": "607e1d3a15047a2f3910769ae907ebe190dacc2a75b048a08191d6cc158d8284",
+          "bytes": 80568
+        },
+        {
+          "sha256": "f68b5822630807c10203849878978737671bfaba2f6d38703af51b619a225d25",
+          "bytes": 82435
+        },
+        {
+          "sha256": "9b12f122d51f0ca8080a95de6ae5c059a7f05e9d6ed2b212e19cc7432747fa52",
+          "bytes": 82849
+        },
+        {
+          "sha256": "9604a1e4ea17a16456482d7a1ed09f7b1f97474c5d3b827e8cf008d29bc27bb2",
+          "bytes": 83935
+        },
+        {
+          "sha256": "e95bb9b138e3e87b9d704622fde687b4f577556bbb50628c64f8f2d9ce156929",
+          "bytes": 85876
+        },
+        {
+          "sha256": "eaec8f22b08e1b7bc9d23320fc7df9724eb0085c597709b9e2f6e2499d2a9577",
+          "bytes": 82671
+        },
+        {
+          "sha256": "791d066deffb0a75a40d7ae519d0bb819fe36b85d8a7bd6f9fd1d4b80f15b355",
+          "bytes": 84567
+        },
+        {
+          "sha256": "fce8e99b11418925bb3747869696a7284ea206d0be090efa84a6b92823aaf84f",
+          "bytes": 85668
+        },
+        {
+          "sha256": "d7b488363ac65b12719c0278d9e70729749767fa5695d2913796d15aedd93fc3",
+          "bytes": 84358
+        },
+        {
+          "sha256": "cd1a9d8581d620ec2268bfd4960977bb3e09a51dcd5d68b625c8a7fcd787f89f",
+          "bytes": 96686
+        },
+        {
+          "sha256": "6687660ee8161ab547d6eb5e3e9e6f9326ea925d3b2d3d50103c426c80c5b415",
+          "bytes": 102728
+        },
+        {
+          "sha256": "46053e686c2879ec5add86645122cd1ac862cebb1c08440183284f06207638db",
+          "bytes": 99666
+        },
+        {
+          "sha256": "8cff2bf02e69a8795f56420384cbcdd70ab7e1975c08404e5408ce53da97cda3",
+          "bytes": 102649
+        },
+        {
+          "sha256": "19b54581fbbe5cd241eaef91d5022852915845e0fdc5c358ab7927647cc19027",
+          "bytes": 103291
+        },
+        {
+          "sha256": "cb2d4e066af3143a1013e4ce9bf7104b482151af1b49203444b84fce4abd3326",
+          "bytes": 99500
+        },
+        {
+          "sha256": "014d076ef4aa40f1f8e87b377ca654bfd3e10e9e71386aba7da862b5e5d2c872",
+          "bytes": 98606
+        },
+        {
+          "sha256": "83fcb5b5c9917573a87e130d118bb3d620a87ef4ce4b2281e6865207193eaa4b",
+          "bytes": 102032
+        },
+        {
+          "sha256": "884a711af57de5e1d97c1e372c16b5a5ed36e2f11bac9e33630e5f6a84ec9415",
+          "bytes": 99442
+        },
+        {
+          "sha256": "b7ea7043c60589c8a9a0cd9d0987f30794673a4a3bbc7c780b3bd581ad407c73",
+          "bytes": 103843
+        },
+        {
+          "sha256": "c605a8d78189b2110f01de586c9196cc35723517f28aef4a76a0fbcf4bce2d11",
+          "bytes": 104568
+        },
+        {
+          "sha256": "9f035adc3dd8da5a6bf94367688b490227cf063476387992e8c6c9b15962b3d9",
+          "bytes": 96835
+        },
+        {
+          "sha256": "e32c01b4c2da761a16d1eab42371b46ddccdd88f8dedae0287f5890b6a7c9041",
+          "bytes": 92946
+        },
+        {
+          "sha256": "1bb72e4a8fb70c9c6710a1a80b1ecb0b6a00c4712482217363ffe8993fac4cba",
+          "bytes": 96467
+        },
+        {
+          "sha256": "1df3f824cc57fa7d17bf775c1184dd743cfaf85d02d098f59b162e1751b20d98",
+          "bytes": 93367
+        },
+        {
+          "sha256": "7b750b7ce3a7bb4b1283f900cff0955f927f1a551280186a670c51a9e185e31c",
+          "bytes": 86879
+        },
+        {
+          "sha256": "a9ffd72a93db8bb3020fa09eaaa7c7f8c6b3f8b7ab63a94cbff353237f927714",
+          "bytes": 87258
+        },
+        {
+          "sha256": "c442231908d0833bcb124619379967ae4da73ca3057a8d8bad8a3b6bec9a8c43",
+          "bytes": 107119
+        },
+        {
+          "sha256": "7e25cce9e5b0d2a714322d56b70f76a0fbaf4393ee18e698eea05b401db461ff",
+          "bytes": 111614
+        },
+        {
+          "sha256": "a24de7783da54838ce51ed2bde3d7788ac24a19c7781cf2ddb6ac1061b824bca",
+          "bytes": 113640
+        },
+        {
+          "sha256": "ad075735145306a1aad3d886539820e103807cc8641c56d3879209c5079c14cd",
+          "bytes": 117650
+        },
+        {
+          "sha256": "44bb2420648a45648d467a1fe526d99e6057250644ddef200564c7e081321b0b",
+          "bytes": 113976
+        },
+        {
+          "sha256": "e4101567aa01d4e789f76dcc34edc5f3b852e3650c4bace49490d3fd0a1aa8cb",
+          "bytes": 113076
+        },
+        {
+          "sha256": "86d73ae1b44aeadee3b754e39c17c8d245515d6790d1232f6a867c9c7c9cf0cf",
+          "bytes": 112441
+        },
+        {
+          "sha256": "b5bcdfe18f307aa3dab3bca856e148332fd54f40231b799effbeb231cc5c1fbf",
+          "bytes": 112022
+        },
+        {
+          "sha256": "69f18c70c60f51b72957ac91a28650a605297e333a57ebe55bf6a5b0d7610926",
+          "bytes": 109335
+        },
+        {
+          "sha256": "baa98a7c750c110f205c51c8baea8d0988fedceeff530b45cea9f6062111970c",
+          "bytes": 107992
+        },
+        {
+          "sha256": "25b32e250764165e6dccfc62f48addbb120e7210ab13debc0467eb455eb11aec",
+          "bytes": 107960
+        },
+        {
+          "sha256": "7f52ea57b38da787a7850c49366cdf7c3985136c3495ccdba2b75ce96289866e",
+          "bytes": 102738
+        },
+        {
+          "sha256": "1024297383a2b5a5246f33df6fb3caea3a5e32afac6672233d90e8ef0dc041e0",
+          "bytes": 106189
+        },
+        {
+          "sha256": "acf0a7acde3ca98fa99a82e46ffe2bde0b3657f2b57dc8f6841a712f5f2f3a7f",
+          "bytes": 106507
+        },
+        {
+          "sha256": "bf96d3e30e161129d6f27076ba38cc7641008fe14f48e0223adc67ecda0598d0",
+          "bytes": 107379
+        },
+        {
+          "sha256": "d28d31f7816ff839b68cc96510c9222ee88b252cc8e1a1f7568838a9733c02e2",
+          "bytes": 106472
+        },
+        {
+          "sha256": "1fe87a49fe15e459e5d64a61190ea3c4b439dca3f562bf10af89a773ad509d51",
+          "bytes": 109397
+        },
+        {
+          "sha256": "9312941e045a77b16ade5ad8660aef51736de00a07bb55f67c5b7ba1fa568623",
+          "bytes": 109598
+        },
+        {
+          "sha256": "1ad63a9a524aebc5106e288b1e1a720a98ba9b0710e66cbf520a44fa2cc3c871",
+          "bytes": 106134
+        },
+        {
+          "sha256": "3e3f3ad719ee9c1da77731b21526c0bc9321e4f9c62b5f83882e7ce2e837580d",
+          "bytes": 105964
+        },
+        {
+          "sha256": "94f7343335917cf315d74678391fefe3b1c6b5100f928aca7afe355ec10c07cb",
+          "bytes": 96511
+        },
+        {
+          "sha256": "82b95907af285beec21e14031cbd824c9437af015ab88a0d9d65eee7b1cbe1cc",
+          "bytes": 98333
+        },
+        {
+          "sha256": "2fb961d933b257b4f2cadb7ee7c6619003d57fb97c203906d5a61f964114cdc5",
+          "bytes": 92359
+        },
+        {
+          "sha256": "f3a4e234d147a8bb9ffb43c9b8d7f09baccd4ad50b9715a56ce4622760752b50",
+          "bytes": 94565
+        },
+        {
+          "sha256": "00444f3d50fbd9800afc358400db6878f9f4b7a83b3ce4aaa91c728f80c5b0ff",
+          "bytes": 90523
+        },
+        {
+          "sha256": "e4bf77b72b35331cc0841bdafae592e879c0f8ac8fb9093cfba198924332706c",
+          "bytes": 81904
+        },
+        {
+          "sha256": "9da8946c1fb3aca62ee9a1f9e3bd6c1e5db94a5982c609c08e4d48303cb52b1e",
+          "bytes": 83579
+        },
+        {
+          "sha256": "f8f9b4b94e8f4a279c1845af17e29e3643c66b9be9f1bbe11d7212abab77c42d",
+          "bytes": 76558
+        },
+        {
+          "sha256": "a07e65210df6ff2937248c637c96c441112592646f1d587628fb838a8a8f0e82",
+          "bytes": 74655
+        },
+        {
+          "sha256": "3810b93dda25d40cafae8325cb8c01f36ee0c8ec42ce127488742448e08e7e01",
+          "bytes": 76203
+        },
+        {
+          "sha256": "11c3abd74e0e5ac700927db053f36246ae2e0ace551b5bfc2b5e292b0cd64ec7",
+          "bytes": 74587
+        },
+        {
+          "sha256": "998c946971eb4317670afbab81c6bd3fdb515ff48339e231ed99c30333ce02c2",
+          "bytes": 72784
+        },
+        {
+          "sha256": "edd93a8a067b8d5001a07e5d346495a7c5cb5d0ae688debc2969d646622a5f24",
+          "bytes": 75732
+        },
+        {
+          "sha256": "e16b6384e3719291ef0c0cd01e1a81129979116991b999a8bcb07d8e949a9ec8",
+          "bytes": 79572
+        },
+        {
+          "sha256": "6d8cb7ba05720276a1d88421a45a377e9ea9ad313d226e82cef9d194138016f1",
+          "bytes": 81742
+        },
+        {
+          "sha256": "3fffbefcf4eb3f50e882d66e28bd41740be9c981ce54e277ec5f99bb20aec67a",
+          "bytes": 81564
+        },
+        {
+          "sha256": "5479fc5adb567b7f596521ba34db90e3ea3a5ced20d969cdb7676b5a609a1c57",
+          "bytes": 85902
+        },
+        {
+          "sha256": "0e7a276ed929ad390967d10bb6e68e3790548cea40f477b305d564f4c3515ad8",
+          "bytes": 70604
+        },
+        {
+          "sha256": "d7b9c8377935e0d5cbf17e9249dd0b2b72bd0321dce2c0bb5f8e5d464fa173de",
+          "bytes": 74202
+        },
+        {
+          "sha256": "781274a9ace37ee8e831efc4bd5c4e7c0b858cd6e5ac3d5635ae1cb7632ef1b0",
+          "bytes": 76505
+        },
+        {
+          "sha256": "125da32e5ed9ee1883f1f4c7c5bd16ee1e3cf160047921e4f307d21b7a689ff5",
+          "bytes": 75593
+        },
+        {
+          "sha256": "9070669f721df89d80853a1e1f5e8d5354856da6657be6ce4186cb5b88c57c31",
+          "bytes": 75737
+        },
+        {
+          "sha256": "44eb7dc1e2045596993a9fb48bc720c27268bf50e9295dfbe65038cf7f51b4c6",
+          "bytes": 76850
+        },
+        {
+          "sha256": "a119f521a1637b5633af27709752a8a50222e3d0e442ae5b96d2bd015211166e",
+          "bytes": 78079
+        },
+        {
+          "sha256": "ceb421d901a6dfcc68d563b70da55c4a20447a18d272a5dfc419b0e8ed6561d6",
+          "bytes": 80815
+        },
+        {
+          "sha256": "5e0fded4ea9b8dc1715f237585cbba9b8f6422229d98c79ecb69a8f8106a3a47",
+          "bytes": 58895
+        },
+        {
+          "sha256": "7f01806e913bc586dcaa34849bdec9178e387dda2213493c5a755a96265144b6",
+          "bytes": 58801
+        },
+        {
+          "sha256": "7999e432029f0f7480839d3dfc41b8af7fac744b0340f4ab569b04e1399e3034",
+          "bytes": 59458
+        },
+        {
+          "sha256": "393457293f8b4dc3d6550f401bc12e7e0c57c89857a5dace3f49446891e63217",
+          "bytes": 61489
+        },
+        {
+          "sha256": "884a02a7f15fa487b62908e8be154ca763c81bebeb3db4af21fbd4699fb175d8",
+          "bytes": 60474
+        },
+        {
+          "sha256": "5a9c16b9982b14d7f52ed96d35ca2694d9251966e444f1aaafb4ce6c5b9790f6",
+          "bytes": 59002
+        },
+        {
+          "sha256": "9508feec179d00d9945ec93759bfad3eac3fd5a7f009f16b3b5e9dd7f3d1ce42",
+          "bytes": 56703
+        },
+        {
+          "sha256": "94f6e3363587311513832f178376f3f7b849dbfeaf816e016264e68fdf0472f8",
+          "bytes": 56813
+        },
+        {
+          "sha256": "2a0500d87eae9998c913fc3ad6ade59a6d2516448350748175098163c2286777",
+          "bytes": 56368
+        },
+        {
+          "sha256": "6a857cf1cfaa9b03569ee9563388dc4affd8bab553740160ed05a6e5df72fa6e",
+          "bytes": 54105
+        },
+        {
+          "sha256": "ba659d3077f20ff8d46fad0609337426fca032defc739f63a1020b4a71ee3ffc",
+          "bytes": 50695
+        },
+        {
+          "sha256": "22319017ba03fe0fd2fb0e6499a34b60fec79473af84aab3a2774abd643d8f74",
+          "bytes": 54552
+        },
+        {
+          "sha256": "895d89aafacc47be3599b2061a50b4be3747fbb3cc42e142facd5b23a40cd26c",
+          "bytes": 53524
+        },
+        {
+          "sha256": "613769da504dfc21b84b849dfe47b7cbea8651bf9b4a4781ce999778f5859c3c",
+          "bytes": 56610
+        },
+        {
+          "sha256": "ee1505ec91e27d9f6897075f1aae37c7b963c83345ff00231ce31bc26c3c30b1",
+          "bytes": 55074
+        },
+        {
+          "sha256": "76b861797939a2a65e8d9bf6bb7d097f54262db2819a04b9a1329b2d18b59790",
+          "bytes": 55310
+        },
+        {
+          "sha256": "86006d0c6918fb169cda39add64eec5f180f6a8be26b12c3c8d66ace45df4269",
+          "bytes": 56035
+        },
+        {
+          "sha256": "8ea31525abf0dbabe8133dfe72a809b6b42bec18985fb5d0f21443e73dbbc12d",
+          "bytes": 53627
+        },
+        {
+          "sha256": "f890915f15868d9e9bedd2e7a1c94e95630f903a1419255083059b494a276acb",
+          "bytes": 58356
+        },
+        {
+          "sha256": "5a4deb30aa4f8005cdac623c194a93fa3ed016f5cba9edc26bb42903213429bf",
+          "bytes": 64830
+        },
+        {
+          "sha256": "bfd13eda7890a5806d94b41ebb8f926ddc4ba28472e8fddc7d1f491ff0c93645",
+          "bytes": 68194
+        },
+        {
+          "sha256": "df791b814c05399270c10687846aa0dfea03a42efae8f60dc1e403aaac13c29f",
+          "bytes": 69058
+        },
+        {
+          "sha256": "f77935d1f5949b2868db7604d2f532704a4b3f5319b48550c10bb78b2987ac43",
+          "bytes": 64335
+        },
+        {
+          "sha256": "807693acaa122b7c5e7ee2372c7c7e116022d7df132c440f5deaad1efcc4a1d3",
+          "bytes": 59641
+        },
+        {
+          "sha256": "ba0810e37c557db3030db7de64e6123ade094977940e06270b0e207565caaf6f",
+          "bytes": 57143
+        },
+        {
+          "sha256": "7ac916c418198206763ff3ef7a4c9f4d9dd62843882eeba9b685f93c84aba574",
+          "bytes": 54826
+        },
+        {
+          "sha256": "fb4ae0d09cfd938120e77a777e9b61e54f21f2c31c74ab8314b55c27ccbdac9d",
+          "bytes": 53541
+        },
+        {
+          "sha256": "e62959e5e1d9e88522b8b6f1b3b42d152a04d67559dc265002ccdd20dee14a02",
+          "bytes": 74323
+        }
+      ],
+      "frame_sampling_in_provider_metadata": false,
+      "videos": [],
+      "requested_image_detail": "high",
+      "model_version": "gpt-6-astra",
+      "response_id": "chatcmpl-EbR1XcfO2KHiyibsvF7KbpuH0fCuC",
+      "usage": {
+        "completion_tokens": 1222,
+        "prompt_tokens": 117965,
+        "total_tokens": 119187,
+        "completion_tokens_details": {
+          "accepted_prediction_tokens": 0,
+          "audio_tokens": 0,
+          "reasoning_tokens": 0,
+          "rejected_prediction_tokens": 0
+        },
+        "prompt_tokens_details": {
+          "audio_tokens": 0,
+          "cached_tokens": 0
+        }
+      },
+      "raw_response": "{\"reviews\":[{\"candidate_id\":\"c1\",\"decision\":\"SUPPORTED\",\"type\":\"SHIELD_TURN\",\"identity_frames\":[\"c1_f00\",\"c1_f01\",\"c1_f11\"],\"before_frame\":\"c1_f07\",\"movement_frames\":[\"c1_f08\",\"c1_f09\",\"c1_f10\",\"c1_f11\"],\"after_frame\":\"c1_f15\",\"visible_movement\":\"The short-haired white player rotates from facing blue #9 to placing his back and hip between #9 and the ball, keeping it within reach.\",\"opponent_response\":\"Blue #9 steps across and maintains close upper-body contact from behind rather than being beaten.\",\"outcome\":\"RETAINS\",\"reason\":\"A protective turn and immediate retention are visible in distinct frames. The later frame shows the white player down and the ball loose, not a successful escape.\",\"uncertainty\":\"Overlapping legs obscure exact touches. The gap before c1_f17 prevents establishing the cause of the fall or a foul decision.\"},{\"candidate_id\":\"c2\",\"decision\":\"REJECTED\",\"type\":\"OTHER\",\"identity_frames\":[\"c2_f01\",\"c2_f02\",\"c2_f13\"],\"before_frame\":\"c2_f02\",\"movement_frames\":[\"c2_f06\",\"c2_f10\",\"c2_f13\",\"c2_f14\",\"c2_f15\"],\"after_frame\":\"c2_f16\",\"visible_movement\":\"The selected short-haired white player runs rightward alongside retreating blue players and then swings through the ball, sending it airborne.\",\"opponent_response\":\"Blue players run back alongside and ahead of him; no distinct wrong-way commitment is visible.\",\"outcome\":\"UNKNOWN\",\"reason\":\"The sequence supports a running attacking action and kick, not a feint or evasive change. A goalkeeper deflection cannot be established from the supplied frames.\",\"uncertainty\":\"Players overlap around the ball during the run. The shot's final result and any goalkeeper contact are not continuously shown.\"},{\"candidate_id\":\"c3\",\"decision\":\"REJECTED\",\"type\":\"OTHER\",\"identity_frames\":[\"c3_f00\",\"c3_f03\",\"c3_f13\"],\"before_frame\":\"c3_f01\",\"movement_frames\":[\"c3_f03\",\"c3_f04\",\"c3_f06\",\"c3_f13\",\"c3_f14\"],\"after_frame\":\"c3_f15\",\"visible_movement\":\"A white player in bright boots controls and carries rightward, then swings at the ball near goal.\",\"opponent_response\":\"Blue defenders pursue and one stays close behind; the goalkeeper sets in front of goal.\",\"outcome\":\"UNKNOWN\",\"reason\":\"Visible control, forward carrying and shooting do not establish a feint. The shooter is visibly #7, so the hypothesis also does not securely tie this action to the originally selected short-haired player.\",\"uncertainty\":\"The gap after c3_f00 prevents a continuous identity link to the receiver. Neither a goal nor a pass is established by the immediate shooting frames.\"},{\"candidate_id\":\"c4\",\"decision\":\"REJECTED\",\"type\":\"OTHER\",\"identity_frames\":[\"c4_f06\",\"c4_f09\",\"c4_f10\"],\"before_frame\":\"c4_f07\",\"movement_frames\":[\"c4_f09\",\"c4_f10\",\"c4_f11\",\"c4_f12\"],\"after_frame\":\"c4_f16\",\"visible_movement\":\"The selected smaller white player, behind teammates #13 and #10, runs toward goal and extends a leg through the ball's path.\",\"opponent_response\":\"A blue defender chases from behind. The goalkeeper comes forward and subsequently goes low as the ball moves across the goal area.\",\"outcome\":\"UNKNOWN\",\"reason\":\"This is a direct running and kicking sequence, without visible deceptive movement or an evasive change. The goalkeeper's action alone does not support a feint.\",\"uncertainty\":\"Teammates obscure several ball contacts. A specific goalkeeper deflection and subsequent possession cannot be confirmed.\"},{\"candidate_id\":\"c5\",\"decision\":\"REJECTED\",\"type\":\"OTHER\",\"identity_frames\":[\"c5_f02\",\"c5_f03\",\"c5_f06\"],\"before_frame\":\"c5_f01\",\"movement_frames\":[\"c5_f02\",\"c5_f03\",\"c5_f05\",\"c5_f06\"],\"after_frame\":\"c5_f07\",\"visible_movement\":\"The selected short-haired white player carries the ball screen-left past the position of white #12, continuing along the same general route.\",\"opponent_response\":\"The blue player in orange boots pursues from behind and to the side; no clear tackle-induced reversal or wrong-way response is visible.\",\"outcome\":\"PROGRESSES\",\"reason\":\"The supplied close sequence shows a carry, not the hypothesized rightward direction change. White #12 is a teammate, not the selected player or an opponent being beaten.\",\"uncertainty\":\"White #12 briefly obscures the ball. The abrupt scene change at c5_f08 prevents linking the later distant play to a pass or shot by the selected player.\"},{\"candidate_id\":\"c6\",\"decision\":\"REJECTED\",\"type\":\"OTHER\",\"identity_frames\":[\"c6_f00\",\"c6_f01\",\"c6_f02\"],\"before_frame\":\"c6_f00\",\"movement_frames\":[\"c6_f01\",\"c6_f02\"],\"after_frame\":\"c6_f03\",\"visible_movement\":\"The selected white player raises and swings a leg at an airborne ball, sending it high toward screen-left.\",\"opponent_response\":\"The nearby blue defender closes and lifts toward the ball after the kick; no deceptive response is visible.\",\"outcome\":\"PASSES\",\"reason\":\"The visible action is an airborne delivery, not a feint. Subsequent frames follow the ball toward a different white player, so that player's later attacking action cannot be attributed to the selection.\",\"uncertainty\":\"Exact foot contact is blurred. Completion of the delivery and the later goal claim are not established by the immediate before-and-after evidence.\"}]}",
+      "response_sha256": "d97de56b07fece0c14d3c0611487486b4e0d85aee206092cdb58a51759a028d9",
+      "elapsed_seconds": 26.835
+    }
+  ]
+}
