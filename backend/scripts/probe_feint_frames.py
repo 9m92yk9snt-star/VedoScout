@@ -105,7 +105,7 @@ def run(video,anchors,output,run_model=False):
             sheets.extend([{'type':'text','text':'SOURCE SHEET '+json.dumps(labels)}, {'type':'image','path':str(path.resolve()),'sha256':p.digest(path)}])
         pid=f'frames_{chunk}'
         items=[{'type':'text','text':PROMPT}]+refs+sheets
-        _,_,audit=t.build_request('emergent','gpt-6-astra',items,reasoning_effort='low',image_detail='high')
+        _,_,audit=t.build_request('emergent','gpt-6-astra',items,reasoning_effort='low',image_detail='high',max_output_tokens=12288)
         packets.append({'packet_id':pid,'start_s':start,'end_s':end,'frames':frames,'request_audit':audit})
         jobs.append({'packet_id':pid,'items':items,'reasoning_effort':'low','image_detail':'high','max_output_tokens':12288})
         allframes.extend(frames)
