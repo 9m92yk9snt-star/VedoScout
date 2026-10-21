@@ -43,3 +43,16 @@ def test_possession_claim_needs_its_own_evidence(change):
 def test_other_candidate_frames_cannot_support_this_outcome():
     candidates,frames,r=example();frames[-1]['candidate_id']='u2'
     with pytest.raises(ValueError):validate({'reviews':[r]},candidates,frames)
+
+def test_retained_context_receipt_corrects_pass_without_promoting_uncertain_feints():
+    import hashlib
+    document=json.loads((Path(__file__).parents[2]/'docs/examples/feint-uncertainty-context-receipt.json').read_text())
+    receipt=document['receipt']
+    assert hashlib.sha256(receipt['raw_response'].encode()).hexdigest()==receipt['response_sha256']
+    assert receipt['payload_sha256']==document['request_audit']['payload_sha256']
+    reviews=validate(json.loads(receipt['raw_response']),document['candidates'],document['frames'])
+    passage=next(r for r in reviews if r['candidate_id']=='u4')
+    assert passage['movement_decision']=='REJECTED'
+    assert passage['outcome']=='PASSES' and passage['recipient']=='TEAMMATE'
+    assert all(r['movement_decision']!='SUPPORTED' for r in reviews)
+    assert document['accepted_for_production_statistics'] is False
