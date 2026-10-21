@@ -83,3 +83,48 @@ are made for an input up to 80s. Each returned claim must cite actual before,
 movement, after and identity frames and original reference IDs. Overlap observations
 are explicitly not deduplicated and cannot be used as unique dribble counts.
 This remains an experiment; unrelated-video generalisation is unverified.
+
+## Actual source-sheet results
+
+Run `39613934001`, code `fab3b182996793271b98a4a3c81f80b353502fdb`, completed
+three actual `gpt-6-astra` calls. The complete source was sampled without target
+times: 232, 232 and 183 frames (including boundary overlaps). Returned calls took
+40.491s, 28.653s and 19.816s individually and reported 230,442 total tokens.
+These are individual call durations, not end-to-end/user waiting time.
+
+The model returned five supported movement observations:
+
+| Source interval | Model-supported observation | Immediate outcome |
+| --- | --- | --- |
+| 8.750–9.750s | Shield-turn | Retains locally; later loss remains separate |
+| 20.249–20.882s | Direction change | Progresses; deception/defender beaten not established |
+| 28.999–29.632s | Direction change | Progresses; precise trick not established |
+| 42.748–43.382s | Direction reversal | Progresses; contacting foot unresolved |
+| 62.381–63.631s | Direction change and protective turn | Progresses; overlapping contacts unresolved |
+
+The human/model-assisted source review agrees that these are visible protective
+turns or changes of route. It does not upgrade them into five successful take-ons.
+A potential body dip near 8.1–8.8s remains uncertain as a deceptive body feint.
+Other uncertain observations were returned near 3.5–4.25s, 21.25–22.13s and
+34.88–35.75s. In particular, the latter model observation suggests an interception
+or loss, while the wider already-reviewed play shows a pass to white #7; that
+possession interpretation is not accepted. This is one reason the raw responses
+must not directly overwrite canonical events or report statistics.
+
+`docs/examples/feint-source-sheet-receipts.json` preserves all three raw responses,
+usage, source/selection hashes, source-sheet hashes, original references and cited
+source frames. Exact request payloads were reconstructed from the preserved source
+sheets and original prompt, and all three request and response hashes verified.
+The original preflight used the default 16384 output token budget while actual
+calls used 12288; both audits are retained and the preflight code is corrected.
+No further model request is needed for that audit correction.
+
+The first source-sheet run `39612874577` stopped before model access because the
+main transport lacked a newer local callback argument; the experiment now uses
+main's interface. No model receipts were produced by that setup failure.
+
+**Status:** a documented positive result on this footage; generic input support
+exists, but accuracy and recall on unrelated videos remain untested. No production
+analysis, PDF/web content, scores, merge or deployment changed. Next evaluation
+must include another selected-player video, failed moves, ordinary carries/pass
+preparations and occluded duels before production integration is considered.
