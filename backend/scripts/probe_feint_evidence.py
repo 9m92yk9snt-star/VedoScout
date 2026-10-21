@@ -153,7 +153,7 @@ def run(video, anchors, output, run_model=False):
     items=[{'type':'text','text':DISCOVERY}]+refs
     for name,view in zip(['full overview','detail band; same original time zero'],views):
         items.extend([{'type':'text','text':name},view])
-    _,_,audit=t.build_request('emergent','gemini-3.1-pro-preview',items,image_detail='high',reasoning_effort='low')
+    _,_,audit=t.build_request('emergent','gemini-3.1-pro-preview',items,image_detail='high',reasoning_effort='low',max_output_tokens=12288)
     meta={'schema':'FEINT_PROBE_V1','source_video_sha256':p.digest(video),'anchors_sha256':p.digest(anchors),
           'duration_s':duration,'detail_crop_xywh':[0,y,width,ch],'identity_references':refaudit,
           'discovery_payload':audit,'expected_answers_used':False,'historical_observations_used':False,
