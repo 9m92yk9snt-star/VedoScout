@@ -249,3 +249,18 @@ def test_cover_uses_larger_saved_full_body_reference_without_replacing_user_phot
     assert _pick_hero_photo(doc, sources.get) == sources['/large']
     doc['photo_source'] = 'upload'
     assert _pick_hero_photo(doc, sources.get) == sources['/original']
+
+
+def test_strengths_explain_the_bound_action_and_its_possible_team_value():
+    r = publish_report(example())
+    for strength in r['report_publication']['view']['topStrengths']:
+        assert strength['observation']
+        assert strength['teamContribution']
+        assert strength['note'] == strength['observation'] + ' ' + strength['teamContribution']
+        assert strength['eventId'] in {e['event_id'] for e in r['canonical_events']['events']}
+    from report_publication import strength_explanation
+    skill = {'key': 'competitive_mindset', 'evidence': [{'what': 'Attempts to recover the ball. The opponent shields it.'}]}
+    observed, value = strength_explanation(skill, {'canonical_event_type': 'DUEL'}, 'Player')
+    assert 'keeps challenging' in observed
+    assert 'can make it harder' in value
+    assert 'wins' not in observed.lower()

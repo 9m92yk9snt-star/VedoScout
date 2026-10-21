@@ -12,7 +12,7 @@ import math
 import re
 from zoneinfo import ZoneInfo
 
-VERSION = 3
+VERSION = 4
 CATEGORIES = ('technical', 'tactical', 'physical', 'mentality')
 EXPECTED_SKILLS = {
     'technical': ('first_touch', 'ball_control', 'dribbling', 'passing', 'shooting', 'weak_foot', 'one_v_one'),
@@ -77,6 +77,39 @@ def reader_summary(event, text, name):
             return first[:-1] + ', who scores.'
         return first + ' A teammate finishes the move.'
     return first
+
+
+def strength_explanation(skill, event, name):
+    """Observed action plus its possible football value, without a new assessment."""
+    observation = reader_summary(event, skill['evidence'][0]['what'], name)
+    text = skill['evidence'][0]['what'].lower()
+    key = skill['key']
+    if key == 'response_to_mistakes' and 'back upright' in text and 'pursues' in text:
+        observation = 'He gets up after losing the ball and chases the opponent.'
+    elif key == 'decision_making' and event.get('canonical_event_type') == 'GOAL' and 'slides' in text:
+        observation = 'He chooses to shoot as a defender slides across. The move ends in a goal.'
+    elif key == 'competitive_mindset' and event.get('canonical_event_type') == 'DUEL' and 'shields' in text:
+        observation = 'He keeps challenging while the opponent shields the ball.'
+    elif key == 'confidence' and event.get('canonical_event_type') == 'GOAL' and 'pursues' in text:
+        observation = 'He takes the shot with defenders closing in. The ball finishes inside the goal.'
+    benefits = {
+        'response_to_mistakes': 'That recovery effort can help the team put pressure back on the ball.',
+        'decision_making': 'Choosing when to finish can help turn an attack into a goal attempt.',
+        'competitive_mindset': 'Continued pressure can make it harder for the opponent to play forward.',
+        'confidence': 'Taking an available shot gives the attack a chance to finish.',
+        'ball_control': 'Keeping the ball close can give the team time to continue the attack.',
+        'dribbling': 'Carrying the ball under pressure can help the team advance.',
+        'shooting': 'Accurate shooting can turn possession into a goal threat.',
+        'passing': 'Finding a teammate can help the team keep the move going.',
+        'first_touch': 'A controlled first touch can make the next pass or movement easier.',
+        'work_rate': 'Staying involved can give teammates more support.',
+        'courage_in_duels': 'Contesting the ball can make it harder for the opponent to play freely.',
+        'intensity': 'Active pressure can reduce the time an opponent has on the ball.',
+        'body_control': 'Adjusting body position can help protect the ball under pressure.',
+    }
+    benefit = benefits.get(key, 'This is one observed example behind the retained skill rating.')
+    # Keep general football value distinct from what this particular action proves.
+    return observation, benefit
 
 
 def label(key):
@@ -442,8 +475,10 @@ def publish_report(document):
     for s in sorted_skills[:4]:
         ev = s['evidence'][0]
         c = comments.get(ev['event_id'], {})
+        observation, contribution = strength_explanation(s, by_id[ev['event_id']], name)
         view['topStrengths'].append({'name': s['label'], 'score': s['score'], 'category': s['category'],
-            'note': excerpt(ev['what']), 'timestamp': ev['timestamp'], 'eventId': ev['event_id'],
+            'note': observation + ' ' + contribution, 'observation': observation,
+            'teamContribution': contribution, 'timestamp': ev['timestamp'], 'eventId': ev['event_id'],
             'evidenceId': ev.get('evidence_id'), 'proofable': ev['proof_verified'],
             'thumb': c.get('frame_url') if c.get('proof_frame_verified') is True else None,
             'thumbVerified': c.get('proof_frame_verified') is True})

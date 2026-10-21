@@ -98,3 +98,7 @@ unknown foot, date/age references, exact frame joins, complete logs, PDF/shared-
 parity, key-action navigation, and withholding recruitment placement. Browser
 visual review of the changed web UI remains required: the cloud browser could
 not connect to the local preview server in this session.
+
+Top-strength copy pairs the linked observed action with its possible football value.
+General team benefits are phrased as possibilities, never as unobserved outcomes;
+ratings, action links, thumbnails and original card geometry remain unchanged.
