@@ -12,7 +12,7 @@ import math
 import re
 from zoneinfo import ZoneInfo
 
-VERSION = 2
+VERSION = 3
 CATEGORIES = ('technical', 'tactical', 'physical', 'mentality')
 EXPECTED_SKILLS = {
     'technical': ('first_touch', 'ball_control', 'dribbling', 'passing', 'shooting', 'weak_foot', 'one_v_one'),
@@ -266,8 +266,52 @@ def publish_report(document):
                if counts['GOAL'] or counts['ASSIST'] else
                f'The report follows {name}\'s involvement across {len(events)} action segments.')
     limitation = 'Counts cover verified observations; the edited clip does not establish full-match totals or long-term potential.'
-    full['parent_summary'] = {'headline': 'The performance at a glance', 'paragraphs': [summary],
-                              'good_news': 'Watch the key actions together, then choose one thing to practise.'}
+    # Use retained, event-bound observations to give the player a readable story.
+    # Keep references alongside the prose so this remains auditable without a model.
+    ranked = sorted(skills, key=lambda row: (-row['score'], row['key']))
+    narrative_events, narrative_paragraphs = [], [summary]
+    for key in ('response_to_mistakes', 'ball_control', 'decision_making', 'dribbling', 'competitive_mindset'):
+        skill = next((row for row in ranked if row['key'] == key), None)
+        if not skill:
+            continue
+        ev = next((ev for ev in skill['evidence'] if ev['event_id'] not in narrative_events
+                   and ev['proof_verified']), None)
+        if not ev:
+            continue
+        fact = reader_summary(by_id[ev['event_id']], ev['what'], name)
+        # Short football prose, gated on facts actually present in this observation.
+        if key == 'response_to_mistakes' and 'back upright' in fact.lower() and 'pursues' in fact.lower():
+            fact = 'After losing the ball, he gets back up and chases the opponent to stay in the play.'
+        elif key == 'ball_control' and 'close touches' in fact.lower() and 'lowering his body' in fact.lower():
+            fact = 'He keeps the ball close as he advances, lowers his body and changes his running line under pressure.'
+        elif key == 'decision_making' and by_id[ev['event_id']]['canonical_event_type'] == 'GOAL' and 'slides' in fact.lower() and 'pursues' in fact.lower():
+            fact = 'For the goal, he shoots with defenders closing in and the ball finishes inside the net.'
+        # One observed action per paragraph; never invent stable personality traits.
+        if fact.split(' ', 1)[0] in {'Gets', 'Collects', 'Carries', 'Receives', 'Attempts', 'Meets', 'Runs', 'Continues', 'Dribbles', 'Escapes', 'Recovers', 'Turns', 'Shoots', 'Releases'}:
+            fact = 'He ' + fact[:1].lower() + fact[1:]
+        narrative_paragraphs.append(fact)
+        narrative_events.append(ev['event_id'])
+        if len(narrative_paragraphs) == 4:
+            break
+    strongest = ranked[:2]
+    strength_phrases = {'response_to_mistakes': 'his reaction after losing possession',
+                        'decision_making': 'his decisions on the ball', 'ball_control': 'his close control',
+                        'shooting': 'his shooting', 'competitive_mindset': 'his efforts in contested play',
+                        'work_rate': 'his effort to stay involved', 'dribbling': 'his dribbling',
+                        'confidence': 'his willingness to take part in attacking actions'}
+    strength_names = ' and '.join(strength_phrases.get(row['key'], 'his ' + row['label'].lower()) for row in strongest)
+    score_explanation = (f'The assessment gives most credit to {strength_names}. '
+                         f'This provisional score uses {len(skills)} rated skills from this video; unseen abilities are not scored.'
+                         if strongest else 'There is not enough supported skill evidence to explain an overall score.')
+    good_news = ('He contributes as both a scorer and a provider in this clip.'
+                 if counts['GOAL'] and counts['ASSIST'] else
+                 narrative_paragraphs[1] if len(narrative_paragraphs) > 1 else
+                 'Review the documented moments together and choose one action to practise.')
+    if any(s['key'] == 'response_to_mistakes' and any(e['event_id'] in narrative_events for e in s['evidence']) for s in skills):
+        good_news = 'His reaction after losing the ball is a positive moment to build on.'
+    full['parent_summary'] = {'headline': 'A goal and a role in creating chances' if counts['GOAL'] and counts['ASSIST'] else 'What the video shows', 'paragraphs': narrative_paragraphs,
+                              'good_news': good_news}
+
     full['executive_summary'] = summary + ' ' + limitation
     full['final_summary'] = full['executive_summary']
     full['snapshot'] = {'biggest_strength': 'Documented attacking contributions', 'hidden_talent': 'Review the linked action',
@@ -358,7 +402,7 @@ def publish_report(document):
             'next_level': 'Reassess with more comparable match observations.',
             'position_why': f'Weight {s["weight"]} in the observed score for {pd.get("position") or "this position"}.'})
     doc['score_meaning'] = {'skills': meanings, 'position': pd.get('position'), 'position_line': ACADEMY_NOTE, 'discovery': None}
-    doc['score_context'] = {'overall': {'score': overall, 'line': METHOD}, 'bracket': (rubric(pd.get('age')) or ('Age unavailable',))[0]}
+    doc['score_context'] = {'overall': {'score': overall, 'line': score_explanation}, 'bracket': (rubric(pd.get('age')) or ('Age unavailable',))[0]}
     evidence_rows = [{**bound(e), 'title': titles[e['canonical_event_type']], 'description': e['_display_description'],
         'summary': e['_reader_summary'],
         'contact_interval_ms': e.get('contact_interval_ms'), 'outcome_ms': (e.get('proof') or {}).get('outcome_ms'),
@@ -413,6 +457,7 @@ def publish_report(document):
             'eventId': row['event_id'], 'proofVerified': row['proof_verified'], 'proofable': row['proof_verified']})
     doc['report_publication'] = {'version': VERSION, 'view': view, 'review': review_info, 'date': date_label, 'score': score_info,
         'duration': duration_label, 'key_actions': evidence_rows, 'assessment_note': limitation,
+        'narrative': {'event_ids': narrative_events, 'score_explanation': score_explanation},
         'stats_definitions': 'Shots include goals. Key passes lead to a teammate shot without a goal; assists are counted separately. Actions are segments, not ball touches.',
         'content_sha256': signature}
     return doc

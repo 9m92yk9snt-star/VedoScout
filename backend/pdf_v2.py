@@ -709,6 +709,22 @@ def draw_cover_image(c, path, x, y, w, h, radius=0, contain=False):
 PAD = 12.0  # inner card padding
 
 
+def _football_photo_backdrop(c, x, y, w, h):
+    """Quiet pitch graphics behind the real photo, confined to its original slot."""
+    c.saveState()
+    clip = c.beginPath()
+    clip.roundRect(x, y, w, h, 8)
+    c.clipPath(clip, stroke=0, fill=0)
+    c.setStrokeColor(HexColor("#527B5B"))
+    c.setLineWidth(.65)
+    c.roundRect(x + 8, y + 8, w - 16, h - 16, 2, stroke=1, fill=0)
+    c.line(x + 8, y + h / 2, x + w - 8, y + h / 2)
+    c.circle(x + w / 2, y + h / 2, 24, stroke=1, fill=0)
+    c.rect(x + w / 2 - 27, y + 8, 54, 21, stroke=1, fill=0)
+    c.rect(x + w / 2 - 27, y + h - 29, 54, 21, stroke=1, fill=0)
+    c.restoreState()
+
+
 def _hero_card(c, d, pd, x, y, w, h, photo_path, contain_photo=False):
     card(c, x, y, w, h)
     hp = 138.0  # photo band height
@@ -721,6 +737,7 @@ def _hero_card(c, d, pd, x, y, w, h, photo_path, contain_photo=False):
             scale = min((w - 2) / iw, (hp - 1) / ih)
             c.setFillColor(FOREST)
             c.roundRect(x + 1, py, w - 2, hp - 1, 8, stroke=0, fill=1)
+            _football_photo_backdrop(c, x + 1, py, w - 2, hp - 1)
             c.drawImage(str(photo_path), x + (w - iw * scale) / 2, py + (hp - 1 - ih * scale) / 2,
                         iw * scale, ih * scale, mask='auto')
             photo_ok = True
@@ -1531,6 +1548,28 @@ def _photo_candidates(doc):
 
 
 def _pick_hero_photo(doc, resolve):
+    # Prefer a larger existing full-body selection over the first tiny video crop.
+    # These are saved identity references, never inferred players or new tracking.
+    if doc.get('report_publication') and doc.get('photo_source') == 'video_crop':
+        anchors = [a for a in doc.get('anchors') or [] if isinstance(a, dict)
+                   and a.get('visibility') != 'partial' and a.get('visible_mask')
+                   and isinstance(a.get('body_ratio'), (int, float)) and 1.65 <= a['body_ratio'] <= 2.45
+                   and isinstance(a.get('box'), dict)]
+        anchors.sort(key=lambda a: float(a['box'].get('w') or 0) * float(a['box'].get('h') or 0), reverse=True)
+        for anchor in anchors:
+            for url in (anchor.get('crop_r2_url'), '/api/uploads/' + anchor['crop_filename'] if anchor.get('crop_filename') else None):
+                if not url:
+                    continue
+                p = resolve(url)
+                if not p:
+                    continue
+                try:
+                    with PILImage.open(p) as im:
+                        iw, ih = im.size
+                    if iw >= 64 and ih >= 96 and .35 <= iw / ih <= 1.1:
+                        return p
+                except (OSError, TypeError, ValueError):
+                    continue
     for url in _photo_candidates(doc):
         p = resolve(url)
         if not p:

@@ -54,8 +54,13 @@ withheld even when an observed aggregate can be calculated.
   page. Reuse the existing rendering functions; matching colours alone is not
   sufficient. No replacement page renderer or new visual design is permitted.
   Fit images inside their original image areas, retaining the source aspect
-  ratio and the existing profile-photo slot. Short shared editorial summaries
-  appear in the PDF. Keep all skill scores within their category in the original
+  ratio and the existing profile-photo slot. Shared player-story paragraphs use retained, identity-bound observations and
+  record their event references. The score explanation names the strongest retained
+  ratings in plain language; the method remains in the scores section. Prefer larger
+  existing full-body identity crops over the first tiny video crop, excluding partial
+  references; preserve uploaded user photos. Pitch graphics stay behind the original
+  photo slot, never over the player or match evidence. No invented photo detail.
+  Short shared editorial summaries appear in the PDF. Keep all skill scores within their category in the original
   four score cards, with academy reference ranges and evidence links in the
   original lower card. Do not print technical IDs or the full audit log. The full
   log and skill evidence remain in the online report and evidence export; five

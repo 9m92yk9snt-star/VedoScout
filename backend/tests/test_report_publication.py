@@ -211,3 +211,41 @@ def test_same_event_id_cannot_authorize_media_from_another_source_or_time(field,
     snapshot = next(m for m in published['report_publication']['view']['snapshotMoments'] if m['eventId'] == 'event-0')
     assert snapshot['thumb'] is None
     assert published['report_publication']['key_actions'][0]['proof_verified'] is False
+
+
+def test_player_story_is_shared_and_only_uses_bound_verified_observations():
+    r = publish_report(example())
+    p = r['report_publication']
+    assert p['view']['parentSummary']['paragraphs'] == r['full_report']['parent_summary']['paragraphs']
+    assert len(p['view']['parentSummary']['paragraphs']) > 1
+    assert r['score_context']['overall']['line'] == p['narrative']['score_explanation']
+    bound = {c['event_id'] for c in r['full_report']['video_comments'] if c['proof_verified']}
+    assert set(p['narrative']['event_ids']) <= bound
+    assert 'rated skills from this video' in p['narrative']['score_explanation']
+    # Removing proof must not leave an apparently evidenced player-story paragraph.
+    original = example()
+    for c in original['full_report']['video_comments']:
+        c['proof_verified'] = False
+    out = publish_report(original)
+    assert out['report_publication']['narrative']['event_ids'] == []
+    assert len(out['full_report']['parent_summary']['paragraphs']) == 1
+
+
+def test_cover_uses_larger_saved_full_body_reference_without_replacing_user_photo(tmp_path):
+    from PIL import Image
+    from pdf_v2 import _pick_hero_photo
+    sources = {}
+    for name in ('original', 'small', 'large', 'partial', 'no-mask'):
+        path = tmp_path / (name + '.jpg')
+        Image.new('RGB', (120, 240)).save(path)
+        sources['/' + name] = str(path)
+    def anchor(name, size, **extra):
+        return {'crop_r2_url': '/' + name, 'box': {'w': size, 'h': size},
+                'body_ratio': 2.0, 'visible_mask': {'width': 96, 'height': 192}, **extra}
+    doc = {'photo_source': 'video_crop', 'report_publication': {'version': 3},
+           'display_crop_url_override': '/original', 'anchors': [
+           anchor('small', .1), anchor('partial', .5, visibility='partial'),
+           anchor('no-mask', .4, visible_mask=None), anchor('large', .2)]}
+    assert _pick_hero_photo(doc, sources.get) == sources['/large']
+    doc['photo_source'] = 'upload'
+    assert _pick_hero_photo(doc, sources.get) == sources['/original']

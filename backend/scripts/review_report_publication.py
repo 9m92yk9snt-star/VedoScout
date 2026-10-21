@@ -38,25 +38,27 @@ def main():
                 cv2.imwrite(str(image), pixels)
                 local[comment.get('frame_url')] = str(image)
             anchors = report.get('anchors') or []
-            if anchors:
-                anchor = anchors[0]
+            for index, anchor in enumerate(anchors):
                 box = anchor.get('box') or {}
                 ok, pixels, _ = read_frame_at(cap, anchor['t'])
                 if ok and all(k in box for k in ('x','y','w','h')):
                     h, w = pixels.shape[:2]
-                    x0, y0 = max(0, int((box['x']-.25*box['w'])*w)), max(0, int((box['y']-.1*box['h'])*h))
-                    x1, y1 = min(w, int((box['x']+1.25*box['w'])*w)), min(h, int((box['y']+1.1*box['h'])*h))
-                    image = images / 'player-from-original-anchor.jpg'
+                    x0, y0 = max(0, int((box['x']-.12*box['w'])*w)), max(0, int((box['y']-.08*box['h'])*h))
+                    x1, y1 = min(w, int((box['x']+1.12*box['w'])*w)), min(h, int((box['y']+1.08*box['h'])*h))
+                    image = images / f'player-from-original-anchor-{index}.jpg'
                     if x1 > x0 and y1 > y0:
-                        crop = pixels[y0:y1,x0:x1]
-                        scale = max(1, 120/crop.shape[1], 120/crop.shape[0])
-                        crop = cv2.resize(crop, None, fx=scale, fy=scale)
-                        cv2.imwrite(str(image), crop)
-                        for key in ('player_photo_url_override','display_crop_url_override','subject_crop_url_override'):
-                            local[report.get(key)] = str(image)
-                        for key in ('player_photo_filename','display_crop_filename','subject_crop_filename','marker_filename'):
-                            if report.get(key):
-                                local['/api/uploads/'+report[key]] = str(image)
+                        # Keep native source pixels: no upscaling or invented detail.
+                        cv2.imwrite(str(image), pixels[y0:y1,x0:x1], [cv2.IMWRITE_JPEG_QUALITY, 95])
+                        for url in (anchor.get('crop_r2_url'), '/api/uploads/' + anchor['crop_filename'] if anchor.get('crop_filename') else None):
+                            if url:
+                                local[url] = str(image)
+                        if index == 0:
+                            for key in ('player_photo_url_override','display_crop_url_override','subject_crop_url_override'):
+                                if report.get(key):
+                                    local[report[key]] = str(image)
+                            for key in ('player_photo_filename','display_crop_filename','subject_crop_filename','marker_filename'):
+                                if report.get(key):
+                                    local['/api/uploads/'+report[key]] = str(image)
         finally:
             cap.release()
     published = publish_report(report)
