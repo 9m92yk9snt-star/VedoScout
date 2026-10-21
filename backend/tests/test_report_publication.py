@@ -131,7 +131,7 @@ def test_concise_pdf_uses_shared_facts_and_keeps_full_audit_in_data(tmp_path):
     skills_page = next(p.extract_text().upper() for p in reader.pages if 'THE NUMBERS, TRANSLATED' in p.extract_text().upper())
     assert all(label in skills_page for label in ('TECHNICAL', 'MENTALITY', 'DRIBBLING', 'SHOOTING', 'CONFIDENCE', 'WORK RATE'))
     first_page = reader.pages[0].extract_text()
-    assert all(label in first_page for label in ("SCOUT'S FIRST IMPRESSION", 'OVERALL OBSERVED', 'MATCH STATS', 'ACADEMY RUBRIC REFERENCE'))
+    assert all(label in first_page for label in ("SCOUT'S FIRST IMPRESSION", 'OVERALL OBSERVED', 'MATCH STATS', 'ACADEMY SKILL GUIDE'))
     assert 'COMPLETE ACTION TIMELINE' not in first_page
     assert 'Contact window' not in '\n'.join(p.extract_text() for p in reader.pages[:5])
 
@@ -228,7 +228,7 @@ def test_player_story_is_shared_and_only_uses_bound_verified_observations():
     assert r['score_context']['overall']['line'] == p['narrative']['score_explanation']
     bound = {c['event_id'] for c in r['full_report']['video_comments'] if c['proof_verified']}
     assert set(p['narrative']['event_ids']) <= bound
-    assert 'rated skills from this video' in p['narrative']['score_explanation']
+    assert 'Your strongest qualities' in p['narrative']['score_explanation']
     # Removing proof must not leave an apparently evidenced player-story paragraph.
     original = example()
     for c in original['full_report']['video_comments']:
@@ -271,3 +271,43 @@ def test_strengths_explain_the_bound_action_and_its_possible_team_value():
     assert 'keeps challenging' in observed
     assert 'can make it harder' in value
     assert 'wins' not in observed.lower()
+
+
+def test_coaching_copy_keeps_grades_and_observations_but_removes_system_diagnostics():
+    source = example()
+    original = deepcopy(source)
+    source['full_report']['parents_package'] = {'message_to_player': {'body': 'old template'}}
+    out = publish_report(source)
+    pub, full = out['report_publication'], out['full_report']
+    assert pub['score']['value'] == 7.8
+    assert pub['score']['rated_skills'] == 4  # still retained internally
+    assert source['canonical_events'] == original['canonical_events']
+    assert [e['event_id'] for e in out['canonical_events']['events']] == [e['event_id'] for e in original['canonical_events']['events']]
+    public = json.dumps([pub['view'], full['parents_package'], out['score_meaning']])
+    assert 'Contact window:' not in public and 'MODEL_' not in public
+    assert 'review your goal, assists and saved shot' not in public
+    assert all(p['how_to_improve'] for p in full['development_priorities_detailed'])
+    assert len({p['how_to_improve'] for p in full['development_priorities_detailed']}) == len(full['development_priorities_detailed'])
+    assert full['parent_value_metrics']['involvement']['quality']
+    assert 'actions_observed' not in full['parent_value_metrics']['involvement']
+    assert 'club selection decision' in pub['score']['comparison']['note']
+    assert out == publish_report(out)
+
+
+def test_non_scoring_player_gets_carries_learning_and_no_invented_goal_or_saved_shot():
+    source = example()
+    source['full_report']['parents_package'] = {'message_to_player': {'body': 'old template'}}
+    for e in source['canonical_events']['events']:
+        e.update(canonical_event_type='DRIBBLE', canonical_outcome='INCOMPLETE',
+                 details=['P1 shields the ball under pressure from p2 before the move ends.'])
+    out = publish_report(source)
+    pub, full = out['report_publication'], out['full_report']
+    assert len(pub['view']['snapshotMoments']) == 4
+    assert {m['eventId'] for m in pub['view']['snapshotMoments']} <= {e['event_id'] for e in source['canonical_events']['events']}
+    assert {r['label']: r['value'] for r in pub['view']['matchStats']}['Ball Carries'] == 6
+    message = full['parents_package']['message_to_player']['body'].lower()
+    assert 'goal' not in message and 'saved shot' not in message and 'assist' not in message
+    assert all('scor' not in p.lower() for p in full['parent_summary']['paragraphs'])
+    assert full['grow_your_game']['lessons']
+    assert all(lesson['moments'][0]['event_id'] in {e['event_id'] for e in source['canonical_events']['events']}
+               for lesson in full['grow_your_game']['lessons'])

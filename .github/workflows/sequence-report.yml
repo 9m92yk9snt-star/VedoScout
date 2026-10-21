@@ -22,6 +22,7 @@ on:
       - 'backend/evidence_authority.py'
       - 'backend/server.py'
       - 'backend/report_publication.py'
+      - 'backend/player_report_copy.py'
       - 'backend/pdf_v2.py'
       - 'backend/tests/test_report_publication.py'
       - '.github/workflows/sequence-report.yml'
