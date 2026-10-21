@@ -180,6 +180,8 @@ def _frame_lookup(full):
 
 
 def derive_v2(report):
+    from report_publication import publish_report
+    report = publish_report(report)
     full = report.get("full_report") or {}
     pd = report.get("player_details") or {}
     skills = _collect_skills(full)
@@ -455,7 +457,7 @@ def derive_v2(report):
     overall = full.get("scores", {}).get("overall_development")
     overall = overall if isinstance(overall, (int, float)) else None
 
-    return {
+    derived = {
         "playerType": full.get("player_type") or "",
         "overall": overall,
         "ageBracket": ob.get("age_bracket_used"),
@@ -476,6 +478,10 @@ def derive_v2(report):
         "missions": [m for m in (full.get("next_match_missions") or [])
                      if isinstance(m, dict) and m.get("mission")][:3],
     }
+    derived["publication"] = report.get("report_publication")
+    derived.update((report.get("report_publication") or {}).get("view") or {})
+    return derived
+
 
 
 def _parent_metrics(full):
@@ -526,7 +532,7 @@ def _action_timeline(full):
             "outcome": oc if oc in ("positive", "neutral", "negative") else "neutral",
             "tracked": bool(a.get("tracking_verified")),
         })
-    return out[:15]
+    return out
 
 
 def _identity_note(report):
@@ -646,8 +652,34 @@ def draw_dots(c, x, cy, n_filled, total=5, r=3.4, gap=4.6):
         c.restoreState()
 
 
-def draw_cover_image(c, path, x, y, w, h, radius=0):
+def draw_contain_image(c, path, x, y, w, h, radius=0):
+    """Keep the source frame intact inside its existing image area."""
+    if not path:
+        return False
+    try:
+        with PILImage.open(path) as source:
+            image = source.convert('RGB')
+        iw, ih = image.size
+        scale = min(w / iw, h / ih)
+        c.saveState()
+        c.setFillColor(FOREST)
+        c.roundRect(x, y, w, h, radius or .1, stroke=0, fill=1)
+        if radius:
+            clip = c.beginPath()
+            clip.roundRect(x, y, w, h, radius)
+            c.clipPath(clip, stroke=0, fill=0)
+        c.drawImage(ImageReader(image), x + (w - iw * scale) / 2, y + (h - ih * scale) / 2,
+                    iw * scale, ih * scale)
+        c.restoreState()
+        return True
+    except (OSError, TypeError, ValueError):
+        return False
+
+
+def draw_cover_image(c, path, x, y, w, h, radius=0, contain=False):
     """Draw an image object-fit:cover inside the given rect (center-cropped)."""
+    if contain:
+        return draw_contain_image(c, path, x, y, w, h, radius)
     try:
         img = PILImage.open(path).convert("RGB")
         iw, ih = img.size
@@ -677,11 +709,43 @@ def draw_cover_image(c, path, x, y, w, h, radius=0):
 PAD = 12.0  # inner card padding
 
 
-def _hero_card(c, d, pd, x, y, w, h, photo_path):
+def _football_photo_backdrop(c, x, y, w, h):
+    """Quiet pitch graphics behind the real photo, confined to its original slot."""
+    c.saveState()
+    clip = c.beginPath()
+    clip.roundRect(x, y, w, h, 8)
+    c.clipPath(clip, stroke=0, fill=0)
+    c.setStrokeColor(HexColor("#527B5B"))
+    c.setLineWidth(.65)
+    c.roundRect(x + 8, y + 8, w - 16, h - 16, 2, stroke=1, fill=0)
+    c.line(x + 8, y + h / 2, x + w - 8, y + h / 2)
+    c.circle(x + w / 2, y + h / 2, 24, stroke=1, fill=0)
+    c.rect(x + w / 2 - 27, y + 8, 54, 21, stroke=1, fill=0)
+    c.rect(x + w / 2 - 27, y + h - 29, 54, 21, stroke=1, fill=0)
+    c.restoreState()
+
+
+def _hero_card(c, d, pd, x, y, w, h, photo_path, contain_photo=False):
     card(c, x, y, w, h)
     hp = 138.0  # photo band height
     py = y + h - hp
-    if not (photo_path and draw_cover_image(c, photo_path, x + 1, py, w - 2, hp - 1, radius=8)):
+    photo_ok = False
+    if photo_path and contain_photo:
+        try:
+            with PILImage.open(photo_path) as image:
+                iw, ih = image.size
+            scale = min((w - 2) / iw, (hp - 1) / ih)
+            c.setFillColor(FOREST)
+            c.roundRect(x + 1, py, w - 2, hp - 1, 8, stroke=0, fill=1)
+            _football_photo_backdrop(c, x + 1, py, w - 2, hp - 1)
+            c.drawImage(str(photo_path), x + (w - iw * scale) / 2, py + (hp - 1 - ih * scale) / 2,
+                        iw * scale, ih * scale, mask='auto')
+            photo_ok = True
+        except (OSError, TypeError, ValueError):
+            pass
+    elif photo_path:
+        photo_ok = draw_cover_image(c, photo_path, x + 1, py, w - 2, hp - 1, radius=8)
+    if not photo_ok:
         c.saveState()
         c.setFillColor(HexColor("#0F2A1A"))
         c.roundRect(x + 1, py, w - 2, hp - 1, 8, stroke=0, fill=1)
@@ -790,7 +854,7 @@ def _overall_score_card(c, d, x, y, w, h, ctx=None, bracket=None):
     ty = y + h - PAD - 4
     c.setFillColor(FOREST)
     c.setFont(F_BOLD, 8.8)
-    c.drawCentredString(cx, ty - 8, "OVERALL DEVELOPMENT")
+    c.drawCentredString(cx, ty - 8, "OVERALL OBSERVED" if d.get("publication") else "OVERALL DEVELOPMENT")
     c.drawCentredString(cx, ty - 19, "SCORE")
     overall = d["overall"]
     pct = (overall / 10 * 100) if overall is not None else 0
@@ -872,7 +936,7 @@ def _snapshot_moment_card(c, m, x, y, w, h, resolve):
     TXT = 72.0  # text block under the photo
     card(c, x, y, w, h, fill=HexColor("#FBFAF2"), r=10)
     # header bar (rounded top corners via card clip)
-    g1, g2 = SNAP_HEADER_COLORS.get(m.get("key"), SNAP_HEADER_COLORS["noticed"])
+    g1, g2 = SNAP_HEADER_COLORS["strength"] if m.get("label") == "Verified action" else SNAP_HEADER_COLORS.get(m.get("key"), SNAP_HEADER_COLORS["noticed"])
     c.saveState()
     p = c.beginPath()
     p.roundRect(x, y, w, h, 10)
@@ -906,7 +970,7 @@ def _snapshot_moment_card(c, m, x, y, w, h, resolve):
     ph = h - HB - TXT
     py = y + TXT
     thumb = resolve(m.get("thumb")) if m.get("thumb") else None
-    if not (thumb and draw_cover_image(c, thumb, x + 1, py, w - 2, ph)):
+    if not (thumb and draw_cover_image(c, thumb, x + 1, py, w - 2, ph, contain=bool(m.get('eventId')))):
         c.saveState()
         c.setFillColor(HexColor("#12301F"))
         c.rect(x + 1, py, w - 2, ph, stroke=0, fill=1)
@@ -1002,8 +1066,20 @@ def _snapshot_page(c, d, report_doc, page_no, total_pages, resolve):
     for k, (px, pyy) in zip(("strength", "noticed", "hidden", "develop"), pos):
         if moments.get(k):
             _snapshot_moment_card(c, moments[k], px, pyy, cw2, ch, resolve)
-    _snapshot_progress_strip(c, (d.get("snapshot") or {}).get("progressNote") or "On the right track!",
-                             M, M, CW, strip_h)
+    extra = d.get('videoHighlight') if d.get('publication') else None
+    if extra and extra.get('eventId'):
+        from urllib.parse import quote
+        card(c, M, M, CW, strip_h, fill=SOFT)
+        c.setFillColor(FOREST)
+        c.setFont(F_BOLD, 8)
+        c.drawString(M + PAD, M + strip_h - 14, extra.get('timestamp', '') + ' - ' + extra.get('title', 'ACTION').upper())
+        draw_par(c, esc(extra.get('caption', '')), M + 108, M + strip_h - 8, CW - 120,
+                 _style(F_BODY, 7, BODY, leading=9), max_h=strip_h - 12)
+        url = 'https://scoutmeplay.com/report/' + quote(str(report_doc.get('id') or ''), safe='') + '#event-' + quote(extra['eventId'], safe='')
+        c.linkURL(url, (M, M, M + CW, M + strip_h), relative=0)
+    else:
+        _snapshot_progress_strip(c, (d.get("snapshot") or {}).get("progressNote") or "On the right track!",
+                                 M, M, CW, strip_h)
     _page_footer(c, page_no, total_pages)
     c.showPage()
 
@@ -1029,11 +1105,11 @@ def _match_stats_card(c, stats, x, y, w, h, coverage_note=None):
                  _style(F_BODY, 5.6, MUTED, leading=7), max_h=21)
 
 
-def _age_comparison_card(c, comp, bracket, x, y, w, h):
+def _age_comparison_card(c, comp, bracket, x, y, w, h, rubric=False):
     card(c, x, y, w, h)
     ty = y + h - PAD
     title_w = w - 2 * PAD
-    ty -= card_title(c, x + PAD, ty, "Vs. Players Same Age", title_w)
+    ty -= card_title(c, x + PAD, ty, "Academy Rubric Reference" if rubric else "Vs. Players Same Age", title_w)
     if bracket:
         c.saveState()
         bw = c.stringWidth(str(bracket).upper(), F_BOLD, 5.4) + 10
@@ -1047,7 +1123,9 @@ def _age_comparison_card(c, comp, bracket, x, y, w, h):
         draw_par(c, esc("Not enough benchmarked skills in this clip."), x + PAD, ty - 4,
                  w - 2 * PAD, _style(F_BODY, 7.2, MUTED, leading=10))
         return
-    row_h = (ty - y - 8) / max(1, len(comp))
+    row_h = (ty - y - (28 if rubric else 8)) / max(1, len(comp))
+    if rubric:
+        draw_par(c, "Coaching rubric, not peer percentiles. Ranges and evidence follow.", x + PAD, y + 20, w - 2 * PAD, _style(F_BODY, 6.2, MUTED, leading=8))
     for r in comp:
         c.setFillColor(BODY)
         c.setFont(F_BODY, 7.2)
@@ -1057,6 +1135,66 @@ def _age_comparison_card(c, comp, bracket, x, y, w, h):
         c.drawRightString(x + w - PAD, ty - 8, str(r["label"]))
         draw_bar(c, x + PAD, ty - 16.5, w - 2 * PAD, 4.4, r["width"], fg=FOREST)
         ty -= row_h
+
+
+def _development_panel(c, d, x, top, w):
+    """One shared frame; measured rows keep observation and advice together."""
+    col_w = (w - 3 * PAD) / 2
+    body = _style(F_BODY, 7.2, BODY, leading=10)
+    def para(text):
+        p = Paragraph(esc(text or ''), body)
+        return p, p.wrap(col_w, H)[1]
+    strengths = [(a, *para(a.get('note'))) for a in d.get('topStrengths') or []]
+    priorities = [(a, *para(a.get('issue')), *para(a.get('howTo'))) for a in d.get('devPriorities') or []]
+    left_h = sum(20 + ph + 16 for _, _, ph in strengths)
+    right_h = sum(20 + 12 + oh + 8 + 12 + ah + 16 for _, _, oh, _, ah in priorities)
+    height = 72 + max(left_h, right_h, 50)
+    y = top - height
+    card(c, x, y, w, height)
+    card_title(c, x + PAD, top - PAD, 'Strengths & Next Development Steps', w - 2 * PAD)
+    left, right = x + PAD, x + 2 * PAD + col_w
+    c.setStrokeColor(BORDER)
+    c.setLineWidth(.6)
+    c.line(x + w / 2, top - 46, x + w / 2, y + PAD)
+    for bx, heading in ((left, 'TOP STRENGTHS'), (right, 'NEXT TRAINING FOCUS')):
+        c.setFillColor(FOREST)
+        c.setFont(F_BOLD, 7.6)
+        c.drawString(bx, top - 48, heading)
+    def title(bx, yy, name, score):
+        c.setFillColor(INK)
+        c.setFont(F_BOLD, 8.4)
+        c.drawString(bx, yy - 9, name)
+        if score is not None:
+            c.setFillColor(GREEN)
+            c.setFont(F_BOLD, 7)
+            c.drawRightString(bx + col_w, yy - 9, f'{score:.1f}/10')
+    yy = top - 59
+    for row, p, ph in strengths:
+        title(left, yy, row['name'], row.get('score'))
+        p.drawOn(c, left, yy - 20 - ph)
+        used = 20 + ph
+        if row.get('timestamp'):
+            c.setFillColor(GREEN)
+            c.setFont(F_BODY, 6.5)
+            c.drawString(left, yy - used - 10, 'Video ' + row['timestamp'])
+        yy -= used + 16
+    yy = top - 59
+    for row, op, oh, ap, ah in priorities:
+        title(right, yy, row['name'], row.get('score'))
+        yy -= 20
+        c.setFillColor(MUTED)
+        c.setFont(F_BOLD, 6.3)
+        c.drawString(right, yy - 7, 'IN THE VIDEO')
+        yy -= 12
+        op.drawOn(c, right, yy - oh)
+        yy -= oh + 8
+        c.setFillColor(GREEN)
+        c.setFont(F_BOLD, 6.3)
+        c.drawString(right, yy - 7, 'NEXT TRAINING FOCUS')
+        yy -= 12
+        ap.drawOn(c, right, yy - ah)
+        yy -= ah + 16
+    return height
 
 
 def _top_strengths_card(c, strengths, x, y, w, h, resolve):
@@ -1072,7 +1210,7 @@ def _top_strengths_card(c, strengths, x, y, w, h, resolve):
         iy_top = ty
         th_w, th_h = 56, min(40, item_h - 12)
         thumb = resolve(s.get("thumb")) if s.get("thumb") else None
-        has_thumb = bool(thumb and draw_cover_image(c, thumb, x + PAD, iy_top - 6 - th_h, th_w, th_h, radius=5))
+        has_thumb = bool(thumb and draw_cover_image(c, thumb, x + PAD, iy_top - 6 - th_h, th_w, th_h, radius=5, contain=bool(s.get('eventId'))))
         # No placeholder: unverified moments render as text-only, full width.
         tx = x + PAD + (th_w + 9 if has_thumb else 0)
         tw = w - PAD - tx
@@ -1195,10 +1333,10 @@ def _parent_tips_card(c, tips, x, y, w, h):
         ty -= item_h
 
 
-def _action_timeline_card(c, actions, x, y, w, h):
+def _action_timeline_card(c, actions, x, y, w, h, title="Action Timeline Preview - Full Log Follows"):
     card(c, x, y, w, h)
     ty = y + h - PAD
-    ty -= card_title(c, x + PAD, ty, "Action Timeline", w - 2 * PAD)
+    ty -= card_title(c, x + PAD, ty, title, w - 2 * PAD)
     row_h = (ty - y - 4) / max(1, len(actions))
     lx = x + PAD + 5
     c.saveState()
@@ -1265,7 +1403,7 @@ def _video_highlight_card(c, vh, x, y, w, h, resolve):
     tw = w - 2 * PAD
     th = tw * 9 / 16
     thumb = resolve(vh.get("thumb")) if vh.get("thumb") else None
-    drew = bool(thumb and draw_cover_image(c, thumb, x + PAD, ty - th, tw, th, radius=7))
+    drew = bool(thumb and draw_cover_image(c, thumb, x + PAD, ty - th, tw, th, radius=7, contain=bool(vh.get('eventId'))))
     if not drew:
         th = 22  # no verified image — timestamp chip renders alone in a slim band
     if vh.get("timestamp"):
@@ -1313,7 +1451,8 @@ def _scout_outlook_card(c, so, x, y, w, h):
         c.setFillColor(INK)
         c.setFont(F_BOLD, 8.6)
         c.drawString(x + PAD, ty - 19, str(so[val_key]))
-        draw_dots(c, x + w - PAD - 5 * (2 * 3.4 + 4.6), ty - 18.5, int(so[dots_key] or 0))
+        if so.get(dots_key):
+            draw_dots(c, x + w - PAD - 5 * (2 * 3.4 + 4.6), ty - 18.5, int(so[dots_key]))
         ty -= 30
     c.saveState()
     c.setFillColor(SOFT)
@@ -1481,6 +1620,28 @@ def _photo_candidates(doc):
 
 
 def _pick_hero_photo(doc, resolve):
+    # Prefer a larger existing full-body selection over the first tiny video crop.
+    # These are saved identity references, never inferred players or new tracking.
+    if doc.get('report_publication') and doc.get('photo_source') == 'video_crop':
+        anchors = [a for a in doc.get('anchors') or [] if isinstance(a, dict)
+                   and a.get('visibility') != 'partial' and a.get('visible_mask')
+                   and isinstance(a.get('body_ratio'), (int, float)) and 1.65 <= a['body_ratio'] <= 2.45
+                   and isinstance(a.get('box'), dict)]
+        anchors.sort(key=lambda a: float(a['box'].get('w') or 0) * float(a['box'].get('h') or 0), reverse=True)
+        for anchor in anchors:
+            for url in (anchor.get('crop_r2_url'), '/api/uploads/' + anchor['crop_filename'] if anchor.get('crop_filename') else None):
+                if not url:
+                    continue
+                p = resolve(url)
+                if not p:
+                    continue
+                try:
+                    with PILImage.open(p) as im:
+                        iw, ih = im.size
+                    if iw >= 64 and ih >= 96 and .35 <= iw / ih <= 1.1:
+                        return p
+                except (OSError, TypeError, ValueError):
+                    continue
     for url in _photo_candidates(doc):
         p = resolve(url)
         if not p:
@@ -2209,7 +2370,7 @@ def _sm_chips_row(c, s, x, cy, max_w):
     chips = []
     ev = s.get("evidence") or {}
     ang = s.get("angles") or {}
-    if ev.get("verified"):
+    if ev.get("verified") and not s.get('hide_time'):
         chips.append((f"SEEN AT {ev.get('timestamp')}", FOREST, LIME))
     if ang.get("better_than") is not None:
         chips.append((f"STRONGER THAN {ang['better_than']} OF 10 HIS AGE", HexColor("#E4EEDD"), GREEN))
@@ -2232,6 +2393,27 @@ def _sm_chips_row(c, s, x, cy, max_w):
 def _sm_rich_card(c, s, x, y, w, h):
     card(c, x, y, w, h)
     ty = y + h - PAD + 2
+    if 'category_skills' in s:
+        c.setFillColor(INK)
+        c.setFont(F_BLACK, 10.5)
+        c.drawString(x + PAD, ty - 15, str(s['category']).upper())
+        c.setFillColor(MUTED)
+        c.setFont(F_BODY, 6.6)
+        c.drawString(x + PAD, ty - 28, "Skill /10 - age-band reference")
+        rows = s['category_skills']
+        if not rows:
+            draw_par(c, "Not assessed in this clip.", x + PAD, ty - 40,
+                     w - 2 * PAD, _style(F_BODY, 7, MUTED, leading=9))
+        for i, skill in enumerate(rows):
+            baseline = ty - 42 - i * 11
+            c.setFillColor(BODY)
+            c.setFont(F_BODY, 7)
+            c.drawString(x + PAD, baseline, skill['label'])
+            ref = (skill.get('comparison') or {}).get('label', 'No reference')
+            c.setFillColor(FOREST)
+            c.setFont(F_BOLD, 6.8)
+            c.drawRightString(x + w - PAD, baseline, f"{skill['score']:.1f} - {ref}")
+        return
     c.setFillColor(MUTED)
     c.setFont(F_BOLD, 5.6)
     c.drawString(x + PAD, ty - 7, str(s.get("category", "")).upper())
@@ -2262,6 +2444,45 @@ def _sm_rich_card(c, s, x, y, w, h):
     _sm_chips_row(c, s, x + PAD, y + 11, w - 2 * PAD)
 
 
+def _publication_score_notes(c, sm, x, top, w):
+    """Concise score context and evidence navigation in the original lower card."""
+    from urllib.parse import quote
+    pub = sm['publication']
+    score = pub['score']
+    comp = score.get('comparison')
+    value = f"{score['value']:.1f}/10" if score['value'] is not None else 'Not assessed'
+    if comp:
+        lines = [f"{value} falls in the {comp['label']} reference range for the observed skills ({comp['bracket']})."]
+    else:
+        lines = [f"Observed skill score: {value}."]
+    story = pub.get('narrative') or {}
+    if story.get('score_explanation'):
+        lines.append(story['score_explanation'])
+    lines.append('The reference is a coaching guide. This clip does not establish academy readiness or long-term potential.')
+    style = _style(F_BODY, 7.2, BODY, leading=10)
+    paragraphs = [Paragraph(esc(line), style) for line in lines]
+    heights = [p.wrap(w - 2 * PAD, H)[1] for p in paragraphs]
+    h = PAD + 25 + sum(ph + 5 for ph in heights) + 43
+    y = top - h
+    card(c, x, y, w, h)
+    ty = top - PAD
+    ty -= card_title(c, x + PAD, ty, 'Academy Reference', w - 2 * PAD)
+    for paragraph, ph in zip(paragraphs, heights):
+        paragraph.drawOn(c, x + PAD, ty - ph)
+        ty -= ph + 5
+    c.setFillColor(FOREST)
+    c.setFont(F_BOLD, 6.6)
+    c.drawString(x + PAD, y + 25, "VIEW THE KEY ACTIONS")
+    actions = pub['key_actions'][:5]
+    for i, action in enumerate(actions):
+        bx = x + PAD + i * ((w - 2 * PAD) / max(1, len(actions)))
+        label = action['timestamp'] + ' ' + action['title']
+        c.setFont(F_BODY, 6.6)
+        c.drawString(bx, y + 13, label)
+        url = 'https://scoutmeplay.com/report/' + quote(str(sm['report_id']), safe='') + '#event-' + quote(action['event_id'], safe='')
+        c.linkURL(url, (bx, y + 10, bx + c.stringWidth(label, F_BODY, 6.6), y + 21), relative=0)
+
+
 def _score_meaning_page(c, sm, player_name, page_no, total_pages):
     """Full page: the numbers, translated — one primary truth per score,
     every other mention a NEW angle (proof, comparison, trend, gap)."""
@@ -2280,9 +2501,10 @@ def _score_meaning_page(c, sm, player_name, page_no, total_pages):
     c.setFillColor(HexColor("#C9D8C0"))
     c.setFont(F_BODY, 6.8)
     c.drawString(M + PAD, yy - 32,
+                 f"Scores and age-band references for {first}, grouped by category." if sm.get("publication") else
                  f"A number on its own says nothing. Here every score becomes a discovery about {first} — "
                  "what it looks like on the pitch, the proof behind it, and the road upward.")
-    if sm.get("position_line"):
+    if sm.get("position_line") and not sm.get("publication"):
         c.setFillColor(HexColor("#9FBF93"))
         c.setFont(F_BODY, 6.4)
         c.drawString(M + PAD, yy - 44, str(sm["position_line"])[:150])
@@ -2290,7 +2512,7 @@ def _score_meaning_page(c, sm, player_name, page_no, total_pages):
     yy -= h_hd + GAP
 
     skills = sm.get("skills") or []
-    rich, rest = skills[:4], skills[4:]
+    rich, rest = (sm["category_groups"], []) if sm.get("category_groups") else (skills[:4], skills[4:])
     disc = sm.get("discovery")
 
     cw2 = (CW - GAP) / 2
@@ -2307,7 +2529,7 @@ def _score_meaning_page(c, sm, player_name, page_no, total_pages):
         max_rows = max(1, int((avail - 30) / row_h))
         n_show = min(len(rest), max_rows * 2)
         rows_used = (n_show + 1) // 2
-        h_sk = rows_used * row_h + 32
+        h_sk = rows_used * row_h + 48
         card(c, M, yy - h_sk, CW, h_sk)
         ty2 = yy - PAD
         ty2 -= card_title(c, M + PAD, ty2, "Every Other Number — A New Angle, Never A Repeat", CW - 2 * PAD)
@@ -2332,12 +2554,15 @@ def _score_meaning_page(c, sm, player_name, page_no, total_pages):
             if ang.get("gap_to_next") is not None and ang.get("next_band"):
                 bits.append(f"{ang['gap_to_next']:.1f} from {ang['next_band']}")
             ev = s.get("evidence") or {}
-            if ev.get("verified"):
+            if ev.get("verified") and not s.get('hide_time'):
                 bits.append(f"seen at {ev.get('timestamp')}")
             c.setFillColor(MUTED)
             c.setFont(F_BODY, 5.9)
             c.drawString(bx, by - 16.5, ("  ·  ".join(bits))[:96])
         yy -= h_sk + GAP
+
+    if sm.get("publication"):
+        _publication_score_notes(c, sm, M, yy, CW)
 
     if disc and yy - M >= h_disc:
         c.saveState()
@@ -2466,7 +2691,7 @@ def _parent_metrics_strip(c, pm, x, y, w, h):
     inv = pm.get("involvement") or {}
     if inv:
         per = inv.get("touches_per_minute")
-        chips.append((str(inv.get("touches_observed", "—")), "TOUCHES",
+        chips.append((str(inv.get("actions_observed", inv.get("touches_observed", "—"))), "ACTIONS" if "actions_observed" in inv else "TOUCHES",
                       f"≈{per}/MIN" if per is not None else "INVOLVEMENT"))
     br = pm.get("bravery") or {}
     if br:
@@ -2683,7 +2908,7 @@ def _diploma_page(c, d, pd, report_date, tracked=False, prog=None):
     c.setFillColor(BODY)
     c.setFont(F_BODY, 10.5)
     c.drawCentredString(W / 2, H - 332,
-                        "has completed a full ScoutMe Pro Benchmarked Analysis as " + ", ".join(b for b in bits if b))
+                        ("has completed a clip-based ScoutMe Pro Analysis as " if d.get("publication") else "has completed a full ScoutMe Pro Benchmarked Analysis as ") + ", ".join(b for b in bits if b))
     if prog:
         ov = next((cat for cat in (prog.get("categories") or []) if cat.get("key") == "overall_development"), None)
         line = f"{_ordinal(prog.get('analysis_number', 2))} ANALYSIS"
@@ -2707,6 +2932,9 @@ def _diploma_page(c, d, pd, report_date, tracked=False, prog=None):
     c.setFillColor(MUTED)
     c.setFont(F_BOLD, 8)
     c.drawCentredString(W / 2, dcy - 24, "/10")
+    if d.get("publication"):
+        c.setFont(F_BOLD, 7)
+        c.drawCentredString(W / 2, dcy - 64, "PROVISIONAL SCORE - OBSERVED SKILLS")
     draw_stars_row(c, W / 2, dcy - 84, int(d.get("stars") or 0), r=7, gap=6)
     if d.get("playerType"):
         c.setFillColor(INK)
@@ -2855,7 +3083,14 @@ def _gyg_page(c, gyg, player_name, page_no, total_pages):
     yy -= 44 + GAP
     lessons = (gyg.get("lessons") or [])[:3]
     hw = (gyg.get("homework_plan") or [])[:4]
-    h_hw = (30 + 22 * len(hw)) if hw else 0
+    h_hw = 0
+    if hw:
+        heights = []
+        for item in hw:
+            text = str(item.get("drill", "")) + (f" — {item['why']}" if item.get("why") else "")
+            paragraph = Paragraph(esc(text), _style(F_BODY, 6.6, BODY, leading=8.6))
+            heights.append(paragraph.wrap(CW - 2 * PAD - 54, H)[1])
+        h_hw = 40 + sum(max(height, 10) + 6 for height in heights)
     avail = yy - M - 24 - ((h_hw + GAP) if hw else 0)
     lh = avail / max(1, len(lessons)) - GAP
     for i, les in enumerate(lessons):
@@ -2867,9 +3102,13 @@ def _gyg_page(c, gyg, player_name, page_no, total_pages):
     c.showPage()
 
 
+
+
 def build_pdf_v2(report_doc: dict, output_path: str, image_resolver=None, promo: bool = False):
-    """Render the Premium Report V2 card layout to a 3-page A4 PDF.
+    """Render the original Premium Report V2 card templates to A4 PDF.
     promo=True adds the shared-link marketing strip (QR + CTA) on page 3."""
+    from report_publication import publish_report
+    report_doc = publish_report(report_doc)
     resolve = image_resolver or (lambda _u: None)
     d = derive_v2(report_doc)
     pd = report_doc.get("player_details") or {}
@@ -2889,228 +3128,292 @@ def build_pdf_v2(report_doc: dict, output_path: str, image_resolver=None, promo:
     sctx = sctx if isinstance(sctx, dict) and sctx.get("overall") else None
     sm = report_doc.get("score_meaning")
     sm = sm if isinstance(sm, dict) and (sm.get("skills") or []) else None
+    if sm and report_doc.get('report_publication'):
+        categories = ('technical', 'tactical', 'physical', 'mentality')
+        # Keep each category together in one original 128-point card.
+        sm = {**sm, 'category_groups': [
+            {'category': cat, 'category_skills': [s for s in sm['skills'] if s.get('category') == cat]}
+            for cat in categories], 'publication': report_doc['report_publication'],
+            'report_id': report_doc.get('id') or ''}
+
     prog = report_doc.get("progression")
     prog = prog if isinstance(prog, dict) and prog.get("categories") else None
     gyg = (report_doc.get("full_report") or {}).get("grow_your_game")
     gyg = gyg if isinstance(gyg, dict) and (gyg.get("lessons") or []) else None
     has_p4 = bool(mm.get("trail") or fifa_lens or prog)
-    total_pages = 5 + (1 if has_p4 else 0) + (1 if (sm or sctx) else 0) + (1 if gyg else 0) + (1 if pp else 0) + (1 if has_print else 0)
+    sequence = bool(report_doc.get('report_publication'))
+    total_pages = (4 if sequence else 5) + int(has_p4) + int(bool(sm or sctx)) + int(bool(pp))
+    if not sequence:
+        total_pages += int(bool(gyg)) + int(has_print)
 
     date_src = report_doc.get("full_generated_at") or report_doc.get("paid_at") or report_doc.get("created_at")
     try:
         dt = datetime.fromisoformat(str(date_src).replace("Z", "+00:00")) if date_src else datetime.now(timezone.utc)
     except Exception:
         dt = datetime.now(timezone.utc)
-    report_date = dt.strftime("%d %B %Y").upper()
+    report_date = (report_doc.get("report_publication") or {}).get("date") or dt.strftime("%d %B %Y").upper()
 
     c = rl_canvas.Canvas(output_path, pagesize=A4)
     c.setTitle(f"ScoutMePlay Premium Report — {player_name}")
     c.setAuthor("ScoutMePlay")
+    page_no = 1
+    if report_doc.get("report_publication"):
+        d['snapshotMoments'] = [{**m, 'label': m.get('title')} for m in d.get('snapshotMoments') or []]
+        shown = {m.get("eventId") for m in d.get("snapshotMoments") or []}
+        extra = next((a for a in report_doc["report_publication"]["key_actions"] if a["event_id"] not in shown), None)
+        if extra:
+            comment = next((v for v in report_doc["full_report"].get("video_comments", []) if v.get("event_id") == extra["event_id"]), {})
+            d["videoHighlight"] = {"timestamp": extra["timestamp"], "caption": extra["summary"], "title": extra["title"],
+                "thumb": comment.get("frame_url") if comment.get("proof_frame_verified") else None, "eventId": extra["event_id"]}
 
-    # ── PAGE 1 — hero / parent summary / score · snapshot / stats / age ──
-    _page_bg(c)
-    hh = _header(c, report_date)
-    row1_top = H - M - hh - 6
-    h1 = 285
-    c1, c2, c3 = 158, 205, CW - 158 - 205 - 2 * GAP
-    hero_photo = _pick_hero_photo(report_doc, resolve)
-    _hero_card(c, d, pd, M, row1_top - h1, c1, h1, hero_photo)
-    _parent_summary_card(c, d["parentSummary"], M + c1 + GAP, row1_top - h1, c2, h1)
-    _overall_score_card(c, d, M + c1 + c2 + 2 * GAP, row1_top - h1, c3, h1,
-                        ctx=(sctx or {}).get("overall"), bracket=(sctx or {}).get("bracket"))
 
-    row2_top = row1_top - h1 - GAP
-    h2 = 240
-    if d["matchStats"]:
-        cw2 = (CW - GAP) / 2
-        _match_stats_card(c, d["matchStats"], M, row2_top - h2, cw2, h2, d.get("matchStatsCoverage"))
-        _age_comparison_card(c, d["ageComparison"], d["ageBracket"], M + cw2 + GAP, row2_top - h2, cw2, h2)
-    else:
-        _age_comparison_card(c, d["ageComparison"], d["ageBracket"], M, row2_top - h2, CW, h2)
+    def render_cover():
+        nonlocal page_no
+        # ── PAGE 1 — hero / parent summary / score · snapshot / stats / age ──
+        _page_bg(c)
+        hh = _header(c, report_date)
+        row1_top = H - M - hh - 6
+        h1 = 285
+        c1, c2, c3 = 158, 205, CW - 158 - 205 - 2 * GAP
+        hero_photo = _pick_hero_photo(report_doc, resolve)
+        _hero_card(c, d, pd, M, row1_top - h1, c1, h1, hero_photo, contain_photo=bool(d.get('publication')))
+        _parent_summary_card(c, d["parentSummary"], M + c1 + GAP, row1_top - h1, c2, h1)
+        _overall_score_card(c, d, M + c1 + c2 + 2 * GAP, row1_top - h1, c3, h1,
+                            ctx=(sctx or {}).get("overall"), bracket=(sctx or {}).get("bracket"))
 
-    # signature quote strip in remaining space (progress strip when a curve exists)
-    strip_top = row2_top - h2 - GAP
-    if strip_top - M > 46:
-        sh = 44
-        if d.get("evidenceQualityNote"):
-            card(c, M, strip_top - sh, CW, sh, fill=SOFT)
-            draw_par(c, esc(d["evidenceQualityNote"]), M + 12, strip_top - 8, CW - 24,
-                     _style(F_BODY, 7.0, BODY, leading=9), max_h=sh - 12)
-        elif prog:
-            _progress_strip(c, prog, M, strip_top - sh, CW, sh)
+        row2_top = row1_top - h1 - GAP
+        h2 = 240
+        if d["matchStats"]:
+            cw2 = (CW - GAP) / 2
+            _match_stats_card(c, d["matchStats"], M, row2_top - h2, cw2, h2, d.get("matchStatsCoverage"))
+            _age_comparison_card(c, d["ageComparison"], d["ageBracket"], M + cw2 + GAP, row2_top - h2, cw2, h2, rubric=bool(d.get("publication")))
         else:
-            c.saveState()
-            c.setFillColor(HexColor("#EDE8D6"))
-            c.roundRect(M, strip_top - sh, CW, sh, 9, stroke=0, fill=1)
-            c.setFillColor(GREEN)
-            c.setFont(F_SCRIPT, 17)
-            c.drawCentredString(W / 2, strip_top - sh / 2 - 6,
-                                f"Every session is a step. Keep going, {player_name.split()[0]}!")
-            c.restoreState()
-    _page_footer(c, 1, total_pages)
-    c.showPage()
+            _age_comparison_card(c, d["ageComparison"], d["ageBracket"], M, row2_top - h2, CW, h2)
 
-    # ── PAGE 2 — SNAPSHOT (2x2 key-moment photo cards + overall progress) ──
-    _snapshot_page(c, d, report_doc, 2, total_pages, resolve)
-
-    # ── PAGE 3 — top strengths / dev priorities · roadmap / training / tips ──
-    _page_bg(c)
-    mh = _mini_header(c, player_name)
-    row3_top = H - M - mh - 4
-    h3 = 360
-    cs1 = 305
-    _top_strengths_card(c, d["topStrengths"], M, row3_top - h3, cs1, h3, resolve)
-    _dev_priorities_card(c, d["devPriorities"], M + cs1 + GAP, row3_top - h3, CW - cs1 - GAP, h3)
-
-    row4_top = row3_top - h3 - GAP
-    h4 = 330
-    cw3 = (CW - 2 * GAP) / 3
-    _roadmap_card(c, d["roadmap"], M, row4_top - h4, cw3, h4)
-    _training_week_card(c, d["trainingWeek"], M + cw3 + GAP, row4_top - h4, cw3, h4)
-    _parent_tips_card(c, d["parentTips"], M + 2 * (cw3 + GAP), row4_top - h4, cw3, h4)
-    _page_footer(c, 3, total_pages)
-    c.showPage()
-
-    # ── PAGE 4 — video highlight / coach notes / scout outlook + footer ──
-    _page_bg(c)
-    mh = _mini_header(c, player_name)
-    row5_top = H - M - mh - 4
-    h5 = 400
-    cv1, cv2 = 196, 168
-    _video_highlight_card(c, d["videoHighlight"], M, row5_top - h5, cv1, h5, resolve)
-    _coach_notes_card(c, d["coachNotes"], M + cv1 + GAP, row5_top - h5, cv2, h5)
-    _scout_outlook_card(c, d["scoutOutlook"], M + cv1 + cv2 + 2 * GAP, row5_top - h5,
-                        CW - cv1 - cv2 - 2 * GAP, h5)
-
-    fy = row5_top - h5 - GAP - 78
-    at = d.get("actionTimeline") or []
-    if at:
-        reserve = (GAP + 66 if promo else 0) + 40 + M
-        avail = row5_top - h5 - 2 * GAP - 78 - reserve
-        rows = min(len(at), int((avail - 31) / 19)) if avail > 90 else 0
-        if rows >= 3:
-            th_at = 31 + rows * 19 + 6
-            _action_timeline_card(c, at[:rows], M, row5_top - h5 - GAP - th_at, CW, th_at)
-            fy = row5_top - h5 - GAP - th_at - GAP - 78
-    _forest_footer(c, M, fy, CW, 78)
-    dy = fy - 14
-    if promo:
-        _promo_strip(c, M, fy - GAP - 66, CW, 66, player_name=player_name)
-        dy = fy - GAP - 66 - 14
-    c.setFillColor(MUTED)
-    c.setFont(F_BODY, 6.2)
-    if d.get("identityNote"):
-        c.drawCentredString(W / 2, dy, d["identityNote"])
-        dy -= 9
-    c.drawCentredString(W / 2, dy,
-                        "Independent player development analysis based on submitted video. Not a recruitment guarantee.")
-    _page_footer(c, 4, total_pages)
-    c.showPage()
-
-    # ── PAGE 5 — development curve + measured movement map + FIFA player twin ──
-    if has_p4:
-        _page_bg(c)
-        mh = _mini_header(c, player_name)
-        yy = H - M - mh - 4
-        blocks = int(bool(prog)) + int(bool(mm.get("trail"))) + int(bool(fifa_lens)) + int(has_pace)
-        if prog:
-            series_ok = len([s for s in (prog.get("series") or [])
-                             if isinstance(s.get("overall"), (int, float))]) >= 3
-            h_pg = 305 if series_ok else 200
-            if blocks == 1:
-                _progress_card(c, prog, M, (H - h_pg) / 2, CW, h_pg)
+        # signature quote strip in remaining space (progress strip when a curve exists)
+        strip_top = row2_top - h2 - GAP
+        if strip_top - M > 46:
+            sh = 44
+            if d.get("evidenceQualityNote"):
+                card(c, M, strip_top - sh, CW, sh, fill=SOFT)
+                draw_par(c, esc(d["evidenceQualityNote"]), M + 12, strip_top - 8, CW - 24,
+                         _style(F_BODY, 7.0, BODY, leading=9), max_h=sh - 12)
+            elif prog:
+                _progress_strip(c, prog, M, strip_top - sh, CW, sh)
             else:
-                _progress_card(c, prog, M, yy - h_pg, CW, h_pg)
-                yy -= h_pg + GAP
-        if mm.get("trail"):
-            if blocks == 1:
-                h_mm = 235
-                _movement_map_card(c, mm, M, (H - h_mm) / 2, CW, h_mm)
-            else:
-                h_mm = min(235.0, yy - M - 30 - (160 + GAP if fifa_lens else 0) - (68 + GAP if has_pace else 0))
-                if h_mm > 120:
-                    _movement_map_card(c, mm, M, yy - h_mm, CW, h_mm)
-                    yy -= h_mm + GAP
-        if has_pace:
-            h_pc = 68
-            if blocks == 1:
-                _pace_strip(c, pace, M, (H - h_pc) / 2, CW, h_pc)
-            elif yy - M - 30 - (160 + GAP if fifa_lens else 0) >= h_pc:
-                _pace_strip(c, pace, M, yy - h_pc, CW, h_pc)
-                yy -= h_pc + GAP
-        if fifa_lens:
-            if blocks == 1:
-                h_tw = 255
-                _player_twin_card(c, fifa_lens, fifa_neighbors, M, (H - h_tw) / 2, CW, h_tw)
-            else:
-                h_tw = min(255.0, yy - M - 30)
-                if h_tw > 150:
-                    _player_twin_card(c, fifa_lens, fifa_neighbors, M, yy - h_tw, CW, h_tw)
-        _page_footer(c, 5, total_pages)
+                c.saveState()
+                c.setFillColor(HexColor("#EDE8D6"))
+                c.roundRect(M, strip_top - sh, CW, sh, 9, stroke=0, fill=1)
+                c.setFillColor(GREEN)
+                c.setFont(F_SCRIPT, 17)
+                c.drawCentredString(W / 2, strip_top - sh / 2 - 6,
+                                    f"Every session is a step. Keep going, {player_name.split()[0]}!")
+                c.restoreState()
+        _page_footer(c, page_no, total_pages)
         c.showPage()
+        page_no += 1
 
-    # ── PAGE — The numbers, translated (meaning + proof) / score guide fallback ──
-    if sm:
-        _score_meaning_page(c, sm, player_name, 5 + (1 if has_p4 else 0), total_pages)
-    elif sctx:
-        _score_guide_page(c, sctx, d, player_name, 5 + (1 if has_p4 else 0), total_pages)
+    def render_snapshot():
+        nonlocal page_no
+        # ── PAGE 2 — SNAPSHOT (2x2 key-moment photo cards + overall progress) ──
+        _snapshot_page(c, d, report_doc, page_no, total_pages, resolve)
+        page_no += 1
 
-    # ── PAGE — GROW YOUR GAME (evidence-gated football education) ──
-    if gyg:
-        _gyg_page(c, gyg, player_name, 5 + (1 if has_p4 else 0) + (1 if (sm or sctx) else 0), total_pages)
-
-    # ── PAGE — Parents Package (home drills / watch together / letter) ──
-    if pp:
+    def render_training():
+        nonlocal page_no
+        # ── PAGE 3 — top strengths / dev priorities · roadmap / training / tips ──
         _page_bg(c)
         mh = _mini_header(c, player_name)
-        yy = H - M - mh - 4
-        pm = d.get("parentMetrics")
-        h_pm = (96 + 11 * len(pm.get("topMinutes") or [])) if pm else 0
-        if pp.get("drills"):
-            h_hd = 258
-            _home_drills_card(c, pp["drills"], M, yy - h_hd, CW, h_hd)
-            yy -= h_hd + GAP
-        if pp.get("watch") or pp.get("message"):
-            cols_h = min(300.0, yy - M - 30 - ((h_pm + GAP) if pm else 0))
-            if cols_h > 140:
-                if pp.get("watch") and pp.get("message"):
-                    lw3 = (CW - GAP) * 0.53
-                    _watch_together_card(c, pp["watch"], M, yy - cols_h, lw3, cols_h)
-                    _letter_card(c, pp["message"], M + lw3 + GAP, yy - cols_h, CW - lw3 - GAP, cols_h, player_name)
-                elif pp.get("watch"):
-                    _watch_together_card(c, pp["watch"], M, yy - cols_h, CW, cols_h)
-                else:
-                    _letter_card(c, pp["message"], M, yy - cols_h, CW, cols_h, player_name)
-                yy -= cols_h + GAP
-        if pm and yy - M - 20 >= h_pm:
-            _parent_metrics_strip(c, pm, M, yy - h_pm, CW, h_pm)
-        _page_footer(c, 5 + (1 if has_p4 else 0) + (1 if (sm or sctx) else 0) + (1 if gyg else 0), total_pages)
+        row3_top = H - M - mh - 4
+        if sequence:
+            h3 = _development_panel(c, d, M, row3_top, CW)
+        else:
+            h3 = 360
+            cs1 = 305
+            _top_strengths_card(c, d["topStrengths"], M, row3_top - h3, cs1, h3, resolve)
+            _dev_priorities_card(c, d["devPriorities"], M + cs1 + GAP, row3_top - h3, CW - cs1 - GAP, h3)
+
+        row4_top = row3_top - h3 - GAP
+        h4 = 250 if sequence else 330
+        cw3 = (CW - 2 * GAP) / 3
+        _roadmap_card(c, d["roadmap"], M, row4_top - h4, cw3, h4)
+        _training_week_card(c, d["trainingWeek"], M + cw3 + GAP, row4_top - h4, cw3, h4)
+        _parent_tips_card(c, d["parentTips"], M + 2 * (cw3 + GAP), row4_top - h4, cw3, h4)
+        _page_footer(c, page_no, total_pages)
         c.showPage()
+        page_no += 1
 
-    # ── PAGE — Printables (mission card + training week planner) ──
-    if has_print:
+    def render_outlook():
+        nonlocal page_no
+        # ── PAGE 4 — video highlight / coach notes / scout outlook + footer ──
         _page_bg(c)
         mh = _mini_header(c, player_name)
-        yy = H - M - mh - 6
+        row5_top = H - M - mh - 4
+        h5 = 400
+        cv1, cv2 = 196, 168
+        _video_highlight_card(c, d["videoHighlight"], M, row5_top - h5, cv1, h5, resolve)
+        _coach_notes_card(c, d["coachNotes"], M + cv1 + GAP, row5_top - h5, cv2, h5)
+        _scout_outlook_card(c, d["scoutOutlook"], M + cv1 + cv2 + 2 * GAP, row5_top - h5,
+                            CW - cv1 - cv2 - 2 * GAP, h5)
+
+        fy = row5_top - h5 - GAP - 78
+        at = d.get("actionTimeline") or []
+        if sequence:
+            at = [{'timestamp': a['timestamp'], 'title': a['title'], 'description': a['summary']}
+                  for a in report_doc['report_publication']['key_actions']]
+        if at:
+            reserve = (GAP + 66 if promo else 0) + 40 + M
+            avail = row5_top - h5 - 2 * GAP - 78 - reserve
+            rows = min(len(at), int((avail - 31) / 19)) if avail > 90 else 0
+            if rows >= 3:
+                th_at = 31 + rows * 19 + 6
+                _action_timeline_card(c, at[:rows], M, row5_top - h5 - GAP - th_at, CW, th_at,
+                                      title="Key Actions" if sequence else "Action Timeline Preview - Full Log Follows")
+                fy = row5_top - h5 - GAP - th_at - GAP - 78
+        _forest_footer(c, M, fy, CW, 78)
+        dy = fy - 14
+        if promo:
+            _promo_strip(c, M, fy - GAP - 66, CW, 66, player_name=player_name)
+            dy = fy - GAP - 66 - 14
         c.setFillColor(MUTED)
-        c.setFont(F_BOLD, 6.6)
-        c.drawString(M, yy - 4, "PRINT THIS PAGE — CUT ALONG THE DASHED LINES")
-        yy -= 14
-        if missions:
-            h_mc = 300
-            _mission_card_print(c, missions, player_name, M, yy - h_mc, CW, h_mc)
-            yy -= h_mc + 16
-        if d.get("trainingWeek"):
-            h_wp = min(300.0, yy - M - 34)
-            if h_wp > 160:
-                _week_planner_print(c, d["trainingWeek"],
-                                    ((report_doc.get("full_report") or {}).get("training_plan") or {}).get("weekly_focus"),
-                                    M, yy - h_wp, CW, h_wp)
-        _page_footer(c, 5 + (1 if has_p4 else 0) + (1 if (sm or sctx) else 0) + (1 if gyg else 0) + (1 if pp else 0), total_pages)
+        c.setFont(F_BODY, 6.2)
+        if d.get("identityNote"):
+            c.drawCentredString(W / 2, dy, d["identityNote"])
+            dy -= 9
+        c.drawCentredString(W / 2, dy,
+                            "Independent player development analysis based on submitted video. Not a recruitment guarantee.")
+        _page_footer(c, page_no, total_pages)
         c.showPage()
+        page_no += 1
 
-    # ── FINAL PAGE — printable certificate / diploma ──
-    _diploma_page(c, d, pd, report_date, tracked=bool(mm.get("trail")), prog=prog)
-    _page_footer(c, total_pages, total_pages)
-    c.showPage()
+    def render_progress():
+        nonlocal page_no
+        # ── PAGE 5 — development curve + measured movement map + FIFA player twin ──
+        if has_p4:
+            _page_bg(c)
+            mh = _mini_header(c, player_name)
+            yy = H - M - mh - 4
+            blocks = int(bool(prog)) + int(bool(mm.get("trail"))) + int(bool(fifa_lens)) + int(has_pace)
+            if prog:
+                series_ok = len([s for s in (prog.get("series") or [])
+                                 if isinstance(s.get("overall"), (int, float))]) >= 3
+                h_pg = 305 if series_ok else 200
+                if blocks == 1:
+                    _progress_card(c, prog, M, (H - h_pg) / 2, CW, h_pg)
+                else:
+                    _progress_card(c, prog, M, yy - h_pg, CW, h_pg)
+                    yy -= h_pg + GAP
+            if mm.get("trail"):
+                if blocks == 1:
+                    h_mm = 235
+                    _movement_map_card(c, mm, M, (H - h_mm) / 2, CW, h_mm)
+                else:
+                    h_mm = min(235.0, yy - M - 30 - (160 + GAP if fifa_lens else 0) - (68 + GAP if has_pace else 0))
+                    if h_mm > 120:
+                        _movement_map_card(c, mm, M, yy - h_mm, CW, h_mm)
+                        yy -= h_mm + GAP
+            if has_pace:
+                h_pc = 68
+                if blocks == 1:
+                    _pace_strip(c, pace, M, (H - h_pc) / 2, CW, h_pc)
+                elif yy - M - 30 - (160 + GAP if fifa_lens else 0) >= h_pc:
+                    _pace_strip(c, pace, M, yy - h_pc, CW, h_pc)
+                    yy -= h_pc + GAP
+            if fifa_lens:
+                if blocks == 1:
+                    h_tw = 255
+                    _player_twin_card(c, fifa_lens, fifa_neighbors, M, (H - h_tw) / 2, CW, h_tw)
+                else:
+                    h_tw = min(255.0, yy - M - 30)
+                    if h_tw > 150:
+                        _player_twin_card(c, fifa_lens, fifa_neighbors, M, yy - h_tw, CW, h_tw)
+            _page_footer(c, page_no, total_pages)
+            c.showPage()
+            page_no += 1
+
+    def render_scores():
+        nonlocal page_no
+        # ── PAGE — The numbers, translated (meaning + proof) / score guide fallback ──
+        if sm:
+            _score_meaning_page(c, sm, player_name, page_no, total_pages)
+            page_no += 1
+        elif sctx:
+            _score_guide_page(c, sctx, d, player_name, page_no, total_pages)
+            page_no += 1
+
+    def render_education():
+        nonlocal page_no
+        # ── PAGE — GROW YOUR GAME (evidence-gated football education) ──
+        if gyg:
+            _gyg_page(c, gyg, player_name, page_no, total_pages)
+            page_no += 1
+
+    def render_parents():
+        nonlocal page_no
+        # ── PAGE — Parents Package (home drills / watch together / letter) ──
+        if pp:
+            _page_bg(c)
+            mh = _mini_header(c, player_name)
+            yy = H - M - mh - 4
+            pm = d.get("parentMetrics")
+            h_pm = (96 + 11 * len(pm.get("topMinutes") or [])) if pm else 0
+            if pp.get("drills"):
+                h_hd = 258
+                _home_drills_card(c, pp["drills"], M, yy - h_hd, CW, h_hd)
+                yy -= h_hd + GAP
+            if pp.get("watch") or pp.get("message"):
+                cols_h = min(300.0, yy - M - 30 - ((h_pm + GAP) if pm else 0))
+                if cols_h > 140:
+                    if pp.get("watch") and pp.get("message"):
+                        lw3 = (CW - GAP) * 0.53
+                        _watch_together_card(c, pp["watch"], M, yy - cols_h, lw3, cols_h)
+                        _letter_card(c, pp["message"], M + lw3 + GAP, yy - cols_h, CW - lw3 - GAP, cols_h, player_name)
+                    elif pp.get("watch"):
+                        _watch_together_card(c, pp["watch"], M, yy - cols_h, CW, cols_h)
+                    else:
+                        _letter_card(c, pp["message"], M, yy - cols_h, CW, cols_h, player_name)
+                    yy -= cols_h + GAP
+            if pm and yy - M - 20 >= h_pm:
+                _parent_metrics_strip(c, pm, M, yy - h_pm, CW, h_pm)
+            _page_footer(c, page_no, total_pages)
+            c.showPage()
+            page_no += 1
+
+    def render_printables():
+        nonlocal page_no
+        # ── PAGE — Printables (mission card + training week planner) ──
+        if has_print:
+            _page_bg(c)
+            mh = _mini_header(c, player_name)
+            yy = H - M - mh - 6
+            c.setFillColor(MUTED)
+            c.setFont(F_BOLD, 6.6)
+            c.drawString(M, yy - 4, "PRINT THIS PAGE — CUT ALONG THE DASHED LINES")
+            yy -= 14
+            if missions:
+                h_mc = 300
+                _mission_card_print(c, missions, player_name, M, yy - h_mc, CW, h_mc)
+                yy -= h_mc + 16
+            if d.get("trainingWeek"):
+                h_wp = min(300.0, yy - M - 34)
+                if h_wp > 160:
+                    _week_planner_print(c, d["trainingWeek"],
+                                        ((report_doc.get("full_report") or {}).get("training_plan") or {}).get("weekly_focus"),
+                                        M, yy - h_wp, CW, h_wp)
+            _page_footer(c, page_no, total_pages)
+            c.showPage()
+            page_no += 1
+
+    def render_certificate():
+        nonlocal page_no
+        # ── FINAL PAGE — printable certificate / diploma ──
+        _diploma_page(c, d, pd, report_date, tracked=bool(mm.get("trail")), prog=prog)
+        _page_footer(c, page_no, total_pages)
+        c.showPage()
+        page_no += 1
+
+    # Keep original cover/Snapshot; consolidate only the approved Sequence development panels.
+    pages = (render_cover, render_scores, render_progress, render_snapshot, render_training, render_parents, render_certificate) if sequence else (render_cover, render_snapshot, render_training, render_outlook, render_progress, render_scores, render_education, render_parents, render_printables, render_certificate)
+    for render in pages:
+        render()
     c.save()

@@ -157,6 +157,7 @@ export function SkillMeaningCard({ s, position, onPlayAt, seekable = true, defau
       {(s.lines || []).map((l, i) => (
         <p key={i} className={`text-[13px] leading-[1.58] mt-2 ${i === 0 ? "text-[#174A30] font-semibold" : "text-[#3C4A40]"}`}>{l}</p>
       ))}
+      {s.comparison && <p className="mt-3 text-xs font-semibold" data-testid={`academy-skill-${s.key}`}>{s.comparison.bracket} · {s.comparison.label} rubric reference</p>}
       <AngleChips s={s} onPlayAt={onPlayAt} seekable={seekable} authority={authority} />
       <button
         type="button"

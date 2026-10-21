@@ -23,6 +23,16 @@ if (config.enableHealthCheck) {
 }
 
 let webpackConfig = {
+  jest: {
+    configure: (jestConfig) => {
+      // Match the source alias used by Webpack when testing report components.
+      jestConfig.moduleNameMapper = {
+        ...jestConfig.moduleNameMapper,
+        '^@/(.*)$': '<rootDir>/src/$1',
+      };
+      return jestConfig;
+    },
+  },
   eslint: {
     configure: {
       extends: ["plugin:react-hooks/recommended"],

@@ -9,6 +9,7 @@ import {
   Star, Target, Sparkles, FileText,
 } from "lucide-react";
 import { SKILL_LABELS } from "./derive";
+import PublicationEvidence from "./PublicationEvidence";
 import {
   MatchStatsCard, AgeComparisonCard, TopStrengthsCard, DevPrioritiesCard,
   RoadmapCard, TrainingPlanCard, ParentTipsCard, VideoHighlightCard,
@@ -36,13 +37,16 @@ const bucketOf = (category, key) => {
   return IQ_TACTICAL.has(key) ? "iq" : "tact";
 };
 
-function collectBuckets(full) {
+const NATIVE_BUCKET = { technical: "tech", tactical: "tact", physical: "phys", mentality: "iq" };
+const NATIVE_CATEGORY = { iq: "mentality", tech: "technical", phys: "physical", tact: "tactical" };
+
+function collectBuckets(full, nativeCategories = false) {
   const out = { iq: [], tech: [], phys: [], tact: [] };
   for (const cat of ["technical", "tactical", "physical", "mentality"]) {
     const sec = full?.[cat] || {};
     for (const [key, sk] of Object.entries(sec)) {
       if (!sk || typeof sk !== "object" || sk.cannot_evaluate || typeof sk.score !== "number") continue;
-      out[bucketOf(cat, key)].push({ key, label: SKILL_LABELS[key] || key.replace(/_/g, " "), score: sk.score });
+      out[nativeCategories ? NATIVE_BUCKET[cat] : bucketOf(cat, key)].push({ key, label: SKILL_LABELS[key] || key.replace(/_/g, " "), score: sk.score });
     }
   }
   return out;
@@ -125,7 +129,7 @@ function CatRow({ num, icon: Icon, title, desc, chip, open, onToggle, children, 
   );
 }
 
-function MobileGauge({ overall, ctx }) {
+function MobileGauge({ overall, ctx, publication }) {
   const C = 2 * Math.PI * 38;
   const offset = overall != null ? C * (1 - overall / 10) : C;
   return (
@@ -140,7 +144,7 @@ function MobileGauge({ overall, ctx }) {
       <div className="absolute top-[26px] inset-x-0 font-barlow font-black text-[28px] text-[#101B12] leading-none" data-testid="pm-overall-score">
         {overall != null ? Number(overall).toFixed(1) : "—"}
       </div>
-      <div className="absolute top-[56px] inset-x-0 text-[7.5px] font-extrabold tracking-[0.18em] text-[#5B6B5E]">OVERALL</div>
+      <div className="absolute top-[56px] inset-x-0 text-[7.5px] font-extrabold tracking-[0.18em] text-[#5B6B5E]">{publication ? "OBSERVED" : "OVERALL"}</div>
       {ctx?.level && (
         <div className="mt-1 text-[#2E7D32] text-[10px] font-extrabold flex items-center justify-center gap-1">
           <TrendingUp className="w-3 h-3" /> {ctx.level}
@@ -192,7 +196,7 @@ function SnapshotHero({ report, d, pd, photoCandidates, reportDate, onReplayIntr
             {pd.current_club ? <><br />{pd.current_club}</> : null}
           </div>
         </div>
-        <MobileGauge overall={d.overall} ctx={report.score_context?.overall} />
+        <MobileGauge overall={d.overall} ctx={report.score_context?.overall} publication={report.report_publication} />
       </div>
       {quad.length > 0 && (
         <div className="grid grid-cols-2 border-t border-[#EDF0EA] mt-4">
@@ -280,11 +284,31 @@ export function PremiumMobileCategories({
   clipBusy, onDownloadPdf, downloadingPdf, fallbackThumb,
 }) {
   const full = report.full_report || {};
-  const buckets = collectBuckets(full);
+  const publication = report.report_publication;
+  const buckets = collectBuckets(full, !!publication);
   const smSkills = report.score_meaning?.skills || [];
-  const smFor = (bucket) => smSkills.filter((s) => bucketOf(s.category, s.key) === bucket);
+  const smFor = (bucket) => smSkills.filter((s) => (publication ? NATIVE_BUCKET[s.category] : bucketOf(s.category, s.key)) === bucket);
+  const categoryScore = (bucket) => {
+    if (!publication) return avgScore(buckets[bucket]);
+    const category = NATIVE_CATEGORY[bucket];
+    const score = full.scores?.[category];
+    return typeof score === "number" && Number.isFinite(score) ? score : null;
+  };
   const [openKey, setOpenKey] = useState(null);
   const rowRefs = useRef({});
+
+  // PDF event links must open the exact evidence section on mobile too.
+  useEffect(() => {
+    const openLinkedEvidence = () => {
+      const id = window.location.hash.slice(1);
+      if (report.report_publication?.key_actions?.some(action => `event-${action.event_id}` === id)) {
+        setOpenKey("evidence");
+      }
+    };
+    openLinkedEvidence();
+    window.addEventListener("hashchange", openLinkedEvidence);
+    return () => window.removeEventListener("hashchange", openLinkedEvidence);
+  }, [report.report_publication]);
 
   // The tabs stick right below whatever top bar the page has (main nav on the
   // report page, sample banner on /sample-report). Measured live because the
@@ -319,28 +343,29 @@ export function PremiumMobileCategories({
     );
   };
 
-  const evidenceCount =
-    snapshotMoments.filter((m) => m.thumb).length + (d.actionTimeline?.length || 0) + (videoHighlight ? 1 : 0);
+  const evidenceCount = report.report_publication
+    ? new Set((d.actionTimeline || []).map(action => action.eventId).filter(Boolean)).size
+    : snapshotMoments.filter((m) => m.thumb).length + (d.actionTimeline?.length || 0) + (videoHighlight ? 1 : 0);
 
   const cats = [
     {
-      key: "iq", icon: Brain, title: "FOOTBALL IQ & MENTALITY",
-      desc: "Scanning, decisions, mentality and attitude.",
-      chip: avgScore(buckets.iq) != null ? { type: "score", value: avgScore(buckets.iq) } : null,
+      key: "iq", icon: Brain, title: publication ? "MENTALITY" : "FOOTBALL IQ & MENTALITY",
+      desc: publication ? "Reaction after mistakes, confidence and effort." : "Scanning, decisions, mentality and attitude.",
+      chip: categoryScore("iq") != null ? { type: "score", value: categoryScore("iq") } : null,
       has: buckets.iq.length > 0 || smFor("iq").length > 0,
       body: () => skillBody("iq"),
     },
     {
-      key: "tech", icon: Zap, title: "TECHNIQUE",
+      key: "tech", icon: Zap, title: publication ? "TECHNICAL" : "TECHNIQUE",
       desc: "First touch, passing, dribbling, finishing.",
-      chip: avgScore(buckets.tech) != null ? { type: "score", value: avgScore(buckets.tech) } : null,
+      chip: categoryScore("tech") != null ? { type: "score", value: categoryScore("tech") } : null,
       has: buckets.tech.length > 0 || smFor("tech").length > 0,
       body: () => skillBody("tech"),
     },
     {
       key: "phys", icon: Activity, title: "PHYSICAL & MOVEMENT",
       desc: "Top speed, sprints, movement map and running patterns.",
-      chip: avgScore(buckets.phys) != null ? { type: "score", value: avgScore(buckets.phys) } : null,
+      chip: categoryScore("phys") != null ? { type: "score", value: categoryScore("phys") } : null,
       has: buckets.phys.length > 0 || report.movement_map?.trail?.length > 0 || !!report.pace_metrics?.top_speed_kmh,
       body: () => (
         <>
@@ -354,8 +379,8 @@ export function PremiumMobileCategories({
     },
     {
       key: "tact", icon: Shield, title: "TACTICAL",
-      desc: "Positioning, pressing and off-ball runs.",
-      chip: avgScore(buckets.tact) != null ? { type: "score", value: avgScore(buckets.tact) } : null,
+      desc: publication ? "Decisions, positioning and off-ball runs." : "Positioning, pressing and off-ball runs.",
+      chip: categoryScore("tact") != null ? { type: "score", value: categoryScore("tact") } : null,
       has: buckets.tact.length > 0 || smFor("tact").length > 0,
       body: () => skillBody("tact"),
     },
@@ -367,7 +392,7 @@ export function PremiumMobileCategories({
       body: () => (
         <>
           <MatchStatsCard matchStats={d.matchStats} coverageNote={d.matchStatsCoverage} />
-          <AgeComparisonCard ageComparison={d.ageComparison} ageBracket={d.ageBracket} />
+          <AgeComparisonCard ageComparison={d.ageComparison} ageBracket={d.ageBracket} rubric={!!report.report_publication} />
           {report.progression?.categories?.length > 0 ? (
             <ProgressCard prog={report.progression} />
           ) : (
@@ -383,6 +408,7 @@ export function PremiumMobileCategories({
       has: true,
       body: () => (
         <>
+          <PublicationEvidence publication={report.report_publication} onPlayAt={playAt} />
           {d.identityNote && (
             <div className="flex items-start gap-2 text-[11.5px] text-[#8A6D3B] bg-[#FFF8E9] border border-[#F0E3C4] rounded-[10px] px-3.5 py-2.5 leading-[1.5]">
               <ShieldCheck className="w-3.5 h-3.5 mt-0.5 shrink-0" />

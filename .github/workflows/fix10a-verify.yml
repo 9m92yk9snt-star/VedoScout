@@ -272,7 +272,7 @@ jobs:
         working-directory: frontend
         env:
           CI: 'true'
-        run: yarn test --watchAll=false --runInBand --testPathPattern='(MarkerStudio|ScoutMode|sceneDetect|MarkedCropCanvas|AnalysisWaiting|BackgroundAnalysisTracker|ProfileAnalysisStatus)\.test\.'
+        run: yarn test --watchAll=false --runInBand --testPathPattern='(MarkerStudio|ScoutMode|sceneDetect|MarkedCropCanvas|AnalysisWaiting|BackgroundAnalysisTracker|ProfileAnalysisStatus|publication)\.test\.'
       - name: Build frontend
         working-directory: frontend
         env:

@@ -1,3 +1,4 @@
+import PublicationEvidence from "./PublicationEvidence";
 // Premium Report V2 — pixel-perfect implementation of the approved reference
 // design (see /public/mockup-report.html for the spec mockup). Pure presentation:
 // all values come from the existing full_report analysis via derive.js.
@@ -175,11 +176,11 @@ function ParentSummaryCard({ parentSummary }) {
   );
 }
 
-function OverallScoreCard({ overall, playerType, stars, ctx, bracket }) {
+function OverallScoreCard({ overall, playerType, stars, ctx, bracket, publication }) {
   const pct = overall != null ? (overall / 10) * 100 : 0;
   return (
     <V2Card testid="v2-overall-score-card" className="flex flex-col items-center justify-center text-center">
-      <h3 className="text-[13.5px] font-extrabold tracking-[0.1em] uppercase text-[#12402A] mb-4">Overall Development Score</h3>
+      <h3 className="text-[13.5px] font-extrabold tracking-[0.1em] uppercase text-[#12402A] mb-4">{publication?.score?.label || "Overall Development Score"}</h3>
       <div
         className="relative w-[180px] h-[180px] rounded-full flex items-center justify-center mb-4"
         style={{ background: `conic-gradient(#12402A 0 ${pct * 0.68}%, #6E9E63 ${pct * 0.68}% ${pct}%, #C9D8C0 ${pct}% 100%)` }}
@@ -202,7 +203,7 @@ function OverallScoreCard({ overall, playerType, stars, ctx, bracket }) {
         ))}
       </div>
       <p className="text-[12px] text-[#68766B] leading-[1.55] max-w-[290px]">
-        {ctx?.line || "This score reflects the current level compared to other players of the same age in this position."}
+        {overall == null ? "Insufficient evidence for an aggregate score." : ctx?.line || "Assessment of the observed skills in this video."}
       </p>
     </V2Card>
   );
@@ -331,7 +332,7 @@ export default function PremiumReportV2({ report, assetBase, onDownloadPdf, down
   const cineMoment = snapshotMoments.find((m) => m.thumb && m.timestamp) || snapshotMoments.find((m) => m.thumb) || null;
   const cineImage = cineMoment?.thumb || photoCandidates[0] || posterUrl || null;
 
-  const reportDate = fmtDate(report.full_generated_at || report.paid_at || report.created_at);
+  const reportDate = report.report_publication?.date || fmtDate(report.full_generated_at || report.paid_at || report.created_at);
 
   return (
     <div className="max-w-[1440px] mx-auto text-[#1C2B21]" data-testid="premium-report-v2" style={{ fontFamily: "'DM Sans', sans-serif" }}>
@@ -389,7 +390,7 @@ export default function PremiumReportV2({ report, assetBase, onDownloadPdf, down
           <div className="grid lg:grid-cols-[1fr_1.22fr_1fr] gap-4 mb-4">
             <PlayerHeroCard playerDetails={pd} photoCandidates={photoCandidates} positionAbbr={d.positionAbbr} />
             <ParentSummaryCard parentSummary={d.parentSummary} />
-            <OverallScoreCard overall={d.overall} playerType={d.playerType} stars={d.stars} ctx={report.score_context?.overall} bracket={report.score_context?.bracket} />
+            <OverallScoreCard overall={d.overall} playerType={d.playerType} stars={d.stars} ctx={report.score_context?.overall} bracket={report.score_context?.bracket} publication={report.report_publication} />
           </div>
 
           {report.progression?.categories?.length > 0 ? (
@@ -399,6 +400,8 @@ export default function PremiumReportV2({ report, assetBase, onDownloadPdf, down
           ) : (
             !report.demo && <ProgressTeaser playerName={pd.player_name} />
           )}
+
+          <PublicationEvidence publication={report.report_publication} onPlayAt={playAt} />
 
           {/* Row 2 — SNAPSHOTS (full-width photo moments) */}
           <div className="mb-4">
@@ -419,7 +422,7 @@ export default function PremiumReportV2({ report, assetBase, onDownloadPdf, down
           )}
           <div className={`grid gap-4 mb-4 ${d.matchStats ? "lg:grid-cols-2" : ""}`}>
             <MatchStatsCard matchStats={d.matchStats} coverageNote={d.matchStatsCoverage} />
-            <AgeComparisonCard ageComparison={d.ageComparison} ageBracket={d.ageBracket} />
+            <AgeComparisonCard ageComparison={d.ageComparison} ageBracket={d.ageBracket} rubric={!!report.report_publication} />
           </div>
 
           {/* Row 3 — top strengths / development priorities */}

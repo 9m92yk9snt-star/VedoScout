@@ -546,3 +546,20 @@ async def test_busy_export_rejects_before_loading_audits(case, monkeypatch):
             release.set()
             response = await first
         assert response.status_code == 200
+
+
+def test_export_retains_raw_scores_and_separately_exposes_publication(case):
+    doc, _, _, _ = case
+    doc.update(analysis_engine="SEQUENCE_V1", player_details={"player_name": "Test Player", "age": 11},
+        full_report={"scores": {"overall_development": None}},
+        canonical_events={"events": [{"event_id": "test-shot", "canonical_ms": 23632,
+            "canonical_event_type": "SHOT", "canonical_outcome": "SAVED", "global_target_id": "GLOBAL_TARGET",
+            "proof": {"proof_eligible": True}, "details": ["A saved shot."], "actor_visual_id": "test:p1"}]})
+    original = copy.deepcopy(doc)
+    build(case)
+    assert doc == original
+    assert read(case, "report.json")["full_report"]["scores"]["overall_development"] is None
+    published = read(case, "publication/current.json")
+    assert published["report_publication"]["version"] == 4
+    assert published["full_report"]["match_stats"]["observed_goals"] == 0
+    assert "not a historical" in published["note"]
