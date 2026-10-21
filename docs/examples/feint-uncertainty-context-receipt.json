@@ -1,0 +1,2941 @@
+{
+  "schema": "FEINT_UNCERTAINTY_CONTEXT_V1",
+  "status": "MODEL_REVIEW_COMPLETED",
+  "source_video_sha256": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+  "anchors_sha256": "95ec65ff36e5d3441a32fe053854f646f6bcbbfe14f88090e7aa98eebe550446",
+  "previous_receipts_sha256": "36919ceefddf2b13b7122cdbe1b5b6d06b91bac1222ba35d5d3f38a0521d9dab",
+  "candidates": [
+    {
+      "type": "DIRECTION_CHANGE",
+      "decision": "UNCERTAIN",
+      "identity_reference_ids": [
+        "r1"
+      ],
+      "identity_frames": [
+        "s003000",
+        "s003125",
+        "s003750"
+      ],
+      "before_frame": "s003500",
+      "movement_frames": [
+        "s003625",
+        "s003750",
+        "s003875"
+      ],
+      "after_frame": "s004250",
+      "visible_movement": "The selected white player opens his arms and angles his body as the ball moves toward screen-right, away from the blue players approaching from screen-left. He follows the ball into the narrowing gap.",
+      "opponent_response": "The nearer blue player continues across his path and steps between him and the ball; the other blue player closes from behind. Neither visibly commits the wrong way.",
+      "outcome": "LOSES",
+      "uncertainty": "The small image and overlapping legs make it unclear whether this is a deliberate evasive touch or continued carrying interrupted by the defender.",
+      "candidate_id": "u1",
+      "interval_ms": [
+        3500,
+        4250
+      ],
+      "origin_receipt_sha256": "840a4304d905d5abb81849ab5ed54f8519ea86cd8d1737dc3479e1438656a7e8"
+    },
+    {
+      "type": "BODY_FEINT",
+      "decision": "UNCERTAIN",
+      "identity_reference_ids": [
+        "r4",
+        "r6"
+      ],
+      "identity_frames": [
+        "s007750",
+        "s008500",
+        "s011375",
+        "s013625"
+      ],
+      "before_frame": "s008125",
+      "movement_frames": [
+        "s008250",
+        "s008375",
+        "s008500",
+        "s008625"
+      ],
+      "after_frame": "s008750",
+      "visible_movement": "Facing blue number 9, white number 15 shortens his steps, bends his knees and dips his upper body toward screen-left while keeping the ball close beneath and slightly ahead of him. He then straightens slightly as the defender approaches.",
+      "opponent_response": "Number 9 lowers his stance and steps forward toward the ball. A wrong-way reaction is not visible.",
+      "outcome": "RETAINS",
+      "uncertainty": "A body dip is visible, but an opposite-direction ball exit is not established. This could be close-control adjustment rather than a deceptive feint; no complete step-over is clearly shown.",
+      "candidate_id": "u2",
+      "interval_ms": [
+        8133,
+        8750
+      ],
+      "origin_receipt_sha256": "840a4304d905d5abb81849ab5ed54f8519ea86cd8d1737dc3479e1438656a7e8"
+    },
+    {
+      "type": "DIRECTION_CHANGE",
+      "decision": "UNCERTAIN",
+      "identity_reference_ids": [
+        "r5"
+      ],
+      "identity_frames": [
+        "s021250",
+        "s021375",
+        "s021500"
+      ],
+      "before_frame": "s021250",
+      "movement_frames": [
+        "s021375",
+        "s021500",
+        "s021625"
+      ],
+      "after_frame": "s022125",
+      "visible_movement": "Between two converging blue players, the selected player drops into a wide, low stance and reaches toward the ball, then tries to continue screen-right. The ball emerges ahead of the taller blue player rather than remaining clearly under white number 15's control.",
+      "opponent_response": "The taller blue player steps across the ball's path while the blond blue player continues on the right. Both converge on the actual ball position.",
+      "outcome": "LOSES",
+      "uncertainty": "Overlapping legs hide the decisive contact. A further evasive cut is possible, but the visible displacement could instead be caused by the opponent's challenge.",
+      "candidate_id": "u3",
+      "interval_ms": [
+        21249,
+        22132
+      ],
+      "origin_receipt_sha256": "840a4304d905d5abb81849ab5ed54f8519ea86cd8d1737dc3479e1438656a7e8"
+    },
+    {
+      "type": "DIRECTION_CHANGE",
+      "decision": "UNCERTAIN",
+      "identity_reference_ids": [
+        "r6"
+      ],
+      "identity_frames": [
+        "s034875",
+        "s035125",
+        "s035625"
+      ],
+      "before_frame": "s034875",
+      "movement_frames": [
+        "s035000",
+        "s035125",
+        "s035250",
+        "s035375"
+      ],
+      "after_frame": "s035750",
+      "visible_movement": "After the cut, white 15 receives with bent knees and the ball on his screen-left side, opens his arms and rotates as the ball moves across toward screen-right. His extended-leg action sends the ball toward the approaching blue player.",
+      "opponent_response": "The blue player approaching from screen-right spreads his stance and reaches into the ball's path; blue players then move away with the ball.",
+      "outcome": "LOSES",
+      "uncertainty": "This could be an attempted lateral escape, but the extended-leg action could instead be a pass intercepted by the defender. A feint or step-over cannot be established.",
+      "candidate_id": "u4",
+      "interval_ms": [
+        34882,
+        35749
+      ],
+      "origin_receipt_sha256": "49c974f0a71f8a9adefade3a0a4362938b6ef4e7edb223c372afe4f99676bb05"
+    }
+  ],
+  "frames": [
+    {
+      "id": "u1_f000150",
+      "candidate_id": "u1",
+      "source_frame_index": 150,
+      "source_ms": 2500,
+      "source_jpeg_sha256": "c5af46fe6545711047ef8c576c175543fce0b0e2b7e5fb4215712af340aceebc"
+    },
+    {
+      "id": "u1_f000158",
+      "candidate_id": "u1",
+      "source_frame_index": 158,
+      "source_ms": 2633,
+      "source_jpeg_sha256": "6169c4c33f8e4e0441bee15bdd81254e38684a8934989a7c167e7a6d380e4dbb"
+    },
+    {
+      "id": "u1_f000165",
+      "candidate_id": "u1",
+      "source_frame_index": 165,
+      "source_ms": 2750,
+      "source_jpeg_sha256": "5d8558c8fc699cc32bb0c0df75a266fb6189df6d6a36d3ca05050d892630781f"
+    },
+    {
+      "id": "u1_f000173",
+      "candidate_id": "u1",
+      "source_frame_index": 173,
+      "source_ms": 2883,
+      "source_jpeg_sha256": "8788c2d5929dfbbe8b1b3cedbba743843d623f82e72b3d29e5ad63ad1b3129a9"
+    },
+    {
+      "id": "u1_f000180",
+      "candidate_id": "u1",
+      "source_frame_index": 180,
+      "source_ms": 3000,
+      "source_jpeg_sha256": "6ded7936dc0cb78f524b4c34c3934ddd35f7a32b7e8f1a36e4abb73022559b54"
+    },
+    {
+      "id": "u1_f000188",
+      "candidate_id": "u1",
+      "source_frame_index": 188,
+      "source_ms": 3133,
+      "source_jpeg_sha256": "9ed37acee7fb48a679c59cea46d7347630c149b65cba4b228402496e52697dd6"
+    },
+    {
+      "id": "u1_f000195",
+      "candidate_id": "u1",
+      "source_frame_index": 195,
+      "source_ms": 3250,
+      "source_jpeg_sha256": "43791b97b02b6dc65a2acfd297f08d5186410c12081e66f4a88de2a359e3aa43"
+    },
+    {
+      "id": "u1_f000203",
+      "candidate_id": "u1",
+      "source_frame_index": 203,
+      "source_ms": 3383,
+      "source_jpeg_sha256": "377b52bf0a4f9ae387f6ef2e0abc287c0d53bb37cc5730485968098a936edb59"
+    },
+    {
+      "id": "u1_f000210",
+      "candidate_id": "u1",
+      "source_frame_index": 210,
+      "source_ms": 3500,
+      "source_jpeg_sha256": "bcfd18ecc423c463aa5ec3602c26d3b1a6c090ef095e466eb6252f1386211b09"
+    },
+    {
+      "id": "u1_f000218",
+      "candidate_id": "u1",
+      "source_frame_index": 218,
+      "source_ms": 3633,
+      "source_jpeg_sha256": "625eb9a68cd2bcb8c09bc307ea48bba2b195aea986b5740fdb11f6211e1198c5"
+    },
+    {
+      "id": "u1_f000225",
+      "candidate_id": "u1",
+      "source_frame_index": 225,
+      "source_ms": 3750,
+      "source_jpeg_sha256": "3f4cf4d6fb411b79ca81b4beaa6f5a0f7825f491e621d5e4a7f89648e1a39eff"
+    },
+    {
+      "id": "u1_f000233",
+      "candidate_id": "u1",
+      "source_frame_index": 233,
+      "source_ms": 3883,
+      "source_jpeg_sha256": "1d5e04d2b47c23ffcb1ded5a2c3f9825bb9d8c505091bd537326496669888587"
+    },
+    {
+      "id": "u1_f000240",
+      "candidate_id": "u1",
+      "source_frame_index": 240,
+      "source_ms": 4000,
+      "source_jpeg_sha256": "816b7aae190c31fbacacb2880f972961a69335f2bd8f081c566c67ccbd107ebd"
+    },
+    {
+      "id": "u1_f000248",
+      "candidate_id": "u1",
+      "source_frame_index": 248,
+      "source_ms": 4133,
+      "source_jpeg_sha256": "68d30721490f8ecd0058632b7ef03febb0e97295a846e9af6c3a906d818547bf"
+    },
+    {
+      "id": "u1_f000255",
+      "candidate_id": "u1",
+      "source_frame_index": 255,
+      "source_ms": 4250,
+      "source_jpeg_sha256": "019d1fba3e9485f7ed218fa6bcbace17dd2a71e3aa570b01db9bd5d2da5d9a4d"
+    },
+    {
+      "id": "u1_f000263",
+      "candidate_id": "u1",
+      "source_frame_index": 263,
+      "source_ms": 4383,
+      "source_jpeg_sha256": "8898d28173f2d1118bc517b3c1b62b58887bf570a6fcace4e30bf6960b58bdce"
+    },
+    {
+      "id": "u1_f000270",
+      "candidate_id": "u1",
+      "source_frame_index": 270,
+      "source_ms": 4500,
+      "source_jpeg_sha256": "5923a51127fe3897af9d96ead12791a9dd477c436376ec219edb9d3b0fb1b200"
+    },
+    {
+      "id": "u1_f000278",
+      "candidate_id": "u1",
+      "source_frame_index": 278,
+      "source_ms": 4633,
+      "source_jpeg_sha256": "cdc4a9688887304f11647b6de3563c7ff9c4444b296ff0da46f910280b4322f3"
+    },
+    {
+      "id": "u1_f000285",
+      "candidate_id": "u1",
+      "source_frame_index": 285,
+      "source_ms": 4750,
+      "source_jpeg_sha256": "9a99fc709a8931d7040feeeff0e65602a2663b749befa21976f401c21a4c9541"
+    },
+    {
+      "id": "u1_f000293",
+      "candidate_id": "u1",
+      "source_frame_index": 293,
+      "source_ms": 4883,
+      "source_jpeg_sha256": "c9663a2161ea3eab4f143a9e0e027bc182515c10bd9e50c6ae01624ec3b10134"
+    },
+    {
+      "id": "u1_f000300",
+      "candidate_id": "u1",
+      "source_frame_index": 300,
+      "source_ms": 5000,
+      "source_jpeg_sha256": "65600106ca89999bc72e56fecff312ad74423f29320f1d264fd295a86e8678b6"
+    },
+    {
+      "id": "u1_f000308",
+      "candidate_id": "u1",
+      "source_frame_index": 308,
+      "source_ms": 5133,
+      "source_jpeg_sha256": "235fd7bc95918f1c978fc19d1b3907728fba96bb4e90919a6de339093b71a93e"
+    },
+    {
+      "id": "u1_f000315",
+      "candidate_id": "u1",
+      "source_frame_index": 315,
+      "source_ms": 5250,
+      "source_jpeg_sha256": "278313aec829e0288a8e00ac39700babbad530dd0da81643e94aea6dc3e49ef7"
+    },
+    {
+      "id": "u1_f000323",
+      "candidate_id": "u1",
+      "source_frame_index": 323,
+      "source_ms": 5383,
+      "source_jpeg_sha256": "ca062f63d22840007c9179455bc21c29ff0bce9a44ead86cd4e94a89a8849a17"
+    },
+    {
+      "id": "u1_f000330",
+      "candidate_id": "u1",
+      "source_frame_index": 330,
+      "source_ms": 5500,
+      "source_jpeg_sha256": "c49007b038b5bb6c894a96b0c58a30ce68fdcb4be85b63ad05715546b324fef7"
+    },
+    {
+      "id": "u1_f000338",
+      "candidate_id": "u1",
+      "source_frame_index": 338,
+      "source_ms": 5633,
+      "source_jpeg_sha256": "6c2c87dd84e72ad78d1a0e710e5b2ba68e17543e98675607f0a4001a87006030"
+    },
+    {
+      "id": "u1_f000345",
+      "candidate_id": "u1",
+      "source_frame_index": 345,
+      "source_ms": 5750,
+      "source_jpeg_sha256": "d004f27dcd3001f3697706fa544e07dd34b21b8ab58084492cd984c899b9f60a"
+    },
+    {
+      "id": "u1_f000353",
+      "candidate_id": "u1",
+      "source_frame_index": 353,
+      "source_ms": 5883,
+      "source_jpeg_sha256": "a51a4a4de2b5395bbf8ed9bf06650a6c6ee8eaa8c81227487c2ab1c9b3e133bd"
+    },
+    {
+      "id": "u1_f000360",
+      "candidate_id": "u1",
+      "source_frame_index": 360,
+      "source_ms": 6000,
+      "source_jpeg_sha256": "22ed0fa37e6cbb3ce4d9da27b87f8325f1f779d827b0e3e5172d6aaf5ed62794"
+    },
+    {
+      "id": "u1_f000368",
+      "candidate_id": "u1",
+      "source_frame_index": 368,
+      "source_ms": 6133,
+      "source_jpeg_sha256": "74c70cb4fd0688f2c523cc23977191098c8c9f50366f019a790f16d627c01e45"
+    },
+    {
+      "id": "u1_f000375",
+      "candidate_id": "u1",
+      "source_frame_index": 375,
+      "source_ms": 6250,
+      "source_jpeg_sha256": "2613315107c5af696c8df4de06c6e179938629118cf9c16965aa8cff80b5af2c"
+    },
+    {
+      "id": "u1_f000383",
+      "candidate_id": "u1",
+      "source_frame_index": 383,
+      "source_ms": 6383,
+      "source_jpeg_sha256": "49fd19604892e9dee13286bdc64037599f6ba1308afcca5f248f6b409301d68c"
+    },
+    {
+      "id": "u1_f000390",
+      "candidate_id": "u1",
+      "source_frame_index": 390,
+      "source_ms": 6500,
+      "source_jpeg_sha256": "1c9119aac1f32771ba9616fec7b27eb87f73f5a8865df6ca16ed118c6f287b36"
+    },
+    {
+      "id": "u1_f000398",
+      "candidate_id": "u1",
+      "source_frame_index": 398,
+      "source_ms": 6633,
+      "source_jpeg_sha256": "4d5040ef93861bf69406a2de6005416174f16720bd990dab0361b2e2ff7e543d"
+    },
+    {
+      "id": "u1_f000405",
+      "candidate_id": "u1",
+      "source_frame_index": 405,
+      "source_ms": 6750,
+      "source_jpeg_sha256": "2680de6fc4ba7a994bdc825483fe4b49ba9ce35219d91da2fb944d6cb00df1a6"
+    },
+    {
+      "id": "u1_f000413",
+      "candidate_id": "u1",
+      "source_frame_index": 413,
+      "source_ms": 6883,
+      "source_jpeg_sha256": "e4b41709967f82c270616acef7a64506da6c4f46a5dfe1a16eb3ae5d75504727"
+    },
+    {
+      "id": "u1_f000420",
+      "candidate_id": "u1",
+      "source_frame_index": 420,
+      "source_ms": 7000,
+      "source_jpeg_sha256": "36dcee7f06a645fd7b576e4b27b403965bf1390db5397f29c628f3335c811e65"
+    },
+    {
+      "id": "u1_f000428",
+      "candidate_id": "u1",
+      "source_frame_index": 428,
+      "source_ms": 7133,
+      "source_jpeg_sha256": "a376402b438fd6f237d7ffa47c2f1789a336cd2ce8a30748263b6fda0a6a1c07"
+    },
+    {
+      "id": "u1_f000435",
+      "candidate_id": "u1",
+      "source_frame_index": 435,
+      "source_ms": 7250,
+      "source_jpeg_sha256": "4a28f9f17a3fbedb64d8417b7fada1a9e7bd97c8b92dbffc3a358a5be0131a13"
+    },
+    {
+      "id": "u1_f000443",
+      "candidate_id": "u1",
+      "source_frame_index": 443,
+      "source_ms": 7383,
+      "source_jpeg_sha256": "7e3b3f4ed8e51f3e95d5b63daba728bbf8c71e484b9cacce86f0b3964bca3253"
+    },
+    {
+      "id": "u1_f000450",
+      "candidate_id": "u1",
+      "source_frame_index": 450,
+      "source_ms": 7500,
+      "source_jpeg_sha256": "f61ad4ac34bd5ed8ef351158144540bd2e1a84d8e61797f52bb65fd9b1c4b327"
+    },
+    {
+      "id": "u1_f000458",
+      "candidate_id": "u1",
+      "source_frame_index": 458,
+      "source_ms": 7633,
+      "source_jpeg_sha256": "43872d487b80f59bdd577403893e243a17a1fa02b6d8a28bda4bdc153408373d"
+    },
+    {
+      "id": "u1_f000465",
+      "candidate_id": "u1",
+      "source_frame_index": 465,
+      "source_ms": 7750,
+      "source_jpeg_sha256": "84d6e8746f1ac384de9edecb400436b90acd6c3a63604768e50bfeeada11449e"
+    },
+    {
+      "id": "u1_f000473",
+      "candidate_id": "u1",
+      "source_frame_index": 473,
+      "source_ms": 7883,
+      "source_jpeg_sha256": "8f6e204b69624c3e79b1a8e0aec9415decfc5a15c31283c82b1b49f048c83c61"
+    },
+    {
+      "id": "u1_f000480",
+      "candidate_id": "u1",
+      "source_frame_index": 480,
+      "source_ms": 8000,
+      "source_jpeg_sha256": "4a258005a80881e0d7a2f17f6bdec4e53d0c90a7b5dc2fec11b161488deb60bb"
+    },
+    {
+      "id": "u1_f000488",
+      "candidate_id": "u1",
+      "source_frame_index": 488,
+      "source_ms": 8133,
+      "source_jpeg_sha256": "0bd908ad98786a15ef5644307237bbd8e2e96939f2117242bb968ec38b5b4362"
+    },
+    {
+      "id": "u2_f000428",
+      "candidate_id": "u2",
+      "source_frame_index": 428,
+      "source_ms": 7133,
+      "source_jpeg_sha256": "a376402b438fd6f237d7ffa47c2f1789a336cd2ce8a30748263b6fda0a6a1c07"
+    },
+    {
+      "id": "u2_f000435",
+      "candidate_id": "u2",
+      "source_frame_index": 435,
+      "source_ms": 7250,
+      "source_jpeg_sha256": "4a28f9f17a3fbedb64d8417b7fada1a9e7bd97c8b92dbffc3a358a5be0131a13"
+    },
+    {
+      "id": "u2_f000443",
+      "candidate_id": "u2",
+      "source_frame_index": 443,
+      "source_ms": 7383,
+      "source_jpeg_sha256": "7e3b3f4ed8e51f3e95d5b63daba728bbf8c71e484b9cacce86f0b3964bca3253"
+    },
+    {
+      "id": "u2_f000450",
+      "candidate_id": "u2",
+      "source_frame_index": 450,
+      "source_ms": 7500,
+      "source_jpeg_sha256": "f61ad4ac34bd5ed8ef351158144540bd2e1a84d8e61797f52bb65fd9b1c4b327"
+    },
+    {
+      "id": "u2_f000458",
+      "candidate_id": "u2",
+      "source_frame_index": 458,
+      "source_ms": 7633,
+      "source_jpeg_sha256": "43872d487b80f59bdd577403893e243a17a1fa02b6d8a28bda4bdc153408373d"
+    },
+    {
+      "id": "u2_f000465",
+      "candidate_id": "u2",
+      "source_frame_index": 465,
+      "source_ms": 7750,
+      "source_jpeg_sha256": "84d6e8746f1ac384de9edecb400436b90acd6c3a63604768e50bfeeada11449e"
+    },
+    {
+      "id": "u2_f000473",
+      "candidate_id": "u2",
+      "source_frame_index": 473,
+      "source_ms": 7883,
+      "source_jpeg_sha256": "8f6e204b69624c3e79b1a8e0aec9415decfc5a15c31283c82b1b49f048c83c61"
+    },
+    {
+      "id": "u2_f000480",
+      "candidate_id": "u2",
+      "source_frame_index": 480,
+      "source_ms": 8000,
+      "source_jpeg_sha256": "4a258005a80881e0d7a2f17f6bdec4e53d0c90a7b5dc2fec11b161488deb60bb"
+    },
+    {
+      "id": "u2_f000488",
+      "candidate_id": "u2",
+      "source_frame_index": 488,
+      "source_ms": 8133,
+      "source_jpeg_sha256": "0bd908ad98786a15ef5644307237bbd8e2e96939f2117242bb968ec38b5b4362"
+    },
+    {
+      "id": "u2_f000495",
+      "candidate_id": "u2",
+      "source_frame_index": 495,
+      "source_ms": 8250,
+      "source_jpeg_sha256": "b6044a526b7dcb726e544dc22ebe25d10450b48e91066afca88a1f7769391ada"
+    },
+    {
+      "id": "u2_f000503",
+      "candidate_id": "u2",
+      "source_frame_index": 503,
+      "source_ms": 8383,
+      "source_jpeg_sha256": "ef19f3997c20772df105f202a278ae9be57eb5faca2b38439b5c647877947ebc"
+    },
+    {
+      "id": "u2_f000511",
+      "candidate_id": "u2",
+      "source_frame_index": 511,
+      "source_ms": 8516,
+      "source_jpeg_sha256": "1263da9ddcce29b1884d789dbb485e9cb023ceb0043474a89f40ae07e8d20d44"
+    },
+    {
+      "id": "u2_f000518",
+      "candidate_id": "u2",
+      "source_frame_index": 518,
+      "source_ms": 8633,
+      "source_jpeg_sha256": "ff08a70230e82fbc1090fedcfa2e9f026c61ad67cdf07b1426b7a3cdb8dc5e74"
+    },
+    {
+      "id": "u2_f000526",
+      "candidate_id": "u2",
+      "source_frame_index": 526,
+      "source_ms": 8766,
+      "source_jpeg_sha256": "3a7da023a06182a9fccbc87aa63d98e6d6aa0db2531bfdef4d78ba2630a023f0"
+    },
+    {
+      "id": "u2_f000533",
+      "candidate_id": "u2",
+      "source_frame_index": 533,
+      "source_ms": 8883,
+      "source_jpeg_sha256": "8d818746c1312a7817191a1053c33fb2672cfa5ae5e7df8f5a2dc612c6e4a2d6"
+    },
+    {
+      "id": "u2_f000541",
+      "candidate_id": "u2",
+      "source_frame_index": 541,
+      "source_ms": 9016,
+      "source_jpeg_sha256": "230dadad9705130f814b6f22a621378fc22f091ccc8cf7f676e107e2538d040b"
+    },
+    {
+      "id": "u2_f000548",
+      "candidate_id": "u2",
+      "source_frame_index": 548,
+      "source_ms": 9133,
+      "source_jpeg_sha256": "c89cf7126b9769b61eb7b88407eaa4349bcb780af85bd3b2f6befb6ed906acc7"
+    },
+    {
+      "id": "u2_f000556",
+      "candidate_id": "u2",
+      "source_frame_index": 556,
+      "source_ms": 9266,
+      "source_jpeg_sha256": "594992696cbe905320f23902261cc7d62728a87a27a47a78dcd8a0b4bbb74334"
+    },
+    {
+      "id": "u2_f000563",
+      "candidate_id": "u2",
+      "source_frame_index": 563,
+      "source_ms": 9383,
+      "source_jpeg_sha256": "f38a0314c245a8e4b0fe795ccdceed0460bdacb5d3a9884350f3a63f7aae4ce8"
+    },
+    {
+      "id": "u2_f000571",
+      "candidate_id": "u2",
+      "source_frame_index": 571,
+      "source_ms": 9516,
+      "source_jpeg_sha256": "e004a9c126e2a3c615e95627d4e59d50b07136cde666601ac6a67441d92e0dd9"
+    },
+    {
+      "id": "u2_f000578",
+      "candidate_id": "u2",
+      "source_frame_index": 578,
+      "source_ms": 9633,
+      "source_jpeg_sha256": "3a2db239d8b39af4f8546a456d32ed25d87fd4e3506febd7d6eee1c11ca776a9"
+    },
+    {
+      "id": "u2_f000586",
+      "candidate_id": "u2",
+      "source_frame_index": 586,
+      "source_ms": 9766,
+      "source_jpeg_sha256": "6814cf171f86a973a64346ed20942e00bfed8dcb14fd1d27e96695a30c469448"
+    },
+    {
+      "id": "u2_f000593",
+      "candidate_id": "u2",
+      "source_frame_index": 593,
+      "source_ms": 9883,
+      "source_jpeg_sha256": "9a8d595d984b9de367fc1bde4598f80ac6228f5d9b417a22e1f6766b9089d6a7"
+    },
+    {
+      "id": "u2_f000601",
+      "candidate_id": "u2",
+      "source_frame_index": 601,
+      "source_ms": 10016,
+      "source_jpeg_sha256": "f771195dd66617bd7c70fcd9564ef13e1b3909bcccdfe4c4480a09ab765f70c1"
+    },
+    {
+      "id": "u2_f000608",
+      "candidate_id": "u2",
+      "source_frame_index": 608,
+      "source_ms": 10133,
+      "source_jpeg_sha256": "9e57113c0583cb7523d5b8147333b27c19e3df71055b4bd73fecbc1272df5c4e"
+    },
+    {
+      "id": "u2_f000616",
+      "candidate_id": "u2",
+      "source_frame_index": 616,
+      "source_ms": 10266,
+      "source_jpeg_sha256": "f948812366556ea7d4f1d499ea4c101f9f9bb66e4cffffa945ef6589200762ff"
+    },
+    {
+      "id": "u2_f000623",
+      "candidate_id": "u2",
+      "source_frame_index": 623,
+      "source_ms": 10383,
+      "source_jpeg_sha256": "1a295abae11838555d44a14653c84b6097ad2e5de06752651833e44410ccea66"
+    },
+    {
+      "id": "u2_f000631",
+      "candidate_id": "u2",
+      "source_frame_index": 631,
+      "source_ms": 10516,
+      "source_jpeg_sha256": "c6fc347f083b5e7503cb3c6de0fa6e3cb6324104f1b3ab3dab65d2ee45363a01"
+    },
+    {
+      "id": "u2_f000638",
+      "candidate_id": "u2",
+      "source_frame_index": 638,
+      "source_ms": 10633,
+      "source_jpeg_sha256": "42ff7f82eb38155f141f66ce7370e7b282f494877688585872e13309ff32e849"
+    },
+    {
+      "id": "u2_f000646",
+      "candidate_id": "u2",
+      "source_frame_index": 646,
+      "source_ms": 10766,
+      "source_jpeg_sha256": "f8e34aa5cf4d0dd56fdf748c93afc8630de8df9f891effead96f4cdd4d08d762"
+    },
+    {
+      "id": "u2_f000653",
+      "candidate_id": "u2",
+      "source_frame_index": 653,
+      "source_ms": 10883,
+      "source_jpeg_sha256": "d911186b63e33f5288f0ece81831caad81df0c12ff37ac2d9e629ea0be73ad41"
+    },
+    {
+      "id": "u2_f000661",
+      "candidate_id": "u2",
+      "source_frame_index": 661,
+      "source_ms": 11016,
+      "source_jpeg_sha256": "245c162d2af133594aa0c069d494705ea16e8f753aeab25f21de4758019acfae"
+    },
+    {
+      "id": "u2_f000668",
+      "candidate_id": "u2",
+      "source_frame_index": 668,
+      "source_ms": 11133,
+      "source_jpeg_sha256": "81a9cca9e9ee259412b4bd73cbcc090fecb498892b87938840b2b07d60975cbe"
+    },
+    {
+      "id": "u2_f000676",
+      "candidate_id": "u2",
+      "source_frame_index": 676,
+      "source_ms": 11266,
+      "source_jpeg_sha256": "9e5158287701b74a105ace15a4897b5bf5c402a28b2957ef6168bef1042fa480"
+    },
+    {
+      "id": "u2_f000683",
+      "candidate_id": "u2",
+      "source_frame_index": 683,
+      "source_ms": 11383,
+      "source_jpeg_sha256": "a3d909256b9dc4b3ad02deae22432c9f85a56f4f1816282d0cba8285905ad789"
+    },
+    {
+      "id": "u2_f000691",
+      "candidate_id": "u2",
+      "source_frame_index": 691,
+      "source_ms": 11516,
+      "source_jpeg_sha256": "643b12979decf8bd8a41f4cd58846e8b4cb69bfeac9bfa344379efe169b05378"
+    },
+    {
+      "id": "u2_f000698",
+      "candidate_id": "u2",
+      "source_frame_index": 698,
+      "source_ms": 11633,
+      "source_jpeg_sha256": "51046b0e2baa4e502f132d865e2d70fc307e570304ad9b4cb2caf1a72859cb19"
+    },
+    {
+      "id": "u2_f000706",
+      "candidate_id": "u2",
+      "source_frame_index": 706,
+      "source_ms": 11766,
+      "source_jpeg_sha256": "51b3581921017354e22d08feffe00c7a664ed1332b4e23499e8d570949d89078"
+    },
+    {
+      "id": "u2_f000713",
+      "candidate_id": "u2",
+      "source_frame_index": 713,
+      "source_ms": 11883,
+      "source_jpeg_sha256": "df74459cadb073f5ac21184cad25af2e3ef4fead31981b73673f9e384740827d"
+    },
+    {
+      "id": "u2_f000721",
+      "candidate_id": "u2",
+      "source_frame_index": 721,
+      "source_ms": 12016,
+      "source_jpeg_sha256": "383e0b5826c2910139f1a59a27765dd0a029e98cc9f3fcb929ca3ff8ddfea576"
+    },
+    {
+      "id": "u2_f000728",
+      "candidate_id": "u2",
+      "source_frame_index": 728,
+      "source_ms": 12133,
+      "source_jpeg_sha256": "6318f79d6229953d50f037c788a2a950f45c204fc0c55d17ed534b07e03202a9"
+    },
+    {
+      "id": "u2_f000736",
+      "candidate_id": "u2",
+      "source_frame_index": 736,
+      "source_ms": 12266,
+      "source_jpeg_sha256": "cf1c08dd27daef2aa7da9a16d04dda05bab612ea8cf1bdb8add6c46c74ec2b86"
+    },
+    {
+      "id": "u2_f000743",
+      "candidate_id": "u2",
+      "source_frame_index": 743,
+      "source_ms": 12383,
+      "source_jpeg_sha256": "42bde68575f944b2d32fdfca6e70f010ec98e786158b5588c0cb3ad2c40054a9"
+    },
+    {
+      "id": "u2_f000751",
+      "candidate_id": "u2",
+      "source_frame_index": 751,
+      "source_ms": 12516,
+      "source_jpeg_sha256": "cdf8df634ae0da080730f6559f487dcb28cd05572c1f3dff4cbbbca17f79f932"
+    },
+    {
+      "id": "u2_f000758",
+      "candidate_id": "u2",
+      "source_frame_index": 758,
+      "source_ms": 12633,
+      "source_jpeg_sha256": "d2f0e38a1a539a137c52ea282f925b48e1d8a78a23c90c8147c1ce23319fc0f9"
+    },
+    {
+      "id": "u3_f001215",
+      "candidate_id": "u3",
+      "source_frame_index": 1215,
+      "source_ms": 20249,
+      "source_jpeg_sha256": "943f1b7cdff66f6859ce2e7a8b495fee2107abcda199ddef4f35f0acc98e49dd"
+    },
+    {
+      "id": "u3_f001222",
+      "candidate_id": "u3",
+      "source_frame_index": 1222,
+      "source_ms": 20366,
+      "source_jpeg_sha256": "dceedbf2037ea831cd14a96b229a8a8c7de05dba5c4f24b6e4ed523336f3b3bb"
+    },
+    {
+      "id": "u3_f001230",
+      "candidate_id": "u3",
+      "source_frame_index": 1230,
+      "source_ms": 20499,
+      "source_jpeg_sha256": "234e2984d8a42c94fbef03706568ceebf2bbdd7426520e727cdd58ed72bf5f90"
+    },
+    {
+      "id": "u3_f001237",
+      "candidate_id": "u3",
+      "source_frame_index": 1237,
+      "source_ms": 20616,
+      "source_jpeg_sha256": "19d42048f7349bd85ec71270ec66db90c8d27d0cd397715a345f3d890e8c4661"
+    },
+    {
+      "id": "u3_f001245",
+      "candidate_id": "u3",
+      "source_frame_index": 1245,
+      "source_ms": 20749,
+      "source_jpeg_sha256": "50ce311c70aadc28f85f2e6536cb1fb04f46bcae03bc45b155766ab2c9aaae6f"
+    },
+    {
+      "id": "u3_f001252",
+      "candidate_id": "u3",
+      "source_frame_index": 1252,
+      "source_ms": 20866,
+      "source_jpeg_sha256": "f808cb500cf2a5d628faa6d15504494787ac5183fb3d28d708b2245c3cbb51a9"
+    },
+    {
+      "id": "u3_f001260",
+      "candidate_id": "u3",
+      "source_frame_index": 1260,
+      "source_ms": 20999,
+      "source_jpeg_sha256": "d1a8808f251dfaa756d6dd32afe6c6384a4996670c02e7385c697510cadad23d"
+    },
+    {
+      "id": "u3_f001267",
+      "candidate_id": "u3",
+      "source_frame_index": 1267,
+      "source_ms": 21116,
+      "source_jpeg_sha256": "88b0e7c61bb74cb255ed23cccf144637dda253fe9a4cc45f20b8430aa1fb2fe6"
+    },
+    {
+      "id": "u3_f001275",
+      "candidate_id": "u3",
+      "source_frame_index": 1275,
+      "source_ms": 21249,
+      "source_jpeg_sha256": "07895d90e496317d32fd1f8ade8564279c963efcaf1c38a8a39409a4a967c97b"
+    },
+    {
+      "id": "u3_f001282",
+      "candidate_id": "u3",
+      "source_frame_index": 1282,
+      "source_ms": 21366,
+      "source_jpeg_sha256": "f6ea28a78f6b5d82ebf0efe41295a152fcfb3a134922dac53dd3127f49d2b071"
+    },
+    {
+      "id": "u3_f001290",
+      "candidate_id": "u3",
+      "source_frame_index": 1290,
+      "source_ms": 21499,
+      "source_jpeg_sha256": "99b6d67f657631e98aced3f7839fc73272071f1145a9b0ef343e08f4801db24a"
+    },
+    {
+      "id": "u3_f001297",
+      "candidate_id": "u3",
+      "source_frame_index": 1297,
+      "source_ms": 21616,
+      "source_jpeg_sha256": "7881c44f2451b6f6da69d2bf24358b17ac5050d2febd68ef947bf0d2e125fa55"
+    },
+    {
+      "id": "u3_f001305",
+      "candidate_id": "u3",
+      "source_frame_index": 1305,
+      "source_ms": 21749,
+      "source_jpeg_sha256": "693a3d62d6bdf045f083293fa5fc891f430002eb06804b934381de8cff8a879d"
+    },
+    {
+      "id": "u3_f001312",
+      "candidate_id": "u3",
+      "source_frame_index": 1312,
+      "source_ms": 21866,
+      "source_jpeg_sha256": "04603e4a41f84bb92162caef988964201590cf5b538ab443e6b2f98784ddf61a"
+    },
+    {
+      "id": "u3_f001320",
+      "candidate_id": "u3",
+      "source_frame_index": 1320,
+      "source_ms": 21999,
+      "source_jpeg_sha256": "c9b82d773b1ab700f9c6182b2b863dbf38f132d93d3542f1991c4697a7182593"
+    },
+    {
+      "id": "u3_f001327",
+      "candidate_id": "u3",
+      "source_frame_index": 1327,
+      "source_ms": 22116,
+      "source_jpeg_sha256": "9b4f345401ac59611d422507adaad6e766a0f555d4eb5a5d8e8f4e6365584e2e"
+    },
+    {
+      "id": "u3_f001335",
+      "candidate_id": "u3",
+      "source_frame_index": 1335,
+      "source_ms": 22249,
+      "source_jpeg_sha256": "bb87113908d46f7b85bcad912785c2440bbff5988ae61935ff141c3b6b2907a3"
+    },
+    {
+      "id": "u3_f001342",
+      "candidate_id": "u3",
+      "source_frame_index": 1342,
+      "source_ms": 22366,
+      "source_jpeg_sha256": "37277b56022e7ef129099778f5b4a0fa5b8d7b0feadeed8cbac62dfbec225edb"
+    },
+    {
+      "id": "u3_f001350",
+      "candidate_id": "u3",
+      "source_frame_index": 1350,
+      "source_ms": 22499,
+      "source_jpeg_sha256": "a2e80851790c74c816e6a396bb2bef49a476b36ccd7672fe50fd704ab895a6bb"
+    },
+    {
+      "id": "u3_f001357",
+      "candidate_id": "u3",
+      "source_frame_index": 1357,
+      "source_ms": 22616,
+      "source_jpeg_sha256": "e2ddcd5d207be4a20ad7e455ee6f3dcc25f0516b7aeeefc2794df3e6208d1459"
+    },
+    {
+      "id": "u3_f001365",
+      "candidate_id": "u3",
+      "source_frame_index": 1365,
+      "source_ms": 22749,
+      "source_jpeg_sha256": "6bc81501736beffe50cde86787650fa9417296197617c765336be55b41d066b9"
+    },
+    {
+      "id": "u3_f001372",
+      "candidate_id": "u3",
+      "source_frame_index": 1372,
+      "source_ms": 22866,
+      "source_jpeg_sha256": "e0a02bdb1b612099dc2f05301ce1275a63840684cdc0d2960401bd16c6e01712"
+    },
+    {
+      "id": "u3_f001380",
+      "candidate_id": "u3",
+      "source_frame_index": 1380,
+      "source_ms": 22999,
+      "source_jpeg_sha256": "72879454ea5424ca3cbcedac700b70305203538e959a6a9343deafec4cc3192b"
+    },
+    {
+      "id": "u3_f001387",
+      "candidate_id": "u3",
+      "source_frame_index": 1387,
+      "source_ms": 23116,
+      "source_jpeg_sha256": "2331aa0587bb53d2d22cc1c200cb92424d6208186c4e1871136114c24e5b8f5a"
+    },
+    {
+      "id": "u3_f001395",
+      "candidate_id": "u3",
+      "source_frame_index": 1395,
+      "source_ms": 23249,
+      "source_jpeg_sha256": "204b7e3a0de5d8cee2b2189b12c8734891733b53892ca587bf7dac0295e002cf"
+    },
+    {
+      "id": "u3_f001402",
+      "candidate_id": "u3",
+      "source_frame_index": 1402,
+      "source_ms": 23366,
+      "source_jpeg_sha256": "3b67ba6b378fc77ff8690b09df02ffde1b90d06b3d4000b4277840ae4549036b"
+    },
+    {
+      "id": "u3_f001410",
+      "candidate_id": "u3",
+      "source_frame_index": 1410,
+      "source_ms": 23499,
+      "source_jpeg_sha256": "a02172bd4b18d7871a6cb03810887fd3ab5c1a23386857fe72998e0ccc6a680a"
+    },
+    {
+      "id": "u3_f001417",
+      "candidate_id": "u3",
+      "source_frame_index": 1417,
+      "source_ms": 23616,
+      "source_jpeg_sha256": "dc4c516657fc118305069a4e511aa9be5279e37e72c68b58167a835408f77f28"
+    },
+    {
+      "id": "u3_f001425",
+      "candidate_id": "u3",
+      "source_frame_index": 1425,
+      "source_ms": 23749,
+      "source_jpeg_sha256": "dc503d134dc75495ee81ffcebfc276da217b5855d84883b6ccc568642991753f"
+    },
+    {
+      "id": "u3_f001432",
+      "candidate_id": "u3",
+      "source_frame_index": 1432,
+      "source_ms": 23866,
+      "source_jpeg_sha256": "ccaa2921f235fe2077c147482340475192c1469f8dca8403eff5acff9043dbd7"
+    },
+    {
+      "id": "u3_f001440",
+      "candidate_id": "u3",
+      "source_frame_index": 1440,
+      "source_ms": 23999,
+      "source_jpeg_sha256": "b915490e427bf9fb0b3d1fc4246395b266fcf4763b3aaa69fca62f0781ff8893"
+    },
+    {
+      "id": "u3_f001447",
+      "candidate_id": "u3",
+      "source_frame_index": 1447,
+      "source_ms": 24116,
+      "source_jpeg_sha256": "855fed547564ca4da9756bb18f06678f6e93295bc64ef3df940348536a1d7f6a"
+    },
+    {
+      "id": "u3_f001455",
+      "candidate_id": "u3",
+      "source_frame_index": 1455,
+      "source_ms": 24249,
+      "source_jpeg_sha256": "6f8c31f4d77ff57560cbe67278443ef7e0db2c17544bf0e63746693b75f6b6e9"
+    },
+    {
+      "id": "u3_f001462",
+      "candidate_id": "u3",
+      "source_frame_index": 1462,
+      "source_ms": 24366,
+      "source_jpeg_sha256": "1e53f3bbb4f70ed524e520d9ceccb17925e7fb899952c5fff4f8c5ecf910b6b5"
+    },
+    {
+      "id": "u3_f001470",
+      "candidate_id": "u3",
+      "source_frame_index": 1470,
+      "source_ms": 24499,
+      "source_jpeg_sha256": "194cac53221571db701c706347f70047aa0bb53f09513ab2b56313617085799f"
+    },
+    {
+      "id": "u3_f001477",
+      "candidate_id": "u3",
+      "source_frame_index": 1477,
+      "source_ms": 24616,
+      "source_jpeg_sha256": "55da4bbe71b0b033ccd8e59e4d0678a7c4aa4f382bd370ae3d41e07ae61cdc4d"
+    },
+    {
+      "id": "u3_f001485",
+      "candidate_id": "u3",
+      "source_frame_index": 1485,
+      "source_ms": 24749,
+      "source_jpeg_sha256": "6588cf77d639f3ce4b138727e79610a39100a20879d34e95cbc2f8e47fab7b24"
+    },
+    {
+      "id": "u3_f001492",
+      "candidate_id": "u3",
+      "source_frame_index": 1492,
+      "source_ms": 24866,
+      "source_jpeg_sha256": "85ef860a1d3f91bb7666bbb488310b00b04a7ba263f8c7b40749c4c2df57ed9b"
+    },
+    {
+      "id": "u3_f001500",
+      "candidate_id": "u3",
+      "source_frame_index": 1500,
+      "source_ms": 24999,
+      "source_jpeg_sha256": "58197714a05804e71d64d55a8d44e658efb5e1c271997f8c83124af662c5d09e"
+    },
+    {
+      "id": "u3_f001508",
+      "candidate_id": "u3",
+      "source_frame_index": 1508,
+      "source_ms": 25132,
+      "source_jpeg_sha256": "4d276f119dcc4ced3fe75476ac322ab0e544b993b6eeece1e5e8eb2c6a8b8180"
+    },
+    {
+      "id": "u3_f001515",
+      "candidate_id": "u3",
+      "source_frame_index": 1515,
+      "source_ms": 25249,
+      "source_jpeg_sha256": "bf398cfadaa69fbf288edc8c73639170a7ab0f0e9a322b23c39acc7792d8d848"
+    },
+    {
+      "id": "u3_f001523",
+      "candidate_id": "u3",
+      "source_frame_index": 1523,
+      "source_ms": 25382,
+      "source_jpeg_sha256": "5ccd8995c1e5b3a4d963c51cca57ff4f9b7875dd36f2d84541b5b5bdec6868f0"
+    },
+    {
+      "id": "u3_f001530",
+      "candidate_id": "u3",
+      "source_frame_index": 1530,
+      "source_ms": 25499,
+      "source_jpeg_sha256": "72fbcae8a16f8cb56ac6b1ea3d9666d4319f9fd12786c7de0c2b2219a9f19bd2"
+    },
+    {
+      "id": "u3_f001538",
+      "candidate_id": "u3",
+      "source_frame_index": 1538,
+      "source_ms": 25632,
+      "source_jpeg_sha256": "afde97e7e99abb584d2453517f6acea79a72f232256b1ca067de3a9c3a8e376a"
+    },
+    {
+      "id": "u3_f001545",
+      "candidate_id": "u3",
+      "source_frame_index": 1545,
+      "source_ms": 25749,
+      "source_jpeg_sha256": "14555927295fb71d8074e50e8a5ad7c4068aae7ed665b79084829b2b28d26b7a"
+    },
+    {
+      "id": "u3_f001553",
+      "candidate_id": "u3",
+      "source_frame_index": 1553,
+      "source_ms": 25882,
+      "source_jpeg_sha256": "5a13838cda0425e1f8d180349d5e2a430fd44d5ce41e40f495c3d4683165bbdf"
+    },
+    {
+      "id": "u3_f001560",
+      "candidate_id": "u3",
+      "source_frame_index": 1560,
+      "source_ms": 25999,
+      "source_jpeg_sha256": "12df944911b4185beda891706a07681781c0dba65fc0ded8ff252188efe5ca09"
+    },
+    {
+      "id": "u3_f001568",
+      "candidate_id": "u3",
+      "source_frame_index": 1568,
+      "source_ms": 26132,
+      "source_jpeg_sha256": "a4f5bc0b809c36689424d7b89e9038ddbd21b889f918af37dc30b0bd99126bd6"
+    },
+    {
+      "id": "u4_f002033",
+      "candidate_id": "u4",
+      "source_frame_index": 2033,
+      "source_ms": 33882,
+      "source_jpeg_sha256": "611ae25119e599be42d70c7761de58533f8bbf75ca6f0b5509e441c57331dae6"
+    },
+    {
+      "id": "u4_f002041",
+      "candidate_id": "u4",
+      "source_frame_index": 2041,
+      "source_ms": 34015,
+      "source_jpeg_sha256": "f2742e85bfaffb9405e61eaac3da84c50ba1b0fe56332c7748fed7a4f3166dc9"
+    },
+    {
+      "id": "u4_f002048",
+      "candidate_id": "u4",
+      "source_frame_index": 2048,
+      "source_ms": 34132,
+      "source_jpeg_sha256": "403dc8438ecd8b47c3e41c99e89e420cc8ff6db1d0f642d9a614dc266ea0f159"
+    },
+    {
+      "id": "u4_f002056",
+      "candidate_id": "u4",
+      "source_frame_index": 2056,
+      "source_ms": 34265,
+      "source_jpeg_sha256": "2e949ff2d9951c7411676c76350b99d2665c4636f60e431034a7029dcfaa5b46"
+    },
+    {
+      "id": "u4_f002063",
+      "candidate_id": "u4",
+      "source_frame_index": 2063,
+      "source_ms": 34382,
+      "source_jpeg_sha256": "880c4eb8536b789d08fa861c6b872346ee7f610f631365f325f91f5b8a9150ce"
+    },
+    {
+      "id": "u4_f002071",
+      "candidate_id": "u4",
+      "source_frame_index": 2071,
+      "source_ms": 34515,
+      "source_jpeg_sha256": "8879c5ba90dd8921339c56d97a410769b277149a6da8bfc6519d6a9eb9ccb9d7"
+    },
+    {
+      "id": "u4_f002078",
+      "candidate_id": "u4",
+      "source_frame_index": 2078,
+      "source_ms": 34632,
+      "source_jpeg_sha256": "50dbc2a7ced76ec90b74aebff01ea0c45676cb305ecab16fea943905efba3927"
+    },
+    {
+      "id": "u4_f002086",
+      "candidate_id": "u4",
+      "source_frame_index": 2086,
+      "source_ms": 34765,
+      "source_jpeg_sha256": "92921e155dc39ff25a2adaae3d505a171da24a47790eb36b01536faf87a763ba"
+    },
+    {
+      "id": "u4_f002093",
+      "candidate_id": "u4",
+      "source_frame_index": 2093,
+      "source_ms": 34882,
+      "source_jpeg_sha256": "9e19c416f757b953f6da435c1f7e99e5d192c12888640b8dda8ef6419b9ceede"
+    },
+    {
+      "id": "u4_f002101",
+      "candidate_id": "u4",
+      "source_frame_index": 2101,
+      "source_ms": 35015,
+      "source_jpeg_sha256": "b2fcaf46144c93c429ae8a4c18c87409964479d3f946ca8e5224b8b1f0d0b96e"
+    },
+    {
+      "id": "u4_f002108",
+      "candidate_id": "u4",
+      "source_frame_index": 2108,
+      "source_ms": 35132,
+      "source_jpeg_sha256": "9e6b4ad9390a6c7bce804bdcc50dfbfd8596bbcd94bd8f2344fa71d22d18e8fb"
+    },
+    {
+      "id": "u4_f002116",
+      "candidate_id": "u4",
+      "source_frame_index": 2116,
+      "source_ms": 35265,
+      "source_jpeg_sha256": "1f3f181b101fc515ee499871d52f3ca711b856ad5d327cc8b9ea223d3c6800dc"
+    },
+    {
+      "id": "u4_f002123",
+      "candidate_id": "u4",
+      "source_frame_index": 2123,
+      "source_ms": 35382,
+      "source_jpeg_sha256": "17e9b36562881573d0e3274c0c6a5bb8ff17e9bd9eb637f27affbf66722f6b81"
+    },
+    {
+      "id": "u4_f002131",
+      "candidate_id": "u4",
+      "source_frame_index": 2131,
+      "source_ms": 35515,
+      "source_jpeg_sha256": "614ad55b4df741f2a94e8a9d491c6d2f3c9f95f811ff8af2950351258b21f087"
+    },
+    {
+      "id": "u4_f002138",
+      "candidate_id": "u4",
+      "source_frame_index": 2138,
+      "source_ms": 35632,
+      "source_jpeg_sha256": "90e63f651aa11f159cb95506cf1265dfc7fdfe53da6ee9b5347b1f17b77ef0aa"
+    },
+    {
+      "id": "u4_f002146",
+      "candidate_id": "u4",
+      "source_frame_index": 2146,
+      "source_ms": 35765,
+      "source_jpeg_sha256": "9895ff3006547dfb81e130c07601c76e889522671b9267cda99b3338aecac435"
+    },
+    {
+      "id": "u4_f002153",
+      "candidate_id": "u4",
+      "source_frame_index": 2153,
+      "source_ms": 35882,
+      "source_jpeg_sha256": "a407f24418bcc15da110269e01e25861f6b472d053a7067273600f6b1ee85019"
+    },
+    {
+      "id": "u4_f002161",
+      "candidate_id": "u4",
+      "source_frame_index": 2161,
+      "source_ms": 36015,
+      "source_jpeg_sha256": "7a4b2e2bf7c70b0d2bcae7cd7cef9e594698632bbabc009ac2a8efa2af1f6f66"
+    },
+    {
+      "id": "u4_f002168",
+      "candidate_id": "u4",
+      "source_frame_index": 2168,
+      "source_ms": 36132,
+      "source_jpeg_sha256": "d3c83c3cfc40ca7fd758a176f77d2d4cb8f57395e10f88f9f06af3cc452cd929"
+    },
+    {
+      "id": "u4_f002176",
+      "candidate_id": "u4",
+      "source_frame_index": 2176,
+      "source_ms": 36265,
+      "source_jpeg_sha256": "32cdd3783623392fbfc5b072ceaeb5a5700ac9ea7533da1aa21c0236e8f8560d"
+    },
+    {
+      "id": "u4_f002183",
+      "candidate_id": "u4",
+      "source_frame_index": 2183,
+      "source_ms": 36382,
+      "source_jpeg_sha256": "2564795df7aa28cd988e1f4401c87f2c80fcf134b475fe7f7e9894d1b5a0f6fc"
+    },
+    {
+      "id": "u4_f002191",
+      "candidate_id": "u4",
+      "source_frame_index": 2191,
+      "source_ms": 36515,
+      "source_jpeg_sha256": "3c2ccffc88ae26e411d98f2289924a946541998db23daf27329859ac0a0980f1"
+    },
+    {
+      "id": "u4_f002198",
+      "candidate_id": "u4",
+      "source_frame_index": 2198,
+      "source_ms": 36632,
+      "source_jpeg_sha256": "16ab3b2cc029a443de1f91e1a119b9007e6254181cd9bb2db188e781ea9bea4b"
+    },
+    {
+      "id": "u4_f002206",
+      "candidate_id": "u4",
+      "source_frame_index": 2206,
+      "source_ms": 36765,
+      "source_jpeg_sha256": "93c61ae52bb25e8585650a906c246d639cc0cb9c70eef88a981fca7affbf0743"
+    },
+    {
+      "id": "u4_f002213",
+      "candidate_id": "u4",
+      "source_frame_index": 2213,
+      "source_ms": 36882,
+      "source_jpeg_sha256": "3c17004d11e3bff54d111e50c6891bb49d32b087d3a3d77cc290e8ec3a694089"
+    },
+    {
+      "id": "u4_f002221",
+      "candidate_id": "u4",
+      "source_frame_index": 2221,
+      "source_ms": 37015,
+      "source_jpeg_sha256": "f1e8291df7e14dc17a65f47494de8a4c08d5958006e4580cf6bcb4747fe0cc3e"
+    },
+    {
+      "id": "u4_f002228",
+      "candidate_id": "u4",
+      "source_frame_index": 2228,
+      "source_ms": 37132,
+      "source_jpeg_sha256": "aa8c504be69d8478eabfe99308085f7e4fa04087d59945c762e61f50989de24b"
+    },
+    {
+      "id": "u4_f002236",
+      "candidate_id": "u4",
+      "source_frame_index": 2236,
+      "source_ms": 37265,
+      "source_jpeg_sha256": "5d6a6dbbbee255651c0af1c28d0bc912cd67d850bc1049cedf21cf1c68b7fe63"
+    },
+    {
+      "id": "u4_f002243",
+      "candidate_id": "u4",
+      "source_frame_index": 2243,
+      "source_ms": 37382,
+      "source_jpeg_sha256": "a8a81072ccd474890f9d8562b24f4413c8d74ef635f7292aabd2a4779c300c9c"
+    },
+    {
+      "id": "u4_f002251",
+      "candidate_id": "u4",
+      "source_frame_index": 2251,
+      "source_ms": 37515,
+      "source_jpeg_sha256": "24bd639c8f344439360b9a1990a5e1be9155ce163f94e643872eee2c5c587f0c"
+    },
+    {
+      "id": "u4_f002258",
+      "candidate_id": "u4",
+      "source_frame_index": 2258,
+      "source_ms": 37632,
+      "source_jpeg_sha256": "f86d0d95858287ece9a61c0b5f0761a8df1504caf6e589d1fa7386ddd37b3843"
+    },
+    {
+      "id": "u4_f002266",
+      "candidate_id": "u4",
+      "source_frame_index": 2266,
+      "source_ms": 37765,
+      "source_jpeg_sha256": "47b3dd74cc70e1995710636ee6aca3b87e2da6cf026e710f5e2d0bd2a22046a7"
+    },
+    {
+      "id": "u4_f002273",
+      "candidate_id": "u4",
+      "source_frame_index": 2273,
+      "source_ms": 37882,
+      "source_jpeg_sha256": "06ca61fe33f55de09124e747794045143cc2878defdf1dc2a7ab2b14b16eafeb"
+    },
+    {
+      "id": "u4_f002281",
+      "candidate_id": "u4",
+      "source_frame_index": 2281,
+      "source_ms": 38015,
+      "source_jpeg_sha256": "e76ac0f437fb902dc25a24861543ac79f00e6f37ad1f050802864dd6dd9ff1fc"
+    },
+    {
+      "id": "u4_f002288",
+      "candidate_id": "u4",
+      "source_frame_index": 2288,
+      "source_ms": 38132,
+      "source_jpeg_sha256": "064fc277160a6824cbc378efed049fae26730adf9f1895783fc8dae7d9371b14"
+    },
+    {
+      "id": "u4_f002296",
+      "candidate_id": "u4",
+      "source_frame_index": 2296,
+      "source_ms": 38265,
+      "source_jpeg_sha256": "00c326991539f57a04f3e7226cc696ddec502705197ff3e7832a57f1a6e1e785"
+    },
+    {
+      "id": "u4_f002303",
+      "candidate_id": "u4",
+      "source_frame_index": 2303,
+      "source_ms": 38382,
+      "source_jpeg_sha256": "66789d12ffced037411eb940272c49d451465b29b2d1b1de0aba7b47dcc7cba5"
+    },
+    {
+      "id": "u4_f002311",
+      "candidate_id": "u4",
+      "source_frame_index": 2311,
+      "source_ms": 38515,
+      "source_jpeg_sha256": "68ea4e124b82e05640bc660c3ad46c89f0ae14b8461dc2ca24de33490dde02c3"
+    },
+    {
+      "id": "u4_f002318",
+      "candidate_id": "u4",
+      "source_frame_index": 2318,
+      "source_ms": 38632,
+      "source_jpeg_sha256": "f2084f9d7e42b64744e6b43fd7e12ba82889975d5b5e5c89dd8b975241530130"
+    },
+    {
+      "id": "u4_f002326",
+      "candidate_id": "u4",
+      "source_frame_index": 2326,
+      "source_ms": 38765,
+      "source_jpeg_sha256": "69615947ebbacec2f2cf05d4f3916361af5c2c73fdec67d891c8f995688ac7fe"
+    },
+    {
+      "id": "u4_f002333",
+      "candidate_id": "u4",
+      "source_frame_index": 2333,
+      "source_ms": 38882,
+      "source_jpeg_sha256": "9de027d86ecd9bea312909448cb404f3869435a95be1d9a0e026358e43dc757c"
+    },
+    {
+      "id": "u4_f002341",
+      "candidate_id": "u4",
+      "source_frame_index": 2341,
+      "source_ms": 39015,
+      "source_jpeg_sha256": "abc89069f7f10273eeffbe2789e5e24782c5dda8295bc22d7d8bd6af43c703af"
+    },
+    {
+      "id": "u4_f002348",
+      "candidate_id": "u4",
+      "source_frame_index": 2348,
+      "source_ms": 39132,
+      "source_jpeg_sha256": "bd5106a17b47fcab9e041e525a94aadd80128e37ac30a69100ed6c3362266359"
+    },
+    {
+      "id": "u4_f002356",
+      "candidate_id": "u4",
+      "source_frame_index": 2356,
+      "source_ms": 39265,
+      "source_jpeg_sha256": "bc9751f3625d3035245cde4201177e05438ceb218b36137ba06e3acb80d12821"
+    },
+    {
+      "id": "u4_f002363",
+      "candidate_id": "u4",
+      "source_frame_index": 2363,
+      "source_ms": 39382,
+      "source_jpeg_sha256": "d3d6db3645544944d75265ece86d7c1614e4aaf442122ca5da8a57c74d323ff0"
+    },
+    {
+      "id": "u4_f002371",
+      "candidate_id": "u4",
+      "source_frame_index": 2371,
+      "source_ms": 39515,
+      "source_jpeg_sha256": "f386e828847ea5a74b3373b27b7a6e6a40a951c5fd783857687895204b2f052c"
+    },
+    {
+      "id": "u4_f002378",
+      "candidate_id": "u4",
+      "source_frame_index": 2378,
+      "source_ms": 39632,
+      "source_jpeg_sha256": "045ac33ec339b681cf6f225b85ab896a7147c47694b1e344d1ecca9c411ed5e0"
+    }
+  ],
+  "references": [
+    {
+      "reference_id": "r1",
+      "requested_ms": 3070,
+      "box": {
+        "x": 0.4098,
+        "y": 0.5002,
+        "w": 0.1467,
+        "h": 0.1127
+      },
+      "target_point": {
+        "x": 0.4449678749970295,
+        "y": 0.5506545696050069
+      },
+      "selection_hints": {
+        "target_point": {
+          "x": 0.4449678749970295,
+          "y": 0.5506545696050069
+        }
+      },
+      "actual_ms": 3067,
+      "image_sha256": "67c57603d5ae370e407c5a1867c5b39ebe6d4deee5089d8b69ff22b645cc3d1d"
+    },
+    {
+      "reference_id": "r2",
+      "requested_ms": 41910,
+      "box": {
+        "x": 0.2287,
+        "y": 0.5403,
+        "w": 0.2055,
+        "h": 0.1511
+      },
+      "target_point": {
+        "x": 0.26874435411020775,
+        "y": 0.6158536585365855
+      },
+      "selection_hints": {
+        "target_point": {
+          "x": 0.26874435411020775,
+          "y": 0.6158536585365855
+        }
+      },
+      "actual_ms": 41915,
+      "image_sha256": "4893834f72d6974d54386ae3ad0017107a2128b68aa7efe3db687523cd1e1a31"
+    },
+    {
+      "reference_id": "r3",
+      "requested_ms": 71010,
+      "box": {
+        "x": 0.5271,
+        "y": 0.5086,
+        "w": 0.1745,
+        "h": 0.1298
+      },
+      "target_point": {
+        "x": 0.5618908035533222,
+        "y": 0.5555535803171444
+      },
+      "selection_hints": {
+        "target_point": {
+          "x": 0.5618908035533222,
+          "y": 0.5555535803171444
+        }
+      },
+      "actual_ms": 71014,
+      "image_sha256": "4c55f0001ab5afaa4372d1b89e630ebbcd5658f3059bf8d77edd0e5266f19723"
+    },
+    {
+      "reference_id": "r4",
+      "requested_ms": 15350,
+      "box": {
+        "x": 0.3469,
+        "y": 0.4608,
+        "w": 0.1582,
+        "h": 0.1707
+      },
+      "target_point": {
+        "x": 0.38686868686868686,
+        "y": 0.5363636363636364
+      },
+      "selection_hints": {
+        "target_point": {
+          "x": 0.38686868686868686,
+          "y": 0.5363636363636364
+        }
+      },
+      "actual_ms": 15349,
+      "image_sha256": "cf671d7c5d5ca690b91ec77739bfb89ca1a553dfa13294de3b294753291daf06"
+    },
+    {
+      "reference_id": "r5",
+      "requested_ms": 21480,
+      "box": {
+        "x": 0.5639,
+        "y": 0.4182,
+        "w": 0.0852,
+        "h": 0.1026
+      },
+      "target_point": {
+        "x": 0.5898194775745796,
+        "y": 0.45775907765703683
+      },
+      "selection_hints": {
+        "target_point": {
+          "x": 0.5898194775745796,
+          "y": 0.45775907765703683
+        },
+        "visible_mask": {
+          "width": 96,
+          "height": 192,
+          "runs": [
+            1111,
+            16,
+            79,
+            18,
+            78,
+            20,
+            75,
+            23,
+            72,
+            25,
+            71,
+            26,
+            69,
+            28,
+            68,
+            29,
+            67,
+            30,
+            65,
+            31,
+            65,
+            32,
+            64,
+            32,
+            64,
+            32,
+            64,
+            33,
+            61,
+            35,
+            61,
+            35,
+            61,
+            35,
+            61,
+            35,
+            60,
+            36,
+            60,
+            36,
+            59,
+            37,
+            56,
+            40,
+            53,
+            42,
+            53,
+            43,
+            51,
+            45,
+            50,
+            46,
+            49,
+            47,
+            48,
+            48,
+            47,
+            49,
+            47,
+            50,
+            45,
+            51,
+            44,
+            52,
+            44,
+            52,
+            43,
+            53,
+            42,
+            54,
+            42,
+            55,
+            40,
+            56,
+            40,
+            56,
+            40,
+            57,
+            38,
+            59,
+            37,
+            62,
+            34,
+            64,
+            31,
+            68,
+            28,
+            69,
+            27,
+            69,
+            25,
+            72,
+            24,
+            72,
+            24,
+            72,
+            23,
+            73,
+            23,
+            73,
+            23,
+            73,
+            22,
+            73,
+            23,
+            73,
+            22,
+            73,
+            22,
+            74,
+            22,
+            37,
+            2,
+            35,
+            21,
+            37,
+            5,
+            32,
+            21,
+            37,
+            6,
+            32,
+            21,
+            38,
+            4,
+            32,
+            21,
+            75,
+            20,
+            75,
+            21,
+            75,
+            20,
+            75,
+            20,
+            76,
+            20,
+            75,
+            7,
+            2,
+            11,
+            76,
+            7,
+            4,
+            8,
+            76,
+            8,
+            4,
+            7,
+            77,
+            8,
+            4,
+            7,
+            76,
+            9,
+            5,
+            6,
+            75,
+            10,
+            4,
+            7,
+            75,
+            21,
+            75,
+            21,
+            75,
+            21,
+            74,
+            22,
+            74,
+            22,
+            74,
+            22,
+            74,
+            21,
+            75,
+            21,
+            75,
+            21,
+            75,
+            21,
+            75,
+            21,
+            76,
+            20,
+            76,
+            20,
+            76,
+            20,
+            76,
+            20,
+            76,
+            19,
+            77,
+            19,
+            77,
+            19,
+            77,
+            19,
+            76,
+            20,
+            76,
+            20,
+            75,
+            20,
+            76,
+            20,
+            75,
+            21,
+            74,
+            22,
+            74,
+            22,
+            73,
+            22,
+            74,
+            22,
+            75,
+            21,
+            75,
+            21,
+            75,
+            21,
+            76,
+            19,
+            77,
+            19,
+            28,
+            8,
+            41,
+            19,
+            26,
+            19,
+            33,
+            17,
+            24,
+            26,
+            30,
+            15,
+            24,
+            28,
+            30,
+            13,
+            24,
+            29,
+            31,
+            11,
+            24,
+            31,
+            30,
+            9,
+            24,
+            33,
+            30,
+            9,
+            24,
+            34,
+            29,
+            9,
+            22,
+            36,
+            30,
+            8,
+            21,
+            37,
+            30,
+            8,
+            20,
+            38,
+            31,
+            7,
+            19,
+            40,
+            30,
+            7,
+            17,
+            42,
+            30,
+            7,
+            16,
+            43,
+            31,
+            6,
+            14,
+            45,
+            31,
+            6,
+            13,
+            47,
+            31,
+            5,
+            10,
+            50,
+            31,
+            5,
+            9,
+            52,
+            30,
+            5,
+            7,
+            55,
+            30,
+            4,
+            5,
+            57,
+            30,
+            4,
+            4,
+            59,
+            29,
+            4,
+            3,
+            60,
+            30,
+            3,
+            2,
+            62,
+            30,
+            66,
+            30,
+            67,
+            30,
+            66,
+            30,
+            67,
+            30,
+            66,
+            30,
+            66,
+            30,
+            66,
+            30,
+            66,
+            30,
+            67,
+            29,
+            67,
+            29,
+            67,
+            29,
+            67,
+            29,
+            67,
+            29,
+            67,
+            29,
+            67,
+            29,
+            67,
+            29,
+            68,
+            28,
+            69,
+            27,
+            69,
+            27,
+            70,
+            26,
+            70,
+            26,
+            71,
+            25,
+            74,
+            21,
+            3073
+          ],
+          "method": "native_person_instance"
+        }
+      },
+      "actual_ms": 21482,
+      "image_sha256": "b23849d5cc2d874839a674ebfbcc912bfb283a643ea60c85581dff4bae10c0c9"
+    },
+    {
+      "reference_id": "r6",
+      "requested_ms": 27630,
+      "box": {
+        "x": 0.4065,
+        "y": 0.5484,
+        "w": 0.1083,
+        "h": 0.1719
+      },
+      "target_point": {
+        "x": 0.4196042053184911,
+        "y": 0.6171150278293135
+      },
+      "selection_hints": {
+        "target_point": {
+          "x": 0.4196042053184911,
+          "y": 0.6171150278293135
+        },
+        "visible_mask": {
+          "width": 96,
+          "height": 192,
+          "runs": [
+            2208,
+            9,
+            87,
+            9,
+            87,
+            10,
+            86,
+            10,
+            86,
+            10,
+            86,
+            10,
+            86,
+            10,
+            86,
+            11,
+            85,
+            11,
+            85,
+            11,
+            85,
+            11,
+            85,
+            11,
+            85,
+            11,
+            85,
+            11,
+            85,
+            11,
+            85,
+            13,
+            83,
+            14,
+            82,
+            14,
+            82,
+            15,
+            81,
+            17,
+            79,
+            17,
+            79,
+            17,
+            79,
+            17,
+            79,
+            17,
+            79,
+            17,
+            79,
+            16,
+            80,
+            16,
+            80,
+            15,
+            81,
+            14,
+            82,
+            14,
+            82,
+            13,
+            83,
+            12,
+            84,
+            11,
+            85,
+            10,
+            86,
+            10,
+            86,
+            10,
+            86,
+            10,
+            86,
+            9,
+            87,
+            9,
+            87,
+            9,
+            87,
+            9,
+            87,
+            9,
+            87,
+            9,
+            87,
+            9,
+            87,
+            10,
+            86,
+            10,
+            86,
+            10,
+            86,
+            10,
+            86,
+            11,
+            85,
+            11,
+            85,
+            11,
+            85,
+            13,
+            83,
+            13,
+            83,
+            13,
+            83,
+            14,
+            82,
+            14,
+            82,
+            14,
+            82,
+            14,
+            82,
+            14,
+            82,
+            13,
+            83,
+            13,
+            83,
+            13,
+            83,
+            13,
+            83,
+            13,
+            83,
+            12,
+            84,
+            12,
+            84,
+            11,
+            85,
+            10,
+            86,
+            10,
+            86,
+            10,
+            86,
+            10,
+            86,
+            9,
+            87,
+            9,
+            87,
+            8,
+            88,
+            8,
+            88,
+            8,
+            88,
+            7,
+            89,
+            6,
+            90,
+            6,
+            90,
+            5,
+            91,
+            5,
+            91,
+            5,
+            91,
+            5,
+            91,
+            5,
+            91,
+            5,
+            91,
+            5,
+            91,
+            5,
+            91,
+            3,
+            93,
+            3,
+            93,
+            2,
+            94,
+            2,
+            94,
+            2,
+            94,
+            2,
+            94,
+            1,
+            16,
+            1,
+            78,
+            1,
+            13,
+            5,
+            77,
+            1,
+            13,
+            5,
+            91,
+            5,
+            93,
+            2,
+            6894
+          ],
+          "method": "native_person_instance"
+        }
+      },
+      "actual_ms": 27632,
+      "image_sha256": "54a7f75a7c142d2c91f6472e334a006bb4976b44d56b7d293ebab5e4cc67e4b1"
+    },
+    {
+      "reference_id": "r7",
+      "requested_ms": 33770,
+      "box": {
+        "x": 0.4657,
+        "y": 0.4266,
+        "w": 0.1657,
+        "h": 0.1849
+      },
+      "target_point": {
+        "x": 0.5061842918985776,
+        "y": 0.5023191094619666
+      },
+      "selection_hints": {
+        "target_point": {
+          "x": 0.5061842918985776,
+          "y": 0.5023191094619666
+        },
+        "visible_mask": {
+          "width": 96,
+          "height": 192,
+          "runs": [
+            2515,
+            13,
+            83,
+            14,
+            82,
+            15,
+            81,
+            15,
+            81,
+            16,
+            79,
+            17,
+            79,
+            17,
+            79,
+            17,
+            79,
+            18,
+            78,
+            18,
+            77,
+            19,
+            77,
+            19,
+            77,
+            18,
+            20,
+            1,
+            57,
+            18,
+            20,
+            2,
+            56,
+            18,
+            20,
+            1,
+            58,
+            17,
+            79,
+            16,
+            80,
+            16,
+            80,
+            15,
+            82,
+            14,
+            82,
+            14,
+            82,
+            14,
+            83,
+            14,
+            82,
+            15,
+            81,
+            16,
+            80,
+            17,
+            79,
+            18,
+            78,
+            18,
+            78,
+            19,
+            76,
+            21,
+            75,
+            22,
+            74,
+            23,
+            72,
+            25,
+            71,
+            25,
+            71,
+            26,
+            70,
+            26,
+            71,
+            26,
+            70,
+            27,
+            69,
+            28,
+            68,
+            29,
+            67,
+            30,
+            67,
+            30,
+            66,
+            33,
+            63,
+            31,
+            65,
+            30,
+            66,
+            29,
+            67,
+            29,
+            67,
+            29,
+            67,
+            28,
+            68,
+            28,
+            68,
+            28,
+            68,
+            28,
+            68,
+            28,
+            68,
+            28,
+            68,
+            28,
+            68,
+            28,
+            68,
+            29,
+            68,
+            28,
+            68,
+            28,
+            68,
+            29,
+            67,
+            29,
+            67,
+            30,
+            66,
+            30,
+            66,
+            30,
+            66,
+            30,
+            66,
+            31,
+            65,
+            31,
+            65,
+            32,
+            64,
+            32,
+            64,
+            32,
+            63,
+            34,
+            62,
+            34,
+            62,
+            34,
+            62,
+            34,
+            62,
+            34,
+            62,
+            34,
+            62,
+            34,
+            62,
+            34,
+            62,
+            33,
+            63,
+            33,
+            63,
+            33,
+            63,
+            33,
+            63,
+            32,
+            63,
+            32,
+            64,
+            32,
+            64,
+            32,
+            64,
+            32,
+            64,
+            32,
+            64,
+            32,
+            64,
+            36,
+            60,
+            40,
+            57,
+            42,
+            54,
+            46,
+            50,
+            50,
+            46,
+            55,
+            41,
+            14,
+            3,
+            39,
+            40,
+            13,
+            5,
+            39,
+            39,
+            13,
+            6,
+            38,
+            38,
+            14,
+            7,
+            38,
+            37,
+            14,
+            9,
+            36,
+            37,
+            14,
+            10,
+            35,
+            37,
+            14,
+            13,
+            33,
+            35,
+            15,
+            17,
+            30,
+            34,
+            15,
+            18,
+            29,
+            34,
+            16,
+            17,
+            29,
+            33,
+            17,
+            17,
+            30,
+            32,
+            17,
+            18,
+            29,
+            32,
+            17,
+            18,
+            29,
+            33,
+            17,
+            18,
+            28,
+            35,
+            15,
+            33,
+            13,
+            37,
+            13,
+            37,
+            9,
+            39,
+            11,
+            40,
+            5,
+            41,
+            10,
+            41,
+            4,
+            41,
+            10,
+            86,
+            10,
+            86,
+            10,
+            86,
+            10,
+            85,
+            11,
+            85,
+            12,
+            83,
+            13,
+            83,
+            13,
+            82,
+            14,
+            82,
+            13,
+            82,
+            14,
+            82,
+            14,
+            82,
+            13,
+            83,
+            12,
+            84,
+            11,
+            3712
+          ],
+          "method": "native_person_instance"
+        }
+      },
+      "actual_ms": 33765,
+      "image_sha256": "cc7cf048898c43cd911b46ad39ee2dcc9bfa9daac0ae2bb34bf696788db57797"
+    },
+    {
+      "reference_id": "r8",
+      "requested_ms": 56050,
+      "box": {
+        "x": 0.3525,
+        "y": 0.5272,
+        "w": 0.1685,
+        "h": 0.1062
+      },
+      "target_point": {
+        "x": 0.3925111170009129,
+        "y": 0.5770275642724623
+      },
+      "selection_hints": {
+        "target_point": {
+          "x": 0.3925111170009129,
+          "y": 0.5770275642724623
+        }
+      },
+      "actual_ms": 56048,
+      "image_sha256": "2a64ce6dcec0d601066b6a27c7caa964049b25f287563e0c17a733337eea50f4"
+    },
+    {
+      "reference_id": "r9",
+      "requested_ms": 55760,
+      "box": {
+        "x": 0.3971,
+        "y": 0.5461,
+        "w": 0.1217,
+        "h": 0.1027
+      },
+      "target_point": {
+        "x": 0.4595959595959596,
+        "y": 0.6204545454545455
+      },
+      "selection_hints": {
+        "target_point": {
+          "x": 0.4595959595959596,
+          "y": 0.6204545454545455
+        }
+      },
+      "actual_ms": 55764,
+      "image_sha256": "44cb793f817ee74f15251b1c27a0777c1eabbbae1c65a0ef4747dd4c4bd87d7b"
+    },
+    {
+      "reference_id": "r10",
+      "requested_ms": 64300,
+      "box": {
+        "x": 0.4476,
+        "y": 0.5508,
+        "w": 0.1482,
+        "h": 0.1104
+      },
+      "target_point": {
+        "x": 0.4823305945754925,
+        "y": 0.5969056453750331
+      },
+      "selection_hints": {
+        "target_point": {
+          "x": 0.4823305945754925,
+          "y": 0.5969056453750331
+        }
+      },
+      "actual_ms": 64297,
+      "image_sha256": "669f49cd0a69b16debf2d2b6833afaafb16587abb9c3cbd4154c6cc2188088a1"
+    }
+  ],
+  "request_audit": {
+    "payload_sha256": "90e6bd3f404ade864426c9ed955dc30d7b8fa88bbd0e73471a7ed7acaa97156d",
+    "payload_bytes": 9804911,
+    "explicit_image_count": 26,
+    "images": [
+      {
+        "sha256": "67c57603d5ae370e407c5a1867c5b39ebe6d4deee5089d8b69ff22b645cc3d1d",
+        "bytes": 97872
+      },
+      {
+        "sha256": "4893834f72d6974d54386ae3ad0017107a2128b68aa7efe3db687523cd1e1a31",
+        "bytes": 153639
+      },
+      {
+        "sha256": "4c55f0001ab5afaa4372d1b89e630ebbcd5658f3059bf8d77edd0e5266f19723",
+        "bytes": 94058
+      },
+      {
+        "sha256": "cf671d7c5d5ca690b91ec77739bfb89ca1a553dfa13294de3b294753291daf06",
+        "bytes": 145908
+      },
+      {
+        "sha256": "b23849d5cc2d874839a674ebfbcc912bfb283a643ea60c85581dff4bae10c0c9",
+        "bytes": 152313
+      },
+      {
+        "sha256": "54a7f75a7c142d2c91f6472e334a006bb4976b44d56b7d293ebab5e4cc67e4b1",
+        "bytes": 149579
+      },
+      {
+        "sha256": "cc7cf048898c43cd911b46ad39ee2dcc9bfa9daac0ae2bb34bf696788db57797",
+        "bytes": 179727
+      },
+      {
+        "sha256": "2a64ce6dcec0d601066b6a27c7caa964049b25f287563e0c17a733337eea50f4",
+        "bytes": 142496
+      },
+      {
+        "sha256": "44cb793f817ee74f15251b1c27a0777c1eabbbae1c65a0ef4747dd4c4bd87d7b",
+        "bytes": 148087
+      },
+      {
+        "sha256": "669f49cd0a69b16debf2d2b6833afaafb16587abb9c3cbd4154c6cc2188088a1",
+        "bytes": 126096
+      },
+      {
+        "sha256": "5168eecb03a4e7799bf3c89def2999bbd4c593e3024591846405ed6fc9ab24ff",
+        "bytes": 251788
+      },
+      {
+        "sha256": "319d45095a4b93c483c5818540005a087b963d8de81099642f75d948d89f905a",
+        "bytes": 227682
+      },
+      {
+        "sha256": "efb8ca2fdd3c54bf08fd430c0fce9befbfc5c528ba3f327fff429fbffb515bee",
+        "bytes": 241414
+      },
+      {
+        "sha256": "69a5560cd76b3d5681db813687d492cd1512604a5cb9b7739a07f3266dbccf1c",
+        "bytes": 262265
+      },
+      {
+        "sha256": "6318aab04c0f241d9549be475e01f1c809edb3dc465c6564ad9d6ca0d2e5c5de",
+        "bytes": 322129
+      },
+      {
+        "sha256": "0a3d6d713d9b192527d5498c0188fc1df30ac2262a9127d770a5a5f4283e1f97",
+        "bytes": 359248
+      },
+      {
+        "sha256": "6f4c7794b2a9e91adf2296b6ee4a95d08bffe30c0b7e837143a34f7a093daf90",
+        "bytes": 367991
+      },
+      {
+        "sha256": "ee19fe904e1304a78f86bc176dfca910017b37a28bc0677790f1187291b47be3",
+        "bytes": 275043
+      },
+      {
+        "sha256": "8cea16e4b2fa4d7c34fb751f69049b8a6e6060c9d31123e1ba757d8140c55ce4",
+        "bytes": 447318
+      },
+      {
+        "sha256": "ef92d30044650714d811d524919af5d933bcf38e2c741f725f326ad5299bafa1",
+        "bytes": 439463
+      },
+      {
+        "sha256": "75080c9f51bf0a736e883eb01f6091bd89c495e6b1031b34a8c9788adf333ea9",
+        "bytes": 413828
+      },
+      {
+        "sha256": "932b5dcf64dbf47a31b21b384a014bc81f08136084eb7b85acd034d7be43543f",
+        "bytes": 464327
+      },
+      {
+        "sha256": "8e1425eb33dd2ddc0cd1d1caf884ad8fd9cc5c948f9476924560b0067e90c735",
+        "bytes": 475515
+      },
+      {
+        "sha256": "b7cdd1815fe168184cb0e540e5b1ec15fd1127e236374f3a3e5408fe12efd227",
+        "bytes": 484288
+      },
+      {
+        "sha256": "14499a911c393e1ab1f6755f07c3e392e111c9f5bbf67525f4b41c8aa106ad41",
+        "bytes": 460886
+      },
+      {
+        "sha256": "d871189c7a8bd9baeee1fc3659985e6cf298fe42d7d55964e3426d4b1758d7ab",
+        "bytes": 430590
+      }
+    ],
+    "frame_sampling_in_provider_metadata": false,
+    "videos": [],
+    "requested_image_detail": "high"
+  },
+  "preparation_seconds": 14.927,
+  "max_model_calls": 1,
+  "expected_answers_used": false,
+  "production_report_modified": false,
+  "unrelated_video_validated": false,
+  "reviews": [
+    {
+      "candidate_id": "u1",
+      "movement_decision": "UNCERTAIN",
+      "type": "DIRECTION_CHANGE",
+      "identity_frames": [
+        "u1_f000180",
+        "u1_f000188",
+        "u1_f000225"
+      ],
+      "before_frame": "u1_f000210",
+      "movement_frames": [
+        "u1_f000218",
+        "u1_f000225",
+        "u1_f000233"
+      ],
+      "after_frame": "u1_f000255",
+      "visible_movement": "The white player opens his arms and angles toward screen-right with the ball close ahead as two blue players converge. A separate, controlled cut is not clearly resolved.",
+      "opponent_response": "The orange-booted blue player steps across his path and continues with the ball, while the other blue player closes alongside.",
+      "uncertainty": "Overlapping legs obscure the relevant touch; the body adjustment cannot confidently be separated from the challenge.",
+      "outcome": "LOSES",
+      "outcome_decision": "SUPPORTED",
+      "outcome_frames": [
+        "u1_f000255",
+        "u1_f000270",
+        "u1_f000285",
+        "u1_f000300",
+        "u1_f000338"
+      ],
+      "recipient": "OPPONENT",
+      "recipient_description": "Blue-shirted player with white shorts, dark socks and bright orange boots.",
+      "outcome_explanation": "Across successive frames the blue player moves ahead with the ball and places his body between it and the selected white player. The white player continues challenging behind him. This establishes a loss of possession, not a confirmed failed direction-change dribble."
+    },
+    {
+      "candidate_id": "u2",
+      "movement_decision": "UNCERTAIN",
+      "type": "BODY_FEINT",
+      "identity_frames": [
+        "u2_f000465",
+        "u2_f000488",
+        "u2_f000511"
+      ],
+      "before_frame": "u2_f000488",
+      "movement_frames": [
+        "u2_f000495",
+        "u2_f000503",
+        "u2_f000511",
+        "u2_f000518"
+      ],
+      "after_frame": "u2_f000526",
+      "visible_movement": "The selected white player slows, bends his knees and lowers his torso over the close ball, then rises slightly as the defender steps in.",
+      "opponent_response": "The blue player with fluorescent boots crouches and approaches the ball directly, then makes close contact. No clear wrong-way reaction is visible.",
+      "uncertainty": "The dip could be a close-control adjustment rather than a feint. Neither a distinct deceptive action nor a complete step-over is established.",
+      "outcome": "RETAINS",
+      "outcome_decision": "SUPPORTED",
+      "outcome_frames": [
+        "u2_f000518",
+        "u2_f000526",
+        "u2_f000571",
+        "u2_f000593",
+        "u2_f000608"
+      ],
+      "recipient": "SELF",
+      "recipient_description": "Short-haired white-shirted player in white shorts and socks, with dark boots.",
+      "outcome_explanation": "He keeps the ball locally through the dip and subsequently turns his body between the defender and ball. Later, a second blue player arrives; the white player falls and the orange-booted opponent takes the ball away at u2_f000721 through u2_f000758. That later loss does not negate the immediate retention or establish that the uncertain feint failed."
+    },
+    {
+      "candidate_id": "u3",
+      "movement_decision": "UNCERTAIN",
+      "type": "DIRECTION_CHANGE",
+      "identity_frames": [
+        "u3_f001260",
+        "u3_f001275",
+        "u3_f001290"
+      ],
+      "before_frame": "u3_f001275",
+      "movement_frames": [
+        "u3_f001282",
+        "u3_f001290",
+        "u3_f001297"
+      ],
+      "after_frame": "u3_f001327",
+      "visible_movement": "The selected white player lowers into a wide stance between the converging blue players and reaches toward the ball before continuing screen-right.",
+      "opponent_response": "The taller, orange-booted blue player crosses into the ball's path; the blond blue player continues to the right.",
+      "uncertainty": "The decisive contact is hidden among the players' legs. A deliberate additional cut cannot be distinguished from displacement during the challenge.",
+      "outcome": "LOSES",
+      "outcome_decision": "SUPPORTED",
+      "outcome_frames": [
+        "u3_f001320",
+        "u3_f001335",
+        "u3_f001350",
+        "u3_f001372",
+        "u3_f001395"
+      ],
+      "recipient": "OPPONENT",
+      "recipient_description": "Taller blue-shirted player with short darker hair, white shorts and orange boots, distinct from the blond blue runner.",
+      "outcome_explanation": "The taller blue player emerges carrying the ball over several strides while the selected white player chases from behind. The white player later reaches back into the contest before the ball is struck toward goal; that later action does not erase the intervening blue possession. The exact later striking contact is insufficiently clear to assign confidently."
+    },
+    {
+      "candidate_id": "u4",
+      "movement_decision": "REJECTED",
+      "type": "OTHER",
+      "identity_frames": [
+        "u4_f002093",
+        "u4_f002108",
+        "u4_f002116"
+      ],
+      "before_frame": "u4_f002093",
+      "movement_frames": [
+        "u4_f002101",
+        "u4_f002108",
+        "u4_f002116",
+        "u4_f002123"
+      ],
+      "after_frame": "u4_f002146",
+      "visible_movement": "The selected white player receives, opens his body and extends a leg to send the ball across toward screen-right. The sequence shows a release rather than a demonstrated change of direction while carrying.",
+      "opponent_response": "A blue player spreads his stance and reaches into the ball's path. Other blue players turn and pursue it, but proximity does not establish controlled possession.",
+      "uncertainty": "A slight defensive touch during the ball's passage is uncertain. No distinct evasive cut or feint is established.",
+      "outcome": "PASSES",
+      "outcome_decision": "SUPPORTED",
+      "outcome_frames": [
+        "u4_f002123",
+        "u4_f002138",
+        "u4_f002161",
+        "u4_f002176",
+        "u4_f002183",
+        "u4_f002206",
+        "u4_f002258"
+      ],
+      "recipient": "TEAMMATE",
+      "recipient_description": "Distinct taller, short dark-haired white-shirted teammate ahead on screen-right, wearing white shorts and socks.",
+      "outcome_explanation": "The ball travels beyond the reaching blue players to the distinct white teammate, who takes it forward and continues toward goal before shooting. The selected passer remains behind the receiving action; his continued run does not make him the recipient or shooter. The later close view of another white attacker follows a cut and should not be merged with this receiving sequence."
+    }
+  ],
+  "receipt": {
+    "packet_id": "uncertainty_context",
+    "provider": "emergent",
+    "requested_model": "gpt-6-astra",
+    "origin": "LIVE_MODEL_REQUEST",
+    "status": "COMPLETED",
+    "requested_reasoning_effort": "low",
+    "payload_sha256": "90e6bd3f404ade864426c9ed955dc30d7b8fa88bbd0e73471a7ed7acaa97156d",
+    "payload_bytes": 9804911,
+    "explicit_image_count": 26,
+    "images": [
+      {
+        "sha256": "67c57603d5ae370e407c5a1867c5b39ebe6d4deee5089d8b69ff22b645cc3d1d",
+        "bytes": 97872
+      },
+      {
+        "sha256": "4893834f72d6974d54386ae3ad0017107a2128b68aa7efe3db687523cd1e1a31",
+        "bytes": 153639
+      },
+      {
+        "sha256": "4c55f0001ab5afaa4372d1b89e630ebbcd5658f3059bf8d77edd0e5266f19723",
+        "bytes": 94058
+      },
+      {
+        "sha256": "cf671d7c5d5ca690b91ec77739bfb89ca1a553dfa13294de3b294753291daf06",
+        "bytes": 145908
+      },
+      {
+        "sha256": "b23849d5cc2d874839a674ebfbcc912bfb283a643ea60c85581dff4bae10c0c9",
+        "bytes": 152313
+      },
+      {
+        "sha256": "54a7f75a7c142d2c91f6472e334a006bb4976b44d56b7d293ebab5e4cc67e4b1",
+        "bytes": 149579
+      },
+      {
+        "sha256": "cc7cf048898c43cd911b46ad39ee2dcc9bfa9daac0ae2bb34bf696788db57797",
+        "bytes": 179727
+      },
+      {
+        "sha256": "2a64ce6dcec0d601066b6a27c7caa964049b25f287563e0c17a733337eea50f4",
+        "bytes": 142496
+      },
+      {
+        "sha256": "44cb793f817ee74f15251b1c27a0777c1eabbbae1c65a0ef4747dd4c4bd87d7b",
+        "bytes": 148087
+      },
+      {
+        "sha256": "669f49cd0a69b16debf2d2b6833afaafb16587abb9c3cbd4154c6cc2188088a1",
+        "bytes": 126096
+      },
+      {
+        "sha256": "5168eecb03a4e7799bf3c89def2999bbd4c593e3024591846405ed6fc9ab24ff",
+        "bytes": 251788
+      },
+      {
+        "sha256": "319d45095a4b93c483c5818540005a087b963d8de81099642f75d948d89f905a",
+        "bytes": 227682
+      },
+      {
+        "sha256": "efb8ca2fdd3c54bf08fd430c0fce9befbfc5c528ba3f327fff429fbffb515bee",
+        "bytes": 241414
+      },
+      {
+        "sha256": "69a5560cd76b3d5681db813687d492cd1512604a5cb9b7739a07f3266dbccf1c",
+        "bytes": 262265
+      },
+      {
+        "sha256": "6318aab04c0f241d9549be475e01f1c809edb3dc465c6564ad9d6ca0d2e5c5de",
+        "bytes": 322129
+      },
+      {
+        "sha256": "0a3d6d713d9b192527d5498c0188fc1df30ac2262a9127d770a5a5f4283e1f97",
+        "bytes": 359248
+      },
+      {
+        "sha256": "6f4c7794b2a9e91adf2296b6ee4a95d08bffe30c0b7e837143a34f7a093daf90",
+        "bytes": 367991
+      },
+      {
+        "sha256": "ee19fe904e1304a78f86bc176dfca910017b37a28bc0677790f1187291b47be3",
+        "bytes": 275043
+      },
+      {
+        "sha256": "8cea16e4b2fa4d7c34fb751f69049b8a6e6060c9d31123e1ba757d8140c55ce4",
+        "bytes": 447318
+      },
+      {
+        "sha256": "ef92d30044650714d811d524919af5d933bcf38e2c741f725f326ad5299bafa1",
+        "bytes": 439463
+      },
+      {
+        "sha256": "75080c9f51bf0a736e883eb01f6091bd89c495e6b1031b34a8c9788adf333ea9",
+        "bytes": 413828
+      },
+      {
+        "sha256": "932b5dcf64dbf47a31b21b384a014bc81f08136084eb7b85acd034d7be43543f",
+        "bytes": 464327
+      },
+      {
+        "sha256": "8e1425eb33dd2ddc0cd1d1caf884ad8fd9cc5c948f9476924560b0067e90c735",
+        "bytes": 475515
+      },
+      {
+        "sha256": "b7cdd1815fe168184cb0e540e5b1ec15fd1127e236374f3a3e5408fe12efd227",
+        "bytes": 484288
+      },
+      {
+        "sha256": "14499a911c393e1ab1f6755f07c3e392e111c9f5bbf67525f4b41c8aa106ad41",
+        "bytes": 460886
+      },
+      {
+        "sha256": "d871189c7a8bd9baeee1fc3659985e6cf298fe42d7d55964e3426d4b1758d7ab",
+        "bytes": 430590
+      }
+    ],
+    "frame_sampling_in_provider_metadata": false,
+    "videos": [],
+    "requested_image_detail": "high",
+    "model_version": "gpt-6-astra",
+    "response_id": "chatcmpl-EbRYnt5x4uhXPuZxsybbk9i6eIfHf",
+    "usage": {
+      "completion_tokens": 1595,
+      "prompt_tokens": 78733,
+      "total_tokens": 80328,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": 0,
+        "audio_tokens": 0,
+        "reasoning_tokens": 50,
+        "rejected_prediction_tokens": 0
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": 0,
+        "cached_tokens": 0
+      }
+    },
+    "raw_response": "{\n  \"reviews\": [\n    {\n      \"candidate_id\": \"u1\",\n      \"movement_decision\": \"UNCERTAIN\",\n      \"type\": \"DIRECTION_CHANGE\",\n      \"identity_frames\": [\"u1_f000180\", \"u1_f000188\", \"u1_f000225\"],\n      \"before_frame\": \"u1_f000210\",\n      \"movement_frames\": [\"u1_f000218\", \"u1_f000225\", \"u1_f000233\"],\n      \"after_frame\": \"u1_f000255\",\n      \"visible_movement\": \"The white player opens his arms and angles toward screen-right with the ball close ahead as two blue players converge. A separate, controlled cut is not clearly resolved.\",\n      \"opponent_response\": \"The orange-booted blue player steps across his path and continues with the ball, while the other blue player closes alongside.\",\n      \"uncertainty\": \"Overlapping legs obscure the relevant touch; the body adjustment cannot confidently be separated from the challenge.\",\n      \"outcome\": \"LOSES\",\n      \"outcome_decision\": \"SUPPORTED\",\n      \"outcome_frames\": [\"u1_f000255\", \"u1_f000270\", \"u1_f000285\", \"u1_f000300\", \"u1_f000338\"],\n      \"recipient\": \"OPPONENT\",\n      \"recipient_description\": \"Blue-shirted player with white shorts, dark socks and bright orange boots.\",\n      \"outcome_explanation\": \"Across successive frames the blue player moves ahead with the ball and places his body between it and the selected white player. The white player continues challenging behind him. This establishes a loss of possession, not a confirmed failed direction-change dribble.\"\n    },\n    {\n      \"candidate_id\": \"u2\",\n      \"movement_decision\": \"UNCERTAIN\",\n      \"type\": \"BODY_FEINT\",\n      \"identity_frames\": [\"u2_f000465\", \"u2_f000488\", \"u2_f000511\"],\n      \"before_frame\": \"u2_f000488\",\n      \"movement_frames\": [\"u2_f000495\", \"u2_f000503\", \"u2_f000511\", \"u2_f000518\"],\n      \"after_frame\": \"u2_f000526\",\n      \"visible_movement\": \"The selected white player slows, bends his knees and lowers his torso over the close ball, then rises slightly as the defender steps in.\",\n      \"opponent_response\": \"The blue player with fluorescent boots crouches and approaches the ball directly, then makes close contact. No clear wrong-way reaction is visible.\",\n      \"uncertainty\": \"The dip could be a close-control adjustment rather than a feint. Neither a distinct deceptive action nor a complete step-over is established.\",\n      \"outcome\": \"RETAINS\",\n      \"outcome_decision\": \"SUPPORTED\",\n      \"outcome_frames\": [\"u2_f000518\", \"u2_f000526\", \"u2_f000571\", \"u2_f000593\", \"u2_f000608\"],\n      \"recipient\": \"SELF\",\n      \"recipient_description\": \"Short-haired white-shirted player in white shorts and socks, with dark boots.\",\n      \"outcome_explanation\": \"He keeps the ball locally through the dip and subsequently turns his body between the defender and ball. Later, a second blue player arrives; the white player falls and the orange-booted opponent takes the ball away at u2_f000721 through u2_f000758. That later loss does not negate the immediate retention or establish that the uncertain feint failed.\"\n    },\n    {\n      \"candidate_id\": \"u3\",\n      \"movement_decision\": \"UNCERTAIN\",\n      \"type\": \"DIRECTION_CHANGE\",\n      \"identity_frames\": [\"u3_f001260\", \"u3_f001275\", \"u3_f001290\"],\n      \"before_frame\": \"u3_f001275\",\n      \"movement_frames\": [\"u3_f001282\", \"u3_f001290\", \"u3_f001297\"],\n      \"after_frame\": \"u3_f001327\",\n      \"visible_movement\": \"The selected white player lowers into a wide stance between the converging blue players and reaches toward the ball before continuing screen-right.\",\n      \"opponent_response\": \"The taller, orange-booted blue player crosses into the ball's path; the blond blue player continues to the right.\",\n      \"uncertainty\": \"The decisive contact is hidden among the players' legs. A deliberate additional cut cannot be distinguished from displacement during the challenge.\",\n      \"outcome\": \"LOSES\",\n      \"outcome_decision\": \"SUPPORTED\",\n      \"outcome_frames\": [\"u3_f001320\", \"u3_f001335\", \"u3_f001350\", \"u3_f001372\", \"u3_f001395\"],\n      \"recipient\": \"OPPONENT\",\n      \"recipient_description\": \"Taller blue-shirted player with short darker hair, white shorts and orange boots, distinct from the blond blue runner.\",\n      \"outcome_explanation\": \"The taller blue player emerges carrying the ball over several strides while the selected white player chases from behind. The white player later reaches back into the contest before the ball is struck toward goal; that later action does not erase the intervening blue possession. The exact later striking contact is insufficiently clear to assign confidently.\"\n    },\n    {\n      \"candidate_id\": \"u4\",\n      \"movement_decision\": \"REJECTED\",\n      \"type\": \"OTHER\",\n      \"identity_frames\": [\"u4_f002093\", \"u4_f002108\", \"u4_f002116\"],\n      \"before_frame\": \"u4_f002093\",\n      \"movement_frames\": [\"u4_f002101\", \"u4_f002108\", \"u4_f002116\", \"u4_f002123\"],\n      \"after_frame\": \"u4_f002146\",\n      \"visible_movement\": \"The selected white player receives, opens his body and extends a leg to send the ball across toward screen-right. The sequence shows a release rather than a demonstrated change of direction while carrying.\",\n      \"opponent_response\": \"A blue player spreads his stance and reaches into the ball's path. Other blue players turn and pursue it, but proximity does not establish controlled possession.\",\n      \"uncertainty\": \"A slight defensive touch during the ball's passage is uncertain. No distinct evasive cut or feint is established.\",\n      \"outcome\": \"PASSES\",\n      \"outcome_decision\": \"SUPPORTED\",\n      \"outcome_frames\": [\"u4_f002123\", \"u4_f002138\", \"u4_f002161\", \"u4_f002176\", \"u4_f002183\", \"u4_f002206\", \"u4_f002258\"],\n      \"recipient\": \"TEAMMATE\",\n      \"recipient_description\": \"Distinct taller, short dark-haired white-shirted teammate ahead on screen-right, wearing white shorts and socks.\",\n      \"outcome_explanation\": \"The ball travels beyond the reaching blue players to the distinct white teammate, who takes it forward and continues toward goal before shooting. The selected passer remains behind the receiving action; his continued run does not make him the recipient or shooter. The later close view of another white attacker follows a cut and should not be merged with this receiving sequence.\"\n    }\n  ]\n}",
+    "response_sha256": "4b42c566abf4963f6b774f222c17aeec65143bfdd864cf0feedb8afacc038391",
+    "elapsed_seconds": 39.591
+  },
+  "workflow_run_id": 39616673706,
+  "code_commit": "a0c02f7f171639815e1ddb5f8bb69cb07863714b",
+  "exact_request_response_and_source_image_hashes_verified": true,
+  "accepted_for_production_statistics": false,
+  "review_note": "The pass interpretation at ~35s supersedes the earlier tentative loss interpretation in this experiment. No canonical events or report statistics are changed. Other uncertain movements remain uncertain."
+}
