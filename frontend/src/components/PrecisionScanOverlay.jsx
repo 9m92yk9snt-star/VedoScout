@@ -7,8 +7,8 @@ import AnalysisWaiting from "./AnalysisWaiting";
 export default function PrecisionScanOverlay({ open, phase, uploadPct, playerName, playerAge, playerPosition, tapsCount, heroImage, startedAt, target = "full" }) {
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-[100] overflow-y-auto bg-[#F2EDE2]" role="dialog" aria-modal="true" aria-label="Video upload">
-      <div className="px-4 py-8 md:px-8 md:py-12">
+    <div className="analysis-upload-overlay fixed inset-0 z-[100] overflow-y-auto bg-[#F2EDE2]" role="dialog" aria-modal="true" aria-label="Video upload">
+      <div className="analysis-waiting-shell px-3 py-2 md:px-8 md:py-12">
         <AnalysisWaiting phase={phase} uploadPct={uploadPct} startedAt={startedAt} status={{
           analysis_target: target, player_details: { player_name: playerName, age: playerAge, position: playerPosition },
           taps_received: tapsCount, poster_url: heroImage,

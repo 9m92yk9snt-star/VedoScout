@@ -54,3 +54,91 @@
 
 .analysis-loading-paused .analysis-activity-bar>span{animation:none;width:35%;background:#b7c5ab}
 .profile-analysis-section{scroll-margin-top:90px}
+.analysis-video-dialog{position:fixed;inset:0;width:min(94vw,960px);max-width:960px;max-height:94dvh;margin:auto;padding:12px;border:1px solid #ffffff30;border-radius:18px;background:#091e16;color:#fff;box-shadow:0 24px 80px #0008}
+.analysis-video-dialog::backdrop{background:#06120dea;backdrop-filter:blur(8px)}
+.analysis-video-dialog>button{display:flex;gap:6px;align-items:center;margin:0 0 8px auto;min-height:44px;padding:0 12px;border:1px solid #ffffff50;border-radius:10px;background:#ffffff0f;color:white;font-size:13px}
+.analysis-video-dialog>video{display:block;width:100%;max-height:calc(94dvh - 85px);object-fit:contain;background:#000;border-radius:8px}
+
+/* Same two cards and brand palette; sharper advice scenes inside the tips card. */
+.analysis-tips{--tip-accent:#ccff00;background:radial-gradient(ellipse at 95% 20%,#40734c66,transparent 62%),linear-gradient(125deg,#143f2c,#091e18);border:1px solid #31573d;isolation:isolate}
+.analysis-tips[data-visual=shot],.analysis-tips[data-visual=run]{--tip-accent:#ffcc70;background:radial-gradient(ellipse at 95% 20%,#8a6b2944,transparent 62%),linear-gradient(125deg,#193e2c,#0c211b)}
+.analysis-tips[data-visual=touch],.analysis-tips[data-visual=defend]{--tip-accent:#8de4d4;background:radial-gradient(ellipse at 95% 20%,#2e7a7944,transparent 62%),linear-gradient(125deg,#123e33,#0b201e)}
+.analysis-tip-top>span:first-child{color:var(--tip-accent)}.analysis-tip-top b{font:inherit;color:#dce7de;letter-spacing:.02em}
+.analysis-tip-scene{position:relative;flex:1;display:flex;align-items:center;min-height:240px;animation:analysis-tip-arrive .4s ease-out}
+.analysis-tip-scene .analysis-tip-content{padding-top:0;min-height:0;flex:1}
+.analysis-tip-scene .analysis-tip-content h2{color:#fff;max-width:77%;text-wrap:balance;font-size:31px}
+.analysis-tip-scene .analysis-tip-content p{color:#e5eee7;max-width:95%;line-height:1.55;font-size:13px}
+.analysis-tip-scene .analysis-tip-pitch{right:-16px;top:16px;opacity:.85;transform:rotate(-10deg);width:150px;filter:drop-shadow(0 0 16px #cfff0025)}
+.analysis-tip-route{animation:analysis-tip-route 5s linear infinite}.analysis-tip-controls button{border:1px solid #ffffff22;background:#ffffff0c;width:44px;height:44px}.analysis-tip-controls button:hover{background:#ffffff25}
+.analysis-tip-footer{margin-top:10px;padding-top:8px}.analysis-tip-footer>span{font-size:10px;color:#d2dfd4;max-width:145px}
+.analysis-tip-timer{position:absolute;bottom:0;left:0;right:0;height:3px;background:#ffffff15}.analysis-tip-timer>span{display:block;height:100%;background:var(--tip-accent);transform-origin:left;animation:analysis-tip-time 5s linear both}
+.analysis-tips[data-paused=true] .analysis-tip-timer>span,.analysis-tips[data-paused=true] .analysis-tip-route{animation-play-state:paused}
+.analysis-elapsed{margin-left:auto;white-space:nowrap}.analysis-server-status{align-items:center}
+@keyframes analysis-tip-arrive{from{opacity:.2;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+@keyframes analysis-tip-route{to{stroke-dashoffset:-60}}
+@keyframes analysis-tip-time{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+
+/* Portrait waiting room: reserve the existing navigation rather than hiding overflow. */
+@media(max-width:767px){
+  body:has(.analysis-waiting-route){padding-bottom:0}
+  .analysis-waiting-route{min-height:0!important;padding-bottom:0!important}
+  .analysis-waiting-shell{height:calc(100dvh - var(--aw-nav-height,56px) - var(--aw-bottom-height,56px));padding-top:8px;padding-bottom:8px;container:analysis-room/size}
+  .analysis-upload-overlay .analysis-waiting-shell{height:100dvh}
+  .analysis-waiting-shell .analysis-waiting{height:100%;display:flex;flex-direction:column}
+  .analysis-waiting-shell .analysis-page-heading{flex:none;margin:0 0 7px}
+  .analysis-waiting-shell .analysis-page-heading h1{font-size:24px;line-height:1.05}
+  .analysis-waiting-shell .analysis-eyebrow,.analysis-waiting-shell .analysis-page-intro,.analysis-waiting-shell .analysis-mobile-break{display:none}
+  .analysis-waiting-shell .analysis-layout{flex:1;min-height:0;grid-template-columns:minmax(0,1fr);grid-template-rows:max-content minmax(174px,1fr);gap:8px;align-items:stretch}
+  .analysis-waiting-shell .analysis-video-cover{height:62px}
+  .analysis-waiting-shell .analysis-player-portrait{display:none}
+  .analysis-waiting-shell .analysis-video-info{left:12px;bottom:8px;gap:2px;right:100px}
+  .analysis-waiting-shell .analysis-video-tag{display:none}
+  .analysis-waiting-shell .analysis-video-info strong{font-size:25px}
+  .analysis-waiting-shell .analysis-video-info>span:last-child{font-size:10px;max-width:100%;line-height:1.2}
+  .analysis-waiting-shell .analysis-replay{top:10px;right:9px;min-height:44px;padding:0 10px;font-size:10px}
+  .analysis-waiting-shell .analysis-status-body{padding:9px 12px}
+  .analysis-waiting-shell .analysis-status-meta{display:none}
+  .analysis-waiting-shell .analysis-finish-estimate{margin-top:0;padding:7px 10px;gap:2px}
+  .analysis-waiting-shell .analysis-finish-estimate>span{font-size:10px}
+  .analysis-waiting-shell .analysis-finish-estimate strong{font-size:25px}
+  .analysis-waiting-shell .analysis-finish-estimate small{font-size:10px;line-height:1.3}
+  .analysis-waiting-shell .analysis-phase-description h2{font-size:21px;margin:7px 0 3px}
+  .analysis-waiting-shell .analysis-phase-description p{font-size:11px;line-height:1.35;min-height:0}
+  .analysis-waiting-shell .analysis-activity-bar{margin:8px 0;height:5px}
+  .analysis-waiting-shell .analysis-loading{margin-bottom:7px}
+  .analysis-waiting-shell .analysis-loading-label{display:none}
+  .analysis-waiting-shell .analysis-step-list{gap:7px}
+  .analysis-waiting-shell .analysis-step-list>li{flex-direction:row;align-items:center;gap:5px;padding-top:6px;font-size:10px}
+  .analysis-waiting-shell .analysis-step-icon{width:19px;height:19px;font-size:8px;flex:none}
+  .analysis-waiting-shell .analysis-step-list small{display:none}
+  .analysis-waiting-shell .analysis-server-status{margin-top:7px;font-size:10px;gap:5px}
+  .analysis-waiting-shell .analysis-server-status>span:first-child{margin-top:0}
+  .analysis-waiting-shell .analysis-background-option{margin-top:7px;gap:3px}
+  .analysis-waiting-shell .analysis-background-option button{min-height:44px;padding:8px;font-size:12px}
+  .analysis-waiting-shell .analysis-background-option p{display:none}
+  .analysis-waiting-shell .analysis-timing-note{display:none}
+  .analysis-waiting-shell .analysis-tips{min-height:174px;padding:10px 12px;border-radius:18px}
+  .analysis-waiting-shell .analysis-tip-top{font-size:9px;gap:5px;letter-spacing:.04em}
+  .analysis-waiting-shell .analysis-tip-top>span:first-child{gap:5px}
+  .analysis-waiting-shell .analysis-tip-scene{min-height:0}
+  .analysis-waiting-shell .analysis-tip-scene .analysis-tip-content h2{font-size:24px;line-height:1.02;margin:6px 0 5px;max-width:79%}
+  .analysis-waiting-shell .analysis-tip-scene .analysis-tip-content p{font-size:12px;line-height:1.35;max-width:100%}
+  .analysis-waiting-shell .analysis-tip-scene .analysis-tip-pitch{width:86px;top:3px;right:-8px;opacity:.75}
+  .analysis-waiting-shell .analysis-tip-footer{padding-top:3px;margin-top:5px}
+  .analysis-waiting-shell .analysis-tip-footer>span{font-size:9px;max-width:135px;line-height:1.3}
+}
+@media(max-width:767px) and (max-height:720px){
+  .analysis-waiting-shell .analysis-phase-description p{display:none}
+  .analysis-waiting-shell .analysis-page-heading h1{font-size:22px}
+  .analysis-waiting-shell .analysis-video-cover{height:54px}
+  .analysis-waiting-shell .analysis-video-info strong{font-size:22px}
+  .analysis-waiting-shell .analysis-replay{top:5px}
+}
+@container analysis-room (max-height:530px){
+  .analysis-waiting-shell .analysis-page-heading{display:none}
+  .analysis-waiting-shell .analysis-phase-description h2{font-size:20px;margin:5px 0 2px}
+  .analysis-waiting-shell .analysis-activity-bar{margin:5px 0}
+}
+/* Zoom, landscape and very small screens can scroll instead of losing content. */
+@media(max-width:767px) and (max-height:540px){.analysis-waiting-shell{height:auto;min-height:calc(100dvh - 112px)}.analysis-waiting-shell .analysis-layout{grid-template-rows:auto minmax(180px,1fr)}}
+@media(prefers-reduced-motion:reduce){.analysis-tip-scene,.analysis-tip-route,.analysis-tip-timer>span{animation:none}}

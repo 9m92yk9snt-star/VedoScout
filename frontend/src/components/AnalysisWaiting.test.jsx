@@ -1,12 +1,12 @@
 import React from "react";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
-import * as matchers from "@testing-library/jest-dom/matchers";
+import "@testing-library/jest-dom";
 import AnalysisWaiting, { FootballTips } from "./AnalysisWaiting";
 import PrecisionScanOverlay from "./PrecisionScanOverlay";
 import PremiumReadyOverlay from "./PremiumReadyOverlay";
 import { activityLabel, assetUrl, completionLabel, elapsedLabel, getAnalysisView } from "../lib/analysisProgress.mjs";
 import { isFullReportReady } from "../lib/reportReady.mjs";
-expect.extend(matchers);
+import { FOOTBALL_TIPS, tipDeck } from "../lib/footballTips.mjs";
 
 const initial = { id: "selected", is_paid: true, analysis_status: "ready", preview: { brief_summary: "Initial preview" },
   player_details: { player_name: "Orman02", age: 11, position: "Winger" }, taps_received: 11,
@@ -23,11 +23,11 @@ test("paid initial preview stays in the waiting room and does not claim full rea
   expect(screen.queryByText(/taps verified|identity locked|top speed|Scout Assigned|Writing Notes/i)).not.toBeInTheDocument();
 });
 
-test("long waits never invent a deadline, ratings or task completion", () => {
+test("a provisional live window never changes ratings or task completion", () => {
   render(<AnalysisWaiting status={{ ...initial, full_report_status: "generating", full_pipeline_stage: "sequence_model_start" }} />);
   act(() => { jest.advanceTimersByTime(10 * 60_000); });
   expect(screen.getByTestId("analysis-waiting")).toHaveAttribute("data-phase", "analyzing");
-  expect(screen.getByTestId("analysis-finish-estimate")).toHaveTextContent("Estimate not available yet");
+  expect(screen.getByTestId("analysis-finish-estimate")).toHaveTextContent(/About|Under/);
   expect(screen.getByRole("list", { name: "Analysis stages" }).querySelector('[data-state="active"]')).toHaveTextContent("Reviewing play");
   expect(screen.getByRole("progressbar")).not.toHaveAttribute("aria-valuenow");
   expect(screen.queryByText(/\d+%|sec left|almost there|calculated|potential/i)).not.toBeInTheDocument();
@@ -69,17 +69,55 @@ test("only measured upload has a percentage and it is scoped to uploading", () =
   expect(screen.getByRole("heading", { name: "Saving your video" })).toBeInTheDocument();
 });
 
-test("tips cycle, pause and move manually without becoming report findings", () => {
-  render(<FootballTips />);
-  expect(screen.getByRole("heading")).toHaveTextContent("See the space");
-  act(() => { jest.advanceTimersByTime(25000); });
-  expect(screen.getByRole("heading")).toHaveTextContent("Give your next move");
+test("tips change every five seconds, pause, and stay separate from findings", () => {
+  render(<FootballTips sessionKey="tips-cycle-test" />);
+  const first = screen.getByRole("heading").textContent;
+  act(() => { jest.advanceTimersByTime(4999); });
+  expect(screen.getByRole("heading").textContent).toBe(first);
+  act(() => { jest.advanceTimersByTime(1); });
+  const second = screen.getByRole("heading").textContent;
+  expect(second).not.toBe(first);
   fireEvent.click(screen.getByRole("button", { name: "Pause football tips" }));
-  act(() => { jest.advanceTimersByTime(50000); });
-  expect(screen.getByRole("heading")).toHaveTextContent("Give your next move");
+  act(() => { jest.advanceTimersByTime(15000); });
+  expect(screen.getByRole("heading").textContent).toBe(second);
   fireEvent.click(screen.getByRole("button", { name: "Previous football tip" }));
-  expect(screen.getByRole("heading")).toHaveTextContent("See the space");
-  expect(screen.getByTestId("analysis-football-tips")).toHaveTextContent("Separate from your video analysis.");
+  expect(screen.getByRole("heading").textContent).toBe(first);
+  expect(screen.getByTestId("analysis-football-tips")).toHaveTextContent("General advice · not report findings");
+});
+
+test("four analyses get ten distinct tips each and retain their deck on return", () => {
+  const values = new Map();
+  const storage = { getItem: key => values.get(key) ?? null, setItem: (key, value) => values.set(key, value) };
+  const decks = [0, 1, 2, 3].map(i => tipDeck(`deck-test-${i}`, storage));
+  expect(FOOTBALL_TIPS).toHaveLength(40);
+  expect(new Set(decks.flat().map(tip => tip.id)).size).toBe(40);
+  expect(decks.every(deck => deck.length === 10)).toBe(true);
+  expect(tipDeck("deck-test-1", storage)).toEqual(decks[1]);
+  expect(tipDeck("blocked-storage", { getItem: () => { throw Error("blocked"); }, setItem: () => { throw Error("blocked"); } })).toHaveLength(10);
+});
+
+test("server work updates the finish window without changing readiness", () => {
+  const now = Date.now();
+  const { rerender } = render(<AnalysisWaiting status={initial} />);
+  expect(screen.getByTestId("analysis-finish-estimate")).not.toHaveTextContent(/not available/i);
+  const status = { ...initial, full_report_status: "generating", completion_estimate: {
+    status: "estimated", basis: "completed_workload", provisional: true, calculated_at: new Date(now).toISOString(),
+    earliest_at: new Date(now+120000).toISOString(), latest_at: new Date(now+240000).toISOString() } };
+  rerender(<AnalysisWaiting status={status} />);
+  expect(screen.getByTestId("analysis-finish-estimate")).toHaveTextContent("About 2–4 min");
+  expect(screen.getByTestId("analysis-finish-estimate")).toHaveTextContent("Expected finish");
+  act(() => { jest.advanceTimersByTime(60000); });
+  expect(screen.getByTestId("analysis-finish-estimate")).toHaveTextContent("About 1–3 min");
+  expect(screen.getByTestId("analysis-waiting")).toHaveAttribute("data-phase", "queued");
+});
+
+test("a numeric upload start has a stable countdown before the first status response", () => {
+  const data = { analysis_target: "full", analysis_started_at: Date.now() };
+  expect(completionLabel(data, Date.now()+60000)).not.toBe(completionLabel(data, Date.now()));
+  const view = getAnalysisView({ ...initial, full_report_status: "generating", sequence_progress: { phase: "writer" } });
+  expect(view.title).toBe("Writing your player report");
+  expect(view.steps[1].state).toBe("done");
+  expect(view.complete).toBe(false);
 });
 
 test("stale heartbeat states uncertainty; it does not guarantee worker recovery", () => {
@@ -112,6 +150,9 @@ test("video replay is the uploaded video, opened on demand without autoplay", ()
   fireEvent.click(screen.getByRole("button", { name: "Watch your uploaded video" }));
   expect(container.querySelector("video")).toHaveAttribute("src", "https://media.example/selected.mp4");
   expect(container.querySelector("video")).not.toHaveAttribute("autoplay");
+  fireEvent.click(screen.getByRole("button", { name: "Close uploaded video" }));
+  expect(container.querySelector("video")).toBeNull();
+  expect(screen.getByRole("button", { name: "Watch your uploaded video" })).toHaveFocus();
 });
 
 test("old stored reports stay readable, but status alone never proves a report exists", () => {
@@ -144,8 +185,8 @@ test("remaining time is a server-backed range, expires and never reaches a fake 
   const now = Date.now();
   const data = { ...initial, full_report_status: "generating", full_pipeline_stage: "sequence_model_start", completion_estimate: {status:"estimated", calculated_at:new Date(now).toISOString(), earliest_at:new Date(now+4*60000).toISOString(), latest_at:new Date(now+7*60000).toISOString()} };
   expect(completionLabel(data, now)).toBe("About 4–7 min");
-  expect(completionLabel(data, now+121000)).toBe("Estimate not available yet");
-  expect(completionLabel({...data,completion_estimate:{...data.completion_estimate,calculated_at:new Date(now+8*60000).toISOString()}},now+8*60000)).toBe("Taking longer than estimated");
+  expect(completionLabel(data, now+121000)).toMatch(/^Last estimate:/);
+  expect(completionLabel({...data,completion_estimate:{...data.completion_estimate,calculated_at:new Date(now+8*60000).toISOString()}},now+8*60000)).toBe("Longer than expected · updating");
   render(<AnalysisWaiting status={data} onContinue={jest.fn()} />);
   expect(screen.getByTestId("analysis-finish-estimate")).toHaveTextContent("Estimated time remaining");
   expect(screen.getByTestId("analysis-finish-estimate")).toHaveTextContent("About 4–7 min");
@@ -165,5 +206,5 @@ test("background exit is available only after upload acceptance and sends one na
 test("stale worker activity suppresses a fresh calculated estimate", () => {
   const now = Date.now();
   const data = { last_progress_at: new Date(now-180000).toISOString(), completion_estimate: { status:"estimated", calculated_at:new Date(now).toISOString(), earliest_at:new Date(now+60000).toISOString(), latest_at:new Date(now+180000).toISOString() } };
-  expect(completionLabel(data, now)).toBe("Waiting for a status update");
+  expect(completionLabel(data, now)).toMatch(/^Last estimate:/);
 });

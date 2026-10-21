@@ -62,6 +62,14 @@ export function getAnalysisView(data = {}, { phase, uploadPct, target } = {}) {
     key = [undefined, null, "queued", "full_start"].includes(data.full_pipeline_stage) ? "queued" : "analyzing";
     title = key === "queued" ? "Waiting for analysis to start" : "Your video is being analyzed";
     detail = TASKS[data.full_pipeline_stage] || "Reviewing your player’s actions and the surrounding play.";
+    const livePhase = data.sequence_progress?.phase;
+    if (livePhase === "writer") {
+      key = "writing"; title = "Writing your player report"; detail = "Turning the reviewed actions into your player assessment and training advice.";
+    } else if (livePhase === "preparation") {
+      key = "analyzing"; title = "Preparing the action review"; detail = "Preparing your video and saved player marks for the review.";
+    } else if (livePhase === "source") {
+      key = "analyzing";
+    }
   } else if (previewReady && full) {
     key = "queued"; title = "Preparing the full analysis";
     detail = "The initial review is complete. Your full report is still being prepared.";
@@ -77,7 +85,7 @@ export function getAnalysisView(data = {}, { phase, uploadPct, target } = {}) {
   }
   const duringUpload = ["uploading", "saving"].includes(phase);
   const prepared = !duringUpload && (previewReady || ["generating", ...Object.keys(FULL_PHASES), "ready"].includes(st) || (previewStatus === "analyzing" && step >= 3));
-  const analyzed = full ? ["verifying", "finalizing"].includes(st) || fullReady : previewReady;
+  const analyzed = full ? ["verifying", "finalizing"].includes(st) || data.sequence_progress?.phase === "writer" || fullReady : previewReady;
   const labels = full ? ["Video received", "Reviewing play", "Final checks"] : ["Prepare video", "Create preview"];
   const states = full
     ? [prepared ? "done" : "active", analyzed ? "done" : prepared ? "active" : "pending", fullReady ? "done" : analyzed ? "active" : "pending"]
@@ -112,18 +120,37 @@ export function assetUrl(src, base = "") {
   return /^(https?:|blob:|data:)/i.test(src) ? src : `${base}${src}`;
 }
 
-/** Deadline ranges are server-calibrated; the client clock only counts down. */
+/** A provisional window uses the retained 77s run until live server timing arrives. */
+export function completionEstimate(data = {}, now = Date.now()) {
+  const saved = data.completion_estimate;
+  if (["estimated", "overdue"].includes(saved?.status) && Number.isFinite(Date.parse(saved.earliest_at))
+      && Number.isFinite(Date.parse(saved.latest_at)) && Date.parse(saved.earliest_at) <= Date.parse(saved.latest_at)) return saved;
+  const full = data.analysis_target !== "preview" && (data.analysis_target === "full" || data.is_paid || data.manually_unlocked || data.full_report_status);
+  const duration = Number(data.video_duration_sec);
+  const scale = Number.isFinite(duration) && duration > 0 ? Math.max(.5, Math.min(4, duration / 77)) : 1;
+  const anchorValue = data.full_report_started_at || data.analysis_started_at || data.created_at;
+  const anchor = typeof anchorValue === "number" ? anchorValue : Date.parse(anchorValue);
+  const start = Number.isFinite(anchor) && anchor <= now ? anchor : now;
+  const seconds = data.full_report_status ? 605 * scale + 178 + 39 * scale : 187 * scale + (full ? 605 * scale + 178 + 39 * scale : 0);
+  return { status: "estimated", provisional: true, basis: "starting_workload", calculated_at: new Date(now).toISOString(),
+    earliest_at: new Date(start + seconds * .75 * 1000).toISOString(), latest_at: new Date(start + seconds * 1.45 * 1000).toISOString() };
+}
+
 export function completionLabel(data, now = Date.now()) {
-  const estimate = data?.completion_estimate;
-  const updated = Date.parse(estimate?.calculated_at);
-  const heartbeat = Date.parse(data?.last_progress_at);
-  if (Number.isFinite(heartbeat) && (heartbeat > now + 60000 || now - heartbeat > 120000)) return "Waiting for a status update";
-  if (!["estimated", "overdue"].includes(estimate?.status) || !Number.isFinite(updated)
-      || updated > now + 60000 || now - updated > 120000) return "Estimate not available yet";
+  const estimate = completionEstimate(data, now);
   const latest = Date.parse(estimate.latest_at), earliest = Date.parse(estimate.earliest_at);
-  if (!Number.isFinite(latest) || !Number.isFinite(earliest) || earliest > latest) return "Estimate not available yet";
-  if (estimate.status === "overdue" || latest <= now) return "Taking longer than estimated";
+  if (estimate.status === "overdue" || latest <= now) return "Longer than expected · updating";
   const low = Math.max(0, Math.ceil((earliest - now) / 60000));
   const high = Math.ceil((latest - now) / 60000);
-  return low === 0 ? `Under ${high} min` : low === high ? `About ${high} min` : `About ${low}–${high} min`;
+  const label = low === 0 ? `Under ${high} min` : low === high ? `About ${high} min` : `About ${low}–${high} min`;
+  const updated = Date.parse(estimate.calculated_at), heartbeat = Date.parse(data?.last_progress_at);
+  const stale = (Number.isFinite(updated) && now - updated > 120000) || (Number.isFinite(heartbeat) && now - heartbeat > 120000);
+  return stale ? `Last estimate: ${label}` : label;
+}
+
+export function completionClock(data, now = Date.now()) {
+  const estimate = completionEstimate(data, now);
+  if (Date.parse(estimate.latest_at) <= now) return "Review is still running";
+  const format = value => new Date(value).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
+  return `${estimate.basis === "starting_workload" ? "Starting estimate" : "Expected finish"} ${format(estimate.earliest_at)}–${format(estimate.latest_at)}`;
 }

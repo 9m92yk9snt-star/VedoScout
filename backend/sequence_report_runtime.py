@@ -4,6 +4,7 @@ The legacy detector/reconstruction is never called here, including on failure.
 All external persistence and the facts-only writer are injected by the server.
 """
 import asyncio
+from datetime import datetime, timezone
 from copy import deepcopy
 import hashlib
 import json
@@ -64,7 +65,7 @@ async def owned_process(args, *, timeout_s, log_path):
             raise SequenceProcessFailure({"returncode": process.returncode, "timeout": False})
 
 
-async def discover(video, anchors_document, work, *, checkpoint=None, resume=None):
+async def discover(video, anchors_document, work, *, checkpoint=None, resume=None, progress=None):
     started = time.monotonic()
     root = Path(work)
     inputs = root / "inputs"
@@ -77,12 +78,19 @@ async def discover(video, anchors_document, work, *, checkpoint=None, resume=Non
     script = Path(__file__).parent / "scripts" / "run_sequence_pilot.py"
     prepared, output = root / "prepared", root / "observations"
     phase = "preparation"
+    source_started_at = datetime.now(timezone.utc).isoformat()
+    if progress:
+        await progress({"phase": "preparation", "started_at": source_started_at})
     async def process():
         nonlocal phase
         await owned_process([sys.executable, script, "prepare", "--evidence-dir", inputs,
                              "--output", prepared, "--scene-packets", "--max-edge", "1280"],
                             timeout_s=75, log_path=root / "preparation.log")
         phase = "observations"
+        if progress:
+            await progress({"phase": "source", "started_at": source_started_at,
+                            "initial_total": len(pilot.read_json(prepared / "manifest.json")["packets"]),
+                            "initial_completed": 0, "updated_at": datetime.now(timezone.utc).isoformat()})
         budget = max(1, 900 - (time.monotonic() - started))
         args = [sys.executable, script, "run", "--prepared", prepared / "manifest.json",
                          "--output", output, "--provider", "emergent", "--model", "gpt-6-astra",
@@ -113,6 +121,15 @@ async def discover(video, anchors_document, work, *, checkpoint=None, resume=Non
         signature = hashlib.sha256(payload).hexdigest()
         if signature != seen:
             await checkpoint(value)
+            if progress:
+                initial_ids = {p["packet_id"] for p in manifest["packets"]}
+                current = [pilot.read_json(p) for p in sorted((output / "responses").glob("*.json"))]
+                complete = [r for r in current if r.get("status") == "COMPLETED"]
+                durations = [r["elapsed_seconds"] for r in complete if isinstance(r.get("elapsed_seconds"), (int, float))]
+                await progress({"phase": "source", "started_at": source_started_at,
+                    "updated_at": datetime.now(timezone.utc).isoformat(), "initial_total": len(initial_ids),
+                    "initial_completed": sum(r.get("packet_id") in initial_ids for r in complete),
+                    "completed_jobs": len(complete), "mean_job_seconds": sum(durations)/len(durations) if durations else 85})
             seen = signature
 
     task = asyncio.create_task(process())
@@ -280,10 +297,15 @@ async def generate(video, doc, *, template, writer=write_facts, discovery=discov
             if checkpoint:
                 await checkpoint({"sequence_retry": {**value, "report_id": doc.get("id"),
                                                       "original_selection_values_sha256": selection_sha}})
+        async def save_live_progress(value):
+            if checkpoint:
+                await checkpoint({"sequence_progress": value,
+                    "sequence_runtime_signature": hashlib.sha256(json.dumps(code_fingerprint(), sort_keys=True).encode()).hexdigest()})
         if retained:
             result, manifest, receipts = retained
         elif discovery is discover:
-            result, manifest, receipts = await discover(video, anchor_document, work, checkpoint=save_progress, resume=retry)
+            result, manifest, receipts = await discover(video, anchor_document, work, checkpoint=save_progress,
+                                                       resume=retry, progress=save_live_progress)
         else:
             result, manifest, receipts = await discovery(video, anchor_document, work)
         # Persist paid observations before projection/writing can fail. A failed
@@ -319,6 +341,7 @@ async def generate(video, doc, *, template, writer=write_facts, discovery=discov
         if checkpoint:
             await checkpoint({"canonical_events": bundle, "sequence_audit": audit,
                               "sequence_timings": source_timings})
+            await save_live_progress({"phase": "writer", "started_at": datetime.now(timezone.utc).isoformat()})
         try:
             operation = writer(prompt, canonical=bundle) if writer is write_facts else writer(prompt)
             written = await asyncio.wait_for(operation, timeout=420)
@@ -333,6 +356,7 @@ async def generate(video, doc, *, template, writer=write_facts, discovery=discov
         if len(json.dumps(audit).encode()) > 4_000_000:
             raise ValueError("SEQUENCE_AUDIT_TOO_LARGE")
         return {"analysis_engine": adapter.ENGINE, "canonical_events": bundle,
+                "sequence_progress": {"phase": "assets", "started_at": datetime.now(timezone.utc).isoformat()},
                 "sequence_audit": audit, "full_report": full,
                 "sequence_timings": {**source_timings,
                                      "facts_writer_and_projection_seconds": round(time.monotonic()-observed, 3),

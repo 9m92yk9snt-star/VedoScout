@@ -1,68 +1,34 @@
-import React, { useEffect, useState } from "react";
-import { ArrowLeft, ArrowRight, Check, Clock, Film, Lightbulb, Pause, Play, RefreshCw } from "lucide-react";
-import { activityLabel, assetUrl, completionLabel, getAnalysisView } from "../lib/analysisProgress.mjs";
+import React, { useEffect, useRef, useState } from "react";
+import { ArrowRight, Check, Clock, Film, Play, RefreshCw, X } from "lucide-react";
+import { activityLabel, assetUrl, completionLabel, completionClock, elapsedLabel, getAnalysisView } from "../lib/analysisProgress.mjs";
 import "./AnalysisWaiting.css";
 
-const TIPS = [
-  { category: "Awareness", title: "See the space before the ball arrives", text: "Take a quick look over your shoulder before receiving. Know where the pressure is, then let your first touch take you towards space." },
-  { category: "First touch", title: "Give your next move a head start", text: "When there is room, receive with an open body and move the ball away from pressure. A useful first touch makes the next pass or dribble easier." },
-  { category: "Movement", title: "Pass, then offer a new angle", text: "After a pass, move into a new passing lane. A small change of angle can give your teammate a clear way to find you again." },
-  { category: "Decision making", title: "Look for the simple option too", text: "Before taking on a defender, check your support. Sometimes a short pass and a new run create more space than another dribble." },
-  { category: "Finishing", title: "Build a repeatable finish", text: "In training, practise placing the ball into different corners from a controlled approach. Start with accuracy, then add pressure and speed." },
-  { category: "Defending", title: "Make the attacker’s next move harder", text: "Stay balanced, watch the ball and guide the attacker away from dangerous space. Choose your moment rather than reaching in immediately." },
-  { category: "Teamwork", title: "Make your message useful", text: "Use short, clear calls such as ‘time’, ‘turn’ or ‘man on’. Help your teammate understand the situation before the ball reaches them." },
-  { category: "Confidence", title: "Make the next action count", text: "After a mistake, find your next useful job: offer a passing option, recover your position or help a teammate. Focus on the action you can take now." },
-];
+import FootballTips from "./FootballTips";
+export { default as FootballTips } from "./FootballTips";
 
-function PitchIllustration() {
-  return (
-    <svg viewBox="0 0 160 100" fill="none" className="analysis-tip-pitch" aria-hidden="true">
-      <rect x="8" y="8" width="144" height="84" rx="3" stroke="currentColor" opacity=".22" />
-      <path d="M80 8v84M8 27h22v46H8M152 27h-22v46h22" stroke="currentColor" opacity=".22" />
-      <circle cx="80" cy="50" r="17" stroke="currentColor" opacity=".22" />
-      <path d="M45 67c24 0 18-35 50-35" stroke="#CCFF00" strokeWidth="2" strokeDasharray="4 4" />
-      <path d="m89 27 7 5-7 5" stroke="#CCFF00" strokeWidth="2" strokeLinecap="round" />
-      <circle cx="45" cy="67" r="7" fill="#CCFF00" />
-      <circle cx="107" cy="32" r="7" stroke="white" strokeWidth="2" />
-      <circle cx="61" cy="29" r="5" fill="white" opacity=".35" />
-    </svg>
-  );
-}
-
-export function FootballTips() {
-  const [index, setIndex] = useState(0);
-  const [paused, setPaused] = useState(() => window.matchMedia?.("(prefers-reduced-motion: reduce)").matches || false);
+function VideoPreview({ video, image, player, onClose }) {
+  const dialog = useRef(null);
+  const close = () => {
+    // Leave the native modal top layer before restoring focus to the replay button.
+    if (dialog.current?.open && dialog.current.close) dialog.current.close();
+    onClose();
+  };
   useEffect(() => {
-    if (paused) return undefined;
-    const timer = setInterval(() => {
-      if (!document.hidden) setIndex(value => (value + 1) % TIPS.length);
-    }, 25000);
-    return () => clearInterval(timer);
-  }, [paused]);
-  const move = direction => { setPaused(true); setIndex(value => (value + direction + TIPS.length) % TIPS.length); };
-  const tip = TIPS[index];
-  return (
-    <section className="analysis-tips" aria-label="Football tips" data-testid="analysis-football-tips">
-      <div className="analysis-tip-top"><span><Lightbulb size={16} /> Touchline tips</span><span>{String(index + 1).padStart(2, "0")} / {TIPS.length}</span></div>
-      <PitchIllustration />
-      <div className="analysis-tip-content">
-        <span className="analysis-tip-category">{tip.category}</span>
-        <h2>{tip.title}</h2>
-        <p>{tip.text}</p>
-      </div>
-      <div className="analysis-tip-footer">
-        <span>General football advice.<br />Separate from your video analysis.</span>
-        <div className="analysis-tip-controls">
-          <button type="button" aria-label="Previous football tip" onClick={() => move(-1)}><ArrowLeft size={17} /></button>
-          <button type="button" aria-label={paused ? "Play football tips" : "Pause football tips"} aria-pressed={paused} onClick={() => setPaused(value => !value)}>{paused ? <Play size={15} /> : <Pause size={15} />}</button>
-          <button type="button" aria-label="Next football tip" onClick={() => move(1)}><ArrowRight size={17} /></button>
-        </div>
-      </div>
-    </section>
-  );
+    const node = dialog.current;
+    if (node.showModal) node.showModal();
+    else node.setAttribute("open", "");
+    return () => { if (node.close && node.open) node.close(); };
+  }, []);
+  return <dialog ref={dialog} className="analysis-video-dialog" aria-label={`${player}’s uploaded video`}
+    onCancel={event => { event.preventDefault(); close(); }}>
+    <button type="button" onClick={close} aria-label="Close uploaded video"><X size={20} /> Close video</button>
+    <video src={video} controls playsInline preload="metadata" poster={image || undefined} aria-label={`${player}’s uploaded video`} />
+  </dialog>;
 }
 
 export default function AnalysisWaiting({ status = {}, phase, uploadPct, startedAt, assetBase = "", error, connectionError, onRetry, onCheckStatus, onContinue, onOpenReport }) {
+  const mountedAt = useRef(Date.now());
+  const replayButton = useRef(null);
   const [now, setNow] = useState(Date.now);
   const [showVideo, setShowVideo] = useState(false);
   useEffect(() => {
@@ -72,7 +38,8 @@ export default function AnalysisWaiting({ status = {}, phase, uploadPct, started
   const view = getAnalysisView(status, { phase, uploadPct });
   const pd = status.player_details || {};
   const player = pd.player_name || "Your player";
-  const finishEstimate = connectionError ? "Reconnecting to update estimate" : view.confirmation ? "Waiting for your player check" : completionLabel(status, now);
+  const timingStatus = { ...status, analysis_started_at: status.analysis_started_at || status.created_at || startedAt || mountedAt.current };
+  const finishEstimate = connectionError ? "Reconnecting to update estimate" : view.confirmation ? "Waiting for your player check" : completionLabel(timingStatus, now);
   const heartbeat = activityLabel(status.last_progress_at, now);
   const activityAt = Date.parse(status.last_progress_at);
   const activityFresh = Number.isFinite(activityAt) && activityAt <= now + 60_000 && now - activityAt <= 120_000;
@@ -97,7 +64,7 @@ export default function AnalysisWaiting({ status = {}, phase, uploadPct, started
       <div className="analysis-layout">
         <section className="analysis-status-card" aria-label="Your video analysis" data-testid="analysis-status-card">
           <div className="analysis-video-cover">
-            {showVideo && video ? <video src={video} controls playsInline preload="metadata" poster={image || undefined} aria-label={`${player}’s uploaded video`} /> : (
+            {(
               <>
                 {image ? <img src={image} alt="Frame from your uploaded video" onError={event => { event.currentTarget.style.display = "none"; }} /> : <div className="analysis-video-placeholder"><Film size={36} /><span>Your video</span></div>}
                 <div className="analysis-video-shade" />
@@ -107,7 +74,7 @@ export default function AnalysisWaiting({ status = {}, phase, uploadPct, started
                   <strong>{player}</strong>
                   <span>{[pd.age ? `Age ${pd.age}` : null, pd.position, taps ? `${taps} player marks received` : null].filter(Boolean).join(" · ")}</span>
                 </div>
-                {video && <button type="button" className="analysis-replay" aria-label="Watch your uploaded video" onClick={() => setShowVideo(true)}><Play size={17} fill="currentColor" /> Watch video</button>}
+                {video && <button ref={replayButton} type="button" className="analysis-replay" aria-label="Watch your uploaded video" onClick={() => setShowVideo(true)}><Play size={17} fill="currentColor" /> Watch video</button>}
               </>
             )}
           </div>
@@ -117,7 +84,7 @@ export default function AnalysisWaiting({ status = {}, phase, uploadPct, started
               <span className={`analysis-state-chip${blocked ? " analysis-state-chip-warning" : ""}`}><span aria-hidden="true" />{blocked ? "Attention needed" : view.complete ? "Complete" : view.confirmation ? "Player check" : "In progress"}</span>
 
             </div>
-            {!uploading && !view.complete && !blocked && <div className="analysis-finish-estimate" data-testid="analysis-finish-estimate"><span><Clock size={15} /> Estimated time remaining</span><strong>{finishEstimate}</strong><small>Estimate for the complete report · updates as the review progresses</small></div>}
+            {!uploading && !view.complete && !blocked && <div className="analysis-finish-estimate" data-testid="analysis-finish-estimate"><span><Clock size={15} /> Estimated time remaining</span><strong>{finishEstimate}</strong><small>{completionClock(timingStatus, now)}</small></div>}
             <div role="status" aria-live="polite" aria-atomic="true" className="analysis-phase-description">
               <h2>{title}</h2>
               <p>{blocked ? issue : view.detail}</p>
@@ -143,12 +110,12 @@ export default function AnalysisWaiting({ status = {}, phase, uploadPct, started
             {!uploading && !view.complete && !blocked && (
               <div className="analysis-server-status" data-testid="analysis-server-status">
                 <span className={connectionError || !activityFresh ? "analysis-status-dot-muted" : ""} aria-hidden="true" />
-                <span>{connectionError || heartbeat}</span>
+                <span>{connectionError || heartbeat}</span><time className="analysis-elapsed">Elapsed {elapsedLabel(status.analysis_started_at || status.created_at || startedAt || mountedAt.current, now)}</time>
               </div>
             )}
-            {!uploading && !view.complete && !blocked && onContinue && <div className="analysis-background-option"><button type="button" className="analysis-main-button" onClick={onContinue}>Continue in background <ArrowRight size={17} /></button><p>You can leave this page. Your analysis will continue. Follow its status from your profile.</p></div>}
+            {!uploading && !view.complete && !blocked && onContinue && <div className="analysis-background-option"><button type="button" className="analysis-main-button" onClick={onContinue}>Continue in background <ArrowRight size={17} /></button><p>Analysis continues. Follow it from your profile.</p></div>}
             {status.retry_in_progress && !blocked && <p className="analysis-retry-note">The server is repeating the review. Your report is still in progress.</p>}
-            {!blocked && !view.complete && <p className="analysis-timing-note">The finish estimate is based on comparable completed analyses when enough data is available. Final checks must finish before your report opens.</p>}
+            {!blocked && !view.complete && <p className="analysis-timing-note">Expected finish window, not a guarantee. Final checks decide when your report is ready.</p>}
             {blocked && <div className="analysis-error-actions">
               {onCheckStatus && <button type="button" className="analysis-main-button" onClick={onCheckStatus}><RefreshCw size={16} /> Check status again</button>}
               {retryAvailable && <button type="button" className="analysis-secondary-button" onClick={onRetry}>Retry analysis</button>}
@@ -157,10 +124,9 @@ export default function AnalysisWaiting({ status = {}, phase, uploadPct, started
           </div>
         </section>
 
-        {!view.complete && <FootballTips />}
+        {!view.complete && <FootballTips sessionKey={status.id || `upload-${startedAt || mountedAt.current}`} />}
       </div>
-
-
+      {showVideo && video && <VideoPreview video={video} image={image} player={player} onClose={() => { setShowVideo(false); replayButton.current?.focus(); }} />}
     </div>
   );
 }
