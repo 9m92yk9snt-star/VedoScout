@@ -13,7 +13,7 @@ jobs:
       github.repository == '9m92yk9snt-star/VedoScout' &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.event.pull_request.head.ref == 'experiment/feint-model-evidence' &&
-      (github.event.action == 'opened' || github.event.before == '78b4b664aa1b351c9e8502df7d9a1866153211a7') &&
+      (github.event.action == 'opened' || github.event.before == 'f92f64414fb5e08740bf53db07f516a6b6ba4f0a') &&
       github.run_attempt == 1
     runs-on: ubuntu-latest
     timeout-minutes: 14
@@ -28,7 +28,7 @@ jobs:
       - name: Install video preparation dependencies
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq ffmpeg
+          sudo apt-get install -y -qq ffmpeg fonts-dejavu-core
           python -m pip install 'numpy<3' 'opencv-python-headless<5' 'Pillow>=10,<15' 'pytest>=8,<10' 'python-dotenv>=1,<2'
       - name: Check evidence contracts without a model
         env:
@@ -54,11 +54,11 @@ jobs:
               assert hashlib.sha256((target/name).read_bytes()).hexdigest()==digest
           print('Verified repository encoding and original selections; no report or expected action times loaded.')
           PY
-      - name: Discover movements and independently review actual source frames (at most two calls)
+      - name: Review complete exact source-sheet sequences (at most three calls)
         env:
           EMERGENT_LLM_KEY: ${{ secrets.EMERGENT_LLM_KEY }}
         run: >-
-          python -u backend/scripts/probe_feint_evidence.py
+          python -u backend/scripts/probe_feint_frames.py
           --video "$RUNNER_TEMP/feint-source/video/source.mp4"
           --anchors "$RUNNER_TEMP/feint-source/anchors.json"
           --output "$RUNNER_TEMP/feint-result" --run-model
@@ -66,7 +66,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: feint-model-evidence-${{ github.run_id }}
+          name: feint-source-sheets-${{ github.run_id }}
           path: ${{ runner.temp }}/feint-result/
           retention-days: 14
           if-no-files-found: warn
