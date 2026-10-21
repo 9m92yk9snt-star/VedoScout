@@ -44,3 +44,18 @@ def test_rejection_not_promoted_and_missing_review_cannot_pass():
 def test_cross_candidate_frame_cannot_support_movement():
     selected,frames,r=fixture();frames[1]['candidate_id']='c2'
     with pytest.raises(ValueError):validate_reviews({'reviews':[r]},selected,frames)
+
+def test_source_sheets_do_not_need_expected_times_and_reject_invented_evidence():
+    from scripts.probe_feint_frames import validate
+    frames=[{'id':f's{i}','source_ms':i*100} for i in range(3)]
+    refs=[{'reference_id':'r1'}]
+    assert validate({'observations':[]},frames,refs)==[]
+    r=dict(type='BODY_FEINT',decision='SUPPORTED',identity_reference_ids=['r1'],
+           identity_frames=['s0'],before_frame='s0',movement_frames=['s1'],after_frame='s2',
+           visible_movement='body shift then ball changes direction',opponent_response='steps',
+           outcome='RETAINS',uncertainty='')
+    assert validate({'observations':[deepcopy(r)]},frames,refs)[0]['source_interval_ms']==[0,200]
+    for change in [dict(before_frame='x'),dict(identity_reference_ids=['invented']),
+                   dict(after_frame='s0'),dict(movement_frames=[]),dict(type='UNKNOWN')]:
+        wrong=deepcopy(r);wrong.update(change)
+        with pytest.raises(ValueError):validate({'observations':[wrong]},frames,refs)
