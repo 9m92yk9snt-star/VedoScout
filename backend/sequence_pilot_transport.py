@@ -1,12 +1,15 @@
 """Bounded image-sequence calls through native Gemini or the Universal Key API.
 
 Only Python's standard library is required. No Emergent environment/SDK, global
-SDK patch, automatic retry, deployment or production database is involved.
+SDK patch, deployment or production database is involved. Transient HTTP 429
+responses get at most one bounded retry per request, within the batch deadline.
 Credentials are read inside owned child processes and never persisted.
 """
 from __future__ import annotations
 
 import base64
+from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 import hashlib
 import json
 import multiprocessing
@@ -22,6 +25,8 @@ KEY_ENV = {"gemini": "GEMINI_API_KEY", "emergent": "EMERGENT_LLM_KEY"}
 MAX_REQUEST_BYTES = 19_500_000
 MAX_RESPONSE_BYTES = 2_000_000
 MAX_CALL_SECONDS = 210.
+MAX_RATE_LIMIT_WAIT_SECONDS = 30.
+RATE_LIMIT_DEFAULT_WAIT_SECONDS = 2.
 STOP_ERRORS = frozenset({"MODEL_ACCESS_DENIED", "MODEL_KEY_NOT_CONFIGURED", "MODEL_QUOTA_OR_RATE_LIMIT"})
 
 
@@ -38,10 +43,23 @@ def limit_diagnostics(exc):
              "too_many_requests": "RATE_LIMITED"}
     try:
         delay = (exc.headers or {}).get("Retry-After", "")
-        if isinstance(delay, str) and re.fullmatch(r"\d{1,5}(?:\.\d{1,3})?", delay.strip()):
-            seconds = float(delay)
-            if seconds <= 86400:
-                result["retry_after_seconds"] = seconds
+        if isinstance(delay, str) and delay.strip():
+            # Do not silently retry early when a provider sends an HTTP-date,
+            # an excessively long cooldown or an unparseable nonempty header.
+            result["retry_after_unusable"] = True
+            try:
+                if re.fullmatch(r"\d{1,5}(?:\.\d{1,3})?", delay.strip()):
+                    seconds = float(delay)
+                else:
+                    until = parsedate_to_datetime(delay.strip())
+                    if until.tzinfo is None:
+                        until = until.replace(tzinfo=timezone.utc)
+                    seconds = max(0., (until - datetime.now(timezone.utc)).total_seconds())
+                if 0 <= seconds <= 86400:
+                    result["retry_after_seconds"] = seconds
+                    result.pop("retry_after_unusable")
+            except (ValueError, TypeError, OverflowError):
+                pass
         raw = exc.read(4097)
         if len(raw) <= 4096:
             data = json.loads(raw)
@@ -182,7 +200,9 @@ def _worker(connection, job, provider, model, timeout_s):
         if exc.code in {402, 429}:
             audit.update(limit_diagnostics(exc))
         exc.close()
-    except (urllib.error.URLError, TimeoutError, OSError):
+    except TimeoutError:
+        audit.update(status="ERROR", error="MODEL_CALL_TIMEOUT")
+    except (urllib.error.URLError, OSError):
         audit.update(status="ERROR", error="MODEL_CONNECTION_FAILED")
     except (ValueError, KeyError, TypeError, json.JSONDecodeError) as exc:
         allowed = {"MODEL_KEY_NOT_CONFIGURED", "PREPARED_IMAGE_CHANGED", "INVALID_MODEL_PROVIDER",
@@ -212,11 +232,12 @@ def run_jobs(jobs, provider, model, *, deadline, per_call_s=90., workers=2, work
     if provider not in KEY_ENV or not 1 <= workers <= 2 or not 0 < per_call_s <= MAX_CALL_SECONDS:
         raise ValueError("INVALID_EXECUTION_BUDGET")
     pending, active, results, abort = list(jobs), {}, [], False
+    rate_retries, histories, resume_at = set(), {}, 0.
     context = multiprocessing.get_context("spawn")
     try:
         while pending or active:
             now = time.monotonic()
-            while pending and len(active) < workers and now < deadline and not abort:
+            while pending and len(active) < workers and resume_at <= now < deadline and not abort:
                 job = pending.pop(0)
                 parent, child = context.Pipe(duplex=False)
                 process = context.Process(target=worker, args=(child, job, provider, model, min(per_call_s, deadline - now)))
@@ -233,19 +254,48 @@ def run_jobs(jobs, provider, model, *, deadline, per_call_s=90., workers=2, work
                         result = {"packet_id": job["packet_id"], "status": "ERROR", "error": "MODEL_CHILD_EXITED"}
                 elif now >= expires or abort or not process.is_alive():
                     result = {"packet_id": job["packet_id"], "status": "ERROR",
-                              "error": "MODEL_ACCESS_STOPPED" if abort else "MODEL_WALL_DEADLINE_EXCEEDED"}
+                              "error": ("MODEL_ACCESS_STOPPED" if abort else
+                                        "MODEL_WALL_DEADLINE_EXCEEDED" if now >= expires else "MODEL_CHILD_EXITED")}
                 if result is not None:
-                    results.append(result)
+                    now = time.monotonic()
+                    packet_id = job["packet_id"]
+                    delay = result.get("retry_after_seconds", RATE_LIMIT_DEFAULT_WAIT_SECONDS)
+                    retry_rate_limit = (result.get("http_status") == 429
+                        and result.get("error") == "MODEL_QUOTA_OR_RATE_LIMIT"
+                        and result.get("limit_kind") != "QUOTA_EXHAUSTED"
+                        and not result.get("retry_after_unusable")
+                        and packet_id not in rate_retries
+                        and type(delay) in {int, float} and 0 <= delay <= MAX_RATE_LIMIT_WAIT_SECONDS
+                        and now + max(1., delay) + per_call_s < deadline and not abort)
+                    if retry_rate_limit:
+                        rate_retries.add(packet_id)
+                        histories[packet_id] = {k: result[k] for k in (
+                            "error", "http_status", "limit_kind", "retry_after_seconds") if k in result}
+                        result = {**result, "rate_limit_retry_scheduled": True}
+                        pending.insert(0, job)
+                        # Pause all new requests, including queued unrelated jobs.
+                        # Already running requests retain their ownership/deadline.
+                        resume_at = max(resume_at, now + max(1., delay))
+                    else:
+                        if packet_id in histories:
+                            result = {**result, "rate_limit_retry_count": 1,
+                                      "prior_rate_limit": histories[packet_id]}
+                        results.append(result)
                     if on_result:
                         on_result(result)
-                    abort = abort or result.get("error") in STOP_ERRORS
+                    abort = abort or (not retry_rate_limit and result.get("error") in STOP_ERRORS)
                     pipe.close(); _stop(process); del active[pid]
             if (now >= deadline or abort) and not active:
                 for job in pending:
-                    results.append({"packet_id": job["packet_id"], "status": "NOT_SENT",
-                        "error": "MODEL_ACCESS_STOPPED" if abort else "RUN_TIME_BUDGET_EXHAUSTED"})
+                    result = {"packet_id": job["packet_id"], "status": "NOT_SENT",
+                              "error": "MODEL_ACCESS_STOPPED" if abort else "RUN_TIME_BUDGET_EXHAUSTED"}
+                    if job["packet_id"] in histories:
+                        result["prior_rate_limit"] = histories[job["packet_id"]]
+                    results.append(result)
+                    if on_result:
+                        on_result(result)
                 pending.clear()
-            if active:
+            if active or (pending and now < resume_at and now < deadline and not abort):
                 time.sleep(.02)
     finally:
         for process, pipe, _job, _expires in active.values():
