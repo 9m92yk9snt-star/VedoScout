@@ -72,7 +72,7 @@ export function getAnalysisView(data = {}, { phase, uploadPct, target } = {}) {
     }
   } else if (previewReady && full) {
     key = "queued"; title = "Preparing the full analysis";
-    detail = "The initial review is complete. Your full report is still being prepared.";
+    detail = "Your video is ready. Your full report is being prepared.";
   } else if (step >= 4 && previewStatus === "analyzing") {
     key = "initial_review"; title = "Reviewing your video";
     detail = "Preparing the initial review before the full analysis.";

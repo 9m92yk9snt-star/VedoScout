@@ -65,8 +65,7 @@ def server_harness(video, doc, directory, *, runtime=sequence_report_runtime):
                  "_analysis_frames_dir": lambda rid: Path(directory) / "frames" / rid,
                  "r2_storage": SimpleNamespace(is_configured=lambda: False),
                  "_send_report_ready_email": suppressed_notification,
-                 "_notify_dashboard_report": suppressed_notification,
-                 "_identity_gate_required": lambda stats: False}
+                 "_notify_dashboard_report": suppressed_notification}
     exec(compile(ast.Module(body=selected, type_ignores=[]), "server-orchestration", "exec"), namespace)
     return namespace, store, trace, notifications
 

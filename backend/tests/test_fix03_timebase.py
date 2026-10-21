@@ -367,11 +367,10 @@ def test_C5_seek_lands_early_then_decodes_forward():
 def test_C6_T10_doubt_tap_canonical_wiring():
     src = (BACKEND / "server.py").read_text()
     assert "CAP_PROP_POS_FRAMES" not in src
-    i = src.find("async def _verify_doubt_taps")
-    assert i > 0
-    seg = src[i:i + 4000]
-    assert 'video_timebase.read_frame_at(cap, float(c["t"]))' in seg
-    # behaviour of read_frame_at itself is proven in C5
+    assert "async def _verify_doubt_taps" not in src
+    # Sequence uses original selections; no late corrective tap tracking remains.
+    worker = src.split("async def generate_full_report_task", 1)[1].split("\n# =", 1)[0]
+    assert "track_player(" not in worker
 
 
 # ---------- C7 / T11 — teleclip edge crop uses actual decoded frame ----------
@@ -446,12 +445,9 @@ def test_T14_authority_semantics_unchanged():
 
 def test_T15_no_new_model_call_sites():
     src = (BACKEND / "server.py").read_text()
-    # FIX09B adds one sequence-intelligence call site. Its bounded retry reuses
-    # this same source call; there is no unbounded or parallel model-call path.
-    assert src.count("call_gemini_with_video(") == 9
-    assert src.count("call_gemini_text(") == 2
-    assert src.count("verify_frame_identity(") == 5
-    assert src.count("verify_ring_placement(") == 1
+    assert src.count("call_gemini_with_video(") == 4
+    assert src.count("verify_frame_identity(") == 0
+    assert src.count("verify_ring_placement(") == 0
     assert src.count("verify_preview_summary(") == 2
     for name in ("video_timebase.py", "cv_shadow.py", "tele_clip.py"):
         low = (BACKEND / name).read_text().lower()

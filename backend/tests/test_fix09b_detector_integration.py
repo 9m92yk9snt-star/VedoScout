@@ -150,4 +150,5 @@ def test_identity_timeline_never_inherits_shadow_detector_disable(monkeypatch):
 def test_server_skips_redundant_shadow_pass_after_unified_preparation():
     src = (BACKEND / "server.py").read_text()
     body = src.split("async def generate_full_report_task", 1)[1].split("\nasync def ", 1)[0]
-    assert "cv_shadow.SHADOW_ENABLED and _unified_prepared is None" in body
+    assert "cv_shadow.run_shadow(" not in body
+    assert "_unified_prepared" not in body

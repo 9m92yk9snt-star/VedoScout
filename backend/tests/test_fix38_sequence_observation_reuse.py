@@ -371,15 +371,12 @@ def test_production_wires_the_existing_call_audit_and_canonical_events_forward()
     root = Path(__file__).resolve().parents[1]
     server = ast.parse((root / "server.py").read_text())
     task = next(n for n in server.body if isinstance(n, ast.AsyncFunctionDef) and n.name == "generate_full_report_task")
-    calls = [n for n in ast.walk(task) if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)
-             and n.func.id == "call_gemini_with_video" and any(k.arg == "observation_audit" for k in n.keywords)]
-    assert len(calls) == 1 and "source_video_sha256" in {k.arg for k in calls[0].keywords}
-    runtime = ast.parse((root / "fix10a_runtime.py").read_text())
-    reconstruct = next(n for n in ast.walk(runtime) if isinstance(n, ast.Call)
-        and isinstance(n.func, ast.Attribute) and n.func.attr == "to_thread"
-        and n.args and isinstance(n.args[0], ast.Attribute)
-        and n.args[0].attr == "reconstruct_physical_match")
-    assert "observed_events" in {k.arg for k in reconstruct.keywords}
+    body = ast.unparse(task)
+    assert "call_gemini_with_video(" not in body
+    assert "sequence_report_runtime.generate(" in body
+    assert "checkpoint_sequence_observations" in body
+    assert '"sequence_audit"' in body or "'sequence_audit'" in body
+    assert '"sequence_retry"' in body or "'sequence_retry'" in body
 
 
 @pytest.mark.parametrize("retry", [False, True])
