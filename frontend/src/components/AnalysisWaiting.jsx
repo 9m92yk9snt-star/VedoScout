@@ -8,6 +8,11 @@ export { default as FootballTips } from "./FootballTips";
 
 function VideoPreview({ video, image, player, onClose }) {
   const dialog = useRef(null);
+  const close = () => {
+    // Leave the native modal top layer before restoring focus to the replay button.
+    if (dialog.current?.open && dialog.current.close) dialog.current.close();
+    onClose();
+  };
   useEffect(() => {
     const node = dialog.current;
     if (node.showModal) node.showModal();
@@ -15,8 +20,8 @@ function VideoPreview({ video, image, player, onClose }) {
     return () => { if (node.close && node.open) node.close(); };
   }, []);
   return <dialog ref={dialog} className="analysis-video-dialog" aria-label={`${player}’s uploaded video`}
-    onCancel={event => { event.preventDefault(); onClose(); }}>
-    <button type="button" onClick={onClose} aria-label="Close uploaded video"><X size={20} /> Close video</button>
+    onCancel={event => { event.preventDefault(); close(); }}>
+    <button type="button" onClick={close} aria-label="Close uploaded video"><X size={20} /> Close video</button>
     <video src={video} controls playsInline preload="metadata" poster={image || undefined} aria-label={`${player}’s uploaded video`} />
   </dialog>;
 }
