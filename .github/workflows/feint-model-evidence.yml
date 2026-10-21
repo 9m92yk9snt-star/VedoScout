@@ -13,7 +13,7 @@ jobs:
       github.repository == '9m92yk9snt-star/VedoScout' &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.event.pull_request.head.ref == 'experiment/feint-model-evidence' &&
-      (github.event.action == 'opened' || github.event.before == 'a02d46d1f528594ec1e54db3f7f908c8865cc9ec') &&
+      (github.event.action == 'opened' || github.event.before == 'a146f9c736a8759141cbf705b276647d9194448f') &&
       github.run_attempt == 1
     runs-on: ubuntu-latest
     timeout-minutes: 14
@@ -34,7 +34,7 @@ jobs:
         env:
           PYTHONPATH: backend
           PYTEST_DISABLE_PLUGIN_AUTOLOAD: '1'
-        run: python -m pytest backend/tests/test_feint_evidence_probe.py -q
+        run: python -m pytest backend/tests/test_feint_evidence_probe.py backend/tests/test_feint_context.py -q
       - name: Reassemble existing source; preserve its original identity selections
         run: |
           python - <<'PY'
@@ -54,19 +54,20 @@ jobs:
               assert hashlib.sha256((target/name).read_bytes()).hexdigest()==digest
           print('Verified repository encoding and original selections; no report or expected action times loaded.')
           PY
-      - name: Review complete exact source-sheet sequences (at most three calls)
+      - name: Recheck model-returned uncertain movements with extended source context (one call)
         env:
           EMERGENT_LLM_KEY: ${{ secrets.EMERGENT_LLM_KEY }}
         run: >-
-          python -u backend/scripts/probe_feint_frames.py
+          python -u backend/scripts/recheck_uncertain_feints.py
           --video "$RUNNER_TEMP/feint-source/video/source.mp4"
           --anchors "$RUNNER_TEMP/feint-source/anchors.json"
+          --previous docs/examples/feint-source-sheet-receipts.json
           --output "$RUNNER_TEMP/feint-result" --run-model
       - name: Preserve returned evidence and receipts
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: feint-source-sheets-${{ github.run_id }}
+          name: feint-uncertainty-context-${{ github.run_id }}
           path: ${{ runner.temp }}/feint-result/
           retention-days: 14
           if-no-files-found: warn
