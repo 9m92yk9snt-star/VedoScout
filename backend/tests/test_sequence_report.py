@@ -210,9 +210,7 @@ def current_code_checkpoint():
     # Unit scenario: a complete same-code checkpoint. Original published
     # fixture provenance remains unchanged on disk.
     doc = json.loads((ROOT / "docs/examples/sequence-report-source-checkpoint.json").read_text())
-    doc["sequence_audit"]["result"]["code_sha256"] = {p.name: runtime.pilot.digest(p) for p in (
-        ROOT / "backend/sequence_pilot.py", ROOT / "backend/sequence_pilot_transport.py",
-        ROOT / "backend/scripts/run_sequence_pilot.py", ROOT / "backend/player_selection.py")}
+    doc["sequence_audit"]["result"]["code_sha256"] = runtime.code_fingerprint()
     return doc
 
 
@@ -241,8 +239,10 @@ def test_corrupted_checkpoint_fails_before_writer_or_new_paid_discovery():
         runtime.retained_source(doc, audit["source_video_sha256"], audit["original_selection_values_sha256"])
 
 
-def test_failed_report_resumes_source_with_zero_new_source_calls(tmp_path, monkeypatch):
+@pytest.mark.parametrize("status", ["failed", "generating"])
+def test_failed_report_resumes_source_with_zero_new_source_calls(tmp_path, monkeypatch, status):
     doc = current_code_checkpoint()
+    doc["full_report_status"] = status  # claim() changes failed to generating before execution
     video = tmp_path / "source.mp4"
     digest = runtime.pilot.digest
     monkeypatch.setattr(runtime.pilot, "digest", lambda p: doc["sequence_audit"]["source_video_sha256"]
@@ -312,7 +312,7 @@ def test_writer_failure_keeps_paid_source_receipts_before_temp_cleanup(tmp_path,
 
 def test_normal_report_lists_omit_bulk_model_receipts():
     doc = {"id": "test", "user_id": "owner", "full_report": {"summary": "ready"},
-           "sequence_audit": {"raw_response": "x"*1_000_000}}
+           "sequence_audit": {"raw_response": "x"*1_000_000}, "sequence_retry": {"raw_response": "bulk"}}
     class Cursor:
         def __init__(self, projection):
             self.projection = projection
@@ -332,6 +332,7 @@ def test_normal_report_lists_omit_bulk_model_receipts():
     for rows in (asyncio.run(ns["my_reports"]({"id": "owner"})), asyncio.run(ns["admin_reports"]())):
         assert rows[0]["id"] == "test" and rows[0]["video_url"] == "/video"
         assert "sequence_audit" not in rows[0] and "full_report" not in rows[0]
+        assert "sequence_retry" not in rows[0]
 
 
 def test_unbound_comment_and_inexact_source_image_are_not_proof(retained):
@@ -439,6 +440,98 @@ def test_owned_process_timeout_reaps_the_child(tmp_path):
     with pytest.raises(TimeoutError):
         asyncio.run(runtime.owned_process([sys.executable, "-c", "import time; time.sleep(30)"],
                                           timeout_s=.1, log_path=tmp_path / "process.log"))
+
+
+def test_owned_process_nonzero_keeps_exit_status_without_stderr(tmp_path):
+    with pytest.raises(runtime.SequenceProcessFailure) as caught:
+        asyncio.run(runtime.owned_process([sys.executable, "-c", "import sys; print('private-provider-body'); sys.exit(3)"],
+                                          timeout_s=3, log_path=tmp_path / "process.log"))
+    assert caught.value.diagnostics == {"returncode": 3, "timeout": False}
+    assert "private" not in str(caught.value)
+
+
+@pytest.mark.parametrize("timeout", [False, True])
+def test_discovery_checkpoints_before_process_finishes_and_preserves_failure(tmp_path, monkeypatch, timeout):
+    async def scenario():
+        saved, received = [], asyncio.Event()
+        source = tmp_path / "source.mp4"; source.write_bytes(b"synthetic")
+        async def process(args, **kwargs):
+            if args[2] == "prepare":
+                runtime.pilot.write_json(tmp_path / "prepared/manifest.json", {
+                    "source_video_sha256": "source", "original_taps_sha256": "selection"})
+                return
+            runtime.pilot.write_json(tmp_path / "observations/responses/sequence_001.json", {
+                "packet_id": "sequence_001", "status": "COMPLETED", "raw_response": "retained reply"})
+            # The source process cannot finish until the server has persisted its receipt.
+            await asyncio.wait_for(received.wait(), 3)
+            runtime.pilot.write_json(tmp_path / "observations/result.json", {
+                "status": "PARTIAL_MODEL_RUN", "model_jobs": [
+                    {"status": "COMPLETED"}, {"status": "ERROR", "error": "MODEL_QUOTA_OR_RATE_LIMIT",
+                                               "raw_response": "secret", "provider_message": "secret"}]})
+            error = runtime.SequenceProcessTimeout if timeout else runtime.SequenceProcessFailure
+            raise error({"returncode": -9 if timeout else 3, "timeout": timeout})
+        async def checkpoint(value):
+            saved.append(deepcopy(value))
+            if value["receipts"]: received.set()
+        monkeypatch.setattr(runtime, "owned_process", process)
+        monkeypatch.setattr(runtime.pilot, "original_taps", lambda _: [])
+        with pytest.raises((runtime.SequenceProcessFailure, runtime.SequenceProcessTimeout)) as caught:
+            await runtime.discover(source, {}, tmp_path, checkpoint=checkpoint)
+        assert saved[-1]["receipts"][0]["raw_response"] == "retained reply"
+        info = caught.value.diagnostics
+        assert info["phase"] == "observations" and info["timeout"] is timeout
+        assert info["completed_receipts"] == 1 and info["error_codes"] == ["MODEL_QUOTA_OR_RATE_LIMIT"]
+        assert "secret" not in json.dumps(info)
+    asyncio.run(scenario())
+
+
+def test_retry_does_not_erase_checkpoint_or_failure_history_before_new_work(tmp_path):
+    video = tmp_path / "source.mp4"; video.write_bytes(b"synthetic")
+    existing = {"code_sha256": "test", "receipts": [{"packet_id": "completed"}]}
+    doc = {"id": "test", "analysis_engine": "SEQUENCE_V1", "full_report_status": "failed",
+           "sequence_retry": existing, "sequence_failures": [{"phase": "preparation"}]}
+    async def generate(*args, **kwargs):
+        assert store.doc["sequence_retry"] == existing
+        assert len(store.doc["sequence_failures"]) == 1
+        raise runtime.SequenceProcessFailure({"phase": "observations", "returncode": 3, "error_codes": []})
+    ns, store, _, _ = server_harness(video, doc, tmp_path,
+        runtime=SimpleNamespace(enabled=lambda: True, generate=generate))
+    asyncio.run(ns["generate_full_report_task"]("test"))
+    assert store.doc["full_report_status"] == "failed"
+    assert store.doc["sequence_retry"] == existing and len(store.doc["sequence_failures"]) == 2
+    assert store.doc["sequence_failures"][-1]["returncode"] == 3
+
+
+@pytest.mark.parametrize("change", [None, "claimed", "report", "source", "selection", "code", "status", "engine"])
+def test_partial_retry_is_bound_to_this_failed_report_source_selection_and_code(change):
+    retry = {"report_id": "one", "source_video_sha256": "source", "original_selection_values_sha256": "selection",
+             "code_sha256": runtime.code_fingerprint(), "receipts": []}
+    doc = {"id": "one", "analysis_engine": "SEQUENCE_V1", "full_report_status": "failed", "sequence_retry": retry}
+    if change == "report": doc["id"] = "other"
+    if change == "claimed": doc["full_report_status"] = "generating"
+    if change == "source": retry["source_video_sha256"] = "other"
+    if change == "selection": retry["original_selection_values_sha256"] = "other"
+    if change == "code": retry["code_sha256"] = {}
+    if change == "status": doc["full_report_status"] = "ready"
+    if change == "engine": doc["analysis_engine"] = "LEGACY"
+    resumed = runtime.retained_retry(doc, "source", "selection")
+    assert (resumed is not None) is (change in {None, "claimed"})
+    if resumed is not None:
+        resumed["receipts"].append("mutation")
+        assert retry["receipts"] == []
+
+
+def test_incomplete_or_unverified_retry_cannot_be_published(retained):
+    result = retained["result"]
+    result.update(fresh_end_to_end_run=False, execution_mode="EXACT_REQUEST_RETRY",
+                  retry_reused_packet_ids=[retained["receipts"][0]["packet_id"]], retry_reused_jobs=1)
+    with pytest.raises(ValueError, match="RUN_INCOMPLETE"):
+        bundle(retained)
+    retained["receipts"][0]["retry_payload_verified"] = True
+    assert bundle(retained)["events"]
+    result["status"] = "PARTIAL_MODEL_RUN"
+    with pytest.raises(ValueError, match="RUN_INCOMPLETE"):
+        bundle(retained)
 
 
 def test_existing_frontend_shows_verified_counts_and_joins_only_matching_proofs(tmp_path, retained):

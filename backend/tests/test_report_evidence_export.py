@@ -38,10 +38,14 @@ def test_export_contains_transitive_local_analysis_source_dependencies():
 def test_sequence_receipts_timings_and_engine_are_exported_without_new_analysis(case):
     doc, _, _, _ = case
     doc.update(analysis_engine="SEQUENCE_V1", sequence_audit={"receipts": [{"response_sha256": "kept"}]},
-               sequence_timings={"total_processing_seconds": 600})
+               sequence_timings={"total_processing_seconds": 600},
+               sequence_failures=[{"phase": "observations", "error_codes": ["MODEL_CONNECTION_FAILED"]}],
+               sequence_retry={"source_video_sha256": "same-source", "receipts": []})
     build(case)
     assert read(case, "sequence/audit.json") == doc["sequence_audit"]
     assert read(case, "sequence/timings.json") == doc["sequence_timings"]
+    assert read(case, "sequence/failures.json") == doc["sequence_failures"]
+    assert read(case, "sequence/retry.json") == doc["sequence_retry"]
     assert read(case, "canonical.json")["analysis_engine"] == "SEQUENCE_V1"
 
 

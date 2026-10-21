@@ -5794,7 +5794,7 @@ async def get_report_status(report_id: str, user=Depends(get_current_user)):
     `status` remains the legacy preview status. `analysis_complete` is scoped
     to this report's entitlement; a paid preview is never a completed dossier.
     """
-    doc = await db.reports.find_one({"id": report_id}, {"sequence_audit": 0})
+    doc = await db.reports.find_one({"id": report_id}, {"sequence_audit": 0, "sequence_retry": 0})
     if not doc:
         raise HTTPException(status_code=404, detail="Report not found.")
     # Allow the owner or admin to poll
@@ -7044,7 +7044,7 @@ async def _ensure_report_video_local(report_id: str) -> Optional[Path]:
 async def my_reports(user=Depends(get_current_user)):
     docs = await db.reports.find(
         {"user_id": user["id"]},
-        {"_id": 0, "full_report": 0, "sequence_audit": 0},
+        {"_id": 0, "full_report": 0, "sequence_audit": 0, "sequence_retry": 0},
     ).sort("created_at", -1).to_list(100)
     for d in docs:
         d["video_url"] = _resolve_video_url(d)
@@ -7463,7 +7463,7 @@ async def get_demo_report():
 
 @api_router.get("/reports/{report_id}")
 async def get_report(report_id: str, user=Depends(get_current_user)):
-    doc = await db.reports.find_one({"id": report_id}, {"_id": 0, "sequence_audit": 0})
+    doc = await db.reports.find_one({"id": report_id}, {"_id": 0, "sequence_audit": 0, "sequence_retry": 0})
     if not doc:
         raise HTTPException(status_code=404, detail="Report not found")
     if doc["user_id"] != user["id"] and user["role"] != "admin":
@@ -9128,9 +9128,11 @@ async def generate_full_report_task(report_id: str) -> None:
                 # FIX 00B — internal checkpoints reset for the new analysis run.
                 "identity_gate_done": False,
                 "identity_regen_required": False,
-            }, "$unset": {k: "" for k in doc if k.startswith(("fix10a_", "fix10b_", "unified_", "football_sequence_", "sequence_"))
-                           or k in {"canonical_events", "event_ledger", "football_scene_graph", "event_discovery_raw",
-                                    "identity_timeline", "identity_timeline_compare"}}},
+            }, "$unset": {k: "" for k in doc if k not in {
+                "sequence_audit", "sequence_timings", "sequence_retry", "sequence_failures"} and (
+                k.startswith(("fix10a_", "fix10b_", "unified_", "football_sequence_", "sequence_"))
+                or k in {"canonical_events", "event_ledger", "football_scene_graph", "event_discovery_raw",
+                         "identity_timeline", "identity_timeline_compare"})}},
         )
         file_path = await _ensure_report_video_local(report_id)
         if not file_path or not file_path.exists():
@@ -9147,8 +9149,7 @@ async def generate_full_report_task(report_id: str) -> None:
             # measured by sequence observations and must not survive a retry.
             await db.reports.update_one({"id": report_id}, {"$unset": {
                 k: "" for k in ("gt_track", "player_track", "movement_map", "pace_metrics", "speed_metrics", "heatmap",
-                                 "identity_timeline", "identity_timeline_compare", "sequence_audit",
-                                 "sequence_timings", "canonical_events")}})
+                                 "identity_timeline", "identity_timeline_compare", "canonical_events")}})
             async def checkpoint_sequence_observations(values):
                 await db.reports.update_one({"id": report_id}, {"$set": values})
             payload = await sequence_report_runtime.generate(file_path, doc, template=FULL_REPORT_PROMPT,
@@ -9801,6 +9802,13 @@ async def generate_full_report_task(report_id: str) -> None:
     except Exception as e:
         logger.exception(f"generate_full_report_task failed for {report_id}")
         await _trace(report_id, "full_failed")
+        diagnostics = getattr(e, "diagnostics", None)
+        if isinstance(diagnostics, dict):
+            try:
+                await db.reports.update_one({"id": report_id}, {"$push": {"sequence_failures": {
+                    "$each": [{**diagnostics, "at": now_iso()}], "$slice": -8}}})
+            except Exception:
+                logger.warning("Could not persist safe sequence failure diagnostics for %s", report_id)
         # Persist a friendly failure marker so the frontend can surface "Try again".
         try:
             await db.reports.update_one(
@@ -9865,7 +9873,7 @@ async def admin_agent_queue(_=Depends(get_current_admin_or_scout)):
     """All unlocked reports with their agent review state — oldest pending first."""
     cursor = db.reports.find(
         {"$or": [{"is_paid": True}, {"manually_unlocked": True}]},
-        {"_id": 0, "full_report": 0, "preview": 0, "sequence_audit": 0},
+        {"_id": 0, "full_report": 0, "preview": 0, "sequence_audit": 0, "sequence_retry": 0},
     ).sort("paid_at", 1)
     out = []
     async for d in cursor:
@@ -15263,7 +15271,7 @@ async def admin_delete_contact(msg_id: str, _=Depends(get_current_admin)):
 
 @api_router.get("/admin/reports")
 async def admin_reports(_=Depends(get_current_admin)):
-    docs = await db.reports.find({}, {"_id": 0, "full_report": 0, "sequence_audit": 0}).sort("created_at", -1).to_list(500)
+    docs = await db.reports.find({}, {"_id": 0, "full_report": 0, "sequence_audit": 0, "sequence_retry": 0}).sort("created_at", -1).to_list(500)
     for d in docs:
         d["video_url"] = _resolve_video_url(d)
         d["poster_url"] = _resolve_poster_url(d)

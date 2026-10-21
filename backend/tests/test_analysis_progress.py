@@ -72,11 +72,13 @@ def status_app(doc):
     reads = []
 
     async def find_one(query, projection):
-        assert projection == {"sequence_audit": 0}
+        assert projection == {"sequence_audit": 0, "sequence_retry": 0}
         reads.append(query)
         result = copy.deepcopy(doc)
         if result:
-            result.pop("sequence_audit", None)
+            for field, included in projection.items():
+                if included == 0:
+                    result.pop(field, None)
         return result
 
     async def current_user(authorization: str = Header(None)):
@@ -108,13 +110,16 @@ def test_status_endpoint_preserves_auth_and_only_reads_selected_report():
 
 def test_status_endpoint_preview_ready_is_not_full_ready():
     client, _ = status_app(report(analysis_status="ready", preview={"brief_summary": "Initial"},
-                                  full_report_status="finalizing", full_report={"scores": {}}))
+                                  full_report_status="finalizing", full_report={"scores": {}},
+                                  sequence_audit={"raw_response": "bulk source audit"},
+                                  sequence_retry={"raw_response": "bulk retry receipt"}))
     data = client.get("/reports/selected/status", headers={"Authorization": "owner"}).json()
     assert data["status"] == "ready"  # backward-compatible preview field
     assert data["preview_ready"] and data["has_full_report"]
     assert data["analysis_phase"] == "finalizing"
     assert not data["analysis_complete"] and not data["full_report_ready"]
     assert "full_report" not in data  # status endpoint stays lightweight
+    assert "sequence_retry" not in data and "sequence_audit" not in data
 
 
 def test_status_endpoint_missing_report():

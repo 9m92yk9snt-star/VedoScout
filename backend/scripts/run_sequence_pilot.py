@@ -18,6 +18,7 @@ import time
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import sequence_pilot as pilot
 import sequence_pilot_transport as transport
+from sequence_run_checkpoint import code_fingerprint, reusable_receipt
 
 FRESH_IDENTITY_INSTRUCTION = "Read all original selections afresh; no inferred appearance profile or past action answer is supplied. A local original point locates the intended physical player at that instant. Connect identity by readable numbers and continuous movement, not guessed facial hair or shadow. At every candidate release distinguish that person's body/boot movement from nearby players. Compare before and after occlusion. A separate teammate can finish first time: the receiving and striking contact may be the same action. Do not invent an extra settled touch or conflate the releaser with the receiver. Keep opposing brushes distinct from controlled possession. If contacts or actors remain ambiguous, retain a specific question. Return the actual result, including unsuccessful actions. No expected answers or target count is supplied."
 
@@ -43,7 +44,7 @@ def original_spatial_items(manifest, packet, output):
 def run(manifest_path, output_dir, *, provider="gemini", model="gemini-2.5-pro", budget_s=300., max_initial=4,
         max_followups=2, per_call_s=90., reasoning_effort=None, identity_profile=False, image_detail=None,
         identity_profile_receipt=None, contact_reviews=False, resume_initial_receipts=None, fresh_originals=False,
-        resume_fresh_initial=None, automatic_outcomes=False):
+        resume_fresh_initial=None, automatic_outcomes=False, retry_receipts=None):
     started, out = time.monotonic(), Path(output_dir).resolve()
     if out.exists() and any(out.iterdir()):
         raise ValueError("OUTPUT_MUST_BE_NEW_OR_EMPTY")
@@ -58,14 +59,14 @@ def run(manifest_path, output_dir, *, provider="gemini", model="gemini-2.5-pro",
         raise ValueError("FRESH_RESUME_REQUIRES_ORIGINAL_SELECTION_MODE")
     if automatic_outcomes and (not fresh_originals or not contact_reviews or resume_fresh_initial):
         raise ValueError("AUTOMATIC_OUTCOMES_REQUIRE_COLD_FRESH_CONTACT_RUN")
+    if retry_receipts and (not automatic_outcomes or resume_initial_receipts or resume_fresh_initial):
+        raise ValueError("EXACT_RETRY_REQUIRES_ORIGINAL_AUTOMATIC_RUN")
     if fresh_originals:
         manifest = fresh_original_manifest(manifest)
     if provider not in transport.KEY_ENV:
         raise ValueError("INVALID_MODEL_PROVIDER")
     summary = {"version": pilot.VERSION, "status": "NOT_STARTED", "provider": provider, "model": model,
-               "code_sha256": {p.name: pilot.digest(p) for p in (
-                   Path(pilot.__file__), Path(transport.__file__), Path(__file__),
-                   Path(pilot.__file__).with_name("player_selection.py"))},
+               "code_sha256": code_fingerprint(),
                "source_video_sha256": manifest["source_video_sha256"], "preparation_reused": True,
                "prior_preparation_seconds": manifest["preparation_seconds"], "wall_budget_seconds": budget_s,
                "production_pipeline_changed": False, "expected_answers_used_as_input": False,
@@ -87,10 +88,17 @@ def run(manifest_path, output_dir, *, provider="gemini", model="gemini-2.5-pro",
     if pilot.digest(manifest["source_video"]) != manifest["source_video_sha256"]:
         raise ValueError("SOURCE_VIDEO_CHANGED")
     deadline, resolved_results, receipts = started + budget_s, [], []
+    saved_retry = pilot.read_json(retry_receipts) if retry_receipts else {}
+    if saved_retry and (saved_retry.get("code_sha256") != summary["code_sha256"]
+            or saved_retry.get("source_video_sha256") != manifest["source_video_sha256"]
+            or saved_retry.get("original_taps_sha256") != manifest["original_taps_sha256"]):
+        raise ValueError("INITIAL_RECEIPT_INPUT_MISMATCH")
+    retry_by_id = {r["packet_id"]: r for r in saved_retry.get("receipts", [])}
+    reused_ids = []
     owner_manifest = manifest
 
     def execute(packets, current_manifest):
-        jobs = []
+        jobs, reused = [], []
         for packet in packets:
             if fresh_originals:
                 packet["contact_sequence_evidence"] = True
@@ -117,11 +125,31 @@ def run(manifest_path, output_dir, *, provider="gemini", model="gemini-2.5-pro",
                 {**packet, "image_delivery": request_audit,
                  "spatial_reference_audit":spatial_audit,
                  "prompt_sha256": hashlib.sha256("\n".join(x["text"] for x in items if x["type"] == "text").encode()).hexdigest()})
-            jobs.append({"packet_id": packet["packet_id"], "items": items,
-                         "reasoning_effort": reasoning_effort, "image_detail": image_detail})
+            candidate = retry_by_id.get(packet["packet_id"], {})
+            verified = False
+            if reusable_receipt(candidate, request_audit, provider=provider, model=model, packet_id=packet["packet_id"]):
+                # Re-parse and rebind to the newly prepared source context before reuse.
+                try:
+                    pilot.resolve_response(pilot.parse_response(candidate["raw_response"]), current_manifest, packet,
+                        {k: candidate[k] for k in ("packet_id", "payload_sha256", "response_sha256", "origin")})
+                except (ValueError, KeyError, TypeError):
+                    candidate = {}
+                else:
+                    candidate = {**candidate, "retry_payload_verified": True}
+                    reused.append(candidate)
+                    reused_ids.append(packet["packet_id"])
+                    verified = True
+            if not verified:
+                jobs.append({"packet_id": packet["packet_id"], "items": items,
+                             "reasoning_effort": reasoning_effort, "image_detail": image_detail})
         print(json.dumps({"phase": packets[0]["phase"] if packets else "NONE", "jobs": len(jobs),
                           "remaining_seconds": round(max(0, deadline - time.monotonic()), 1)}), flush=True)
-        responses = transport.run_jobs(jobs, provider, model, deadline=deadline, per_call_s=per_call_s)
+        def save_receipt(receipt):
+            pilot.write_json(out / "responses" / (receipt["packet_id"] + ".json"), receipt)
+        for receipt in reused:
+            save_receipt(receipt)
+        responses = reused + (transport.run_jobs(jobs, provider, model, deadline=deadline, per_call_s=per_call_s,
+                                                on_result=save_receipt) if jobs else [])
         by_id = {p["packet_id"]: p for p in packets}
         for receipt in responses:
             pilot.write_json(out / "responses" / (receipt["packet_id"] + ".json"), receipt)
@@ -256,6 +284,9 @@ def run(manifest_path, output_dir, *, provider="gemini", model="gemini-2.5-pro",
         summary.update(status="EXPERIMENT_STOPPED", error_type=type(exc).__name__,
                        error_code=str(exc) if str(exc) in safe_codes else "EXPERIMENT_PROCESSING_FAILED")
     finally:
+        summary.update(retry_reused_packet_ids=reused_ids, retry_reused_jobs=len(reused_ids),
+                       execution_mode="EXACT_REQUEST_RETRY" if reused_ids else "FRESH",
+                       fresh_end_to_end_run=bool(fresh_originals and not resume_fresh_initial and not reused_ids))
         summary.update(model_jobs=receipts, analysis_seconds=round(time.monotonic() - started, 3),
                        model_jobs_completed=sum(r.get("status") == "COMPLETED" for r in receipts),
                        independent_visual_correctness_verified=False)
@@ -275,6 +306,7 @@ def main():
     prepare.add_argument("--overlap-ms", type=int, default=6000)
     prepare.add_argument("--scene-packets", action="store_true", help="Split using measured source-image changes; raw reference consensus")
     model = commands.add_parser("run", help="Paid model experiment; requires configured environment key")
+    model.add_argument("--retry-receipts", type=Path, help="Same-report exact-request receipts; never historical action hints")
     model.add_argument("--prepared", type=Path, required=True)
     model.add_argument("--output", type=Path, required=True)
     model.add_argument("--provider", choices=sorted(transport.KEY_ENV), default="gemini")
@@ -308,7 +340,8 @@ def main():
                      reasoning_effort=args.reasoning_effort, identity_profile=args.identity_profile, image_detail=args.image_detail,
                      identity_profile_receipt=args.identity_profile_receipt, contact_reviews=args.contact_reviews,
                      resume_initial_receipts=args.resume_initial_receipts, fresh_originals=args.fresh_originals,
-                     resume_fresh_initial=args.resume_fresh_initial,automatic_outcomes=args.automatic_outcomes)
+                     resume_fresh_initial=args.resume_fresh_initial,automatic_outcomes=args.automatic_outcomes,
+                     retry_receipts=args.retry_receipts)
         print(json.dumps({k: result.get(k) for k in ("status", "analysis_seconds", "model_jobs_completed", "counts")}, indent=2))
         return 0 if result["status"] == "MODEL_OBSERVATIONS_RETURNED" else 3
     else:

@@ -207,7 +207,7 @@ def _stop(process):
     process.close()
 
 
-def run_jobs(jobs, provider, model, *, deadline, per_call_s=90., workers=2, worker=_worker):
+def run_jobs(jobs, provider, model, *, deadline, per_call_s=90., workers=2, worker=_worker, on_result=None):
     """Two owned children; a wall deadline stops actual work, including hung IO."""
     if provider not in KEY_ENV or not 1 <= workers <= 2 or not 0 < per_call_s <= MAX_CALL_SECONDS:
         raise ValueError("INVALID_EXECUTION_BUDGET")
@@ -236,6 +236,8 @@ def run_jobs(jobs, provider, model, *, deadline, per_call_s=90., workers=2, work
                               "error": "MODEL_ACCESS_STOPPED" if abort else "MODEL_WALL_DEADLINE_EXCEEDED"}
                 if result is not None:
                     results.append(result)
+                    if on_result:
+                        on_result(result)
                     abort = abort or result.get("error") in STOP_ERRORS
                     pipe.close(); _stop(process); del active[pid]
             if (now >= deadline or abort) and not active:

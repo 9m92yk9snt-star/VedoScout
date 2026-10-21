@@ -614,6 +614,71 @@ def test_quota_failure_stops_every_queued_request_without_retry():
     assert all(r["error"] == "MODEL_ACCESS_STOPPED" for r in result[1:])
 
 
+def test_transport_persists_result_before_returning_the_batch():
+    saved = []
+    result = t.run_jobs([{"packet_id": "first"}], "emergent", "gpt-6-astra",
+                        deadline=time.monotonic()+5, workers=1, worker=quota_worker,
+                        on_result=lambda row: saved.append(deepcopy(row)))
+    assert saved == result and saved[0]["http_status"] == 429
+
+
+@pytest.mark.parametrize("change,expected_sent", [
+    (None, ["second"]), ("request", ["first", "second"]),
+    ("response", ["first", "second"]), ("model", ["first", "second"]),
+    ("status", ["first", "second"]), ("invalid_json", ["first", "second"]),
+])
+def test_retry_only_sends_unfinished_or_changed_exact_requests(tmp_path, monkeypatch, change, expected_sent):
+    from scripts import run_sequence_pilot as runner
+    from sequence_run_checkpoint import code_fingerprint
+    manifest, packet, data = fixture()
+    source = tmp_path / "source.bin"; source.write_bytes(b"synthetic source")
+    manifest.update(source_video=str(source), source_video_sha256=p.digest(source), original_taps_sha256="selections",
+                    references=[{"reference_id": "r1"}])
+    manifest["packets"].append({**packet, "packet_id": "second"})
+    path = tmp_path / "manifest.json"; p.write_json(path, manifest)
+    items = lambda m, j: [{"type": "text", "text": j["packet_id"]}]
+    monkeypatch.setattr(p, "packet_items", items)
+    monkeypatch.setattr(runner, "original_spatial_items", lambda *a: ([], []))
+    monkeypatch.setattr(p, "plan_contact_reviews", lambda *a, **kw: [])
+    monkeypatch.setattr(p, "plan_outcome_reviews", lambda *a, **kw: [])
+    monkeypatch.setenv("EMERGENT_LLM_KEY", "SYNTHETIC_NO_NETWORK_TEST")
+    def receipt(job):
+        audit = t.build_request("emergent", "gpt-6-astra", job["items"], reasoning_effort="medium", image_detail="high")[2]
+        raw = json.dumps(data)
+        return {**audit, "packet_id": job["packet_id"], "provider": "emergent", "requested_model": "gpt-6-astra",
+                "origin": "LIVE_MODEL_REQUEST", "status": "COMPLETED", "raw_response": raw,
+                "response_sha256": hashlib.sha256(raw.encode()).hexdigest()}
+    # Reconstruct exactly what the runner inserts; only the first job finished previously.
+    first = receipt({"packet_id": "first", "items": [items(None, packet)[0],
+                     {"type": "text", "text": runner.FRESH_IDENTITY_INSTRUCTION}]})
+    if change == "request": first["payload_sha256"] = "changed"
+    if change == "response": first["raw_response"] += "corrupted"
+    if change == "model": first["requested_model"] = "other-model"
+    if change == "status": first["status"] = "ERROR"
+    if change == "invalid_json":
+        first["raw_response"] = "not JSON"
+        first["response_sha256"] = hashlib.sha256(b"not JSON").hexdigest()
+    retry = {"code_sha256": code_fingerprint(), "source_video_sha256": manifest["source_video_sha256"],
+             "original_taps_sha256": "selections", "receipts": [first]}
+    retry_path = tmp_path / "retry.json"; p.write_json(retry_path, retry)
+    sent = []
+    def send(jobs, *a, on_result, **kw):
+        sent.extend(j["packet_id"] for j in jobs)
+        rows = [receipt(j) for j in jobs]
+        for row in rows: on_result(row)
+        return rows
+    monkeypatch.setattr(t, "run_jobs", send)
+    result = run(path, tmp_path / "result", provider="emergent", model="gpt-6-astra", fresh_originals=True,
+                 contact_reviews=True, automatic_outcomes=True, reasoning_effort="medium", image_detail="high",
+                 retry_receipts=retry_path)
+    assert sent == expected_sent
+    assert result["status"] == "MODEL_OBSERVATIONS_RETURNED"
+    assert result["retry_reused_packet_ids"] == (["first"] if change is None else [])
+    assert result["fresh_end_to_end_run"] is (change is not None)
+    for name in ("first", "second"):
+        assert p.read_json(tmp_path / "result/responses" / (name + ".json"))["status"] == "COMPLETED"
+
+
 @pytest.mark.parametrize("payload,header,kind", [
     ({"error": {"code": "insufficient_quota", "message": "secret-token-do-not-save"}}, "30", "QUOTA_EXHAUSTED"),
     ({"error": {"type": "rate_limit_error", "message": "secret-token-do-not-save"}}, "1.5", "RATE_LIMITED"),
@@ -931,7 +996,7 @@ def test_cold_automatic_outcome_round_shares_budget_and_preserves_uncertainty_on
         return m,[{**j,"frame_ids":packet["frame_ids"]} for j in jobs]
     monkeypatch.setattr(p,"prepare_contact_reviews",prepare)
     calls=[]
-    def transport(jobs,provider,model,*,deadline,per_call_s):
+    def transport(jobs,provider,model,*,deadline,per_call_s,on_result):
         calls.append((deepcopy(jobs),deadline))
         assert len(jobs)==1 and "SAVED" not in json.dumps(jobs)
         j=jobs[0]

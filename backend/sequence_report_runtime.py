@@ -19,6 +19,7 @@ import sequence_pilot_transport as transport
 import sequence_report_adapter as adapter
 from evidence_authority import attach_clip_authority, compute_proof_frame_verified
 from report_fact_authority import assessment_prompt
+from sequence_run_checkpoint import code_fingerprint, failure_metadata
 
 
 def enabled():
@@ -29,6 +30,18 @@ def enabled():
     return True
 
 
+class SequenceProcessFailure(RuntimeError):
+    def __init__(self, diagnostics):
+        super().__init__("SEQUENCE_PROCESS_FAILED")
+        self.diagnostics = diagnostics
+
+
+class SequenceProcessTimeout(TimeoutError):
+    def __init__(self, diagnostics):
+        super().__init__("SEQUENCE_PROCESS_TIMEOUT")
+        self.diagnostics = diagnostics
+
+
 async def owned_process(args, *, timeout_s, log_path):
     """Cancellation/timeout also kills model workers; never leave paid orphans."""
     with Path(log_path).open("wb") as log:
@@ -36,20 +49,22 @@ async def owned_process(args, *, timeout_s, log_path):
                                                        start_new_session=True)
         try:
             await asyncio.wait_for(process.wait(), timeout_s)
-        except BaseException:
+        except BaseException as exc:
             if process.returncode is None:
                 try:
                     os.killpg(process.pid, signal.SIGKILL)
                 except ProcessLookupError:
                     pass
                 await process.wait()
+            if isinstance(exc, TimeoutError):
+                raise SequenceProcessTimeout({"returncode": process.returncode, "timeout": True}) from None
             raise
         if process.returncode:
             # Do not expose provider output, filesystem paths or credentials.
-            raise RuntimeError("SEQUENCE_PROCESS_FAILED")
+            raise SequenceProcessFailure({"returncode": process.returncode, "timeout": False})
 
 
-async def discover(video, anchors_document, work):
+async def discover(video, anchors_document, work, *, checkpoint=None, resume=None):
     started = time.monotonic()
     root = Path(work)
     inputs = root / "inputs"
@@ -61,16 +76,65 @@ async def discover(video, anchors_document, work):
     (inputs / "SHA256SUMS").write_text("".join(f"{sha}  {name}\n" for sha, name in sums))
     script = Path(__file__).parent / "scripts" / "run_sequence_pilot.py"
     prepared, output = root / "prepared", root / "observations"
-    await owned_process([sys.executable, script, "prepare", "--evidence-dir", inputs,
-                         "--output", prepared, "--scene-packets", "--max-edge", "1280"],
-                        timeout_s=75, log_path=root / "preparation.log")
-    budget = max(1, 900 - (time.monotonic() - started))
-    await owned_process([sys.executable, script, "run", "--prepared", prepared / "manifest.json",
+    phase = "preparation"
+    async def process():
+        nonlocal phase
+        await owned_process([sys.executable, script, "prepare", "--evidence-dir", inputs,
+                             "--output", prepared, "--scene-packets", "--max-edge", "1280"],
+                            timeout_s=75, log_path=root / "preparation.log")
+        phase = "observations"
+        budget = max(1, 900 - (time.monotonic() - started))
+        args = [sys.executable, script, "run", "--prepared", prepared / "manifest.json",
                          "--output", output, "--provider", "emergent", "--model", "gpt-6-astra",
                          "--reasoning-effort", "medium", "--budget-s", str(budget), "--per-call-s", "120",
                          "--max-initial", "12", "--max-followups", "6", "--fresh-originals",
-                         "--contact-reviews", "--automatic-outcomes", "--image-detail", "high"],
-                        timeout_s=budget + 10, log_path=root / "observations.log")
+                         "--contact-reviews", "--automatic-outcomes", "--image-detail", "high"]
+        if resume:
+            pilot.write_json(root / "retry.json", resume)
+            args += ["--retry-receipts", root / "retry.json"]
+        await owned_process(args, timeout_s=budget + 10, log_path=root / "observations.log")
+
+    seen = None
+    async def persist_progress():
+        nonlocal seen
+        if not checkpoint or not (prepared / "manifest.json").exists():
+            return
+        manifest = pilot.read_json(prepared / "manifest.json")
+        # Retain previous completed work even if this retry is interrupted before
+        # the rebuilt runner has reached its packet. Every reuse is checked again.
+        by_id = {r["packet_id"]: r for r in (resume or {}).get("receipts", [])}
+        by_id.update({p.stem: pilot.read_json(p) for p in sorted((output / "responses").glob("*.json"))})
+        rows = [by_id[k] for k in sorted(by_id)]
+        value = {"code_sha256": code_fingerprint(), "source_video_sha256": manifest["source_video_sha256"],
+                 "original_taps_sha256": manifest["original_taps_sha256"], "receipts": rows}
+        payload = json.dumps(value, sort_keys=True).encode()
+        if len(payload) > 4_000_000:
+            raise ValueError("SEQUENCE_RETRY_TOO_LARGE")
+        signature = hashlib.sha256(payload).hexdigest()
+        if signature != seen:
+            await checkpoint(value)
+            seen = signature
+
+    task = asyncio.create_task(process())
+    try:
+        while not task.done():
+            await asyncio.wait({task}, timeout=.5)
+            await persist_progress()
+        await task
+    except (SequenceProcessFailure, SequenceProcessTimeout) as exc:
+        result = pilot.read_json(output / "result.json") if (output / "result.json").exists() else {}
+        rows = result.get("model_jobs") or [pilot.read_json(p) for p in sorted((output / "responses").glob("*.json"))]
+        exc.diagnostics = failure_metadata(phase, time.monotonic()-started, result=result, receipts=rows,
+                                           **exc.diagnostics)
+        raise
+    finally:
+        if not task.done():
+            task.cancel()
+        try:
+            await task
+        except BaseException:
+            pass
+        await persist_progress()
     result = pilot.read_json(output / "result.json")
     manifest = pilot.read_json(prepared / "manifest.json")
     frames = {f["frame_id"]: f for f in manifest["frames"]}
@@ -164,14 +228,13 @@ def retained_source(doc, source, selection_sha):
     Never accept an inferred identity profile, a different selection or a
     checkpoint interpreted by different source-analysis code.
     """
-    if doc.get("analysis_engine") != adapter.ENGINE or doc.get("full_report_status") != "failed":
+    # Admission claims the retry before this function runs, changing failed to
+    # generating. Both states are eligible; ready reports never enter recovery.
+    if doc.get("analysis_engine") != adapter.ENGINE or doc.get("full_report_status") not in {"failed", "generating"}:
         return None
     audit = doc.get("sequence_audit") or {}
     result = audit.get("result") or {}
-    root = Path(__file__).parent
-    code = {p.name: pilot.digest(p) for p in (
-        Path(pilot.__file__), Path(transport.__file__), root / "scripts/run_sequence_pilot.py",
-        root / "player_selection.py")}
+    code = code_fingerprint()
     if (audit.get("source_video_sha256") != source
             or audit.get("original_selection_values_sha256") != selection_sha
             or result.get("code_sha256") != code
@@ -183,6 +246,17 @@ def retained_source(doc, source, selection_sha):
     receipts = audit.get("receipts") or []
     adapter.canonical_bundle(result, manifest, receipts)  # recheck all receipts and role bindings
     return deepcopy(result), manifest, deepcopy(receipts)
+
+
+def retained_retry(doc, source, selection_sha):
+    retry = doc.get("sequence_retry") or {}
+    if (doc.get("analysis_engine") == adapter.ENGINE and doc.get("full_report_status") in {"failed", "generating"}
+            and doc.get("id") and retry.get("report_id") == doc["id"]
+            and retry.get("source_video_sha256") == source
+            and retry.get("original_selection_values_sha256") == selection_sha
+            and retry.get("code_sha256") == code_fingerprint()):
+        return deepcopy(retry)
+    return None
 
 
 async def generate(video, doc, *, template, writer=write_facts, discovery=discover, checkpoint=None):
@@ -201,7 +275,17 @@ async def generate(video, doc, *, template, writer=write_facts, discovery=discov
     selection_sha = hashlib.sha256(json.dumps(anchor_document, sort_keys=True).encode()).hexdigest()
     retained = retained_source(doc, source, selection_sha) if discovery is discover else None
     with tempfile.TemporaryDirectory(prefix="sequence-report-") as work:
-        result, manifest, receipts = retained or await discovery(video, anchor_document, work)
+        retry = retained_retry(doc, source, selection_sha)
+        async def save_progress(value):
+            if checkpoint:
+                await checkpoint({"sequence_retry": {**value, "report_id": doc.get("id"),
+                                                      "original_selection_values_sha256": selection_sha}})
+        if retained:
+            result, manifest, receipts = retained
+        elif discovery is discover:
+            result, manifest, receipts = await discover(video, anchor_document, work, checkpoint=save_progress, resume=retry)
+        else:
+            result, manifest, receipts = await discovery(video, anchor_document, work)
         # Persist paid observations before projection/writing can fail. A failed
         # writer must never discard nine minutes of source-reading receipts.
         audit = {"result": result, "receipts": receipts, "writer_receipts": [],
@@ -226,6 +310,7 @@ async def generate(video, doc, *, template, writer=write_facts, discovery=discov
             audit["original_source_analysis_seconds"] = round(observed-started, 3)
         source_timings = {"source_analysis_seconds": round(observed-started, 3),
                           "source_phase_reused": retained is not None,
+                          "source_jobs_reused": result.get("retry_reused_jobs", 0),
                           "retained_source_analysis_seconds": audit["original_source_analysis_seconds"] if retained else None}
         prompt = assessment_prompt(template, bundle, doc.get("player_details"),
                                    {"coverage_status": "PARTIAL", "engine": adapter.ENGINE,
