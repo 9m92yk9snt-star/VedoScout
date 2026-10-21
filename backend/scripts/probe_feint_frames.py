@@ -117,8 +117,9 @@ def run(video,anchors,output,run_model=False):
             'caveat':'Source citations and model claims are documented; factual correctness requires independent source review.'}
     p.write_json(out/'result.json',result)
     if not run_model:return result
-    receipts=t.run_jobs(jobs,'emergent','gpt-6-astra',deadline=time.monotonic()+420,per_call_s=205,workers=2,
-                       on_result=lambda r:p.write_json(out/(r['packet_id']+'-receipt.json'),r))
+    receipts=t.run_jobs(jobs,'emergent','gpt-6-astra',deadline=time.monotonic()+420,per_call_s=205,workers=2)
+    for receipt in receipts:
+        p.write_json(out/(receipt['packet_id']+'-receipt.json'),receipt)
     try:
         observations=[]
         for receipt,packet in zip(receipts,packets):
