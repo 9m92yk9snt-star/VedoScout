@@ -1244,10 +1244,10 @@ def _parent_tips_card(c, tips, x, y, w, h):
         ty -= item_h
 
 
-def _action_timeline_card(c, actions, x, y, w, h):
+def _action_timeline_card(c, actions, x, y, w, h, title="Action Timeline Preview - Full Log Follows"):
     card(c, x, y, w, h)
     ty = y + h - PAD
-    ty -= card_title(c, x + PAD, ty, "Action Timeline Preview - Full Log Follows", w - 2 * PAD)
+    ty -= card_title(c, x + PAD, ty, title, w - 2 * PAD)
     row_h = (ty - y - 4) / max(1, len(actions))
     lx = x + PAD + 5
     c.saveState()
@@ -2282,6 +2282,27 @@ def _sm_chips_row(c, s, x, cy, max_w):
 def _sm_rich_card(c, s, x, y, w, h):
     card(c, x, y, w, h)
     ty = y + h - PAD + 2
+    if 'category_skills' in s:
+        c.setFillColor(INK)
+        c.setFont(F_BLACK, 10.5)
+        c.drawString(x + PAD, ty - 15, str(s['category']).upper())
+        c.setFillColor(MUTED)
+        c.setFont(F_BODY, 6.6)
+        c.drawString(x + PAD, ty - 28, "Skill /10 - age-band reference")
+        rows = s['category_skills']
+        if not rows:
+            draw_par(c, "Not assessed in this clip.", x + PAD, ty - 40,
+                     w - 2 * PAD, _style(F_BODY, 7, MUTED, leading=9))
+        for i, skill in enumerate(rows):
+            baseline = ty - 42 - i * 11
+            c.setFillColor(BODY)
+            c.setFont(F_BODY, 7)
+            c.drawString(x + PAD, baseline, skill['label'])
+            ref = (skill.get('comparison') or {}).get('label', 'No reference')
+            c.setFillColor(FOREST)
+            c.setFont(F_BOLD, 6.8)
+            c.drawRightString(x + w - PAD, baseline, f"{skill['score']:.1f} - {ref}")
+        return
     c.setFillColor(MUTED)
     c.setFont(F_BOLD, 5.6)
     c.drawString(x + PAD, ty - 7, str(s.get("category", "")).upper())
@@ -2312,6 +2333,41 @@ def _sm_rich_card(c, s, x, y, w, h):
     _sm_chips_row(c, s, x + PAD, y + 11, w - 2 * PAD)
 
 
+def _publication_score_notes(c, sm, x, y, w, h):
+    """Concise score context and evidence navigation in the original lower card."""
+    from urllib.parse import quote
+    pub = sm['publication']
+    score = pub['score']
+    card(c, x, y, w, h)
+    ty = y + h - PAD
+    ty -= card_title(c, x + PAD, ty, "Score & Academy Reference", w - 2 * PAD)
+    lines = [
+        f"{score['rated_skills']}/{score['total_skills']} skills rated; {score['weighted_coverage_pct']}% of rubric weight covered. Unrated skills are excluded.",
+        "Observed clip only. Position priorities carry weight 2; other skills weight 1.",
+    ]
+    comp = score.get('comparison')
+    if comp:
+        lines.append(comp['bracket'] + ': ' + ' | '.join(f"{r['label']} {r['min']}-{r['max']}" for r in comp['ranges']))
+    lines += ["Coaching rubric v1, not measured peer percentiles or an academy-admission prediction.",
+              "Unconfirmed foot-side observations are excluded from weak-foot grading.",
+              "Full observations and supporting evidence are retained in the online report and evidence export."]
+    for line in lines:
+        used = draw_par(c, esc(line), x + PAD, ty, w - 2 * PAD,
+                        _style(F_BODY, 6.6, BODY, leading=8.5))
+        ty -= used + 3
+    c.setFillColor(FOREST)
+    c.setFont(F_BOLD, 6.6)
+    c.drawString(x + PAD, y + 25, "OPEN KEY-ACTION EVIDENCE (account access may be required)")
+    actions = pub['key_actions'][:5]
+    for i, action in enumerate(actions):
+        bx = x + PAD + i * ((w - 2 * PAD) / max(1, len(actions)))
+        label = action['timestamp'] + ' ' + action['title']
+        c.setFont(F_BODY, 6.6)
+        c.drawString(bx, y + 13, label)
+        url = 'https://scoutmeplay.com/report/' + quote(str(sm['report_id']), safe='') + '#event-' + quote(action['event_id'], safe='')
+        c.linkURL(url, (bx, y + 10, bx + c.stringWidth(label, F_BODY, 6.6), y + 21), relative=0)
+
+
 def _score_meaning_page(c, sm, player_name, page_no, total_pages):
     """Full page: the numbers, translated — one primary truth per score,
     every other mention a NEW angle (proof, comparison, trend, gap)."""
@@ -2330,9 +2386,10 @@ def _score_meaning_page(c, sm, player_name, page_no, total_pages):
     c.setFillColor(HexColor("#C9D8C0"))
     c.setFont(F_BODY, 6.8)
     c.drawString(M + PAD, yy - 32,
+                 f"Scores and age-band references for {first}, grouped by category." if sm.get("publication") else
                  f"A number on its own says nothing. Here every score becomes a discovery about {first} — "
                  "what it looks like on the pitch, the proof behind it, and the road upward.")
-    if sm.get("position_line"):
+    if sm.get("position_line") and not sm.get("publication"):
         c.setFillColor(HexColor("#9FBF93"))
         c.setFont(F_BODY, 6.4)
         c.drawString(M + PAD, yy - 44, str(sm["position_line"])[:150])
@@ -2340,7 +2397,7 @@ def _score_meaning_page(c, sm, player_name, page_no, total_pages):
     yy -= h_hd + GAP
 
     skills = sm.get("skills") or []
-    rich, rest = skills[:4], skills[4:]
+    rich, rest = (sm["category_groups"], []) if sm.get("category_groups") else (skills[:4], skills[4:])
     disc = sm.get("discovery")
 
     cw2 = (CW - GAP) / 2
@@ -2388,6 +2445,9 @@ def _score_meaning_page(c, sm, player_name, page_no, total_pages):
             c.setFont(F_BODY, 5.9)
             c.drawString(bx, by - 16.5, ("  ·  ".join(bits))[:96])
         yy -= h_sk + GAP
+
+    if sm.get("publication"):
+        _publication_score_notes(c, sm, M, yy - 153, CW, 153)
 
     if disc and yy - M >= h_disc:
         c.saveState()
@@ -2928,78 +2988,9 @@ def _gyg_page(c, gyg, player_name, page_no, total_pages):
 
 
 
-def _publication_layout(report):
-    """Paginate authoritative copy with measured Paragraph heights, never slice rows."""
-    pub = report.get("report_publication")
-    if not pub:
-        return []
-    from urllib.parse import quote
-    blocks = []
-    def add(text, heading=False):
-        style = _style(F_BOLD if heading else F_BODY, 11 if heading else 8.3,
-                       FOREST if heading else BODY, leading=14 if heading else 10.8)
-        blocks.append(Paragraph(text, style))
-    score = pub["score"]
-    add("SCORE, ACADEMY REFERENCE &amp; EVIDENCE", True)
-    add(f"<b>{esc(score['label'])}: {score['value'] if score['value'] is not None else 'Not assessed'}/10</b> - provisional clip assessment")
-    add(f"{score['rated_skills']}/{score['total_skills']} skills rated; {score['weighted_coverage_pct']}% of rubric weight covered; {score['unique_events']} distinct supporting actions.")
-    add(esc(score['method']))
-    comp = score.get("comparison")
-    if comp:
-        add(esc(comp['bracket'] + ' - ' + comp['label'] + ' reference for observed skills'), True)
-        add(esc(' | '.join(f"{r['label']}: {r['min']}-{r['max']}" for r in comp['ranges'])))
-        add(esc(comp['note']))
-    add(esc(pub['stats_definitions']))
-    add(esc(pub["review"]["analysis_status"] + " - " + pub["review"]["human_status"]))
-    add("DOCUMENTED KEY ACTIONS", True)
-    report_id = quote(str(report.get('id') or ''), safe='')
-    for action in pub['key_actions']:
-        event = quote(action['event_id'], safe='')
-        url = f"https://scoutmeplay.com/report/{report_id}#event-{event}"
-        add(f"<b>{esc(action['timestamp'])} - {esc(action['title'])}</b>")
-        interval = action.get('contact_interval_ms')
-        if interval:
-            add(esc(f"Contact window: {interval[0]/1000:.3f}-{interval[1]/1000:.3f} s. Foot side is not established."))
-        add(f"Evidence reference: {esc(action['event_id'])} - <link href='{url}' color='#12402A'><u>Open report evidence (account access may be required)</u></link>")
-    add("OBSERVED SKILL GRADES &amp; SUPPORTING ACTIONS", True)
-    for skill in (report.get('score_meaning') or {}).get('skills', []):
-        ref = skill.get('comparison') or {}
-        ev = skill.get('evidence') or {}
-        add(esc(f"{skill['label']}: {skill['score']:.1f}/10 - {ref.get('label', 'No age reference')} - {ev.get('timestamp', '')}"))
-        source_skill = (report['full_report'].get(skill.get('category')) or {}).get(skill.get('key')) or {}
-        refs = ', '.join(e['event_id'] for e in source_skill.get('evidence') or []) or str(ev.get('event_id') or 'Unavailable')
-        add(esc('Evidence reference: ' + refs))
-    add("COMPLETE ACTION TIMELINE", True)
-    for action in pub['view']['actionTimeline']:
-        add(f"<b>{esc(action['timestamp'])} - {esc(action['title'])}</b> - {esc(action['description'])}")
-        add(esc('Evidence reference: ' + action['eventId']))
-    add(esc(pub['assessment_note']))
-    available = H - 2 * M - 66
-    pages, current, used = [], [], 0
-    for index, block in enumerate(blocks):
-        _, height = block.wrap(CW - 20, available)
-        # Keep action headings with at least the following description.
-        if block.text.startswith('<b>') and index + 1 < len(blocks):
-            following_height = blocks[index + 1].wrap(CW - 20, available)[1]
-            if current and used + height + following_height + 12 > available:
-                pages.append(current)
-                current, used = [], 0
-        # A paragraph longer than a page is split by ReportLab, preserving text.
-        pieces = block.split(CW - 20, available) if height > available else [block]
-        for piece in pieces:
-            _, height = piece.wrap(CW - 20, available)
-            if current and used + height + 6 > available:
-                pages.append(current)
-                current, used = [], 0
-            current.append((piece, height))
-            used += height + 6
-    if current:
-        pages.append(current)
-    return pages
-
 
 def build_pdf_v2(report_doc: dict, output_path: str, image_resolver=None, promo: bool = False):
-    """Render the Premium Report V2 card layout to a 3-page A4 PDF.
+    """Render the original Premium Report V2 card templates to A4 PDF.
     promo=True adds the shared-link marketing strip (QR + CTA) on page 3."""
     from report_publication import publish_report
     report_doc = publish_report(report_doc)
@@ -3024,17 +3015,21 @@ def build_pdf_v2(report_doc: dict, output_path: str, image_resolver=None, promo:
     sm = sm if isinstance(sm, dict) and (sm.get("skills") or []) else None
     if sm and report_doc.get('report_publication'):
         categories = ('technical', 'tactical', 'physical', 'mentality')
-        top_by_category = [next((s for s in sm['skills'] if s.get('category') == cat), None) for cat in categories]
-        rich = [s for s in top_by_category if s]
-        ordered = rich + [s for cat in categories for s in sm['skills'] if s.get('category') == cat and s not in rich]
-        sm = {**sm, 'skills': [{**s, 'hide_time': True} for s in ordered]}
+        # Keep each category together in one original 128-point card.
+        sm = {**sm, 'category_groups': [
+            {'category': cat, 'category_skills': [s for s in sm['skills'] if s.get('category') == cat]}
+            for cat in categories], 'publication': report_doc['report_publication'],
+            'report_id': report_doc.get('id') or ''}
+
     prog = report_doc.get("progression")
     prog = prog if isinstance(prog, dict) and prog.get("categories") else None
     gyg = (report_doc.get("full_report") or {}).get("grow_your_game")
     gyg = gyg if isinstance(gyg, dict) and (gyg.get("lessons") or []) else None
     has_p4 = bool(mm.get("trail") or fifa_lens or prog)
-    publication_pages = _publication_layout(report_doc)
-    total_pages = len(publication_pages) + 5 + (1 if has_p4 else 0) + (1 if (sm or sctx) else 0) + (1 if gyg else 0) + (1 if pp else 0) + (1 if has_print else 0)
+    sequence = bool(report_doc.get('report_publication'))
+    total_pages = 5 + int(has_p4) + int(bool(sm or sctx)) + int(bool(pp))
+    if not sequence:
+        total_pages += int(bool(gyg)) + int(has_print)
 
     date_src = report_doc.get("full_generated_at") or report_doc.get("paid_at") or report_doc.get("created_at")
     try:
@@ -3145,13 +3140,17 @@ def build_pdf_v2(report_doc: dict, output_path: str, image_resolver=None, promo:
 
         fy = row5_top - h5 - GAP - 78
         at = d.get("actionTimeline") or []
+        if sequence:
+            at = [{'timestamp': a['timestamp'], 'title': a['title'], 'description': a['summary']}
+                  for a in report_doc['report_publication']['key_actions']]
         if at:
             reserve = (GAP + 66 if promo else 0) + 40 + M
             avail = row5_top - h5 - 2 * GAP - 78 - reserve
             rows = min(len(at), int((avail - 31) / 19)) if avail > 90 else 0
             if rows >= 3:
                 th_at = 31 + rows * 19 + 6
-                _action_timeline_card(c, at[:rows], M, row5_top - h5 - GAP - th_at, CW, th_at)
+                _action_timeline_card(c, at[:rows], M, row5_top - h5 - GAP - th_at, CW, th_at,
+                                      title="Key Actions" if sequence else "Action Timeline Preview - Full Log Follows")
                 fy = row5_top - h5 - GAP - th_at - GAP - 78
         _forest_footer(c, M, fy, CW, 78)
         dy = fy - 14
@@ -3287,19 +3286,6 @@ def build_pdf_v2(report_doc: dict, output_path: str, image_resolver=None, promo:
             c.showPage()
             page_no += 1
 
-    def render_appendix():
-        nonlocal page_no
-        for offset, paragraphs in enumerate(publication_pages):
-            _page_bg(c)
-            hh = _mini_header(c, player_name)
-            yy = H - M - hh - 14
-            for paragraph, height in paragraphs:
-                paragraph.drawOn(c, M + 10, yy - height)
-                yy -= height + 6
-            _page_footer(c, page_no, total_pages)
-            c.showPage()
-            page_no += 1
-
     def render_certificate():
         nonlocal page_no
         # ── FINAL PAGE — printable certificate / diploma ──
@@ -3309,7 +3295,7 @@ def build_pdf_v2(report_doc: dict, output_path: str, image_resolver=None, promo:
         page_no += 1
 
     # Only sequence changes: move original templates as units; do not redesign their grids.
-    pages = (render_cover, render_scores, render_progress, render_snapshot, render_outlook, render_training, render_education, render_parents, render_printables, render_appendix, render_certificate) if report_doc.get("report_publication") else (render_cover, render_snapshot, render_training, render_outlook, render_progress, render_scores, render_education, render_parents, render_printables, render_appendix, render_certificate)
+    pages = (render_cover, render_scores, render_progress, render_snapshot, render_outlook, render_training, render_parents, render_certificate) if sequence else (render_cover, render_snapshot, render_training, render_outlook, render_progress, render_scores, render_education, render_parents, render_printables, render_certificate)
     for render in pages:
         render()
     c.save()

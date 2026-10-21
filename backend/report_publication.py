@@ -63,7 +63,7 @@ def excerpt(text):
 
 
 def reader_summary(event, text, name):
-    """Short editorial copy from retained facts; full wording stays in the appendix."""
+    """Short editorial copy from retained facts; full wording stays in the online report and evidence export."""
     first = excerpt(text)
     first = re.sub(r'^' + re.escape(name) + r'\s+', '', first, flags=re.I)
     first = first[:1].upper() + first[1:]

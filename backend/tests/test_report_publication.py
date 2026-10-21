@@ -99,7 +99,7 @@ def test_academy_is_a_documented_age_rubric_not_a_percentile():
     assert comparison(8, 9) is None
 
 
-def test_pdf_consumes_identical_shared_view_and_all_events(tmp_path):
+def test_concise_pdf_uses_shared_facts_and_keeps_full_audit_in_data(tmp_path):
     pytest.importorskip('reportlab')
     from pdf_v2 import derive_v2, build_pdf_v2
     from pypdf import PdfReader
@@ -112,8 +112,15 @@ def test_pdf_consumes_identical_shared_view_and_all_events(tmp_path):
     reader = PdfReader(path)
     text = '\n'.join(p.extract_text() for p in reader.pages)
     assert '20 OCTOBER 2026' in text
-    assert 'COMPLETE ACTION TIMELINE' in text
-    assert all(e['event_id'] in text for e in r['canonical_events']['events'])
+    assert 'COMPLETE ACTION TIMELINE' not in text
+    assert 'Evidence reference:' not in text
+    assert all(e['event_id'] not in text for e in r['canonical_events']['events'])
+    assert len(r['report_publication']['view']['actionTimeline']) == 6
+    links = [a.get_object()['/A']['/URI'] for p in reader.pages for a in p.get('/Annots', [])]
+    assert all(any(url.endswith('#event-' + a['event_id']) for url in links) for a in r['report_publication']['key_actions'])
+    assert 'GROW YOUR GAME' not in text and 'NEXT MATCH MISSIONS' not in text
+    assert 'KEY ACTIONS' in text
+    assert all(f'PAGE {i + 1} / {len(reader.pages)}' in p.extract_text() for i,p in enumerate(reader.pages))
     assert 'Stronger than' not in text and 'None\'' not in text
     assert 'full ScoutMe Pro Benchmarked Analysis' not in text
     skills_page = next(p.extract_text().upper() for p in reader.pages if 'THE NUMBERS, TRANSLATED' in p.extract_text().upper())
@@ -167,7 +174,7 @@ def test_original_cover_snapshot_and_training_grids_are_preserved(monkeypatch, t
     import pdf_v2 as pdf
     captured = {}
     for name in ('_hero_card', '_parent_summary_card', '_overall_score_card', '_snapshot_moment_card',
-                 '_top_strengths_card', '_dev_priorities_card', '_roadmap_card', '_training_week_card', '_parent_tips_card'):
+                 '_top_strengths_card', '_dev_priorities_card', '_roadmap_card', '_training_week_card', '_parent_tips_card', '_sm_rich_card'):
         original = getattr(pdf, name)
         def wrapper(*args, _original=original, _name=name, **kwargs):
             captured.setdefault(_name, []).append(args)
@@ -183,6 +190,11 @@ def test_original_cover_snapshot_and_training_grids_are_preserved(monkeypatch, t
     assert snapshot[1][0] == snapshot[3][0] == pytest.approx(26 + (pdf.CW + pdf.GAP) / 2)
     assert snapshot[0][1] == snapshot[1][1] and snapshot[2][1] == snapshot[3][1]
     assert all(args[4:6] == pytest.approx((305, 360)) for args in captured['_top_strengths_card'])
+    grouped = captured['_sm_rich_card']
+    assert [args[1]['category'] for args in grouped] == ['technical', 'tactical', 'physical', 'mentality']
+    assert all(args[5] == 128 for args in grouped)
+    assert all(s['category'] == args[1]['category'] for args in grouped for s in args[1]['category_skills'])
+    assert sum(len(args[1]['category_skills']) for args in grouped) == 4
     assert all(args[5] == 330 for key in ('_roadmap_card', '_training_week_card', '_parent_tips_card') for args in captured[key])
 
 

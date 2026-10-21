@@ -48,14 +48,19 @@ withheld even when an observed aggregate can be calculated.
 - All key scoring actions and the complete chronological event log are retained.
   Group the original Premium V2 page templates as complete units: overview and
   skill categories, snapshot and remaining action highlight, then training,
-  education and parent support. Preserve their exact grids and dimensions,
+  and parent support. Omit the separate lesson and duplicate printable training
+  pages in the concise Sequence PDF. Preserve retained grids and dimensions,
   including the 2x2 snapshot and the strengths/priorities plus 3-column training
   page. Reuse the existing rendering functions; matching colours alone is not
   sufficient. No replacement page renderer or new visual design is permitted.
   Fit images inside their original image areas, retaining the source aspect
   ratio and the existing profile-photo slot. Short shared editorial summaries
-  appear in the main report; the measured-height appendix preserves the full
-  log, skill evidence and stable links back to the authenticated report.
+  appear in the PDF. Keep all skill scores within their category in the original
+  four score cards, with academy reference ranges and evidence links in the
+  original lower card. Do not print technical IDs or the full audit log. The full
+  log and skill evidence remain in the online report and evidence export; five
+  short key-action links navigate to the authenticated report. This is selection
+  of shared facts, not a second assessment.
 - Shots include goals. Key passes are explicitly defined here as teammate-shot
   passes without a goal, with assists counted separately. Observed duels are
   distinguished from wins. Action segments are not ball touches.
