@@ -116,8 +116,8 @@ def test_pdf_consumes_identical_shared_view_and_all_events(tmp_path):
     assert all(e['event_id'] in text for e in r['canonical_events']['events'])
     assert 'Stronger than' not in text and 'None\'' not in text
     assert 'full ScoutMe Pro Benchmarked Analysis' not in text
-    skills_page = next(p.extract_text().upper() for p in reader.pages if 'SKILLS & ACADEMY REFERENCE' in p.extract_text().upper())
-    assert all(label in skills_page for label in ('TECHNIQUE', 'GAME UNDERSTANDING', 'PHYSICAL', 'MENTALITY', 'ACADEMY REFERENCE'))
+    skills_page = next(p.extract_text().upper() for p in reader.pages if 'THE NUMBERS, TRANSLATED' in p.extract_text().upper())
+    assert all(label in skills_page for label in ('TECHNICAL', 'MENTALITY', 'DRIBBLING', 'SHOOTING', 'CONFIDENCE', 'WORK RATE'))
     first_page = reader.pages[0].extract_text()
     assert all(label in first_page for label in ("SCOUT'S FIRST IMPRESSION", 'OVERALL OBSERVED', 'MATCH STATS', 'ACADEMY RUBRIC REFERENCE'))
     assert 'COMPLETE ACTION TIMELINE' not in first_page
@@ -126,13 +126,21 @@ def test_pdf_consumes_identical_shared_view_and_all_events(tmp_path):
 
 def test_pdf_images_keep_entire_frame_aspect_ratio(tmp_path):
     from PIL import Image
-    from pdf_sequence import fitted_image
+    from pdf_v2 import draw_contain_image
     source = tmp_path / 'wide-frame.jpg'
     Image.new('RGB', (1600, 900)).save(source)
-    rendered = fitted_image(source, 300, 100)
-    assert rendered.drawWidth / rendered.drawHeight == pytest.approx(1600 / 900)
-    assert rendered.drawWidth <= 300 and rendered.drawHeight <= 100
-    assert fitted_image(None, 300, 100).getPlainText().startswith('Image unavailable')
+    class RecordingCanvas:
+        def saveState(self): pass
+        def restoreState(self): pass
+        def setFillColor(self, *_): pass
+        def roundRect(self, *_, **kw): pass
+        def drawImage(self, image, x, y, w, h): self.size = (w, h)
+    canvas = RecordingCanvas()
+    assert draw_contain_image(canvas, source, 0, 0, 300, 100)
+    w, h = canvas.size
+    assert w / h == pytest.approx(1600 / 900)
+    assert w <= 300 and h <= 100
+    assert draw_contain_image(canvas, None, 0, 0, 300, 100) is False
 
 
 def test_original_pdf_theme_and_native_frames_survive_paginated_render(tmp_path):
@@ -143,7 +151,9 @@ def test_original_pdf_theme_and_native_frames_survive_paginated_render(tmp_path)
     source = tmp_path / 'native-frame.jpg'
     Image.new('RGB', (1600, 900), '#32794b').save(source)
     output = tmp_path / 'classic-report.pdf'
-    build_pdf_v2(publish_report(example()), str(output), image_resolver=lambda _: str(source))
+    report = publish_report(example())
+    report['display_crop_url_override'] = '/test-native.jpg'
+    build_pdf_v2(report, str(output), image_resolver=lambda _: str(source))
     reader = PdfReader(output)
     fills = [tuple(float(n) for n in args) for args, op in ContentStream(reader.pages[0].get_contents(), reader).operations if op == b'rg']
     assert any(rgb == pytest.approx(CREAM.rgb(), abs=.00001) for rgb in fills)
@@ -151,6 +161,29 @@ def test_original_pdf_theme_and_native_frames_survive_paginated_render(tmp_path)
     assert len(reader.pages[0].images) == 1
     assert sum(len(page.get('/Annots', [])) for page in reader.pages) == 5
     assert f'PAGE {len(reader.pages)} / {len(reader.pages)}' in reader.pages[-1].extract_text()
+
+
+def test_original_cover_snapshot_and_training_grids_are_preserved(monkeypatch, tmp_path):
+    import pdf_v2 as pdf
+    captured = {}
+    for name in ('_hero_card', '_parent_summary_card', '_overall_score_card', '_snapshot_moment_card',
+                 '_top_strengths_card', '_dev_priorities_card', '_roadmap_card', '_training_week_card', '_parent_tips_card'):
+        original = getattr(pdf, name)
+        def wrapper(*args, _original=original, _name=name, **kwargs):
+            captured.setdefault(_name, []).append(args)
+            return _original(*args, **kwargs)
+        monkeypatch.setattr(pdf, name, wrapper)
+    pdf.build_pdf_v2(publish_report(example()), str(tmp_path / 'original-grids.pdf'))
+    # Exact geometry from the uploaded Premium V2 PDF: no substitute card grids.
+    assert captured['_hero_card'][0][3:7] == pytest.approx((26, pdf.H - 365, 158, 285))
+    assert captured['_parent_summary_card'][0][2:6] == pytest.approx((193, pdf.H - 365, 205, 285))
+    snapshot = [args[2:6] for args in captured['_snapshot_moment_card']]
+    assert len(snapshot) == 4
+    assert snapshot[0][0] == snapshot[2][0] == 26
+    assert snapshot[1][0] == snapshot[3][0] == pytest.approx(26 + (pdf.CW + pdf.GAP) / 2)
+    assert snapshot[0][1] == snapshot[1][1] and snapshot[2][1] == snapshot[3][1]
+    assert all(args[4:6] == pytest.approx((305, 360)) for args in captured['_top_strengths_card'])
+    assert all(args[5] == 330 for key in ('_roadmap_card', '_training_week_card', '_parent_tips_card') for args in captured[key])
 
 
 def test_non_sequence_reports_keep_existing_contract():

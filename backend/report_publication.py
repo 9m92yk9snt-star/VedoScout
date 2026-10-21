@@ -294,11 +294,20 @@ def publish_report(document):
     full['parent_corner'] = None
     # Retain education, removing the unsupported population comparison.
     if isinstance(full.get('grow_your_game'), dict):
+        lessons = []
+        recovery = (full.get('mentality', {}).get('response_to_mistakes') or {}).get('evidence') or []
         for lesson in full['grow_your_game'].get('lessons', []):
-            lesson['age_benchmark'] = None
-            for field in ('what_happened', 'what_happened_in_match', 'personal_advice'):
-                if isinstance(lesson.get(field), str):
-                    lesson[field] = lesson[field].replace('absolutely elite reaction', 'immediate recovery effort')
+            evidence = next((ev for ev in recovery if ev.get('proof_verified') and ev.get('event_id') in by_id), None)
+            if lesson.get('topic_id') != 'five_seconds_after_mistake' or not evidence:
+                continue
+            lesson.update(age_benchmark=None, title='React after losing the ball', category='mentality',
+                what_happened=reader_summary(by_id[evidence['event_id']], evidence['what'], name),
+                what_scouts_look_for='How a player responds after losing possession: getting back into play and supporting the team.',
+                why_it_matters='A recovery run can help the team respond to a turnover.',
+                personal_advice='After losing the ball, look for a useful next action: recover, press or support a teammate.',
+                moments=[{**evidence, 'what': evidence['what']}])
+            lessons.append(lesson)
+        full['grow_your_game']['lessons'] = lessons
     # Keep useful drills but replace personal deficit claims with cited observations.
     priorities = sorted(skills, key=lambda s: (s['score'], s['key']))[:3]
     used_priority_events = set()

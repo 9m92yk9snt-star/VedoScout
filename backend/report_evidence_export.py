@@ -35,7 +35,7 @@ CONFIG_KEYS = ("FULL_REPORT_ENGINE", "IDENTITY_TIMELINE_ENABLED", "IDENTITY_TIME
                "FIX10A_SUPPORT_VISION_MODEL", "FIX10A_MAX_JERSEY_READS", "FIX10A_MAX_ROLE_TRACKS",
                "FIX10A_MAX_ROLE_FRAMES", "FIX10A_MAX_GOAL_FRAMES", "FIX15_MAX_DENSE_GOAL_FRAMES")
 SOURCE_MODULES = (
-    "report_publication.py", "pdf_v2.py", "pdf_sequence.py", "score_meaning.py", "score_context.py", "snapshot_card.py", "progression.py",
+    "report_publication.py", "pdf_v2.py", "score_meaning.py", "score_context.py", "snapshot_card.py", "progression.py",
     "scripts/review_report_publication.py",
     "sequence_report_adapter.py", "sequence_report_runtime.py", "sequence_pilot.py", "sequence_pilot_transport.py",
     "scripts/run_sequence_pilot.py",

@@ -46,13 +46,14 @@ withheld even when an observed aggregate can be calculated.
   text remain in raw evidence. Contact brackets remain brackets, not invented
   exact contact instants or foot-side conclusions.
 - All key scoring actions and the complete chronological event log are retained.
-  The PDF groups the overview, all key actions, all four skill categories with
-  their academy reference, and development/training in consecutive sections.
-  Keep the existing Premium V2 cream/green palette, rounded cards, branding,
-  fonts and profile/summary/circular-score cover grid. Grouping and copy edits
-  must not replace this established visual design.
-  Images retain the complete source aspect ratio; a full match frame replaces
-  an enlarged identity crop on the cover. Short shared editorial summaries
+  Group the original Premium V2 page templates as complete units: overview and
+  skill categories, snapshot and remaining action highlight, then training,
+  education and parent support. Preserve their exact grids and dimensions,
+  including the 2x2 snapshot and the strengths/priorities plus 3-column training
+  page. Reuse the existing rendering functions; matching colours alone is not
+  sufficient. No replacement page renderer or new visual design is permitted.
+  Fit images inside their original image areas, retaining the source aspect
+  ratio and the existing profile-photo slot. Short shared editorial summaries
   appear in the main report; the measured-height appendix preserves the full
   log, skill evidence and stable links back to the authenticated report.
 - Shots include goals. Key passes are explicitly defined here as teammate-shot
@@ -77,8 +78,9 @@ python backend/scripts/review_report_publication.py \
 ```
 
 This checks stored proof-frame PTS against the exported canonical video, extracts
-local review images, and renders the PDF. Sequence reports use whole, bound
-match frames and do not enlarge the low-resolution identity portrait. No new
+local review images, and renders the PDF. Sequence reports fit whole, bound
+match frames inside the original image slots. The original profile-photo slot
+is retained; rendering cannot recover detail absent from its source image. No new
 analysis, model requests, merge or deployment is performed.
 
 Tests cover projection immutability/idempotence, invalid grades, missing evidence,
