@@ -101,7 +101,7 @@ def run(video,anchors,output,run_model=False):
                 draw.text((x+6,z+5),f'{fid} | {actual/1000:.3f}s',fill='white',font=font)
                 rec={'id':fid,'source_ms':actual,'source_frame_index':round(cap.get(cv2.CAP_PROP_POS_FRAMES))-1}
                 frames.append(rec);labels.append(rec)
-            path=out/f'chunk{chunk}-sheet{sheetno:02}.jpg';sheet.save(path,quality=88)
+            path=out/f'chunk{chunk}-sheet{sheetno:02}.jpg';sheet.save(path,quality=65)
             sheets.extend([{'type':'text','text':'SOURCE SHEET '+json.dumps(labels)}, {'type':'image','path':str(path.resolve()),'sha256':p.digest(path)}])
         pid=f'frames_{chunk}'
         items=[{'type':'text','text':PROMPT}]+refs+sheets
