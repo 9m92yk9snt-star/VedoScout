@@ -128,3 +128,46 @@ exists, but accuracy and recall on unrelated videos remain untested. No producti
 analysis, PDF/web content, scores, merge or deployment changed. Next evaluation
 must include another selected-player video, failed moves, ordinary carries/pass
 preparations and occluded duels before production integration is considered.
+
+## Extended-context follow-up
+
+`recheck_uncertain_feints.py` selects the four uncertain incidents from the actual
+raw source-sheet responses. It verifies their source, selection and response hashes,
+adds one second before and four seconds after each movement interval, and prepares
+only those contexts by one forward source decode. Neither user reference times nor
+canonical outcomes are inputs. Movement and possession outcome each require their
+own decision and citations; a supported pass requires a separate teammate, and a
+supported loss requires opponent possession rather than proximity alone.
+
+Run `39616673706`, code `a0c02f7f171639815e1ddb5f8bb69cb07863714b`, completed
+one actual `gpt-6-astra` request on 186 context source frames. Preparation took
+14.927s on the runner (10.598s locally); the model call took 39.591s and reported
+80,328 tokens. These numbers exclude CI installation/queueing and are not live
+production analysis time.
+
+Results:
+- Near 3.5s, movement remains uncertain; subsequent opponent possession is supported.
+- Near 8.1s, the body dip remains uncertain as a feint; immediate retention is
+  supported. The later fall/loss is explicitly separate.
+- Near 21.25s, the extra cut remains uncertain; the model supports intervening blue
+  possession. Its uncertainty about a later striking contact does not supersede
+  existing higher-detail saved-shot evidence.
+- Near 35s, a feint is rejected and the pass to a separate white teammate is supported.
+  This corrects the earlier tentative interception/loss interpretation after following
+  the recipient into the subsequent carry and shot. Source review of that expanded
+  sequence agrees with the pass interpretation.
+
+No uncertain movement was promoted to a supported feint. The earlier five supported
+movement observations remain a separate set; these are not successful take-on totals.
+Raw response, source-frame metadata, original references, usage and duration are in
+`docs/examples/feint-uncertainty-context-receipt.json`. The exact submitted request was
+reconstructed from preserved source sheets and prompt; request/response hashes and
+all source-JPEG hashes verified. Twenty-two offline contract/regression tests pass;
+the live follow-up workflow also passed its then-current 21 tests.
+
+Independent-video testing remains blocked by the available footage: the inspected
+older uploaded Almin test07 versions show the same recording at the sampled instants.
+The repository's other MP4s are a non-match clip and generated introduction cards.
+These do not establish new-match generalisation. A different match video, preferably
+with its existing original selections/evidence export, is required for that test.
+No production reports, scores, canonical events or layout have been changed.
