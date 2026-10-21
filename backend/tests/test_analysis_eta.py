@@ -100,5 +100,41 @@ def test_history_lookup_is_bounded_cached_and_optional():
     assert not {"video_url", "user_id", "player_details", "full_report"}.intersection(calls[0][2])
     eta._CACHE.clear()
     def broken(*args): raise RuntimeError("unavailable")
-    assert asyncio.run(eta.completion_estimate(SimpleNamespace(find=broken),doc))=={"status":"unavailable"}
+    fallback = asyncio.run(eta.completion_estimate(SimpleNamespace(find=broken),doc))
+    assert fallback["status"] == "estimated" and fallback["provisional"] is True
     eta._CACHE.clear()
+
+
+def test_sequence_has_a_starting_estimate_without_legacy_manifest_or_history():
+    now = datetime.now(timezone.utc)
+    doc = {"analysis_engine": "SEQUENCE_V1", "is_paid": True, "video_duration_sec": 77,
+           "full_report_status": "generating", "full_report_started_at": now.isoformat()}
+    result = eta.workload_estimate(doc, now)
+    assert result["provisional"] and result["sample_count"] == 1
+    assert 600 < (datetime.fromisoformat(result["earliest_at"])-now).total_seconds() < 700
+    assert 1100 < (datetime.fromisoformat(result["latest_at"])-now).total_seconds() < 1300
+    assert "report_id" not in result and "analysis_complete" not in result
+
+
+def test_estimate_updates_from_completed_work_then_writer_and_assets():
+    now = datetime.now(timezone.utc)
+    doc = {"analysis_engine": "SEQUENCE_V1", "full_report_status": "generating",
+           "sequence_progress": {"phase": "source", "updated_at": now.isoformat(), "initial_total": 10,
+                                 "initial_completed": 2, "mean_job_seconds": 85}}
+    first = eta.workload_estimate(doc, now)
+    doc["sequence_progress"]["initial_completed"] = 8
+    later = eta.workload_estimate(doc, now)
+    assert datetime.fromisoformat(later["latest_at"]) < datetime.fromisoformat(first["latest_at"])
+    doc["sequence_progress"] = {"phase": "writer", "started_at": now.isoformat()}
+    writer = eta.workload_estimate(doc, now)
+    doc["sequence_progress"]["phase"] = "assets"
+    assert datetime.fromisoformat(eta.workload_estimate(doc, now)["latest_at"]) < datetime.fromisoformat(writer["latest_at"])
+
+
+def test_provisional_time_expiring_never_marks_a_report_ready():
+    now = datetime.now(timezone.utc)
+    doc = {"is_paid": True, "full_report_status": "generating", "full_report_started_at": (now-timedelta(hours=1)).isoformat()}
+    assert eta.workload_estimate(doc, now)["status"] == "overdue"
+    assert doc["full_report_status"] == "generating"
+    doc["full_report_status"] = "failed"
+    assert eta.workload_estimate(doc, now) == {"status": "unavailable"}

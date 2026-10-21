@@ -2105,7 +2105,7 @@ export default function ReportPage() {
      dossier automatically the moment generation completes. ═══ */
   if (!report.demo && (unlocked || !isPreviewReady(report))) {
     return (
-      <div className="min-h-screen bg-[#F2EDE2] pb-16">
+      <div className="analysis-waiting-route min-h-screen bg-[#F2EDE2] pb-16">
         <Navigation />
         <PremiumBuildingDashboard
           report={report}

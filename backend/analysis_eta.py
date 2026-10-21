@@ -1,7 +1,7 @@
-"""Read-only, bounded estimates from comparable completed production runs.
+"""Read-only finish windows: comparable history, then an explicit workload estimate.
 
-No fallback stopwatch or invented duration. Source/configuration, video length,
-stage, retries and observed spread determine whether a range can be shown.
+The provisional calibration is one retained 77-second Sequence run, not a
+population percentile or a readiness signal. Real work updates the prediction.
 """
 import asyncio
 import hashlib
@@ -23,6 +23,8 @@ def _timestamp(value):
 
 
 def _signature(doc):
+    if doc.get("analysis_engine") == "SEQUENCE_V1":
+        return doc.get("sequence_runtime_signature")
     manifest = doc.get("analysis_run_manifest") or {}
     if not isinstance(manifest, dict):
         return None
@@ -92,16 +94,17 @@ def estimate_from_history(doc, history, now=None):
 
 async def completion_estimate(collection, doc):
     """Cache only timing projections; never expose other reports or model data."""
-    unknown = {"status": "unavailable"}
+    fallback = workload_estimate(doc)
     if not _signature(doc) or doc.get("full_report_status") not in ("generating", "verifying", "finalizing"):
-        return unknown
+        return fallback
     cache_key = id(collection)
     cached = _CACHE.get(cache_key)
     if not cached or time.monotonic() - cached[0] > 120:
         cutoff = (datetime.now(timezone.utc) - timedelta(days=3)).isoformat()
         projection = {"_id": 0, "full_report_started_at": 1, "full_report_run_finished_at": 1,
                       "full_report_status": 1, "full_report_retries": 1, "doubt_moments": 1,
-                      "video_duration_sec": 1, "full_pipeline_trace": 1, "analysis_run_manifest": 1}
+                      "video_duration_sec": 1, "full_pipeline_trace": 1, "analysis_run_manifest": 1,
+                      "analysis_engine": 1, "sequence_runtime_signature": 1}
         try:
             query = collection.find({"full_report_status": "ready", "full_report": {"$exists": True, "$nin": [None, {}]},
                                      "full_report_run_finished_at": {"$gte": cutoff}}, projection)
@@ -112,8 +115,60 @@ async def completion_estimate(collection, doc):
             cached = (time.monotonic(), rows)
             _CACHE[cache_key] = cached
         except Exception:
-            return unknown  # estimation failure never blocks status/readiness
+            return fallback  # estimation failure never blocks status/readiness
     try:
-        return estimate_from_history(doc, cached[1])
+        result = estimate_from_history(doc, cached[1])
+        return result if result["status"] != "unavailable" else fallback
     except (TypeError, ValueError, OverflowError):
-        return unknown
+        return fallback
+
+
+def workload_estimate(doc, now=None):
+    """Always give an active upload a labelled starting window, without a model call."""
+    now = now or datetime.now(timezone.utc)
+    full = bool(doc.get("is_paid") or doc.get("manually_unlocked") or doc.get("analysis_engine") == "SEQUENCE_V1"
+                or doc.get("full_report_status"))
+    state = doc.get("full_report_status")
+    if (state in {"ready", "failed", "awaiting_confirmation"}
+            or doc.get("analysis_status") == "failed"
+            or (not full and (doc.get("analysis_status") == "ready" and doc.get("preview")))):
+        return {"status": "unavailable"}
+    try:
+        duration = float(doc.get("video_duration_sec") or 77)
+        if not math.isfinite(duration) or duration <= 0: duration = 77
+    except (TypeError, ValueError):
+        duration = 77
+    scale = max(.5, min(4., duration / 77))
+    progress = doc.get("sequence_progress") or {}
+    if not isinstance(progress, dict): progress = {}
+    def number(value, default):
+        try:
+            parsed = float(value)
+            return parsed if math.isfinite(parsed) else default
+        except (TypeError, ValueError):
+            return default
+    phase = progress.get("phase")
+    source, writer, assets = 605 * scale, 178, 39 * max(.5, scale)
+    anchor = _timestamp(doc.get("full_report_started_at") if state else doc.get("created_at")) or now.timestamp()
+    work = source + writer + assets if state else 187 * scale + (source + writer + assets if full else 0)
+    basis = "starting_workload"
+    if state in {"verifying", "finalizing"} or phase == "assets":
+        anchor = _timestamp(progress.get("started_at")) or _timestamp(doc.get("full_generated_at")) or anchor
+        work, basis = assets, "current_phase"
+    elif phase == "writer":
+        anchor = _timestamp(progress.get("started_at")) or anchor
+        work, basis = writer + assets, "current_phase"
+    elif phase == "source" and progress.get("initial_total"):
+        total = max(1, min(12, int(number(progress["initial_total"], 10))))
+        completed = min(total, max(0, int(number(progress.get("initial_completed", 0), 0))))
+        mean = max(30., min(120., number(progress.get("mean_job_seconds"), 85)))
+        # Two workers; reserve another detail round. No completion from elapsed time.
+        work = math.ceil((total-completed)/2) * mean + 100 + writer + assets
+        anchor = _timestamp(progress.get("updated_at")) or anchor
+        basis = "completed_workload"
+    earliest, latest = anchor + work * .75, anchor + work * 1.45
+    iso = lambda seconds: datetime.fromtimestamp(seconds, timezone.utc).isoformat()
+    return {"status": "overdue" if latest <= now.timestamp() else "estimated",
+            "earliest_at": iso(earliest), "latest_at": iso(latest), "calculated_at": now.isoformat(),
+            "basis": basis, "provisional": True, "sample_count": 1,
+            "calibration": "Retained Sequence 77s run; workload estimate, not a guaranteed finish time"}

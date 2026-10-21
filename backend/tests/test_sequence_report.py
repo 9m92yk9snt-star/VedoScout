@@ -303,7 +303,7 @@ def test_writer_failure_keeps_paid_source_receipts_before_temp_cleanup(tmp_path,
     with pytest.raises(RuntimeError, match="SYNTHETIC_WRITER_FAILURE"):
         asyncio.run(runtime.generate(tmp_path / "video.mp4", {"raw_marker_anchors": raw},
                     template=ns["FULL_REPORT_PROMPT"], discovery=discovery, writer=writer, checkpoint=checkpoint))
-    assert len(saved) == 3
+    assert len(saved) == 4
     assert len(saved[-1]["sequence_audit"]["receipts"]) == 13
     assert any(s.get("canonical_events", {}).get("events") for s in saved)
     assert saved[-1]["sequence_audit"]["writer_receipts"][0]["http_status"] == 429

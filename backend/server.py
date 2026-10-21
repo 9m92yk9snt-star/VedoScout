@@ -5831,6 +5831,8 @@ async def get_report_status(report_id: str, user=Depends(get_current_user)):
         "full_report_retries": int(doc.get("full_report_retries") or 0),
         "full_report_run_id": doc.get("full_report_run_id"),
         "full_pipeline_stage": doc.get("full_pipeline_stage"),
+        "video_duration_sec": doc.get("video_duration_sec"),
+        "sequence_progress": doc.get("sequence_progress"),
         "physical_windows_completed": doc.get("fix10a_completed_windows"),
         "analysis_coverage": (doc.get("unified_scoring_scan") or {}).get("coverage_status"),
         "pipeline_stage": (
