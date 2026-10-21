@@ -58,3 +58,28 @@ The GitHub experiment triggers only when its same-repository draft PR opens, on
 `experiment/feint-model-evidence`, first attempt only. Existing historical experiment
 gates are unchanged. The uploaded artifact contains the actual receipts and source
 images for review and expires after 14 days.
+
+## Actual native-video trial
+
+Run `39611370114` at code commit `aa370f1161fd204f892ef00a06ab8b867f4c7809`
+completed both real calls. Gemini discovery took 47.579s (334,452 tokens reported);
+Astra source-frame review took 26.835s (119,187 tokens). These are model-call times,
+not end-to-end processing or user waiting time. One shield-turn was supported near
+9s; five other candidates were rejected as feints in the supplied review frames.
+The discovery missed important relevant intervals and described several unrelated
+shots/passes and unsupported outcomes. **This native discovery is not suitable for
+production feint evidence.** Raw receipts and source metadata are retained in
+`docs/examples/feint-native-experiment-receipts.json`. The initial CI setup failure
+occurred before any model request; a missing dotenv test dependency was corrected.
+
+## Source-sheet alternative
+
+`backend/scripts/probe_feint_frames.py` is a separate, generic whole-source trial.
+It covers the complete input at 8 source frames/s, in fixed 27s chunks with 2s
+boundary overlap. Exact frame IDs and source timestamps are printed on every tile;
+original source selections provide identity only. No earlier model candidate,
+expected event time or historical report is read. At most three Astra image calls
+are made for an input up to 80s. Each returned claim must cite actual before,
+movement, after and identity frames and original reference IDs. Overlap observations
+are explicitly not deduplicated and cannot be used as unique dribble counts.
+This remains an experiment; unrelated-video generalisation is unverified.
