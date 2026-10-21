@@ -1,0 +1,2949 @@
+{
+  "schema": "FEINT_SOURCE_SHEETS_V1",
+  "status": "MODEL_REVIEW_COMPLETED",
+  "source_video_sha256": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+  "anchors_sha256": "95ec65ff36e5d3441a32fe053854f646f6bcbbfe14f88090e7aa98eebe550446",
+  "duration_s": 76.763596,
+  "sample_fps": 8,
+  "crop_xyxy": [
+    0,
+    464,
+    1080,
+    1713
+  ],
+  "references": [
+    {
+      "reference_id": "r1",
+      "requested_ms": 3070,
+      "box": {
+        "x": 0.4098,
+        "y": 0.5002,
+        "w": 0.1467,
+        "h": 0.1127
+      },
+      "target_point": {
+        "x": 0.4449678749970295,
+        "y": 0.5506545696050069
+      },
+      "selection_hints": {
+        "target_point": {
+          "x": 0.4449678749970295,
+          "y": 0.5506545696050069
+        }
+      },
+      "image_sha256": "2deeb83a61c3de2696069757fb179eb8bb2776a0b4fbd6ffb963e6417d431dca"
+    },
+    {
+      "reference_id": "r2",
+      "requested_ms": 41910,
+      "box": {
+        "x": 0.2287,
+        "y": 0.5403,
+        "w": 0.2055,
+        "h": 0.1511
+      },
+      "target_point": {
+        "x": 0.26874435411020775,
+        "y": 0.6158536585365855
+      },
+      "selection_hints": {
+        "target_point": {
+          "x": 0.26874435411020775,
+          "y": 0.6158536585365855
+        }
+      },
+      "image_sha256": "d2ac40f60be62779e0d544074809a79c1c0d9d225f8f78c71d30a372c94db183"
+    },
+    {
+      "reference_id": "r3",
+      "requested_ms": 71010,
+      "box": {
+        "x": 0.5271,
+        "y": 0.5086,
+        "w": 0.1745,
+        "h": 0.1298
+      },
+      "target_point": {
+        "x": 0.5618908035533222,
+        "y": 0.5555535803171444
+      },
+      "selection_hints": {
+        "target_point": {
+          "x": 0.5618908035533222,
+          "y": 0.5555535803171444
+        }
+      },
+      "image_sha256": "c4a33cf6bdc29b7ff5c2ed4aa66c3c4d6d4f61485ff221d432a79480e33e9a4a"
+    },
+    {
+      "reference_id": "r4",
+      "requested_ms": 15350,
+      "box": {
+        "x": 0.3469,
+        "y": 0.4608,
+        "w": 0.1582,
+        "h": 0.1707
+      },
+      "target_point": {
+        "x": 0.38686868686868686,
+        "y": 0.5363636363636364
+      },
+      "selection_hints": {
+        "target_point": {
+          "x": 0.38686868686868686,
+          "y": 0.5363636363636364
+        }
+      },
+      "image_sha256": "077375be887414bc1eb104eff67df1901d02f7d10904e2f486fe739079b4b641"
+    },
+    {
+      "reference_id": "r5",
+      "requested_ms": 21480,
+      "box": {
+        "x": 0.5639,
+        "y": 0.4182,
+        "w": 0.0852,
+        "h": 0.1026
+      },
+      "target_point": {
+        "x": 0.5898194775745796,
+        "y": 0.45775907765703683
+      },
+      "selection_hints": {
+        "target_point": {
+          "x": 0.5898194775745796,
+          "y": 0.45775907765703683
+        },
+        "visible_mask": {
+          "width": 96,
+          "height": 192,
+          "runs": [
+            1111,
+            16,
+            79,
+            18,
+            78,
+            20,
+            75,
+            23,
+            72,
+            25,
+            71,
+            26,
+            69,
+            28,
+            68,
+            29,
+            67,
+            30,
+            65,
+            31,
+            65,
+            32,
+            64,
+            32,
+            64,
+            32,
+            64,
+            33,
+            61,
+            35,
+            61,
+            35,
+            61,
+            35,
+            61,
+            35,
+            60,
+            36,
+            60,
+            36,
+            59,
+            37,
+            56,
+            40,
+            53,
+            42,
+            53,
+            43,
+            51,
+            45,
+            50,
+            46,
+            49,
+            47,
+            48,
+            48,
+            47,
+            49,
+            47,
+            50,
+            45,
+            51,
+            44,
+            52,
+            44,
+            52,
+            43,
+            53,
+            42,
+            54,
+            42,
+            55,
+            40,
+            56,
+            40,
+            56,
+            40,
+            57,
+            38,
+            59,
+            37,
+            62,
+            34,
+            64,
+            31,
+            68,
+            28,
+            69,
+            27,
+            69,
+            25,
+            72,
+            24,
+            72,
+            24,
+            72,
+            23,
+            73,
+            23,
+            73,
+            23,
+            73,
+            22,
+            73,
+            23,
+            73,
+            22,
+            73,
+            22,
+            74,
+            22,
+            37,
+            2,
+            35,
+            21,
+            37,
+            5,
+            32,
+            21,
+            37,
+            6,
+            32,
+            21,
+            38,
+            4,
+            32,
+            21,
+            75,
+            20,
+            75,
+            21,
+            75,
+            20,
+            75,
+            20,
+            76,
+            20,
+            75,
+            7,
+            2,
+            11,
+            76,
+            7,
+            4,
+            8,
+            76,
+            8,
+            4,
+            7,
+            77,
+            8,
+            4,
+            7,
+            76,
+            9,
+            5,
+            6,
+            75,
+            10,
+            4,
+            7,
+            75,
+            21,
+            75,
+            21,
+            75,
+            21,
+            74,
+            22,
+            74,
+            22,
+            74,
+            22,
+            74,
+            21,
+            75,
+            21,
+            75,
+            21,
+            75,
+            21,
+            75,
+            21,
+            76,
+            20,
+            76,
+            20,
+            76,
+            20,
+            76,
+            20,
+            76,
+            19,
+            77,
+            19,
+            77,
+            19,
+            77,
+            19,
+            76,
+            20,
+            76,
+            20,
+            75,
+            20,
+            76,
+            20,
+            75,
+            21,
+            74,
+            22,
+            74,
+            22,
+            73,
+            22,
+            74,
+            22,
+            75,
+            21,
+            75,
+            21,
+            75,
+            21,
+            76,
+            19,
+            77,
+            19,
+            28,
+            8,
+            41,
+            19,
+            26,
+            19,
+            33,
+            17,
+            24,
+            26,
+            30,
+            15,
+            24,
+            28,
+            30,
+            13,
+            24,
+            29,
+            31,
+            11,
+            24,
+            31,
+            30,
+            9,
+            24,
+            33,
+            30,
+            9,
+            24,
+            34,
+            29,
+            9,
+            22,
+            36,
+            30,
+            8,
+            21,
+            37,
+            30,
+            8,
+            20,
+            38,
+            31,
+            7,
+            19,
+            40,
+            30,
+            7,
+            17,
+            42,
+            30,
+            7,
+            16,
+            43,
+            31,
+            6,
+            14,
+            45,
+            31,
+            6,
+            13,
+            47,
+            31,
+            5,
+            10,
+            50,
+            31,
+            5,
+            9,
+            52,
+            30,
+            5,
+            7,
+            55,
+            30,
+            4,
+            5,
+            57,
+            30,
+            4,
+            4,
+            59,
+            29,
+            4,
+            3,
+            60,
+            30,
+            3,
+            2,
+            62,
+            30,
+            66,
+            30,
+            67,
+            30,
+            66,
+            30,
+            67,
+            30,
+            66,
+            30,
+            66,
+            30,
+            66,
+            30,
+            66,
+            30,
+            67,
+            29,
+            67,
+            29,
+            67,
+            29,
+            67,
+            29,
+            67,
+            29,
+            67,
+            29,
+            67,
+            29,
+            67,
+            29,
+            68,
+            28,
+            69,
+            27,
+            69,
+            27,
+            70,
+            26,
+            70,
+            26,
+            71,
+            25,
+            74,
+            21,
+            3073
+          ],
+          "method": "native_person_instance"
+        }
+      },
+      "image_sha256": "f58d1dd43674b2c46e35ae5f7ff60feb7a6de354f19b48fc7ef847d75a8550c4"
+    },
+    {
+      "reference_id": "r6",
+      "requested_ms": 27630,
+      "box": {
+        "x": 0.4065,
+        "y": 0.5484,
+        "w": 0.1083,
+        "h": 0.1719
+      },
+      "target_point": {
+        "x": 0.4196042053184911,
+        "y": 0.6171150278293135
+      },
+      "selection_hints": {
+        "target_point": {
+          "x": 0.4196042053184911,
+          "y": 0.6171150278293135
+        },
+        "visible_mask": {
+          "width": 96,
+          "height": 192,
+          "runs": [
+            2208,
+            9,
+            87,
+            9,
+            87,
+            10,
+            86,
+            10,
+            86,
+            10,
+            86,
+            10,
+            86,
+            10,
+            86,
+            11,
+            85,
+            11,
+            85,
+            11,
+            85,
+            11,
+            85,
+            11,
+            85,
+            11,
+            85,
+            11,
+            85,
+            11,
+            85,
+            13,
+            83,
+            14,
+            82,
+            14,
+            82,
+            15,
+            81,
+            17,
+            79,
+            17,
+            79,
+            17,
+            79,
+            17,
+            79,
+            17,
+            79,
+            17,
+            79,
+            16,
+            80,
+            16,
+            80,
+            15,
+            81,
+            14,
+            82,
+            14,
+            82,
+            13,
+            83,
+            12,
+            84,
+            11,
+            85,
+            10,
+            86,
+            10,
+            86,
+            10,
+            86,
+            10,
+            86,
+            9,
+            87,
+            9,
+            87,
+            9,
+            87,
+            9,
+            87,
+            9,
+            87,
+            9,
+            87,
+            9,
+            87,
+            10,
+            86,
+            10,
+            86,
+            10,
+            86,
+            10,
+            86,
+            11,
+            85,
+            11,
+            85,
+            11,
+            85,
+            13,
+            83,
+            13,
+            83,
+            13,
+            83,
+            14,
+            82,
+            14,
+            82,
+            14,
+            82,
+            14,
+            82,
+            14,
+            82,
+            13,
+            83,
+            13,
+            83,
+            13,
+            83,
+            13,
+            83,
+            13,
+            83,
+            12,
+            84,
+            12,
+            84,
+            11,
+            85,
+            10,
+            86,
+            10,
+            86,
+            10,
+            86,
+            10,
+            86,
+            9,
+            87,
+            9,
+            87,
+            8,
+            88,
+            8,
+            88,
+            8,
+            88,
+            7,
+            89,
+            6,
+            90,
+            6,
+            90,
+            5,
+            91,
+            5,
+            91,
+            5,
+            91,
+            5,
+            91,
+            5,
+            91,
+            5,
+            91,
+            5,
+            91,
+            5,
+            91,
+            3,
+            93,
+            3,
+            93,
+            2,
+            94,
+            2,
+            94,
+            2,
+            94,
+            2,
+            94,
+            1,
+            16,
+            1,
+            78,
+            1,
+            13,
+            5,
+            77,
+            1,
+            13,
+            5,
+            91,
+            5,
+            93,
+            2,
+            6894
+          ],
+          "method": "native_person_instance"
+        }
+      },
+      "image_sha256": "3a6182d7fa67f17274de16d5a3b147a973b45f61de821ec61492bb40b87f0ecd"
+    },
+    {
+      "reference_id": "r7",
+      "requested_ms": 33770,
+      "box": {
+        "x": 0.4657,
+        "y": 0.4266,
+        "w": 0.1657,
+        "h": 0.1849
+      },
+      "target_point": {
+        "x": 0.5061842918985776,
+        "y": 0.5023191094619666
+      },
+      "selection_hints": {
+        "target_point": {
+          "x": 0.5061842918985776,
+          "y": 0.5023191094619666
+        },
+        "visible_mask": {
+          "width": 96,
+          "height": 192,
+          "runs": [
+            2515,
+            13,
+            83,
+            14,
+            82,
+            15,
+            81,
+            15,
+            81,
+            16,
+            79,
+            17,
+            79,
+            17,
+            79,
+            17,
+            79,
+            18,
+            78,
+            18,
+            77,
+            19,
+            77,
+            19,
+            77,
+            18,
+            20,
+            1,
+            57,
+            18,
+            20,
+            2,
+            56,
+            18,
+            20,
+            1,
+            58,
+            17,
+            79,
+            16,
+            80,
+            16,
+            80,
+            15,
+            82,
+            14,
+            82,
+            14,
+            82,
+            14,
+            83,
+            14,
+            82,
+            15,
+            81,
+            16,
+            80,
+            17,
+            79,
+            18,
+            78,
+            18,
+            78,
+            19,
+            76,
+            21,
+            75,
+            22,
+            74,
+            23,
+            72,
+            25,
+            71,
+            25,
+            71,
+            26,
+            70,
+            26,
+            71,
+            26,
+            70,
+            27,
+            69,
+            28,
+            68,
+            29,
+            67,
+            30,
+            67,
+            30,
+            66,
+            33,
+            63,
+            31,
+            65,
+            30,
+            66,
+            29,
+            67,
+            29,
+            67,
+            29,
+            67,
+            28,
+            68,
+            28,
+            68,
+            28,
+            68,
+            28,
+            68,
+            28,
+            68,
+            28,
+            68,
+            28,
+            68,
+            28,
+            68,
+            29,
+            68,
+            28,
+            68,
+            28,
+            68,
+            29,
+            67,
+            29,
+            67,
+            30,
+            66,
+            30,
+            66,
+            30,
+            66,
+            30,
+            66,
+            31,
+            65,
+            31,
+            65,
+            32,
+            64,
+            32,
+            64,
+            32,
+            63,
+            34,
+            62,
+            34,
+            62,
+            34,
+            62,
+            34,
+            62,
+            34,
+            62,
+            34,
+            62,
+            34,
+            62,
+            34,
+            62,
+            33,
+            63,
+            33,
+            63,
+            33,
+            63,
+            33,
+            63,
+            32,
+            63,
+            32,
+            64,
+            32,
+            64,
+            32,
+            64,
+            32,
+            64,
+            32,
+            64,
+            32,
+            64,
+            36,
+            60,
+            40,
+            57,
+            42,
+            54,
+            46,
+            50,
+            50,
+            46,
+            55,
+            41,
+            14,
+            3,
+            39,
+            40,
+            13,
+            5,
+            39,
+            39,
+            13,
+            6,
+            38,
+            38,
+            14,
+            7,
+            38,
+            37,
+            14,
+            9,
+            36,
+            37,
+            14,
+            10,
+            35,
+            37,
+            14,
+            13,
+            33,
+            35,
+            15,
+            17,
+            30,
+            34,
+            15,
+            18,
+            29,
+            34,
+            16,
+            17,
+            29,
+            33,
+            17,
+            17,
+            30,
+            32,
+            17,
+            18,
+            29,
+            32,
+            17,
+            18,
+            29,
+            33,
+            17,
+            18,
+            28,
+            35,
+            15,
+            33,
+            13,
+            37,
+            13,
+            37,
+            9,
+            39,
+            11,
+            40,
+            5,
+            41,
+            10,
+            41,
+            4,
+            41,
+            10,
+            86,
+            10,
+            86,
+            10,
+            86,
+            10,
+            85,
+            11,
+            85,
+            12,
+            83,
+            13,
+            83,
+            13,
+            82,
+            14,
+            82,
+            13,
+            82,
+            14,
+            82,
+            14,
+            82,
+            13,
+            83,
+            12,
+            84,
+            11,
+            3712
+          ],
+          "method": "native_person_instance"
+        }
+      },
+      "image_sha256": "69f82b65e6fbd75e2b040f61c1a61daf33a248f37c357b5f765b8b956b53e2e5"
+    },
+    {
+      "reference_id": "r8",
+      "requested_ms": 56050,
+      "box": {
+        "x": 0.3525,
+        "y": 0.5272,
+        "w": 0.1685,
+        "h": 0.1062
+      },
+      "target_point": {
+        "x": 0.3925111170009129,
+        "y": 0.5770275642724623
+      },
+      "selection_hints": {
+        "target_point": {
+          "x": 0.3925111170009129,
+          "y": 0.5770275642724623
+        }
+      },
+      "image_sha256": "0610ad635d0f3c6c1c41d014442521fc969bafa7158778f8cb2017e4768f8d65"
+    },
+    {
+      "reference_id": "r9",
+      "requested_ms": 55760,
+      "box": {
+        "x": 0.3971,
+        "y": 0.5461,
+        "w": 0.1217,
+        "h": 0.1027
+      },
+      "target_point": {
+        "x": 0.4595959595959596,
+        "y": 0.6204545454545455
+      },
+      "selection_hints": {
+        "target_point": {
+          "x": 0.4595959595959596,
+          "y": 0.6204545454545455
+        }
+      },
+      "image_sha256": "9a6889c679db6168384ea427fb07a563ddb1f5011ef875abea88c6916b70781c"
+    },
+    {
+      "reference_id": "r10",
+      "requested_ms": 64300,
+      "box": {
+        "x": 0.4476,
+        "y": 0.5508,
+        "w": 0.1482,
+        "h": 0.1104
+      },
+      "target_point": {
+        "x": 0.4823305945754925,
+        "y": 0.5969056453750331
+      },
+      "selection_hints": {
+        "target_point": {
+          "x": 0.4823305945754925,
+          "y": 0.5969056453750331
+        }
+      },
+      "image_sha256": "b50d4818b23fcce786c533de8467bdf1fefe3d3c23eb68de2048bbed369b8820"
+    }
+  ],
+  "expected_answers_used": false,
+  "historical_observations_used": false,
+  "max_model_calls": 3,
+  "production_ready": false,
+  "unrelated_video_validated": false,
+  "caveat": "Source citations and model claims are documented; factual correctness requires independent source review.",
+  "observations": [
+    {
+      "type": "DIRECTION_CHANGE",
+      "decision": "UNCERTAIN",
+      "identity_reference_ids": [
+        "r1"
+      ],
+      "identity_frames": [
+        "s003000",
+        "s003125",
+        "s003750"
+      ],
+      "before_frame": "s003500",
+      "movement_frames": [
+        "s003625",
+        "s003750",
+        "s003875"
+      ],
+      "after_frame": "s004250",
+      "visible_movement": "The selected white player opens his arms and angles his body as the ball moves toward screen-right, away from the blue players approaching from screen-left. He follows the ball into the narrowing gap.",
+      "opponent_response": "The nearer blue player continues across his path and steps between him and the ball; the other blue player closes from behind. Neither visibly commits the wrong way.",
+      "outcome": "LOSES",
+      "uncertainty": "The small image and overlapping legs make it unclear whether this is a deliberate evasive touch or continued carrying interrupted by the defender.",
+      "source_interval_ms": [
+        3500,
+        4250
+      ],
+      "packet_id": "frames_0"
+    },
+    {
+      "type": "BODY_FEINT",
+      "decision": "UNCERTAIN",
+      "identity_reference_ids": [
+        "r4",
+        "r6"
+      ],
+      "identity_frames": [
+        "s007750",
+        "s008500",
+        "s011375",
+        "s013625"
+      ],
+      "before_frame": "s008125",
+      "movement_frames": [
+        "s008250",
+        "s008375",
+        "s008500",
+        "s008625"
+      ],
+      "after_frame": "s008750",
+      "visible_movement": "Facing blue number 9, white number 15 shortens his steps, bends his knees and dips his upper body toward screen-left while keeping the ball close beneath and slightly ahead of him. He then straightens slightly as the defender approaches.",
+      "opponent_response": "Number 9 lowers his stance and steps forward toward the ball. A wrong-way reaction is not visible.",
+      "outcome": "RETAINS",
+      "uncertainty": "A body dip is visible, but an opposite-direction ball exit is not established. This could be close-control adjustment rather than a deceptive feint; no complete step-over is clearly shown.",
+      "source_interval_ms": [
+        8133,
+        8750
+      ],
+      "packet_id": "frames_0"
+    },
+    {
+      "type": "SHIELD_TURN",
+      "decision": "SUPPORTED",
+      "identity_reference_ids": [
+        "r4",
+        "r6"
+      ],
+      "identity_frames": [
+        "s008750",
+        "s009500",
+        "s011375",
+        "s013625"
+      ],
+      "before_frame": "s008750",
+      "movement_frames": [
+        "s008875",
+        "s009000",
+        "s009125",
+        "s009250",
+        "s009375"
+      ],
+      "after_frame": "s009750",
+      "visible_movement": "As number 9 reaches in, number 15 pivots from facing the defender to placing his side and back between the defender and the ball. He bends low, spreads his stance and keeps the ball on the screen-right side of his body.",
+      "opponent_response": "Number 9 stays in contact at his back and side and reaches a leg around him rather than being beaten.",
+      "outcome": "RETAINS",
+      "uncertainty": "The exact touching foot is obscured during contact. Retention is local to this turn; it does not imply escape from the subsequent challenge.",
+      "source_interval_ms": [
+        8750,
+        9750
+      ],
+      "packet_id": "frames_0"
+    },
+    {
+      "type": "DIRECTION_CHANGE",
+      "decision": "SUPPORTED",
+      "identity_reference_ids": [
+        "r5"
+      ],
+      "identity_frames": [
+        "s020250",
+        "s020625",
+        "s021500"
+      ],
+      "before_frame": "s020250",
+      "movement_frames": [
+        "s020375",
+        "s020500",
+        "s020625",
+        "s020750"
+      ],
+      "after_frame": "s020875",
+      "visible_movement": "White number 15 approaches the blue defender with the ball close, lowers his body and changes from a more direct approach to a screen-right exit across the defender's front. The ball moves right with him and he takes another stride after it.",
+      "opponent_response": "The defender turns and moves alongside the new path. Another blue player continues closing from screen-left.",
+      "outcome": "PROGRESSES",
+      "uncertainty": "The change of line is visible, but the distant view does not establish a particular foot technique, deceptive intent or a defender decisively beaten.",
+      "source_interval_ms": [
+        20249,
+        20882
+      ],
+      "packet_id": "frames_0"
+    },
+    {
+      "type": "DIRECTION_CHANGE",
+      "decision": "UNCERTAIN",
+      "identity_reference_ids": [
+        "r5"
+      ],
+      "identity_frames": [
+        "s021250",
+        "s021375",
+        "s021500"
+      ],
+      "before_frame": "s021250",
+      "movement_frames": [
+        "s021375",
+        "s021500",
+        "s021625"
+      ],
+      "after_frame": "s022125",
+      "visible_movement": "Between two converging blue players, the selected player drops into a wide, low stance and reaches toward the ball, then tries to continue screen-right. The ball emerges ahead of the taller blue player rather than remaining clearly under white number 15's control.",
+      "opponent_response": "The taller blue player steps across the ball's path while the blond blue player continues on the right. Both converge on the actual ball position.",
+      "outcome": "LOSES",
+      "uncertainty": "Overlapping legs hide the decisive contact. A further evasive cut is possible, but the visible displacement could instead be caused by the opponent's challenge.",
+      "source_interval_ms": [
+        21249,
+        22132
+      ],
+      "packet_id": "frames_0"
+    },
+    {
+      "type": "DIRECTION_CHANGE",
+      "decision": "SUPPORTED",
+      "identity_reference_ids": [
+        "r6"
+      ],
+      "identity_frames": [
+        "s027625",
+        "s028500",
+        "s029000"
+      ],
+      "before_frame": "s029000",
+      "movement_frames": [
+        "s029125",
+        "s029250",
+        "s029375"
+      ],
+      "after_frame": "s029625",
+      "visible_movement": "White 15 approaches the blue defender with the ball close, lowers his body and angles across the defender's front. He then pushes the ball out toward screen-right and accelerates after it rather than continuing directly into the defender.",
+      "opponent_response": "The defender steps toward the ball, turns into close shoulder-to-shoulder pursuit and follows the rightward exit. No clear wrong-way commitment is visible.",
+      "outcome": "PROGRESSES",
+      "uncertainty": "Overlapping legs obscure the precise touch. The change of route and subsequent progress are visible, but a specific deceptive trick is not established.",
+      "source_interval_ms": [
+        28999,
+        29632
+      ],
+      "packet_id": "frames_1"
+    },
+    {
+      "type": "DIRECTION_CHANGE",
+      "decision": "UNCERTAIN",
+      "identity_reference_ids": [
+        "r6"
+      ],
+      "identity_frames": [
+        "s034875",
+        "s035125",
+        "s035625"
+      ],
+      "before_frame": "s034875",
+      "movement_frames": [
+        "s035000",
+        "s035125",
+        "s035250",
+        "s035375"
+      ],
+      "after_frame": "s035750",
+      "visible_movement": "After the cut, white 15 receives with bent knees and the ball on his screen-left side, opens his arms and rotates as the ball moves across toward screen-right. His extended-leg action sends the ball toward the approaching blue player.",
+      "opponent_response": "The blue player approaching from screen-right spreads his stance and reaches into the ball's path; blue players then move away with the ball.",
+      "outcome": "LOSES",
+      "uncertainty": "This could be an attempted lateral escape, but the extended-leg action could instead be a pass intercepted by the defender. A feint or step-over cannot be established.",
+      "source_interval_ms": [
+        34882,
+        35749
+      ],
+      "packet_id": "frames_1"
+    },
+    {
+      "type": "DIRECTION_CHANGE",
+      "decision": "SUPPORTED",
+      "identity_reference_ids": [
+        "r2"
+      ],
+      "identity_frames": [
+        "s041875",
+        "s042500",
+        "s043125",
+        "s044500"
+      ],
+      "before_frame": "s042750",
+      "movement_frames": [
+        "s042875",
+        "s043000",
+        "s043125"
+      ],
+      "after_frame": "s043375",
+      "visible_movement": "The selected player carries screen-left, shortens his stride as a defender approaches from that side, plants and rotates his body. He redirects the ball back toward screen-right and leans into an accelerating exit with the ball ahead of him.",
+      "opponent_response": "The approaching defender lowers into a wide stance and then turns to chase from behind as the player exits right. The frames do not establish a separate wrong-way reaction to a body feint.",
+      "outcome": "PROGRESSES",
+      "uncertainty": "The reversal is clear, but the exact contacting foot and any additional deceptive foot action are not resolved.",
+      "source_interval_ms": [
+        42748,
+        43382
+      ],
+      "packet_id": "frames_1"
+    },
+    {
+      "type": "DIRECTION_CHANGE",
+      "decision": "SUPPORTED",
+      "identity_reference_ids": [
+        "r10"
+      ],
+      "identity_frames": [
+        "s062500",
+        "s063500",
+        "s064250"
+      ],
+      "before_frame": "s062375",
+      "movement_frames": [
+        "s062500",
+        "s062625",
+        "s062750",
+        "s062875",
+        "s063000",
+        "s063250",
+        "s063375"
+      ],
+      "after_frame": "s063625",
+      "visible_movement": "The selected white player initially carries towards screen-right with the ball ahead. He shortens his stride, bends over the ball and turns across its path; the ball moves back towards screen-left. During the close challenge he rotates his body between the blue player and the ball, then emerges moving screen-left with the ball ahead of him.",
+      "opponent_response": "The nearest blue player closes from the carrier's left/rear, steps into the ball's path and stays alongside during the turn. He then turns to pursue as the white player emerges. No clear wrong-way reaction is visible.",
+      "outcome": "PROGRESSES",
+      "uncertainty": "The players' overlapping legs obscure the precise turning touch and any intervening defensive contact. A change of direction and subsequent controlled exit are visible, but a specific trick or deceptive body feint cannot be established.",
+      "source_interval_ms": [
+        62381,
+        63631
+      ],
+      "packet_id": "frames_2"
+    }
+  ],
+  "overlap_deduplicated": false,
+  "cited_source_frames": [
+    {
+      "id": "s003000",
+      "source_ms": 3000,
+      "source_frame_index": 180
+    },
+    {
+      "id": "s003125",
+      "source_ms": 3133,
+      "source_frame_index": 188
+    },
+    {
+      "id": "s003500",
+      "source_ms": 3500,
+      "source_frame_index": 210
+    },
+    {
+      "id": "s003625",
+      "source_ms": 3633,
+      "source_frame_index": 218
+    },
+    {
+      "id": "s003750",
+      "source_ms": 3750,
+      "source_frame_index": 225
+    },
+    {
+      "id": "s003875",
+      "source_ms": 3883,
+      "source_frame_index": 233
+    },
+    {
+      "id": "s004250",
+      "source_ms": 4250,
+      "source_frame_index": 255
+    },
+    {
+      "id": "s007750",
+      "source_ms": 7750,
+      "source_frame_index": 465
+    },
+    {
+      "id": "s008125",
+      "source_ms": 8133,
+      "source_frame_index": 488
+    },
+    {
+      "id": "s008250",
+      "source_ms": 8250,
+      "source_frame_index": 495
+    },
+    {
+      "id": "s008375",
+      "source_ms": 8383,
+      "source_frame_index": 503
+    },
+    {
+      "id": "s008500",
+      "source_ms": 8500,
+      "source_frame_index": 510
+    },
+    {
+      "id": "s008625",
+      "source_ms": 8633,
+      "source_frame_index": 518
+    },
+    {
+      "id": "s008750",
+      "source_ms": 8750,
+      "source_frame_index": 525
+    },
+    {
+      "id": "s008875",
+      "source_ms": 8883,
+      "source_frame_index": 533
+    },
+    {
+      "id": "s009000",
+      "source_ms": 9000,
+      "source_frame_index": 540
+    },
+    {
+      "id": "s009125",
+      "source_ms": 9133,
+      "source_frame_index": 548
+    },
+    {
+      "id": "s009250",
+      "source_ms": 9250,
+      "source_frame_index": 555
+    },
+    {
+      "id": "s009375",
+      "source_ms": 9383,
+      "source_frame_index": 563
+    },
+    {
+      "id": "s009500",
+      "source_ms": 9500,
+      "source_frame_index": 570
+    },
+    {
+      "id": "s009750",
+      "source_ms": 9750,
+      "source_frame_index": 585
+    },
+    {
+      "id": "s011375",
+      "source_ms": 11383,
+      "source_frame_index": 683
+    },
+    {
+      "id": "s013625",
+      "source_ms": 13633,
+      "source_frame_index": 818
+    },
+    {
+      "id": "s020250",
+      "source_ms": 20249,
+      "source_frame_index": 1215
+    },
+    {
+      "id": "s020375",
+      "source_ms": 20383,
+      "source_frame_index": 1223
+    },
+    {
+      "id": "s020500",
+      "source_ms": 20499,
+      "source_frame_index": 1230
+    },
+    {
+      "id": "s020625",
+      "source_ms": 20633,
+      "source_frame_index": 1238
+    },
+    {
+      "id": "s020750",
+      "source_ms": 20749,
+      "source_frame_index": 1245
+    },
+    {
+      "id": "s020875",
+      "source_ms": 20882,
+      "source_frame_index": 1253
+    },
+    {
+      "id": "s021250",
+      "source_ms": 21249,
+      "source_frame_index": 1275
+    },
+    {
+      "id": "s021375",
+      "source_ms": 21382,
+      "source_frame_index": 1283
+    },
+    {
+      "id": "s021500",
+      "source_ms": 21499,
+      "source_frame_index": 1290
+    },
+    {
+      "id": "s021625",
+      "source_ms": 21632,
+      "source_frame_index": 1298
+    },
+    {
+      "id": "s022125",
+      "source_ms": 22132,
+      "source_frame_index": 1328
+    },
+    {
+      "id": "s027625",
+      "source_ms": 27632,
+      "source_frame_index": 1658
+    },
+    {
+      "id": "s028500",
+      "source_ms": 28499,
+      "source_frame_index": 1710
+    },
+    {
+      "id": "s029000",
+      "source_ms": 28999,
+      "source_frame_index": 1740
+    },
+    {
+      "id": "s029125",
+      "source_ms": 29132,
+      "source_frame_index": 1748
+    },
+    {
+      "id": "s029250",
+      "source_ms": 29249,
+      "source_frame_index": 1755
+    },
+    {
+      "id": "s029375",
+      "source_ms": 29382,
+      "source_frame_index": 1763
+    },
+    {
+      "id": "s029625",
+      "source_ms": 29632,
+      "source_frame_index": 1778
+    },
+    {
+      "id": "s034875",
+      "source_ms": 34882,
+      "source_frame_index": 2093
+    },
+    {
+      "id": "s035000",
+      "source_ms": 34999,
+      "source_frame_index": 2100
+    },
+    {
+      "id": "s035125",
+      "source_ms": 35132,
+      "source_frame_index": 2108
+    },
+    {
+      "id": "s035250",
+      "source_ms": 35249,
+      "source_frame_index": 2115
+    },
+    {
+      "id": "s035375",
+      "source_ms": 35382,
+      "source_frame_index": 2123
+    },
+    {
+      "id": "s035625",
+      "source_ms": 35632,
+      "source_frame_index": 2138
+    },
+    {
+      "id": "s035750",
+      "source_ms": 35749,
+      "source_frame_index": 2145
+    },
+    {
+      "id": "s041875",
+      "source_ms": 41882,
+      "source_frame_index": 2513
+    },
+    {
+      "id": "s042500",
+      "source_ms": 42498,
+      "source_frame_index": 2550
+    },
+    {
+      "id": "s042750",
+      "source_ms": 42748,
+      "source_frame_index": 2565
+    },
+    {
+      "id": "s042875",
+      "source_ms": 42882,
+      "source_frame_index": 2573
+    },
+    {
+      "id": "s043000",
+      "source_ms": 42998,
+      "source_frame_index": 2580
+    },
+    {
+      "id": "s043125",
+      "source_ms": 43132,
+      "source_frame_index": 2588
+    },
+    {
+      "id": "s043375",
+      "source_ms": 43382,
+      "source_frame_index": 2603
+    },
+    {
+      "id": "s044500",
+      "source_ms": 44498,
+      "source_frame_index": 2670
+    },
+    {
+      "id": "s062375",
+      "source_ms": 62381,
+      "source_frame_index": 3743
+    },
+    {
+      "id": "s062500",
+      "source_ms": 62497,
+      "source_frame_index": 3750
+    },
+    {
+      "id": "s062625",
+      "source_ms": 62631,
+      "source_frame_index": 3758
+    },
+    {
+      "id": "s062750",
+      "source_ms": 62747,
+      "source_frame_index": 3765
+    },
+    {
+      "id": "s062875",
+      "source_ms": 62881,
+      "source_frame_index": 3773
+    },
+    {
+      "id": "s063000",
+      "source_ms": 62997,
+      "source_frame_index": 3780
+    },
+    {
+      "id": "s063250",
+      "source_ms": 63247,
+      "source_frame_index": 3795
+    },
+    {
+      "id": "s063375",
+      "source_ms": 63381,
+      "source_frame_index": 3803
+    },
+    {
+      "id": "s063500",
+      "source_ms": 63497,
+      "source_frame_index": 3810
+    },
+    {
+      "id": "s063625",
+      "source_ms": 63631,
+      "source_frame_index": 3818
+    },
+    {
+      "id": "s064250",
+      "source_ms": 64247,
+      "source_frame_index": 3855
+    }
+  ],
+  "packets": [
+    {
+      "packet_id": "frames_0",
+      "start_s": 0,
+      "end_s": 29,
+      "preflight_default_output_budget_audit": {
+        "payload_sha256": "149298fdac51a057dfdb7cc2a3985afb5b49b2ffcbfaa5c4ac12d4b1c61699de",
+        "payload_bytes": 11179664,
+        "explicit_image_count": 30,
+        "images": [
+          {
+            "sha256": "2deeb83a61c3de2696069757fb179eb8bb2776a0b4fbd6ffb963e6417d431dca",
+            "bytes": 97581
+          },
+          {
+            "sha256": "d2ac40f60be62779e0d544074809a79c1c0d9d225f8f78c71d30a372c94db183",
+            "bytes": 153441
+          },
+          {
+            "sha256": "c4a33cf6bdc29b7ff5c2ed4aa66c3c4d6d4f61485ff221d432a79480e33e9a4a",
+            "bytes": 93653
+          },
+          {
+            "sha256": "077375be887414bc1eb104eff67df1901d02f7d10904e2f486fe739079b4b641",
+            "bytes": 145591
+          },
+          {
+            "sha256": "f58d1dd43674b2c46e35ae5f7ff60feb7a6de354f19b48fc7ef847d75a8550c4",
+            "bytes": 152080
+          },
+          {
+            "sha256": "3a6182d7fa67f17274de16d5a3b147a973b45f61de821ec61492bb40b87f0ecd",
+            "bytes": 149341
+          },
+          {
+            "sha256": "69f82b65e6fbd75e2b040f61c1a61daf33a248f37c357b5f765b8b956b53e2e5",
+            "bytes": 179461
+          },
+          {
+            "sha256": "0610ad635d0f3c6c1c41d014442521fc969bafa7158778f8cb2017e4768f8d65",
+            "bytes": 142132
+          },
+          {
+            "sha256": "9a6889c679db6168384ea427fb07a563ddb1f5011ef875abea88c6916b70781c",
+            "bytes": 147751
+          },
+          {
+            "sha256": "b50d4818b23fcce786c533de8467bdf1fefe3d3c23eb68de2048bbed369b8820",
+            "bytes": 125661
+          },
+          {
+            "sha256": "c36ee4622f742be290d4523864186688775da86710ca2b2854ac7d81318ff865",
+            "bytes": 296791
+          },
+          {
+            "sha256": "fe6f5c647ead02342adf697f91226e5c11393dcae41455685a331a40241585d1",
+            "bytes": 264922
+          },
+          {
+            "sha256": "5d3b9209506035f316491c3331cfc9c5c4c1a5cabb512e308fad57a51222f491",
+            "bytes": 242186
+          },
+          {
+            "sha256": "14246cbcc616a5b1735d961c5df4119be45f7ae7b9e42accaffee5a5e4b46f67",
+            "bytes": 222580
+          },
+          {
+            "sha256": "b67762fcce7456a94b144e7ade30316992ec248b5f9960d79b4799a108b99ce0",
+            "bytes": 245387
+          },
+          {
+            "sha256": "5b49b2c89f4f7aa2432a678425019f13d8affec4b507e605fbeddba781aa14ce",
+            "bytes": 346480
+          },
+          {
+            "sha256": "763fc094d9cce2e575ba1d70cdf7d8ad66f1798593e9c5b70df5d86242a1e595",
+            "bytes": 361720
+          },
+          {
+            "sha256": "123c9ab1752fdd12eee1cc9dbd1ce0c170e37604e1beab6031d41986a222d949",
+            "bytes": 362460
+          },
+          {
+            "sha256": "234945d5d0d379d186ae9fc3130e4fec0b6e285e4cb8c577790c719c8e6729c2",
+            "bytes": 348091
+          },
+          {
+            "sha256": "e7aa8f9eb8694ef870bfec7863a7b09493530cb3c105b882b86a71b8e9153b7c",
+            "bytes": 351305
+          },
+          {
+            "sha256": "00336c7068b28de7da08c218510956f59c11553d334fa007c7a053d3f6678546",
+            "bytes": 349903
+          },
+          {
+            "sha256": "9495df6d0b0885f24a53c9e848421d5b59e5c16e10a2f4db2f2dc3b49748108f",
+            "bytes": 375827
+          },
+          {
+            "sha256": "23bdadb82870f5a658dda58b83c4f0483171a213e06deef820579139e4f3c081",
+            "bytes": 380518
+          },
+          {
+            "sha256": "c8c9ac13353e8863e12bceb3e7c9389bf8b6b6035b7b431381f46a7a096d5a49",
+            "bytes": 437323
+          },
+          {
+            "sha256": "8b918765cb1e353e39a2e8080dd17bae9e4e10af6cf62ba587b02a571deee1e1",
+            "bytes": 437974
+          },
+          {
+            "sha256": "09e2c6bddd80a99fb95a70d3be370f5ec3769ed996e19013eddca6e3e80f4344",
+            "bytes": 429506
+          },
+          {
+            "sha256": "753dbf5e1446a4b5a4d35c0204b739d6dc946a6f36d59a4f60f118c26cbece63",
+            "bytes": 440404
+          },
+          {
+            "sha256": "44eb2c5ee02870afd0ab9b6bfca560450a6cc90cbe90a7fcf209deac81345562",
+            "bytes": 460219
+          },
+          {
+            "sha256": "c6dc495c5699dfd78a79201c9dc050028505ed3419bb13a9107dd21e4e8ec562",
+            "bytes": 448075
+          },
+          {
+            "sha256": "8ce2a9766301c9ac596743ebb4de9ce9121434a03180f5bf86eeb35d9d9a06ea",
+            "bytes": 173830
+          }
+        ],
+        "frame_sampling_in_provider_metadata": false,
+        "videos": [],
+        "requested_image_detail": "high"
+      },
+      "actual_request_audit": {
+        "payload_sha256": "0892133503b37fe91d4f8a9ab0b7224fd766e9cd131dba10c8e03deab864c6b7",
+        "payload_bytes": 11179664,
+        "explicit_image_count": 30,
+        "images": [
+          {
+            "sha256": "2deeb83a61c3de2696069757fb179eb8bb2776a0b4fbd6ffb963e6417d431dca",
+            "bytes": 97581
+          },
+          {
+            "sha256": "d2ac40f60be62779e0d544074809a79c1c0d9d225f8f78c71d30a372c94db183",
+            "bytes": 153441
+          },
+          {
+            "sha256": "c4a33cf6bdc29b7ff5c2ed4aa66c3c4d6d4f61485ff221d432a79480e33e9a4a",
+            "bytes": 93653
+          },
+          {
+            "sha256": "077375be887414bc1eb104eff67df1901d02f7d10904e2f486fe739079b4b641",
+            "bytes": 145591
+          },
+          {
+            "sha256": "f58d1dd43674b2c46e35ae5f7ff60feb7a6de354f19b48fc7ef847d75a8550c4",
+            "bytes": 152080
+          },
+          {
+            "sha256": "3a6182d7fa67f17274de16d5a3b147a973b45f61de821ec61492bb40b87f0ecd",
+            "bytes": 149341
+          },
+          {
+            "sha256": "69f82b65e6fbd75e2b040f61c1a61daf33a248f37c357b5f765b8b956b53e2e5",
+            "bytes": 179461
+          },
+          {
+            "sha256": "0610ad635d0f3c6c1c41d014442521fc969bafa7158778f8cb2017e4768f8d65",
+            "bytes": 142132
+          },
+          {
+            "sha256": "9a6889c679db6168384ea427fb07a563ddb1f5011ef875abea88c6916b70781c",
+            "bytes": 147751
+          },
+          {
+            "sha256": "b50d4818b23fcce786c533de8467bdf1fefe3d3c23eb68de2048bbed369b8820",
+            "bytes": 125661
+          },
+          {
+            "sha256": "c36ee4622f742be290d4523864186688775da86710ca2b2854ac7d81318ff865",
+            "bytes": 296791
+          },
+          {
+            "sha256": "fe6f5c647ead02342adf697f91226e5c11393dcae41455685a331a40241585d1",
+            "bytes": 264922
+          },
+          {
+            "sha256": "5d3b9209506035f316491c3331cfc9c5c4c1a5cabb512e308fad57a51222f491",
+            "bytes": 242186
+          },
+          {
+            "sha256": "14246cbcc616a5b1735d961c5df4119be45f7ae7b9e42accaffee5a5e4b46f67",
+            "bytes": 222580
+          },
+          {
+            "sha256": "b67762fcce7456a94b144e7ade30316992ec248b5f9960d79b4799a108b99ce0",
+            "bytes": 245387
+          },
+          {
+            "sha256": "5b49b2c89f4f7aa2432a678425019f13d8affec4b507e605fbeddba781aa14ce",
+            "bytes": 346480
+          },
+          {
+            "sha256": "763fc094d9cce2e575ba1d70cdf7d8ad66f1798593e9c5b70df5d86242a1e595",
+            "bytes": 361720
+          },
+          {
+            "sha256": "123c9ab1752fdd12eee1cc9dbd1ce0c170e37604e1beab6031d41986a222d949",
+            "bytes": 362460
+          },
+          {
+            "sha256": "234945d5d0d379d186ae9fc3130e4fec0b6e285e4cb8c577790c719c8e6729c2",
+            "bytes": 348091
+          },
+          {
+            "sha256": "e7aa8f9eb8694ef870bfec7863a7b09493530cb3c105b882b86a71b8e9153b7c",
+            "bytes": 351305
+          },
+          {
+            "sha256": "00336c7068b28de7da08c218510956f59c11553d334fa007c7a053d3f6678546",
+            "bytes": 349903
+          },
+          {
+            "sha256": "9495df6d0b0885f24a53c9e848421d5b59e5c16e10a2f4db2f2dc3b49748108f",
+            "bytes": 375827
+          },
+          {
+            "sha256": "23bdadb82870f5a658dda58b83c4f0483171a213e06deef820579139e4f3c081",
+            "bytes": 380518
+          },
+          {
+            "sha256": "c8c9ac13353e8863e12bceb3e7c9389bf8b6b6035b7b431381f46a7a096d5a49",
+            "bytes": 437323
+          },
+          {
+            "sha256": "8b918765cb1e353e39a2e8080dd17bae9e4e10af6cf62ba587b02a571deee1e1",
+            "bytes": 437974
+          },
+          {
+            "sha256": "09e2c6bddd80a99fb95a70d3be370f5ec3769ed996e19013eddca6e3e80f4344",
+            "bytes": 429506
+          },
+          {
+            "sha256": "753dbf5e1446a4b5a4d35c0204b739d6dc946a6f36d59a4f60f118c26cbece63",
+            "bytes": 440404
+          },
+          {
+            "sha256": "44eb2c5ee02870afd0ab9b6bfca560450a6cc90cbe90a7fcf209deac81345562",
+            "bytes": 460219
+          },
+          {
+            "sha256": "c6dc495c5699dfd78a79201c9dc050028505ed3419bb13a9107dd21e4e8ec562",
+            "bytes": 448075
+          },
+          {
+            "sha256": "8ce2a9766301c9ac596743ebb4de9ce9121434a03180f5bf86eeb35d9d9a06ea",
+            "bytes": 173830
+          }
+        ],
+        "frame_sampling_in_provider_metadata": false,
+        "videos": [],
+        "requested_image_detail": "high"
+      }
+    },
+    {
+      "packet_id": "frames_1",
+      "start_s": 27,
+      "end_s": 56,
+      "preflight_default_output_budget_audit": {
+        "payload_sha256": "442c0331b0effb32cd6811aafbf338c62266869addf1d0faa7bd31669e37ec5c",
+        "payload_bytes": 13230664,
+        "explicit_image_count": 30,
+        "images": [
+          {
+            "sha256": "2deeb83a61c3de2696069757fb179eb8bb2776a0b4fbd6ffb963e6417d431dca",
+            "bytes": 97581
+          },
+          {
+            "sha256": "d2ac40f60be62779e0d544074809a79c1c0d9d225f8f78c71d30a372c94db183",
+            "bytes": 153441
+          },
+          {
+            "sha256": "c4a33cf6bdc29b7ff5c2ed4aa66c3c4d6d4f61485ff221d432a79480e33e9a4a",
+            "bytes": 93653
+          },
+          {
+            "sha256": "077375be887414bc1eb104eff67df1901d02f7d10904e2f486fe739079b4b641",
+            "bytes": 145591
+          },
+          {
+            "sha256": "f58d1dd43674b2c46e35ae5f7ff60feb7a6de354f19b48fc7ef847d75a8550c4",
+            "bytes": 152080
+          },
+          {
+            "sha256": "3a6182d7fa67f17274de16d5a3b147a973b45f61de821ec61492bb40b87f0ecd",
+            "bytes": 149341
+          },
+          {
+            "sha256": "69f82b65e6fbd75e2b040f61c1a61daf33a248f37c357b5f765b8b956b53e2e5",
+            "bytes": 179461
+          },
+          {
+            "sha256": "0610ad635d0f3c6c1c41d014442521fc969bafa7158778f8cb2017e4768f8d65",
+            "bytes": 142132
+          },
+          {
+            "sha256": "9a6889c679db6168384ea427fb07a563ddb1f5011ef875abea88c6916b70781c",
+            "bytes": 147751
+          },
+          {
+            "sha256": "b50d4818b23fcce786c533de8467bdf1fefe3d3c23eb68de2048bbed369b8820",
+            "bytes": 125661
+          },
+          {
+            "sha256": "c6dc495c5699dfd78a79201c9dc050028505ed3419bb13a9107dd21e4e8ec562",
+            "bytes": 448075
+          },
+          {
+            "sha256": "bb37b1247b56bc5dd67f256feddcbc99e386f3c85ca7467bcf02693d221b1b62",
+            "bytes": 428806
+          },
+          {
+            "sha256": "ecd9ee1933c8aa6d9ffcf9e67ce66f120f349faa6348c35ec0b02a2c53146697",
+            "bytes": 431081
+          },
+          {
+            "sha256": "d773ba0a45ae0a6ad8667b7dc27f76ed59beb5512171d6120b3d852d62887684",
+            "bytes": 455045
+          },
+          {
+            "sha256": "c7742feb12d906cc6993d1e3fdde92eded329918a497217ec992562621f1ea9a",
+            "bytes": 466055
+          },
+          {
+            "sha256": "d20afe708df948856b7f7cb412f8f21536c8725b2c263cbbfcbb947b1c56ef0f",
+            "bytes": 485530
+          },
+          {
+            "sha256": "36467b3b18408968bb2d78c7d3e8e6e8db59df9227b50c1df26dc5808e363804",
+            "bytes": 467910
+          },
+          {
+            "sha256": "bfbdd81ac0423228aca31bc6b083bd43d78433d46ec020f97331aeb329df352e",
+            "bytes": 460771
+          },
+          {
+            "sha256": "017e3d90b02194dab732ff27550aaf26cadbb177ca8a112fd5dc977255ef84a5",
+            "bytes": 477308
+          },
+          {
+            "sha256": "a89b147e87109c392f6f577bd139915bdc446a24e3bcbcacdd3d6282a460fa01",
+            "bytes": 457926
+          },
+          {
+            "sha256": "6e0db88c6668efeff840c2f61ec9fb6db86d4ef5ed8e88d00d89ecc4f8df05d1",
+            "bytes": 385654
+          },
+          {
+            "sha256": "16ce9ac6c2b43399c95183ad3211638ad80dad8359233bdbdc935fbc04d4cf92",
+            "bytes": 423189
+          },
+          {
+            "sha256": "d9d69c8ee63da33a90f6ccfff7aa30cc08468ad26cd895e2c289b297c5540249",
+            "bytes": 433007
+          },
+          {
+            "sha256": "7db71b55e48ca57029d8bb7f6fbced7200a5cf0e1c16a1a1bc5ab861678fcf6f",
+            "bytes": 444818
+          },
+          {
+            "sha256": "a0c2706d666837711c7c2a0bd7f34a466a87cc2f46eb4118ddc057d31af7b081",
+            "bytes": 406371
+          },
+          {
+            "sha256": "c5e3dd70a69af17a1f9c2be3a9ff39072e4d9941e210b34b8049e9d68e10c24c",
+            "bytes": 382250
+          },
+          {
+            "sha256": "e24e54b928a7e98aa5e38724664f731b69bc376175797f82943e4f84a4c426cf",
+            "bytes": 435732
+          },
+          {
+            "sha256": "c65489e5774b23d54aa63e6c7935323f6bcaf3ce2118dbbf70b28b9d57cc9357",
+            "bytes": 438488
+          },
+          {
+            "sha256": "eaeb7096cb59e2f9897e838c324236cdb6fea8e740dcf5819e852573b3ca3855",
+            "bytes": 428492
+          },
+          {
+            "sha256": "e133bb6cb7073e36f5518be4711f4a05f998d3e486dbb6b89ba710d6816bc332",
+            "bytes": 157077
+          }
+        ],
+        "frame_sampling_in_provider_metadata": false,
+        "videos": [],
+        "requested_image_detail": "high"
+      },
+      "actual_request_audit": {
+        "payload_sha256": "21673ddd31ff15ee3250def641ea8bf8365d5d76e11eda48f01e7785b951c93d",
+        "payload_bytes": 13230664,
+        "explicit_image_count": 30,
+        "images": [
+          {
+            "sha256": "2deeb83a61c3de2696069757fb179eb8bb2776a0b4fbd6ffb963e6417d431dca",
+            "bytes": 97581
+          },
+          {
+            "sha256": "d2ac40f60be62779e0d544074809a79c1c0d9d225f8f78c71d30a372c94db183",
+            "bytes": 153441
+          },
+          {
+            "sha256": "c4a33cf6bdc29b7ff5c2ed4aa66c3c4d6d4f61485ff221d432a79480e33e9a4a",
+            "bytes": 93653
+          },
+          {
+            "sha256": "077375be887414bc1eb104eff67df1901d02f7d10904e2f486fe739079b4b641",
+            "bytes": 145591
+          },
+          {
+            "sha256": "f58d1dd43674b2c46e35ae5f7ff60feb7a6de354f19b48fc7ef847d75a8550c4",
+            "bytes": 152080
+          },
+          {
+            "sha256": "3a6182d7fa67f17274de16d5a3b147a973b45f61de821ec61492bb40b87f0ecd",
+            "bytes": 149341
+          },
+          {
+            "sha256": "69f82b65e6fbd75e2b040f61c1a61daf33a248f37c357b5f765b8b956b53e2e5",
+            "bytes": 179461
+          },
+          {
+            "sha256": "0610ad635d0f3c6c1c41d014442521fc969bafa7158778f8cb2017e4768f8d65",
+            "bytes": 142132
+          },
+          {
+            "sha256": "9a6889c679db6168384ea427fb07a563ddb1f5011ef875abea88c6916b70781c",
+            "bytes": 147751
+          },
+          {
+            "sha256": "b50d4818b23fcce786c533de8467bdf1fefe3d3c23eb68de2048bbed369b8820",
+            "bytes": 125661
+          },
+          {
+            "sha256": "c6dc495c5699dfd78a79201c9dc050028505ed3419bb13a9107dd21e4e8ec562",
+            "bytes": 448075
+          },
+          {
+            "sha256": "bb37b1247b56bc5dd67f256feddcbc99e386f3c85ca7467bcf02693d221b1b62",
+            "bytes": 428806
+          },
+          {
+            "sha256": "ecd9ee1933c8aa6d9ffcf9e67ce66f120f349faa6348c35ec0b02a2c53146697",
+            "bytes": 431081
+          },
+          {
+            "sha256": "d773ba0a45ae0a6ad8667b7dc27f76ed59beb5512171d6120b3d852d62887684",
+            "bytes": 455045
+          },
+          {
+            "sha256": "c7742feb12d906cc6993d1e3fdde92eded329918a497217ec992562621f1ea9a",
+            "bytes": 466055
+          },
+          {
+            "sha256": "d20afe708df948856b7f7cb412f8f21536c8725b2c263cbbfcbb947b1c56ef0f",
+            "bytes": 485530
+          },
+          {
+            "sha256": "36467b3b18408968bb2d78c7d3e8e6e8db59df9227b50c1df26dc5808e363804",
+            "bytes": 467910
+          },
+          {
+            "sha256": "bfbdd81ac0423228aca31bc6b083bd43d78433d46ec020f97331aeb329df352e",
+            "bytes": 460771
+          },
+          {
+            "sha256": "017e3d90b02194dab732ff27550aaf26cadbb177ca8a112fd5dc977255ef84a5",
+            "bytes": 477308
+          },
+          {
+            "sha256": "a89b147e87109c392f6f577bd139915bdc446a24e3bcbcacdd3d6282a460fa01",
+            "bytes": 457926
+          },
+          {
+            "sha256": "6e0db88c6668efeff840c2f61ec9fb6db86d4ef5ed8e88d00d89ecc4f8df05d1",
+            "bytes": 385654
+          },
+          {
+            "sha256": "16ce9ac6c2b43399c95183ad3211638ad80dad8359233bdbdc935fbc04d4cf92",
+            "bytes": 423189
+          },
+          {
+            "sha256": "d9d69c8ee63da33a90f6ccfff7aa30cc08468ad26cd895e2c289b297c5540249",
+            "bytes": 433007
+          },
+          {
+            "sha256": "7db71b55e48ca57029d8bb7f6fbced7200a5cf0e1c16a1a1bc5ab861678fcf6f",
+            "bytes": 444818
+          },
+          {
+            "sha256": "a0c2706d666837711c7c2a0bd7f34a466a87cc2f46eb4118ddc057d31af7b081",
+            "bytes": 406371
+          },
+          {
+            "sha256": "c5e3dd70a69af17a1f9c2be3a9ff39072e4d9941e210b34b8049e9d68e10c24c",
+            "bytes": 382250
+          },
+          {
+            "sha256": "e24e54b928a7e98aa5e38724664f731b69bc376175797f82943e4f84a4c426cf",
+            "bytes": 435732
+          },
+          {
+            "sha256": "c65489e5774b23d54aa63e6c7935323f6bcaf3ce2118dbbf70b28b9d57cc9357",
+            "bytes": 438488
+          },
+          {
+            "sha256": "eaeb7096cb59e2f9897e838c324236cdb6fea8e740dcf5819e852573b3ca3855",
+            "bytes": 428492
+          },
+          {
+            "sha256": "e133bb6cb7073e36f5518be4711f4a05f998d3e486dbb6b89ba710d6816bc332",
+            "bytes": 157077
+          }
+        ],
+        "frame_sampling_in_provider_metadata": false,
+        "videos": [],
+        "requested_image_detail": "high"
+      }
+    },
+    {
+      "packet_id": "frames_2",
+      "start_s": 54,
+      "end_s": 76.763596,
+      "preflight_default_output_budget_audit": {
+        "payload_sha256": "38f990829a945116c810e72e404fd8c1b4193aa106bfaef229e5b5059fd52ca5",
+        "payload_bytes": 8302425,
+        "explicit_image_count": 26,
+        "images": [
+          {
+            "sha256": "2deeb83a61c3de2696069757fb179eb8bb2776a0b4fbd6ffb963e6417d431dca",
+            "bytes": 97581
+          },
+          {
+            "sha256": "d2ac40f60be62779e0d544074809a79c1c0d9d225f8f78c71d30a372c94db183",
+            "bytes": 153441
+          },
+          {
+            "sha256": "c4a33cf6bdc29b7ff5c2ed4aa66c3c4d6d4f61485ff221d432a79480e33e9a4a",
+            "bytes": 93653
+          },
+          {
+            "sha256": "077375be887414bc1eb104eff67df1901d02f7d10904e2f486fe739079b4b641",
+            "bytes": 145591
+          },
+          {
+            "sha256": "f58d1dd43674b2c46e35ae5f7ff60feb7a6de354f19b48fc7ef847d75a8550c4",
+            "bytes": 152080
+          },
+          {
+            "sha256": "3a6182d7fa67f17274de16d5a3b147a973b45f61de821ec61492bb40b87f0ecd",
+            "bytes": 149341
+          },
+          {
+            "sha256": "69f82b65e6fbd75e2b040f61c1a61daf33a248f37c357b5f765b8b956b53e2e5",
+            "bytes": 179461
+          },
+          {
+            "sha256": "0610ad635d0f3c6c1c41d014442521fc969bafa7158778f8cb2017e4768f8d65",
+            "bytes": 142132
+          },
+          {
+            "sha256": "9a6889c679db6168384ea427fb07a563ddb1f5011ef875abea88c6916b70781c",
+            "bytes": 147751
+          },
+          {
+            "sha256": "b50d4818b23fcce786c533de8467bdf1fefe3d3c23eb68de2048bbed369b8820",
+            "bytes": 125661
+          },
+          {
+            "sha256": "eaeb7096cb59e2f9897e838c324236cdb6fea8e740dcf5819e852573b3ca3855",
+            "bytes": 428492
+          },
+          {
+            "sha256": "a9b905408ca20b099fd94cb2848676330d65369cccaf769b8d634f9b58351aa2",
+            "bytes": 353910
+          },
+          {
+            "sha256": "8329c1c922457867fd499f554bd7058bac1a87dd8dc2b1b303794c05c6456e97",
+            "bytes": 382493
+          },
+          {
+            "sha256": "1086b234d80ef1cc83ff2e6cae77d7090491a8c49fdcf96ddad11027de8ce132",
+            "bytes": 375225
+          },
+          {
+            "sha256": "8b1ae393093be4a2b1a0be93a9d4107976356b9bb12f278546fa3fd680f755d7",
+            "bytes": 337182
+          },
+          {
+            "sha256": "a9cd97047b872139fccbc8640a43928d6d68b0edfac5137435513f8b3abdfdb8",
+            "bytes": 309833
+          },
+          {
+            "sha256": "3da59721776e6bb617019f553e9a6201c90951cca7107244f0820cfa2633db35",
+            "bytes": 322913
+          },
+          {
+            "sha256": "899379e5b952b6423e7d699dbb316c0785e6f7774ef8647199230f9080d9a8d2",
+            "bytes": 294359
+          },
+          {
+            "sha256": "86294b05aaff27fe32bc3e56f7b7e7765257c9555010e3bf46bc187f80ab9deb",
+            "bytes": 237557
+          },
+          {
+            "sha256": "50a6049e6d450afc6ea84578b3848a3ff03e96b9446775fd25a0f633632f98a7",
+            "bytes": 245169
+          },
+          {
+            "sha256": "68236f917c060fdf4e58705bbadb312d688742b5dc74c6fa977ac257d4515068",
+            "bytes": 237950
+          },
+          {
+            "sha256": "93b6b30ebc76b2258767e2f6645b1d8b7aa8a9a4552874e389bc27202135a662",
+            "bytes": 244961
+          },
+          {
+            "sha256": "a104a3fc21d2f008c0fdd13ff31529a507db7b83ff592f854d588ffbaeaad175",
+            "bytes": 277145
+          },
+          {
+            "sha256": "58487f82df31e06b8624603cfdef083ef54de414685b06bddd6d0133d327ecc9",
+            "bytes": 307833
+          },
+          {
+            "sha256": "990e7205c8a67ecd8ff915724e323265689dcba1e5bcef14eed7713f3bf4e5d3",
+            "bytes": 347260
+          },
+          {
+            "sha256": "52813fd2f6fcdcfe8546f594b7f7c972414c3e44841f62cb8b95ee0fce495641",
+            "bytes": 118253
+          }
+        ],
+        "frame_sampling_in_provider_metadata": false,
+        "videos": [],
+        "requested_image_detail": "high"
+      },
+      "actual_request_audit": {
+        "payload_sha256": "ffed31125db3b6596ebddef315ff0232739798fbd96335b6a233a7e8495bef3a",
+        "payload_bytes": 8302425,
+        "explicit_image_count": 26,
+        "images": [
+          {
+            "sha256": "2deeb83a61c3de2696069757fb179eb8bb2776a0b4fbd6ffb963e6417d431dca",
+            "bytes": 97581
+          },
+          {
+            "sha256": "d2ac40f60be62779e0d544074809a79c1c0d9d225f8f78c71d30a372c94db183",
+            "bytes": 153441
+          },
+          {
+            "sha256": "c4a33cf6bdc29b7ff5c2ed4aa66c3c4d6d4f61485ff221d432a79480e33e9a4a",
+            "bytes": 93653
+          },
+          {
+            "sha256": "077375be887414bc1eb104eff67df1901d02f7d10904e2f486fe739079b4b641",
+            "bytes": 145591
+          },
+          {
+            "sha256": "f58d1dd43674b2c46e35ae5f7ff60feb7a6de354f19b48fc7ef847d75a8550c4",
+            "bytes": 152080
+          },
+          {
+            "sha256": "3a6182d7fa67f17274de16d5a3b147a973b45f61de821ec61492bb40b87f0ecd",
+            "bytes": 149341
+          },
+          {
+            "sha256": "69f82b65e6fbd75e2b040f61c1a61daf33a248f37c357b5f765b8b956b53e2e5",
+            "bytes": 179461
+          },
+          {
+            "sha256": "0610ad635d0f3c6c1c41d014442521fc969bafa7158778f8cb2017e4768f8d65",
+            "bytes": 142132
+          },
+          {
+            "sha256": "9a6889c679db6168384ea427fb07a563ddb1f5011ef875abea88c6916b70781c",
+            "bytes": 147751
+          },
+          {
+            "sha256": "b50d4818b23fcce786c533de8467bdf1fefe3d3c23eb68de2048bbed369b8820",
+            "bytes": 125661
+          },
+          {
+            "sha256": "eaeb7096cb59e2f9897e838c324236cdb6fea8e740dcf5819e852573b3ca3855",
+            "bytes": 428492
+          },
+          {
+            "sha256": "a9b905408ca20b099fd94cb2848676330d65369cccaf769b8d634f9b58351aa2",
+            "bytes": 353910
+          },
+          {
+            "sha256": "8329c1c922457867fd499f554bd7058bac1a87dd8dc2b1b303794c05c6456e97",
+            "bytes": 382493
+          },
+          {
+            "sha256": "1086b234d80ef1cc83ff2e6cae77d7090491a8c49fdcf96ddad11027de8ce132",
+            "bytes": 375225
+          },
+          {
+            "sha256": "8b1ae393093be4a2b1a0be93a9d4107976356b9bb12f278546fa3fd680f755d7",
+            "bytes": 337182
+          },
+          {
+            "sha256": "a9cd97047b872139fccbc8640a43928d6d68b0edfac5137435513f8b3abdfdb8",
+            "bytes": 309833
+          },
+          {
+            "sha256": "3da59721776e6bb617019f553e9a6201c90951cca7107244f0820cfa2633db35",
+            "bytes": 322913
+          },
+          {
+            "sha256": "899379e5b952b6423e7d699dbb316c0785e6f7774ef8647199230f9080d9a8d2",
+            "bytes": 294359
+          },
+          {
+            "sha256": "86294b05aaff27fe32bc3e56f7b7e7765257c9555010e3bf46bc187f80ab9deb",
+            "bytes": 237557
+          },
+          {
+            "sha256": "50a6049e6d450afc6ea84578b3848a3ff03e96b9446775fd25a0f633632f98a7",
+            "bytes": 245169
+          },
+          {
+            "sha256": "68236f917c060fdf4e58705bbadb312d688742b5dc74c6fa977ac257d4515068",
+            "bytes": 237950
+          },
+          {
+            "sha256": "93b6b30ebc76b2258767e2f6645b1d8b7aa8a9a4552874e389bc27202135a662",
+            "bytes": 244961
+          },
+          {
+            "sha256": "a104a3fc21d2f008c0fdd13ff31529a507db7b83ff592f854d588ffbaeaad175",
+            "bytes": 277145
+          },
+          {
+            "sha256": "58487f82df31e06b8624603cfdef083ef54de414685b06bddd6d0133d327ecc9",
+            "bytes": 307833
+          },
+          {
+            "sha256": "990e7205c8a67ecd8ff915724e323265689dcba1e5bcef14eed7713f3bf4e5d3",
+            "bytes": 347260
+          },
+          {
+            "sha256": "52813fd2f6fcdcfe8546f594b7f7c972414c3e44841f62cb8b95ee0fce495641",
+            "bytes": 118253
+          }
+        ],
+        "frame_sampling_in_provider_metadata": false,
+        "videos": [],
+        "requested_image_detail": "high"
+      }
+    }
+  ],
+  "workflow_run_id": 39613934001,
+  "code_commit": "fab3b182996793271b98a4a3c81f80b353502fdb",
+  "receipts": [
+    {
+      "packet_id": "frames_0",
+      "provider": "emergent",
+      "requested_model": "gpt-6-astra",
+      "origin": "LIVE_MODEL_REQUEST",
+      "status": "COMPLETED",
+      "requested_reasoning_effort": "low",
+      "payload_sha256": "0892133503b37fe91d4f8a9ab0b7224fd766e9cd131dba10c8e03deab864c6b7",
+      "payload_bytes": 11179664,
+      "explicit_image_count": 30,
+      "images": [
+        {
+          "sha256": "2deeb83a61c3de2696069757fb179eb8bb2776a0b4fbd6ffb963e6417d431dca",
+          "bytes": 97581
+        },
+        {
+          "sha256": "d2ac40f60be62779e0d544074809a79c1c0d9d225f8f78c71d30a372c94db183",
+          "bytes": 153441
+        },
+        {
+          "sha256": "c4a33cf6bdc29b7ff5c2ed4aa66c3c4d6d4f61485ff221d432a79480e33e9a4a",
+          "bytes": 93653
+        },
+        {
+          "sha256": "077375be887414bc1eb104eff67df1901d02f7d10904e2f486fe739079b4b641",
+          "bytes": 145591
+        },
+        {
+          "sha256": "f58d1dd43674b2c46e35ae5f7ff60feb7a6de354f19b48fc7ef847d75a8550c4",
+          "bytes": 152080
+        },
+        {
+          "sha256": "3a6182d7fa67f17274de16d5a3b147a973b45f61de821ec61492bb40b87f0ecd",
+          "bytes": 149341
+        },
+        {
+          "sha256": "69f82b65e6fbd75e2b040f61c1a61daf33a248f37c357b5f765b8b956b53e2e5",
+          "bytes": 179461
+        },
+        {
+          "sha256": "0610ad635d0f3c6c1c41d014442521fc969bafa7158778f8cb2017e4768f8d65",
+          "bytes": 142132
+        },
+        {
+          "sha256": "9a6889c679db6168384ea427fb07a563ddb1f5011ef875abea88c6916b70781c",
+          "bytes": 147751
+        },
+        {
+          "sha256": "b50d4818b23fcce786c533de8467bdf1fefe3d3c23eb68de2048bbed369b8820",
+          "bytes": 125661
+        },
+        {
+          "sha256": "c36ee4622f742be290d4523864186688775da86710ca2b2854ac7d81318ff865",
+          "bytes": 296791
+        },
+        {
+          "sha256": "fe6f5c647ead02342adf697f91226e5c11393dcae41455685a331a40241585d1",
+          "bytes": 264922
+        },
+        {
+          "sha256": "5d3b9209506035f316491c3331cfc9c5c4c1a5cabb512e308fad57a51222f491",
+          "bytes": 242186
+        },
+        {
+          "sha256": "14246cbcc616a5b1735d961c5df4119be45f7ae7b9e42accaffee5a5e4b46f67",
+          "bytes": 222580
+        },
+        {
+          "sha256": "b67762fcce7456a94b144e7ade30316992ec248b5f9960d79b4799a108b99ce0",
+          "bytes": 245387
+        },
+        {
+          "sha256": "5b49b2c89f4f7aa2432a678425019f13d8affec4b507e605fbeddba781aa14ce",
+          "bytes": 346480
+        },
+        {
+          "sha256": "763fc094d9cce2e575ba1d70cdf7d8ad66f1798593e9c5b70df5d86242a1e595",
+          "bytes": 361720
+        },
+        {
+          "sha256": "123c9ab1752fdd12eee1cc9dbd1ce0c170e37604e1beab6031d41986a222d949",
+          "bytes": 362460
+        },
+        {
+          "sha256": "234945d5d0d379d186ae9fc3130e4fec0b6e285e4cb8c577790c719c8e6729c2",
+          "bytes": 348091
+        },
+        {
+          "sha256": "e7aa8f9eb8694ef870bfec7863a7b09493530cb3c105b882b86a71b8e9153b7c",
+          "bytes": 351305
+        },
+        {
+          "sha256": "00336c7068b28de7da08c218510956f59c11553d334fa007c7a053d3f6678546",
+          "bytes": 349903
+        },
+        {
+          "sha256": "9495df6d0b0885f24a53c9e848421d5b59e5c16e10a2f4db2f2dc3b49748108f",
+          "bytes": 375827
+        },
+        {
+          "sha256": "23bdadb82870f5a658dda58b83c4f0483171a213e06deef820579139e4f3c081",
+          "bytes": 380518
+        },
+        {
+          "sha256": "c8c9ac13353e8863e12bceb3e7c9389bf8b6b6035b7b431381f46a7a096d5a49",
+          "bytes": 437323
+        },
+        {
+          "sha256": "8b918765cb1e353e39a2e8080dd17bae9e4e10af6cf62ba587b02a571deee1e1",
+          "bytes": 437974
+        },
+        {
+          "sha256": "09e2c6bddd80a99fb95a70d3be370f5ec3769ed996e19013eddca6e3e80f4344",
+          "bytes": 429506
+        },
+        {
+          "sha256": "753dbf5e1446a4b5a4d35c0204b739d6dc946a6f36d59a4f60f118c26cbece63",
+          "bytes": 440404
+        },
+        {
+          "sha256": "44eb2c5ee02870afd0ab9b6bfca560450a6cc90cbe90a7fcf209deac81345562",
+          "bytes": 460219
+        },
+        {
+          "sha256": "c6dc495c5699dfd78a79201c9dc050028505ed3419bb13a9107dd21e4e8ec562",
+          "bytes": 448075
+        },
+        {
+          "sha256": "8ce2a9766301c9ac596743ebb4de9ce9121434a03180f5bf86eeb35d9d9a06ea",
+          "bytes": 173830
+        }
+      ],
+      "frame_sampling_in_provider_metadata": false,
+      "videos": [],
+      "requested_image_detail": "high",
+      "model_version": "gpt-6-astra",
+      "response_id": "chatcmpl-EbRJQ3b86nccXighnQaJS04IeFGTI",
+      "usage": {
+        "completion_tokens": 1378,
+        "prompt_tokens": 80131,
+        "total_tokens": 81509,
+        "completion_tokens_details": {
+          "accepted_prediction_tokens": 0,
+          "audio_tokens": 0,
+          "reasoning_tokens": 77,
+          "rejected_prediction_tokens": 0
+        },
+        "prompt_tokens_details": {
+          "audio_tokens": 0,
+          "cached_tokens": 0
+        }
+      },
+      "raw_response": "{\n  \"observations\": [\n    {\n      \"type\": \"DIRECTION_CHANGE\",\n      \"decision\": \"UNCERTAIN\",\n      \"identity_reference_ids\": [\"r1\"],\n      \"identity_frames\": [\"s003000\", \"s003125\", \"s003750\"],\n      \"before_frame\": \"s003500\",\n      \"movement_frames\": [\"s003625\", \"s003750\", \"s003875\"],\n      \"after_frame\": \"s004250\",\n      \"visible_movement\": \"The selected white player opens his arms and angles his body as the ball moves toward screen-right, away from the blue players approaching from screen-left. He follows the ball into the narrowing gap.\",\n      \"opponent_response\": \"The nearer blue player continues across his path and steps between him and the ball; the other blue player closes from behind. Neither visibly commits the wrong way.\",\n      \"outcome\": \"LOSES\",\n      \"uncertainty\": \"The small image and overlapping legs make it unclear whether this is a deliberate evasive touch or continued carrying interrupted by the defender.\"\n    },\n    {\n      \"type\": \"BODY_FEINT\",\n      \"decision\": \"UNCERTAIN\",\n      \"identity_reference_ids\": [\"r4\", \"r6\"],\n      \"identity_frames\": [\"s007750\", \"s008500\", \"s011375\", \"s013625\"],\n      \"before_frame\": \"s008125\",\n      \"movement_frames\": [\"s008250\", \"s008375\", \"s008500\", \"s008625\"],\n      \"after_frame\": \"s008750\",\n      \"visible_movement\": \"Facing blue number 9, white number 15 shortens his steps, bends his knees and dips his upper body toward screen-left while keeping the ball close beneath and slightly ahead of him. He then straightens slightly as the defender approaches.\",\n      \"opponent_response\": \"Number 9 lowers his stance and steps forward toward the ball. A wrong-way reaction is not visible.\",\n      \"outcome\": \"RETAINS\",\n      \"uncertainty\": \"A body dip is visible, but an opposite-direction ball exit is not established. This could be close-control adjustment rather than a deceptive feint; no complete step-over is clearly shown.\"\n    },\n    {\n      \"type\": \"SHIELD_TURN\",\n      \"decision\": \"SUPPORTED\",\n      \"identity_reference_ids\": [\"r4\", \"r6\"],\n      \"identity_frames\": [\"s008750\", \"s009500\", \"s011375\", \"s013625\"],\n      \"before_frame\": \"s008750\",\n      \"movement_frames\": [\"s008875\", \"s009000\", \"s009125\", \"s009250\", \"s009375\"],\n      \"after_frame\": \"s009750\",\n      \"visible_movement\": \"As number 9 reaches in, number 15 pivots from facing the defender to placing his side and back between the defender and the ball. He bends low, spreads his stance and keeps the ball on the screen-right side of his body.\",\n      \"opponent_response\": \"Number 9 stays in contact at his back and side and reaches a leg around him rather than being beaten.\",\n      \"outcome\": \"RETAINS\",\n      \"uncertainty\": \"The exact touching foot is obscured during contact. Retention is local to this turn; it does not imply escape from the subsequent challenge.\"\n    },\n    {\n      \"type\": \"DIRECTION_CHANGE\",\n      \"decision\": \"SUPPORTED\",\n      \"identity_reference_ids\": [\"r5\"],\n      \"identity_frames\": [\"s020250\", \"s020625\", \"s021500\"],\n      \"before_frame\": \"s020250\",\n      \"movement_frames\": [\"s020375\", \"s020500\", \"s020625\", \"s020750\"],\n      \"after_frame\": \"s020875\",\n      \"visible_movement\": \"White number 15 approaches the blue defender with the ball close, lowers his body and changes from a more direct approach to a screen-right exit across the defender's front. The ball moves right with him and he takes another stride after it.\",\n      \"opponent_response\": \"The defender turns and moves alongside the new path. Another blue player continues closing from screen-left.\",\n      \"outcome\": \"PROGRESSES\",\n      \"uncertainty\": \"The change of line is visible, but the distant view does not establish a particular foot technique, deceptive intent or a defender decisively beaten.\"\n    },\n    {\n      \"type\": \"DIRECTION_CHANGE\",\n      \"decision\": \"UNCERTAIN\",\n      \"identity_reference_ids\": [\"r5\"],\n      \"identity_frames\": [\"s021250\", \"s021375\", \"s021500\"],\n      \"before_frame\": \"s021250\",\n      \"movement_frames\": [\"s021375\", \"s021500\", \"s021625\"],\n      \"after_frame\": \"s022125\",\n      \"visible_movement\": \"Between two converging blue players, the selected player drops into a wide, low stance and reaches toward the ball, then tries to continue screen-right. The ball emerges ahead of the taller blue player rather than remaining clearly under white number 15's control.\",\n      \"opponent_response\": \"The taller blue player steps across the ball's path while the blond blue player continues on the right. Both converge on the actual ball position.\",\n      \"outcome\": \"LOSES\",\n      \"uncertainty\": \"Overlapping legs hide the decisive contact. A further evasive cut is possible, but the visible displacement could instead be caused by the opponent's challenge.\"\n    }\n  ],\n  \"limitations\": [\n    \"The supplied chronological source interval ends at s028875. Identity-only references outside this interval do not provide movement evidence for those later times.\",\n    \"Distant tiles, camera movement and overlapping legs limit identification of individual touches and brief feints.\",\n    \"After the cut to s007500, identity is supported by the selected player's appearance and subsequent continuous movement to readable white number 15. Blue number 20's later turns while number 15 pursues are not attributed to the selected player.\",\n    \"The final reception and carry are truncated before a clear evasive exit or outcome can be established.\"\n  ]\n}",
+      "response_sha256": "840a4304d905d5abb81849ab5ed54f8519ea86cd8d1737dc3479e1438656a7e8",
+      "elapsed_seconds": 40.491
+    },
+    {
+      "packet_id": "frames_1",
+      "provider": "emergent",
+      "requested_model": "gpt-6-astra",
+      "origin": "LIVE_MODEL_REQUEST",
+      "status": "COMPLETED",
+      "requested_reasoning_effort": "low",
+      "payload_sha256": "21673ddd31ff15ee3250def641ea8bf8365d5d76e11eda48f01e7785b951c93d",
+      "payload_bytes": 13230664,
+      "explicit_image_count": 30,
+      "images": [
+        {
+          "sha256": "2deeb83a61c3de2696069757fb179eb8bb2776a0b4fbd6ffb963e6417d431dca",
+          "bytes": 97581
+        },
+        {
+          "sha256": "d2ac40f60be62779e0d544074809a79c1c0d9d225f8f78c71d30a372c94db183",
+          "bytes": 153441
+        },
+        {
+          "sha256": "c4a33cf6bdc29b7ff5c2ed4aa66c3c4d6d4f61485ff221d432a79480e33e9a4a",
+          "bytes": 93653
+        },
+        {
+          "sha256": "077375be887414bc1eb104eff67df1901d02f7d10904e2f486fe739079b4b641",
+          "bytes": 145591
+        },
+        {
+          "sha256": "f58d1dd43674b2c46e35ae5f7ff60feb7a6de354f19b48fc7ef847d75a8550c4",
+          "bytes": 152080
+        },
+        {
+          "sha256": "3a6182d7fa67f17274de16d5a3b147a973b45f61de821ec61492bb40b87f0ecd",
+          "bytes": 149341
+        },
+        {
+          "sha256": "69f82b65e6fbd75e2b040f61c1a61daf33a248f37c357b5f765b8b956b53e2e5",
+          "bytes": 179461
+        },
+        {
+          "sha256": "0610ad635d0f3c6c1c41d014442521fc969bafa7158778f8cb2017e4768f8d65",
+          "bytes": 142132
+        },
+        {
+          "sha256": "9a6889c679db6168384ea427fb07a563ddb1f5011ef875abea88c6916b70781c",
+          "bytes": 147751
+        },
+        {
+          "sha256": "b50d4818b23fcce786c533de8467bdf1fefe3d3c23eb68de2048bbed369b8820",
+          "bytes": 125661
+        },
+        {
+          "sha256": "c6dc495c5699dfd78a79201c9dc050028505ed3419bb13a9107dd21e4e8ec562",
+          "bytes": 448075
+        },
+        {
+          "sha256": "bb37b1247b56bc5dd67f256feddcbc99e386f3c85ca7467bcf02693d221b1b62",
+          "bytes": 428806
+        },
+        {
+          "sha256": "ecd9ee1933c8aa6d9ffcf9e67ce66f120f349faa6348c35ec0b02a2c53146697",
+          "bytes": 431081
+        },
+        {
+          "sha256": "d773ba0a45ae0a6ad8667b7dc27f76ed59beb5512171d6120b3d852d62887684",
+          "bytes": 455045
+        },
+        {
+          "sha256": "c7742feb12d906cc6993d1e3fdde92eded329918a497217ec992562621f1ea9a",
+          "bytes": 466055
+        },
+        {
+          "sha256": "d20afe708df948856b7f7cb412f8f21536c8725b2c263cbbfcbb947b1c56ef0f",
+          "bytes": 485530
+        },
+        {
+          "sha256": "36467b3b18408968bb2d78c7d3e8e6e8db59df9227b50c1df26dc5808e363804",
+          "bytes": 467910
+        },
+        {
+          "sha256": "bfbdd81ac0423228aca31bc6b083bd43d78433d46ec020f97331aeb329df352e",
+          "bytes": 460771
+        },
+        {
+          "sha256": "017e3d90b02194dab732ff27550aaf26cadbb177ca8a112fd5dc977255ef84a5",
+          "bytes": 477308
+        },
+        {
+          "sha256": "a89b147e87109c392f6f577bd139915bdc446a24e3bcbcacdd3d6282a460fa01",
+          "bytes": 457926
+        },
+        {
+          "sha256": "6e0db88c6668efeff840c2f61ec9fb6db86d4ef5ed8e88d00d89ecc4f8df05d1",
+          "bytes": 385654
+        },
+        {
+          "sha256": "16ce9ac6c2b43399c95183ad3211638ad80dad8359233bdbdc935fbc04d4cf92",
+          "bytes": 423189
+        },
+        {
+          "sha256": "d9d69c8ee63da33a90f6ccfff7aa30cc08468ad26cd895e2c289b297c5540249",
+          "bytes": 433007
+        },
+        {
+          "sha256": "7db71b55e48ca57029d8bb7f6fbced7200a5cf0e1c16a1a1bc5ab861678fcf6f",
+          "bytes": 444818
+        },
+        {
+          "sha256": "a0c2706d666837711c7c2a0bd7f34a466a87cc2f46eb4118ddc057d31af7b081",
+          "bytes": 406371
+        },
+        {
+          "sha256": "c5e3dd70a69af17a1f9c2be3a9ff39072e4d9941e210b34b8049e9d68e10c24c",
+          "bytes": 382250
+        },
+        {
+          "sha256": "e24e54b928a7e98aa5e38724664f731b69bc376175797f82943e4f84a4c426cf",
+          "bytes": 435732
+        },
+        {
+          "sha256": "c65489e5774b23d54aa63e6c7935323f6bcaf3ce2118dbbf70b28b9d57cc9357",
+          "bytes": 438488
+        },
+        {
+          "sha256": "eaeb7096cb59e2f9897e838c324236cdb6fea8e740dcf5819e852573b3ca3855",
+          "bytes": 428492
+        },
+        {
+          "sha256": "e133bb6cb7073e36f5518be4711f4a05f998d3e486dbb6b89ba710d6816bc332",
+          "bytes": 157077
+        }
+      ],
+      "frame_sampling_in_provider_metadata": false,
+      "videos": [],
+      "requested_image_detail": "high",
+      "model_version": "gpt-6-astra",
+      "response_id": "chatcmpl-EbRJQhDArlqyiEy4iQHgsXf5HRbTM",
+      "usage": {
+        "completion_tokens": 878,
+        "prompt_tokens": 80273,
+        "total_tokens": 81151,
+        "completion_tokens_details": {
+          "accepted_prediction_tokens": 0,
+          "audio_tokens": 0,
+          "reasoning_tokens": 68,
+          "rejected_prediction_tokens": 0
+        },
+        "prompt_tokens_details": {
+          "audio_tokens": 0,
+          "cached_tokens": 0
+        }
+      },
+      "raw_response": "{\n  \"observations\": [\n    {\n      \"type\": \"DIRECTION_CHANGE\",\n      \"decision\": \"SUPPORTED\",\n      \"identity_reference_ids\": [\"r6\"],\n      \"identity_frames\": [\"s027625\", \"s028500\", \"s029000\"],\n      \"before_frame\": \"s029000\",\n      \"movement_frames\": [\"s029125\", \"s029250\", \"s029375\"],\n      \"after_frame\": \"s029625\",\n      \"visible_movement\": \"White 15 approaches the blue defender with the ball close, lowers his body and angles across the defender's front. He then pushes the ball out toward screen-right and accelerates after it rather than continuing directly into the defender.\",\n      \"opponent_response\": \"The defender steps toward the ball, turns into close shoulder-to-shoulder pursuit and follows the rightward exit. No clear wrong-way commitment is visible.\",\n      \"outcome\": \"PROGRESSES\",\n      \"uncertainty\": \"Overlapping legs obscure the precise touch. The change of route and subsequent progress are visible, but a specific deceptive trick is not established.\"\n    },\n    {\n      \"type\": \"DIRECTION_CHANGE\",\n      \"decision\": \"UNCERTAIN\",\n      \"identity_reference_ids\": [\"r6\"],\n      \"identity_frames\": [\"s034875\", \"s035125\", \"s035625\"],\n      \"before_frame\": \"s034875\",\n      \"movement_frames\": [\"s035000\", \"s035125\", \"s035250\", \"s035375\"],\n      \"after_frame\": \"s035750\",\n      \"visible_movement\": \"After the cut, white 15 receives with bent knees and the ball on his screen-left side, opens his arms and rotates as the ball moves across toward screen-right. His extended-leg action sends the ball toward the approaching blue player.\",\n      \"opponent_response\": \"The blue player approaching from screen-right spreads his stance and reaches into the ball's path; blue players then move away with the ball.\",\n      \"outcome\": \"LOSES\",\n      \"uncertainty\": \"This could be an attempted lateral escape, but the extended-leg action could instead be a pass intercepted by the defender. A feint or step-over cannot be established.\"\n    },\n    {\n      \"type\": \"DIRECTION_CHANGE\",\n      \"decision\": \"SUPPORTED\",\n      \"identity_reference_ids\": [\"r2\"],\n      \"identity_frames\": [\"s041875\", \"s042500\", \"s043125\", \"s044500\"],\n      \"before_frame\": \"s042750\",\n      \"movement_frames\": [\"s042875\", \"s043000\", \"s043125\"],\n      \"after_frame\": \"s043375\",\n      \"visible_movement\": \"The selected player carries screen-left, shortens his stride as a defender approaches from that side, plants and rotates his body. He redirects the ball back toward screen-right and leans into an accelerating exit with the ball ahead of him.\",\n      \"opponent_response\": \"The approaching defender lowers into a wide stance and then turns to chase from behind as the player exits right. The frames do not establish a separate wrong-way reaction to a body feint.\",\n      \"outcome\": \"PROGRESSES\",\n      \"uncertainty\": \"The reversal is clear, but the exact contacting foot and any additional deceptive foot action are not resolved.\"\n    }\n  ],\n  \"limitations\": [\n    \"Small player images, intermittent leg overlap and roughly 0.12-second sampling limit identification of individual touches and brief foot tricks.\",\n    \"Identity was followed as white 15 using the references and continuous movement. Actions by white 17 and other ball recipients were not transferred to the selected player.\",\n    \"Cuts interrupt continuity; only locally identifiable movements are reported. Ordinary receiving turns, straight carries, shooting actions and opponents' tackles were not counted as feints.\"\n  ]\n}",
+      "response_sha256": "49c974f0a71f8a9adefade3a0a4362938b6ef4e7edb223c372afe4f99676bb05",
+      "elapsed_seconds": 28.653
+    },
+    {
+      "packet_id": "frames_2",
+      "provider": "emergent",
+      "requested_model": "gpt-6-astra",
+      "origin": "LIVE_MODEL_REQUEST",
+      "status": "COMPLETED",
+      "requested_reasoning_effort": "low",
+      "payload_sha256": "ffed31125db3b6596ebddef315ff0232739798fbd96335b6a233a7e8495bef3a",
+      "payload_bytes": 8302425,
+      "explicit_image_count": 26,
+      "images": [
+        {
+          "sha256": "2deeb83a61c3de2696069757fb179eb8bb2776a0b4fbd6ffb963e6417d431dca",
+          "bytes": 97581
+        },
+        {
+          "sha256": "d2ac40f60be62779e0d544074809a79c1c0d9d225f8f78c71d30a372c94db183",
+          "bytes": 153441
+        },
+        {
+          "sha256": "c4a33cf6bdc29b7ff5c2ed4aa66c3c4d6d4f61485ff221d432a79480e33e9a4a",
+          "bytes": 93653
+        },
+        {
+          "sha256": "077375be887414bc1eb104eff67df1901d02f7d10904e2f486fe739079b4b641",
+          "bytes": 145591
+        },
+        {
+          "sha256": "f58d1dd43674b2c46e35ae5f7ff60feb7a6de354f19b48fc7ef847d75a8550c4",
+          "bytes": 152080
+        },
+        {
+          "sha256": "3a6182d7fa67f17274de16d5a3b147a973b45f61de821ec61492bb40b87f0ecd",
+          "bytes": 149341
+        },
+        {
+          "sha256": "69f82b65e6fbd75e2b040f61c1a61daf33a248f37c357b5f765b8b956b53e2e5",
+          "bytes": 179461
+        },
+        {
+          "sha256": "0610ad635d0f3c6c1c41d014442521fc969bafa7158778f8cb2017e4768f8d65",
+          "bytes": 142132
+        },
+        {
+          "sha256": "9a6889c679db6168384ea427fb07a563ddb1f5011ef875abea88c6916b70781c",
+          "bytes": 147751
+        },
+        {
+          "sha256": "b50d4818b23fcce786c533de8467bdf1fefe3d3c23eb68de2048bbed369b8820",
+          "bytes": 125661
+        },
+        {
+          "sha256": "eaeb7096cb59e2f9897e838c324236cdb6fea8e740dcf5819e852573b3ca3855",
+          "bytes": 428492
+        },
+        {
+          "sha256": "a9b905408ca20b099fd94cb2848676330d65369cccaf769b8d634f9b58351aa2",
+          "bytes": 353910
+        },
+        {
+          "sha256": "8329c1c922457867fd499f554bd7058bac1a87dd8dc2b1b303794c05c6456e97",
+          "bytes": 382493
+        },
+        {
+          "sha256": "1086b234d80ef1cc83ff2e6cae77d7090491a8c49fdcf96ddad11027de8ce132",
+          "bytes": 375225
+        },
+        {
+          "sha256": "8b1ae393093be4a2b1a0be93a9d4107976356b9bb12f278546fa3fd680f755d7",
+          "bytes": 337182
+        },
+        {
+          "sha256": "a9cd97047b872139fccbc8640a43928d6d68b0edfac5137435513f8b3abdfdb8",
+          "bytes": 309833
+        },
+        {
+          "sha256": "3da59721776e6bb617019f553e9a6201c90951cca7107244f0820cfa2633db35",
+          "bytes": 322913
+        },
+        {
+          "sha256": "899379e5b952b6423e7d699dbb316c0785e6f7774ef8647199230f9080d9a8d2",
+          "bytes": 294359
+        },
+        {
+          "sha256": "86294b05aaff27fe32bc3e56f7b7e7765257c9555010e3bf46bc187f80ab9deb",
+          "bytes": 237557
+        },
+        {
+          "sha256": "50a6049e6d450afc6ea84578b3848a3ff03e96b9446775fd25a0f633632f98a7",
+          "bytes": 245169
+        },
+        {
+          "sha256": "68236f917c060fdf4e58705bbadb312d688742b5dc74c6fa977ac257d4515068",
+          "bytes": 237950
+        },
+        {
+          "sha256": "93b6b30ebc76b2258767e2f6645b1d8b7aa8a9a4552874e389bc27202135a662",
+          "bytes": 244961
+        },
+        {
+          "sha256": "a104a3fc21d2f008c0fdd13ff31529a507db7b83ff592f854d588ffbaeaad175",
+          "bytes": 277145
+        },
+        {
+          "sha256": "58487f82df31e06b8624603cfdef083ef54de414685b06bddd6d0133d327ecc9",
+          "bytes": 307833
+        },
+        {
+          "sha256": "990e7205c8a67ecd8ff915724e323265689dcba1e5bcef14eed7713f3bf4e5d3",
+          "bytes": 347260
+        },
+        {
+          "sha256": "52813fd2f6fcdcfe8546f594b7f7c972414c3e44841f62cb8b95ee0fce495641",
+          "bytes": 118253
+        }
+      ],
+      "frame_sampling_in_provider_metadata": false,
+      "videos": [],
+      "requested_image_detail": "high",
+      "model_version": "gpt-6-astra",
+      "response_id": "chatcmpl-EbRJpjJ9rdirh9tETiQ7kZ00YmjJd",
+      "usage": {
+        "completion_tokens": 538,
+        "prompt_tokens": 67244,
+        "total_tokens": 67782,
+        "completion_tokens_details": {
+          "accepted_prediction_tokens": 0,
+          "audio_tokens": 0,
+          "reasoning_tokens": 80,
+          "rejected_prediction_tokens": 0
+        },
+        "prompt_tokens_details": {
+          "audio_tokens": 0,
+          "cached_tokens": 0
+        }
+      },
+      "raw_response": "{\n  \"observations\": [\n    {\n      \"type\": \"DIRECTION_CHANGE\",\n      \"decision\": \"SUPPORTED\",\n      \"identity_reference_ids\": [\"r10\"],\n      \"identity_frames\": [\"s062500\", \"s063500\", \"s064250\"],\n      \"before_frame\": \"s062375\",\n      \"movement_frames\": [\"s062500\", \"s062625\", \"s062750\", \"s062875\", \"s063000\", \"s063250\", \"s063375\"],\n      \"after_frame\": \"s063625\",\n      \"visible_movement\": \"The selected white player initially carries towards screen-right with the ball ahead. He shortens his stride, bends over the ball and turns across its path; the ball moves back towards screen-left. During the close challenge he rotates his body between the blue player and the ball, then emerges moving screen-left with the ball ahead of him.\",\n      \"opponent_response\": \"The nearest blue player closes from the carrier's left/rear, steps into the ball's path and stays alongside during the turn. He then turns to pursue as the white player emerges. No clear wrong-way reaction is visible.\",\n      \"outcome\": \"PROGRESSES\",\n      \"uncertainty\": \"The players' overlapping legs obscure the precise turning touch and any intervening defensive contact. A change of direction and subsequent controlled exit are visible, but a specific trick or deceptive body feint cannot be established.\"\n    }\n  ],\n  \"limitations\": [\n    \"Small player images and overlapping bodies limit identification of individual foot contacts.\",\n    \"The early sequence around s055750 and s056000 shows the selected player running forward; no distinct evasive move is established there.\",\n    \"The close contest around s060250 includes a player going to ground, but the images do not clearly separate an intentional evasive touch from tackle-related ball movement.\",\n    \"Cuts at s059000 and s065000 interrupt continuity; identity cannot be assumed from possession alone.\",\n    \"The action around s071000 is a ball release under pressure rather than a clearly visible dribbling feint. The subsequent receiver is not treated as the selected player.\"\n  ]\n}",
+      "response_sha256": "727b8661af7ae4d23dcfe19289cc76803938169816e525d199a8d15f97d95953",
+      "elapsed_seconds": 19.816
+    }
+  ],
+  "request_response_hashes_reconstructed_and_verified": true,
+  "audit_note": "Original preflight used default 16384 output tokens; actual calls used 12288. Reconstructed exact actual requests from preserved source sheets and original prompt match all receipt payload hashes. Both audits retained."
+}
