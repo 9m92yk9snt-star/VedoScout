@@ -353,42 +353,29 @@ def test_continuous_match_persistence_stays_below_mongo_document_budget():
 def test_server_wiring_retries_only_incomplete_windows_and_clears_stale_truth():
     src = (BACKEND / "server.py").read_text()
     body = src.split("async def generate_full_report_task", 1)[1].split("\nasync def ", 1)[0]
-    assert "for _attempt_no in range(2):" in body
-    assert "is_production_ready(_unified_candidate)" in body
-    assert "build_retry_request(" in body
-    assert '"canonical_events": ""' in body
-    assert '"legacy_fallback_pending"' in body
-    assert "_geometry_authority_track" in body
-    assert '"movement_track_source": _movement_track_source' in body
-    assert '"unified_event_barriers": ""' in body
-    assert "proof_unsafe_intervals(" in src
-    assert "restore_event_track(" in src
+    assert "for _attempt_no in range(2):" not in body
+    assert "legacy_fallback_pending" not in body
+    assert "checkpoint_sequence_observations" in body
+    assert '"sequence_retry"' in body
+    assert '"canonical_events"' in body
+    assert "restore_event_track(" in src  # deterministic archived-report reads
 
 
 def test_corrective_path_requires_current_ok_canonical_authority():
     src = (BACKEND / "server.py").read_text()
-    body = src.split("async def _run_identity_corrective_pass", 1)[1]
-    body = body.split("\nasync def ", 1)[0]
-    assert 'fresh.get("unified_analysis_status") == "ok"' in body
-    assert "if not _canonical_authority:" in body
-    assert 'fresh.get("unified_scoring_scan")' in body
+    assert "async def _run_identity_corrective_pass" not in src
+    worker = src.split("async def generate_full_report_task", 1)[1].split("\n# =", 1)[0]
+    assert "unified_scoring_scan" not in worker
+    assert "sequence_report_runtime.generate(" in worker
 
 
 def test_server_wires_canonical_frame_geometry_into_proof_and_clip_time():
     src = (BACKEND / "server.py").read_text()
     ensure = src.split("def ensure_video_frames", 1)[1].split("\nasync def ", 1)[0]
-    tele = src.split("async def _telestrate_verified_frames", 1)[1]
-    tele = tele.split("\nasync def ", 1)[0]
-    clips = src.split("async def _generate_tele_clips", 1)[1]
-    clips = clips.split("\ndef ", 1)[0]
-    tracking = src.split("def _apply_tracking_verification", 1)[1]
-    tracking = tracking.split("\nasync def ", 1)[0]
-
     assert "_extract_video_frame_at_media_time(" in ensure
     assert 'out["requested_evidence_time_ms"] = ems' in ensure
     assert 'out["frame_time_authority"] = "ACTUAL_MEDIA_PTS"' in ensure
     assert "event_ledger.resolve_target_box(" in ensure
-    assert "canonical_event_telestration_box(c)" in tele
-    assert 'c["tele_authority"] = "FIX09B_CANONICAL_GEOMETRY"' in tele
-    assert 'c.get("canonical_event_ms")' in clips
-    assert 'event_ms = a.get("event_start_ms")' in tracking
+    runtime = (BACKEND / "sequence_report_runtime.py").read_text()
+    assert '"SEQUENCE_ACTUAL_FRAME_MISMATCH"' in runtime
+    assert '"SEQUENCE_ASSET_BINDING_INVALID"' in runtime

@@ -138,20 +138,6 @@ def test_T7_all_rejected_timeline_stays_empty():
 
 # ---------- T8 — verifier error is not success ----------
 
-def test_T8_cross_verifier_error_fails_closed(monkeypatch):
-    async def boom(**kw):
-        raise RuntimeError("gemini down")
-    monkeypatch.setattr(server, "call_gemini_with_video", boom)
-    full = {"action_timeline": [_evt("00:10"), _evt("00:20")], "scores": {}}
-    asyncio.run(server._cross_verify_full_report(
-        "fix02-t8", full,
-        file_path="video.mp4", marker_path=None, crop_path_str=None,
-        anchor_crops=[], anchor_payload_list=[], gt_track=None, gt_t_off=0.0, doc={},
-    ))
-    assert full["action_timeline"] == []          # pass-1 never exposed as verified
-    cv = full["cross_verification"]
-    assert cv["status"] == "fail_closed_error"
-    assert cv["events_checked"] == 2 and cv["events_dropped"] == 2
 
 
 # ---------- T9 / T10 — proof eligibility ----------
@@ -256,72 +242,16 @@ def test_T13_score_meaning_legacy_unchanged():
 
 # ---------- T14 / T15 — frame identity fails closed ----------
 
-def _frame_doc():
-    return {"fingerprint": {}, "player_details": {"jersey_color": "red"}}
 
 
-def _run_verify(monkeypatch, tmp_path, verdict_fn, enriched):
-    frames_dir = tmp_path / "frames"
-    frames_dir.mkdir(exist_ok=True)
-    for c in enriched:
-        if c.get("_make_file"):
-            (frames_dir / Path(str(c["frame_url"])).name).write_bytes(b"jpg")
-    monkeypatch.setattr(server, "verify_frame_identity", verdict_fn)
-    async def no_sleep(_):
-        return None
-    monkeypatch.setattr(server.asyncio, "sleep", no_sleep)
-    try:
-        stats = asyncio.run(server._verify_enriched_frames(
-            "fix02-frames", _frame_doc(), tmp_path / "v.mp4", frames_dir, enriched, ["ref.jpg"],
-        ))
-    finally:
-        monkeypatch.undo()
-    return stats
 
 
-def test_T14_persistent_error_fails_closed_without_hard_reject(monkeypatch, tmp_path):
-    async def always_error(*a, **kw):
-        return "error"
-    c = {**_com("00:36"), "frame_url": "/api/uploads/frames/x/f1.jpg", "_make_file": True}
-    stats = _run_verify(monkeypatch, tmp_path, always_error, [c])
-    assert c["identity_verified"] is False           # never null while usable
-    assert c["identity_verification_status"] == "error"
-    assert c["frame_url"] is None                    # unusable as proof
-    assert c.get("identity_hard_reject") is not True  # infra != WRONG_PLAYER
-    assert stats["hard_rejected"] == 0
 
 
-def test_T14b_task_exception_fails_closed_without_hard_reject(monkeypatch, tmp_path):
-    async def raises(*a, **kw):
-        raise RuntimeError("api exploded")
-    c = {**_com("00:36"), "frame_url": "/api/uploads/frames/x/f2.jpg", "_make_file": True}
-    stats = _run_verify(monkeypatch, tmp_path, raises, [c])
-    assert c["identity_verified"] is False
-    assert c["identity_verification_status"] == "error"
-    assert c["frame_url"] is None
-    assert c.get("identity_hard_reject") is not True
-    assert stats["hard_rejected"] == 0
 
 
-def test_T15_missing_frame_cannot_become_proof(monkeypatch, tmp_path):
-    async def never_called(*a, **kw):
-        raise AssertionError("verifier must not run for a missing frame")
-    c = {**_com("00:36"), "frame_url": "/api/uploads/frames/x/gone.jpg"}
-    _run_verify(monkeypatch, tmp_path, never_called, [c])
-    assert c["identity_verified"] is False
-    assert c["identity_verification_status"] == "missing"
-    assert c["frame_url"] is None
-    assert c.get("identity_hard_reject") is not True
 
 
-def test_T14c_confirmed_sets_status(monkeypatch, tmp_path):
-    async def confirmed(*a, **kw):
-        return "confirmed"
-    c = {**_com("00:36"), "frame_url": "/api/uploads/frames/x/f3.jpg", "_make_file": True}
-    _run_verify(monkeypatch, tmp_path, confirmed, [c])
-    assert c["identity_verified"] is True
-    assert c["identity_verification_status"] == "confirmed"
-    assert c["frame_url"] is not None
 
 
 # ---------- T16 / T17 — exact frame moment requirement ----------
@@ -472,17 +402,11 @@ console.log(JSON.stringify({{
 
 def test_T22_no_new_model_call_sites():
     src = (BACKEND / "server.py").read_text()
-    # FIX09B adds one sequence-intelligence call site. Its bounded retry reuses
-    # this same source call; there is no unbounded or parallel model-call path.
-    assert src.count("call_gemini_with_video(") == 9
-    assert src.count("call_gemini_text(") == 2
-    assert src.count("verify_frame_identity(") == 5
-    assert src.count("verify_ring_placement(") == 1
+    # Only the free preview/content gate retains Gemini video calls.
+    assert src.count("call_gemini_with_video(") == 4  # definition + gate + preview + bounded retry
+    assert src.count("verify_frame_identity(") == 0
+    assert src.count("verify_ring_placement(") == 0
     assert src.count("verify_preview_summary(") == 2
-    # deterministic layer wiring: exactly the two shared-pipeline call sites
-    assert src.count("apply_fail_closed_proof_authority(") == 2
-    # FIX 08 — +1 deterministic call site (event-native exact frames): 3 → 4
-    assert src.count("compute_proof_frame_verified(") == 4
     ea = (BACKEND / "evidence_authority.py").read_text().lower()
     for banned in ("gemini", "openai", "httpx", "emergent", "llmchat"):
         assert banned not in ea

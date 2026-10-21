@@ -245,23 +245,19 @@ def test_T14_corrective_new_namespace():
 
 def test_T14_both_pipelines_use_same_helper():
     src = (BACKEND / "server.py").read_text()
-    # FIX 08 — each pipeline calls the SAME helper twice: FIX01 ids, then an
-    # idempotent re-bind after event-native evidence rows are created (2 → 4).
-    assert src.count("attach_event_evidence_authority(") == 4
-    assert "full = attach_event_evidence_authority(full)" in src
-    assert "retry = attach_event_evidence_authority(retry)" in src
+    assert "_run_identity_corrective_pass" not in src
+    adapter = (BACKEND / "sequence_report_adapter.py").read_text()
+    assert "attach_event_evidence_authority(" in adapter
+    assert "apply_fail_closed_proof_authority(" in adapter
 
 
 # ---------- TEST 15 — zero new LLM cost ----------
 
 def test_T15_no_new_llm_call_sites():
     src = (BACKEND / "server.py").read_text()
-    # FIX09B adds one sequence-intelligence call site. Its bounded retry reuses
-    # this same source call; there is no unbounded or parallel model-call path.
-    assert src.count("call_gemini_with_video(") == 9
-    assert src.count("call_gemini_text(") == 2
-    assert src.count("verify_frame_identity(") == 5
-    assert src.count("verify_ring_placement(") == 1
+    assert src.count("call_gemini_with_video(") == 4
+    assert src.count("verify_frame_identity(") == 0
+    assert src.count("verify_ring_placement(") == 0
     assert src.count("verify_preview_summary(") == 2
     ea = (BACKEND / "evidence_authority.py").read_text()
     for banned in ("gemini", "openai", "gpt", "httpx", "requests", "llm",

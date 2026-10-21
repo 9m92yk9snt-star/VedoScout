@@ -157,10 +157,12 @@ async def test_manual_start_uses_same_atomic_heartbeat_path():
     fn = load_function("server.py", "generate_full_report", {
         "db": SimpleNamespace(reports=reports), "analysis_jobs": jobs,
         "_ensure_report_video_local": video, "_full_report_with_heartbeat": "leased_runner",
+        "FULL_REPORT_STALL_SECONDS": 180,
     })
     background = SimpleNamespace(add_task=lambda *args: queues.append(args))
     results = await asyncio.gather(*(fn("r", background, {"id": "owner"}) for _ in range(4)))
     assert len(queues) == 1 and queues[0][0] == "leased_runner"
+    assert queues[0][2].stall_seconds == 180
     assert sum(r["status"] == "generating" for r in results) == 1
 
 

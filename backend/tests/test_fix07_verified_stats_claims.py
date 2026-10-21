@@ -351,34 +351,6 @@ def test_V43_wrong_player_assist():
     assert full["verified_stats"]["assists"] == 0
 
 
-def test_V44_empty_pass1_timeline_scan_runs_once(monkeypatch):
-    calls = {"n": 0}
-    # FIX08 C09 — a novel scan GOAL needs FIX08 spatial actor authority:
-    # usable track + contact_ms + actor_box matching the target geometry.
-    goal_row = {**_disc("01:10", "GOAL", "SHOT", "SCORED"),
-                "contact_ms": 70000,
-                "actor_box": {"x": 0.40, "y": 0.30, "w": 0.06, "h": 0.18}}
-    gt_track = {"points": [{"t": float(60 + i), "x": 0.40, "y": 0.30,
-                            "w": 0.06, "h": 0.18} for i in range(20)]}
-
-    async def fake_verify(**kw):
-        calls["n"] += 1
-        assert "SCORING INVOLVEMENT SCAN" in kw["prompt"]
-        return {"verdicts": [],
-                "discovered_scoring_events": [goal_row],
-                "independent_scores": {}}
-
-    monkeypatch.setattr(server, "call_gemini_with_video", fake_verify)
-    full = {"action_timeline": [], "scores": {}}
-    asyncio.run(server._cross_verify_full_report(
-        "t-fix07", full, file_path="/tmp/none.mp4", marker_path=None,
-        crop_path_str=None, anchor_crops=None, anchor_payload_list=[],
-        gt_track=gt_track, gt_t_off=None, doc={"player_details": {}}))
-    assert calls["n"] == 1, "verifier must run exactly ONCE"
-    full = attach_event_evidence_authority(full)
-    full = vstats.apply_verified_stats_authority(full)
-    assert full["verified_stats"]["goals"] == 1
-    assert full["verified_stats"]["scoring_scan"]["performed"] is True
 
 
 def test_V45_complete_scoring_example():
@@ -463,13 +435,10 @@ def test_V48_fix01_ids_preserved():
 
 def test_V49_retry_path_runs_same_pipeline():
     src = (BACKEND / "server.py").read_text()
-    assert src.count("vstats.apply_verified_stats_authority(") == 2, \
-        "normal + corrective paths must both run the FIX07 authority"
-    for chunk in src.split("attach_event_evidence_authority(")[1:]:
-        head = chunk[:400]
-        if "apply_fail_closed_proof_authority" in head:
-            assert "apply_verified_stats_authority" in head, \
-                "FIX07 must run between FIX01 attach and the proof gate"
+    worker = src.split("async def generate_full_report_task", 1)[1].split("\n# =", 1)[0]
+    assert "sequence_report_runtime.generate(" in worker
+    assert "_corrective_only_recovery(" not in src
+    assert "vstats.apply_verified_stats_authority(" not in worker
 
 
 def test_V50_zero_new_model_calls():
@@ -478,10 +447,7 @@ def test_V50_zero_new_model_calls():
                   "aiohttp", "requests.", "urllib", "socket", "emergentintegrations"):
         assert token not in vsrc, f"forbidden call path in verified_stats.py: {token}"
     src = (BACKEND / "server.py").read_text()
-    body = src.split("async def _cross_verify_full_report", 1)[1]
-    body = body.split("\nasync def ", 1)[0]
-    assert body.count("call_gemini_with_video(") == 1, \
-        "the cross-verification stage must stay a single verifier call"
+    assert "async def _cross_verify_full_report" not in src
 
 
 # ------------------------------------------- C01–C06 correction tests

@@ -426,12 +426,10 @@ def test_discovery_prompt_contract():
 
 def test_exactly_one_discovery_call_site():
     src = (BACKEND / "server.py").read_text()
-    assert src.count('session_id=f"discover-') == 1, \
-        "FIX08 adds EXACTLY ONE dedicated discovery call"
+    assert 'session_id=f"discover-' not in src
     body = src.split("async def generate_full_report_task", 1)[1].split("\nasync def ", 1)[0]
-    assert body.count("call_gemini_with_video(") == 3, \
-        ("normal pipeline has sequence + fallback discovery + full call sites; "
-         "sequence and legacy discovery are mutually exclusive")
+    assert body.count("call_gemini_with_video(") == 0
+    assert body.count("sequence_report_runtime.generate(") == 1
     lsrc = (BACKEND / "event_ledger.py").read_text()
     for token in ("LlmChat", "call_gemini", "httpx", "aiohttp", "requests.",
                   "urllib", "socket", "emergentintegrations"):
@@ -515,23 +513,6 @@ def test_F03_exact_frame_uses_milliseconds_not_mmss(tmp_path, monkeypatch):
     assert out["proof_frame_verified"] is True
 
 
-def test_F04_event_track_locked_zero_identity_model_calls(tmp_path, monkeypatch):
-    import server
-    calls = []
-
-    async def fake_verify(*a, **kw):
-        calls.append(a)
-        return "confirmed"
-
-    monkeypatch.setattr(server, "verify_frame_identity", fake_verify)
-    row = _native_row()
-    row["frame_url"] = "/api/uploads/frames/t1/frame_00.jpg"
-    import asyncio
-    stats = asyncio.run(server._verify_enriched_frames(
-        "t1", {"fingerprint": {}}, tmp_path / "v.mp4", tmp_path, [row], ["ref.jpg"]))
-    assert calls == [], "event_track_locked must cause ZERO verify_frame_identity calls"
-    assert row.get("identity_verified") is None, "separate semantics — not model-verified"
-    assert row.get("frame_url"), "frame must survive without a model check"
 
 
 def test_F05_locked_still_requires_exact_frame_time():
@@ -768,24 +749,12 @@ def test_F15_no_legacy_timeline_fallback():
     assert el.authoritative_timeline({"status": "invalid", "track_usable": True}) == []
     assert el.authoritative_timeline({"status": "ok", "track_usable": False,
                                       "events": [{"contact_ms": 1000}]}) == []
-    # Both production paths now share the fallback-provenance bridge. Check
-    # that routing and its real fail-closed output, not the old source layout.
+    # Retired ledger fallback must never re-enter the live Sequence worker.
     import unified_analysis_engine as unified
     tree = ast.parse((BACKEND / "server.py").read_text())
-    expected_routes = {
-        "_run_identity_corrective_pass": ("retry", "_lg"),
-        "generate_full_report_task": ("full", "event_ledger_obj"),
-    }
-    for name, arguments in expected_routes.items():
-        function = next(node for node in tree.body
-                        if isinstance(node, ast.AsyncFunctionDef) and node.name == name)
-        calls = [node for node in ast.walk(function)
-                 if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
-                 and isinstance(node.func.value, ast.Name)
-                 and node.func.value.id == "unified_analysis_engine"
-                 and node.func.attr == "apply_legacy_result_to_report"]
-        assert len(calls) == 1, f"{name} must route fallback through the shared authority bridge"
-        assert [ast.unparse(arg) for arg in calls[0].args] == list(arguments)
+    function = next(node for node in tree.body if isinstance(node, ast.AsyncFunctionDef)
+                    and node.name == "generate_full_report_task")
+    assert "apply_legacy_result_to_report" not in ast.unparse(function)
     valid = el.build_ledger(_discovery([_cand()]), TRACK, DUR)
     for ledger in (None, {"status": "invalid", "track_usable": True},
                    {"status": "ok", "track_usable": False,

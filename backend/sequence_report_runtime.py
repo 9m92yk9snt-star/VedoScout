@@ -25,8 +25,8 @@ from sequence_run_checkpoint import code_fingerprint, failure_metadata
 
 def enabled():
     """All new full reports use sequences; obsolete environment flags cannot
-    silently reactivate legacy reconstruction. Retained reports still recover
-    through their existing engine-specific asset path in the server.
+    silently reactivate legacy reconstruction. The server only regenerates
+    Sequence assets; historical completed reports remain readable.
     """
     return True
 

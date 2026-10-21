@@ -487,8 +487,9 @@ def test_F30_fix06_path_zero_verifier():
     import ast
     src = (BACKEND / "server.py").read_text()
     function = next(n for n in ast.walk(ast.parse(src))
-                    if isinstance(n, ast.AsyncFunctionDef) and n.name == "_movement_pace_core")
+                    if isinstance(n, ast.AsyncFunctionDef) and n.name == "generate_full_report_task")
     body = ast.unparse(function)
+    assert "compute_speed_metrics" not in body
     for token in ("_trusted_fastest_moment", "verify_frame_identity",
                   "call_gemini", "LlmChat"):
         assert token not in body, f"FIX06 movement path can invoke {token}"
