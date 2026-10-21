@@ -602,7 +602,7 @@ def test_access_denied_stops_queued_work_without_alternate_route():
 
 def quota_worker(connection, job, provider, model, timeout_s):
     connection.send({"packet_id": job["packet_id"], "status": "ERROR", "http_status": 429,
-                     "error": "MODEL_QUOTA_OR_RATE_LIMIT"})
+                     "error": "MODEL_QUOTA_OR_RATE_LIMIT", "limit_kind": "QUOTA_EXHAUSTED"})
     connection.close()
 
 
@@ -709,6 +709,22 @@ def test_oversized_error_body_stays_unknown_without_retaining_it():
     assert stream.tell() == 4097
 
 
+def test_http_date_retry_after_is_respected_and_unusable_header_is_not_ignored():
+    from datetime import datetime, timedelta, timezone
+    from email.utils import format_datetime
+    import io
+    import urllib.error
+    until = format_datetime(datetime.now(timezone.utc) + timedelta(seconds=60), usegmt=True)
+    error = urllib.error.HTTPError("https://synthetic.invalid", 429, "synthetic",
+                                  {"Retry-After": until}, io.BytesIO(b'{}'))
+    assert 58 <= t.limit_diagnostics(error)["retry_after_seconds"] <= 60
+    for header in ("99999", "unknown-provider-header"):
+        error = urllib.error.HTTPError("https://synthetic.invalid", 429, "synthetic",
+                                      {"Retry-After": header}, io.BytesIO(b'{}'))
+        diagnostic = t.limit_diagnostics(error)
+        assert diagnostic == {"limit_kind": "UNSPECIFIED", "retry_after_unusable": True}
+
+
 def test_wall_deadline_kills_real_worker_process():
     before = {c.pid for c in multiprocessing.active_children()}
     started = time.monotonic()
@@ -717,6 +733,153 @@ def test_wall_deadline_kills_real_worker_process():
     assert time.monotonic() - started < 3
     assert result[0]["error"] == "MODEL_WALL_DEADLINE_EXCEEDED"
     assert {c.pid for c in multiprocessing.active_children()} == before
+
+
+def crash_worker(connection, job, provider, model, timeout_s):
+    import os
+    os._exit(7)
+
+
+def test_crashed_worker_is_not_reported_as_a_timeout():
+    before = {c.pid for c in multiprocessing.active_children()}
+    result = t.run_jobs([{"packet_id": "crash"}], "emergent", "gpt-6-astra",
+                        deadline=time.monotonic()+5, worker=crash_worker)
+    assert result[0]["error"] == "MODEL_CHILD_EXITED"
+    assert {c.pid for c in multiprocessing.active_children()} == before
+
+
+def test_socket_timeout_has_its_own_receipt_without_exposing_connection_details(monkeypatch):
+    class Connection:
+        def send(self, row):
+            self.row = row
+        def close(self):
+            pass
+    def timeout(*a, **kw):
+        raise TimeoutError("private-provider-details")
+    monkeypatch.setenv("EMERGENT_LLM_KEY", "SYNTHETIC_NO_NETWORK_TEST")
+    monkeypatch.setattr(t.urllib.request, "urlopen", timeout)
+    connection = Connection()
+    t._worker(connection, {"packet_id": "timeout", "items": [{"type": "text", "text": "synthetic"}]},
+              "emergent", "gpt-6-astra", 1)
+    assert connection.row["error"] == "MODEL_CALL_TIMEOUT"
+    assert "private-provider-details" not in json.dumps(connection.row)
+
+
+def rate_limit_worker(connection, job, provider, model, timeout_s):
+    marker = Path(job["marker"])
+    if job.get("always_limited") or not marker.exists():
+        marker.write_text("limited")
+        row = {"status": "ERROR", "error": "MODEL_QUOTA_OR_RATE_LIMIT", "http_status": 429,
+               "limit_kind": job.get("limit_kind", "RATE_LIMITED"),
+               "retry_after_seconds": job.get("delay", 0)}
+    else:
+        row = {"status": "COMPLETED"}
+    connection.send({"packet_id": job["packet_id"], "sent_at": time.monotonic(), **row})
+    connection.close()
+
+
+def sibling_rate_limit_worker(connection, job, provider, model, timeout_s):
+    if job["packet_id"] == "sibling":
+        time.sleep(1.5)
+        connection.send({"packet_id": "sibling", "status": "COMPLETED"})
+        connection.close()
+    else:
+        rate_limit_worker(connection, job, provider, model, timeout_s)
+
+
+def test_transient_429_does_not_kill_a_running_sibling(tmp_path):
+    result = t.run_jobs([{"packet_id": "limited", "marker": str(tmp_path / "limited")},
+                         {"packet_id": "sibling"}], "emergent", "gpt-6-astra",
+                        deadline=time.monotonic()+10, per_call_s=3, worker=sibling_rate_limit_worker)
+    assert [r["status"] for r in result] == ["COMPLETED", "COMPLETED"]
+    assert result[0]["rate_limit_retry_count"] == 1
+
+
+@pytest.mark.parametrize("kind", ["RATE_LIMITED", "UNSPECIFIED"])
+def test_transient_429_retries_once_and_pauses_queued_requests(tmp_path, kind):
+    saved = []
+    jobs = [{"packet_id": name, "marker": str(tmp_path / name), "limit_kind": kind}
+            for name in ("first", "second")]
+    # The queued request will succeed immediately, but may not jump the cooldown.
+    (tmp_path / "second").write_text("ready")
+    before = {c.pid for c in multiprocessing.active_children()}
+    result = t.run_jobs(jobs, "emergent", "gpt-6-astra", deadline=time.monotonic()+10,
+                        per_call_s=2, workers=1, worker=rate_limit_worker,
+                        on_result=lambda row: saved.append(deepcopy(row)))
+    assert [r["status"] for r in result] == ["COMPLETED", "COMPLETED"]
+    assert result[0]["rate_limit_retry_count"] == 1
+    assert result[0]["prior_rate_limit"]["http_status"] == 429
+    assert saved[0]["rate_limit_retry_scheduled"] is True
+    assert result[0]["sent_at"] - saved[0]["sent_at"] >= 1
+    assert result[1]["sent_at"] >= result[0]["sent_at"]
+    assert {c.pid for c in multiprocessing.active_children()} == before
+
+
+def test_repeated_429_stops_after_one_retry_and_keeps_both_failures(tmp_path):
+    result = t.run_jobs([{"packet_id": "limited", "marker": str(tmp_path / "limited"),
+                          "always_limited": True},
+                         {"packet_id": "queued", "marker": str(tmp_path / "queued")}],
+                        "emergent", "gpt-6-astra", deadline=time.monotonic()+10,
+                        per_call_s=2, workers=1, worker=rate_limit_worker)
+    assert result[0]["error"] == "MODEL_QUOTA_OR_RATE_LIMIT"
+    assert result[0]["rate_limit_retry_count"] == 1
+    assert result[0]["prior_rate_limit"]["error"] == "MODEL_QUOTA_OR_RATE_LIMIT"
+    assert result[1]["status"] == "NOT_SENT"
+    assert not (tmp_path / "queued").exists()
+
+
+@pytest.mark.parametrize("delay,budget", [(31, 10), (86400, 10), (2, 2)])
+def test_429_never_retries_earlier_than_retry_after_or_beyond_budget(tmp_path, delay, budget):
+    saved = []
+    result = t.run_jobs([{"packet_id": "limited", "marker": str(tmp_path / "limited"), "delay": delay}],
+                        "emergent", "gpt-6-astra", deadline=time.monotonic()+budget,
+                        per_call_s=2, workers=1, worker=rate_limit_worker, on_result=saved.append)
+    assert len(saved) == 1 and result[0]["http_status"] == 429
+    assert "rate_limit_retry_count" not in result[0]
+
+
+@pytest.mark.parametrize("recovers", [False, True])
+def test_missing_initial_is_retried_before_optional_work_without_repeating_completed_packets(
+        tmp_path, monkeypatch, recovers):
+    from scripts import run_sequence_pilot as runner
+    manifest, packet, data = fixture()
+    source = tmp_path / "source.bin"; source.write_bytes(b"synthetic")
+    manifest.update(source_video=str(source), source_video_sha256=p.digest(source),
+                    references=[{"reference_id": "r1"}])
+    manifest["packets"].append({**packet, "packet_id": "second"})
+    path = tmp_path / "manifest.json"; p.write_json(path, manifest)
+    monkeypatch.setenv("EMERGENT_LLM_KEY", "SYNTHETIC_NO_NETWORK_TEST")
+    monkeypatch.setattr(p, "packet_items", lambda m, j: [{"type": "text", "text": j["packet_id"]}])
+    monkeypatch.setattr(runner, "original_spatial_items", lambda *a: ([], []))
+    calls, planners = [], []
+    def send(jobs, *a, on_result, deadline, per_call_s):
+        calls.append(([j["packet_id"] for j in jobs], deadline, per_call_s))
+        rows = []
+        for job in jobs:
+            row = {"packet_id": job["packet_id"], "status": "COMPLETED",
+                   "raw_response": json.dumps(data), "origin": "SYNTHETIC_TEST_ONLY",
+                   "payload_sha256": "request", "response_sha256": "response"}
+            if job["packet_id"] == "first" and (len(calls) == 1 or not recovers):
+                row.update(status="ERROR", error="MODEL_WALL_DEADLINE_EXCEEDED")
+            on_result(row); rows.append(row)
+        return rows
+    monkeypatch.setattr(t, "run_jobs", send)
+    def plan(*a, **kw):
+        planners.append(len(calls))
+        return []
+    monkeypatch.setattr(p, "plan_contact_reviews", plan)
+    monkeypatch.setattr(p, "plan_outcome_reviews", plan)
+    result = run(path, tmp_path / "run", provider="emergent", model="gpt-6-astra",
+                 fresh_originals=True, contact_reviews=True, automatic_outcomes=True,
+                 budget_s=600, per_call_s=120)
+    assert [c[0] for c in calls] == [["first", "second"], ["first"]]
+    assert calls[0][1] == calls[1][1] and calls[1][2] == 180
+    assert planners == ([2, 2] if recovers else [])
+    assert result["status"] == ("MODEL_OBSERVATIONS_RETURNED" if recovers else "PARTIAL_MODEL_RUN")
+    assert len(result["model_jobs"]) == 2
+    saved = p.read_json(tmp_path / "run/responses/first.json")
+    assert saved["initial_recovery_count"] == 1
+    assert saved["prior_initial_error"] == "MODEL_WALL_DEADLINE_EXCEEDED"
 
 
 def test_no_model_key_does_not_fake_success_or_use_historical_answers(tmp_path, monkeypatch):

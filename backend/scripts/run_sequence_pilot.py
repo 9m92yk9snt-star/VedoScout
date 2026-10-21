@@ -97,7 +97,7 @@ def run(manifest_path, output_dir, *, provider="gemini", model="gemini-2.5-pro",
     reused_ids = []
     owner_manifest = manifest
 
-    def execute(packets, current_manifest):
+    def execute(packets, current_manifest, *, call_seconds=None):
         jobs, reused = [], []
         for packet in packets:
             if fresh_originals:
@@ -148,10 +148,16 @@ def run(manifest_path, output_dir, *, provider="gemini", model="gemini-2.5-pro",
             pilot.write_json(out / "responses" / (receipt["packet_id"] + ".json"), receipt)
         for receipt in reused:
             save_receipt(receipt)
-        responses = reused + (transport.run_jobs(jobs, provider, model, deadline=deadline, per_call_s=per_call_s,
+        responses = reused + (transport.run_jobs(jobs, provider, model, deadline=deadline,
+                                                per_call_s=per_call_s if call_seconds is None else call_seconds,
                                                 on_result=save_receipt) if jobs else [])
         by_id = {p["packet_id"]: p for p in packets}
         for receipt in responses:
+            previous = next((r for r in receipts if r.get("packet_id") == receipt["packet_id"]), None)
+            if previous:
+                receipt = {**receipt, "initial_recovery_count": 1,
+                           "prior_initial_error": previous.get("error")}
+                receipts.remove(previous)
             pilot.write_json(out / "responses" / (receipt["packet_id"] + ".json"), receipt)
             receipts.append({k: v for k, v in receipt.items() if k not in {"raw_response", "images"}})
             print(json.dumps({k: receipt.get(k) for k in ("packet_id", "status", "error", "elapsed_seconds")}), flush=True)
@@ -234,11 +240,24 @@ def run(manifest_path, output_dir, *, provider="gemini", model="gemini-2.5-pro",
                                previous_run_source_processing_seconds=saved.get("previous_run_source_processing_seconds"))
         else:
             execute(manifest["packets"], manifest)
+            # A missing source interval takes priority over optional detail.
+            # Retry only transiently failed initial requests, once, without
+            # repeating completed observations or extending the run deadline.
+            transient = {"MODEL_WALL_DEADLINE_EXCEEDED", "MODEL_CALL_TIMEOUT",
+                         "MODEL_CONNECTION_FAILED", "MODEL_CHILD_EXITED"}
+            failed = {r["packet_id"] for r in receipts if r.get("error") in transient}
+            recovery = [packet for packet in manifest["packets"] if packet["packet_id"] in failed]
+            recovery_seconds = min(transport.MAX_CALL_SECONDS, per_call_s * 1.5)
+            if (recovery and not any(r.get("error") in transport.STOP_ERRORS for r in receipts)
+                    and time.monotonic() + recovery_seconds + 5 < deadline):
+                execute(recovery, manifest, call_seconds=recovery_seconds)
+        initial_complete = (bool(resume_initial_receipts or resume_fresh_initial) or
+            {r["packet_id"] for r in resolved_results} >= {p["packet_id"] for p in manifest["packets"]})
         merged = pilot.reconcile(resolved_results, sampling_gap_ms=manifest["input_coverage"]["max_sample_gap_ms"])
         summary.update(merged)  # preserve completed observations if later work fails
         access_failed = any(r.get("error") in transport.STOP_ERRORS for r in receipts)
         planner = pilot.plan_contact_reviews if contact_reviews else pilot.followup_plan
-        followups = [] if access_failed else planner(manifest, merged, limit=max_followups,
+        followups = [] if access_failed or not initial_complete else planner(manifest, merged, limit=max_followups,
             **({"terminal_only":True, "complete_terminal_context":automatic_outcomes}
                if fresh_originals and contact_reviews else {}))
         if followups and time.monotonic() + 5 < deadline:
@@ -261,7 +280,7 @@ def run(manifest_path, output_dir, *, provider="gemini", model="gemini-2.5-pro",
             return merged
         merged = merge_active()
         outcome_followups = []
-        if automatic_outcomes and not any(r.get("error") in transport.STOP_ERRORS for r in receipts):
+        if automatic_outcomes and initial_complete and not any(r.get("error") in transport.STOP_ERRORS for r in receipts):
             outcome_followups = pilot.plan_outcome_reviews(manifest, merged, manifest["packets"]+followups,
                                                            limit=max(0,max_followups-len(followups)))
             summary["outcome_review_plan"] = deepcopy(outcome_followups)

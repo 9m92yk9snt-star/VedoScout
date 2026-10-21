@@ -27,7 +27,7 @@ def reusable_receipt(receipt, request, *, provider, model, packet_id):
 
 SAFE_ERRORS = frozenset({
     "MODEL_ACCESS_DENIED", "MODEL_KEY_NOT_CONFIGURED", "MODEL_QUOTA_OR_RATE_LIMIT",
-    "MODEL_HTTP_ERROR", "MODEL_CONNECTION_FAILED", "MODEL_CHILD_EXITED",
+    "MODEL_HTTP_ERROR", "MODEL_CONNECTION_FAILED", "MODEL_CALL_TIMEOUT", "MODEL_CHILD_EXITED",
     "MODEL_WALL_DEADLINE_EXCEEDED", "MODEL_ACCESS_STOPPED", "RUN_TIME_BUDGET_EXHAUSTED",
     "INVALID_PROVIDER_RESPONSE", "INCOMPLETE_MODEL_RESPONSE", "EMPTY_MODEL_RESPONSE",
     "REQUEST_IMAGE_BUDGET_EXCEEDED", "RESPONSE_BYTE_BUDGET_EXCEEDED", "PREPARED_IMAGE_CHANGED",
@@ -53,6 +53,10 @@ def failure_metadata(phase, elapsed, *, returncode=None, timeout=False, result=N
              "error_codes": sorted(errors),
              "http_statuses": sorted({r["http_status"] for r in rows
                  if type(r.get("http_status")) is int and 100 <= r["http_status"] <= 599})}
+    kinds = sorted({r["limit_kind"] for r in rows
+                    if r.get("limit_kind") in {"QUOTA_EXHAUSTED", "RATE_LIMITED", "UNSPECIFIED"}})
+    if kinds:
+        value["limit_kinds"] = kinds
     if result.get("error_type") in {"ValueError", "TimeoutError", "OSError", "KeyError", "TypeError"}:
         value["error_type"] = result["error_type"]
     if result.get("status") in {"PARTIAL_MODEL_RUN", "EXPERIMENT_STOPPED", "MODEL_ACCESS_DENIED",
