@@ -5,6 +5,11 @@ import PublicationEvidence from './PublicationEvidence';
 import { DreamPathSection } from './dreampath';
 import { PremiumMobileCategories } from './categories';
 
+// These are retained-data rendering tests; sharing must never call the API.
+jest.mock('../../lib/api', () => ({ post: jest.fn(() => {
+  throw new Error('Unexpected API request in report publication test');
+}) }));
+
 const publication = {
   date: '20 OCTOBER 2026', duration: '01:17',
   score: {label:'Overall Observed Score', value:7.6, rated_skills:13, total_skills:25,
