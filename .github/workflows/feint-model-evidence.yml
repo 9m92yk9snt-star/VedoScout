@@ -1,7 +1,7 @@
 name: Isolated feint model evidence experiment
 on:
   pull_request:
-    types: [opened]
+    types: [opened, synchronize]
     paths:
       - 'backend/scripts/probe_feint_evidence.py'
       - '.github/workflows/feint-model-evidence.yml'
@@ -13,6 +13,7 @@ jobs:
       github.repository == '9m92yk9snt-star/VedoScout' &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.event.pull_request.head.ref == 'experiment/feint-model-evidence' &&
+      (github.event.action == 'opened' || github.event.before == '78b4b664aa1b351c9e8502df7d9a1866153211a7') &&
       github.run_attempt == 1
     runs-on: ubuntu-latest
     timeout-minutes: 14
@@ -28,7 +29,7 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq ffmpeg
-          python -m pip install 'numpy<3' 'opencv-python-headless<5' 'Pillow>=10,<15' 'pytest>=8,<10'
+          python -m pip install 'numpy<3' 'opencv-python-headless<5' 'Pillow>=10,<15' 'pytest>=8,<10' 'python-dotenv>=1,<2'
       - name: Check evidence contracts without a model
         env:
           PYTHONPATH: backend
