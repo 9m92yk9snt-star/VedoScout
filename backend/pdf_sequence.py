@@ -1,5 +1,4 @@
-"""Reading-first Sequence PDF. All facts come from the shared publication view."""
-from pathlib import Path
+"""Grouped Sequence report using the original Premium V2 card design."""
 from xml.sax.saxutils import escape
 
 from PIL import Image as PILImage
@@ -7,31 +6,115 @@ from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.ttfonts import TTFont, TTFError
+from reportlab.pdfgen import canvas as rl_canvas
 from reportlab.platypus import (
-    SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image, PageBreak,
-    KeepTogether, CondPageBreak,
+    BaseDocTemplate, Frame, PageTemplate, Paragraph, Spacer, Table, TableStyle, Image, PageBreak,
+    KeepTogether, CondPageBreak, Flowable,
+)
+from pdf_v2 import (
+    CREAM, BORDER, FOREST, BODY as BODY_COLOR, MUTED, SOFT, LIME,
+    F_BODY, F_BOLD, F_BLACK, card, card_title, draw_par, _style,
+    _header, _mini_header, _page_bg, _page_footer, _hero_card,
+    _parent_summary_card, _overall_score_card, _match_stats_card,
+    _age_comparison_card, derive_v2,
 )
 
 PAGE_W, PAGE_H = A4
-MARGIN = 34
+MARGIN = 26
 WIDTH = PAGE_W - 2 * MARGIN
-GREEN = colors.HexColor('#12402A')
-INK = colors.HexColor('#22382B')
-MUTED = colors.HexColor('#627168')
-LINE = colors.HexColor('#DCE4DA')
-PALE = colors.HexColor('#F0F5EC')
-GOLD = colors.HexColor('#D7AE4B')
-BODY, BOLD, DISPLAY = 'Helvetica', 'Helvetica-Bold', 'Helvetica-Bold'
-try:
-    for name, filename in [('SequenceBody', 'DMSans-Regular.ttf'),
-                           ('SequenceBold', 'Barlow-Bold.ttf'),
-                           ('SequenceDisplay', 'Barlow-Black.ttf')]:
-        pdfmetrics.registerFont(TTFont(name, str(Path(__file__).parent / 'fonts' / filename)))
-    BODY, BOLD, DISPLAY = 'SequenceBody', 'SequenceBold', 'SequenceDisplay'
-    pdfmetrics.registerFontFamily('SequenceBody', normal=BODY, bold=BOLD, italic=BODY, boldItalic=BOLD)
-except (OSError, ValueError, TTFError):
-    pass
+GREEN, INK, LINE, PALE = FOREST, BODY_COLOR, BORDER, SOFT
+BODY, BOLD, DISPLAY = F_BODY, F_BOLD, F_BLACK
+pdfmetrics.registerFontFamily(BODY, normal=BODY, bold=BOLD, italic=BODY, boldItalic=BOLD)
+
+
+class CardTable(Table):
+    """The original white rounded cards, with measured content and intact corners."""
+    def draw(self):
+        c = self.canv
+        c.saveState()
+        card(c, 0, 0, self._width, self._height)
+        clip = c.beginPath()
+        clip.roundRect(0, 0, self._width, self._height, 9)
+        c.clipPath(clip, stroke=0, fill=0)
+        super().draw()
+        c.restoreState()
+
+
+class SectionBanner(Flowable):
+    def __init__(self, number, title, deck):
+        super().__init__()
+        self.width, self.height = WIDTH, 50
+        self.number, self.title, self.deck = number, title, deck
+
+    def draw(self):
+        c = self.canv
+        card(c, 0, 0, self.width, self.height, fill=FOREST, stroke=FOREST)
+        draw_par(c, safe(self.title.upper()), 12, 37, self.width - 24,
+                 _style(F_BLACK, 13, LIME, leading=16))
+        draw_par(c, safe(self.deck), 12, 17, self.width - 24,
+                 _style(F_BODY, 7.8, colors.HexColor('#E9EFE2'), leading=10))
+
+
+class CardHeading(Flowable):
+    def __init__(self, title, width):
+        super().__init__()
+        self.title, self.width, self.height = title, width, 25
+
+    def draw(self):
+        card_title(self.canv, 0, 25, self.title, self.width)
+
+
+class ClassicOverview(Flowable):
+    """Keep the established profile / summary / donut, then stats / academy grid."""
+    def __init__(self, report, resolve):
+        super().__init__()
+        self.width, self.height = WIDTH, 594
+        self.report, self.resolve = report, resolve
+
+    def draw(self):
+        report, c = self.report, self.canv
+        d, profile = derive_v2(report), report.get('player_details') or {}
+        actions = report['report_publication']['key_actions']
+        comments = {e['event_id']: e for e in report['full_report'].get('video_comments', [])}
+        cover = next((e for e in actions if e['title'] == 'Goal' and action_image(e, comments, self.resolve)), None)
+        cover = cover or next((e for e in actions if action_image(e, comments, self.resolve)), None)
+        photo = action_image(cover, comments, self.resolve) if cover else None
+        h1, gap, left, middle = 270, 9, 158, 205
+        right = WIDTH - left - middle - 2 * gap
+        y = self.height - h1
+        _hero_card(c, d, profile, 0, y, left, h1, photo, contain_photo=True)
+        _parent_summary_card(c, d['parentSummary'], left + gap, y, middle, h1)
+        score = report['report_publication']['score']
+        context = {'line': f'Provisional clip score. {score["rated_skills"]}/{score["total_skills"]} skills rated; '
+                   f'{score["weighted_coverage_pct"]:g}% rubric coverage. Full-match level is not assessed.'}
+        _overall_score_card(c, d, left + middle + 2 * gap, y, right, h1, ctx=context)
+        h2, row_top, half = 230, y - gap, (WIDTH - gap) / 2
+        _match_stats_card(c, d['matchStats'], 0, row_top - h2, half, h2,
+                         'Counts describe this clip. Actions are segments, not individual ball touches.')
+        _age_comparison_card(c, d['ageComparison'], d['ageBracket'], half + gap, row_top - h2, half, h2, rubric=True)
+        note_y = row_top - h2 - gap - 50
+        card(c, 0, note_y, WIDTH, 50, fill=SOFT)
+        draw_par(c, 'Key actions, all four skill categories and development priorities follow together. '
+                 'Precise timings and the complete evidence log are in the appendix.',
+                 12, note_y + 38, WIDTH - 24, _style(F_BODY, 9, BODY_COLOR, leading=12))
+
+
+class NumberedCanvas(rl_canvas.Canvas):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._page_states = []
+
+    def showPage(self):
+        self._page_states.append(dict(self.__dict__))
+        self._startPage()
+
+    def save(self):
+        total = len(self._page_states)
+        for state in self._page_states:
+            self.__dict__.update(state)
+            _page_footer(self, self._pageNumber, total)
+            super().showPage()
+        super().save()
 
 
 def p(text, size=10, color=INK, bold=False, leading=None):
@@ -46,13 +129,11 @@ def safe(text):
 
 
 def section(number, title, deck):
-    return [p(f'{number} / PLAYER REPORT', 8, MUTED, True), Spacer(1, 5),
-            p(safe(title), 25, GREEN, True), Spacer(1, 7),
-            p(safe(deck), 10, MUTED), Spacer(1, 18)]
+    return [SectionBanner(number, title, deck), Spacer(1, 12)]
 
 
 def table(data, widths, *, shade=False, padding=10):
-    t = Table(data, colWidths=widths, hAlign='LEFT')
+    t = CardTable(data, colWidths=widths, hAlign='LEFT')
     t.setStyle(TableStyle([
         ('VALIGN', (0, 0), (-1, -1), 'TOP'),
         ('LEFTPADDING', (0, 0), (-1, -1), padding),
@@ -94,7 +175,7 @@ def action_card(action, index, comments, resolve, width, image_height):
 
 
 def category_card(full, category, label, expected):
-    rows = [[p(label, 16, GREEN, True), p('GRADE', 8, MUTED, True)]]
+    rows = [[CardHeading(label, (WIDTH - 16) / 2 - 66), p('GRADE', 8, MUTED, True)]]
     for key in expected:
         from report_publication import label as skill_label
         skill = full.get(category, {}).get(key) or {}
@@ -116,44 +197,8 @@ def build_sequence_pdf(report, output_path, resolve):
     comments = {c['event_id']: c for c in full.get('video_comments', [])}
     story = []
 
-    # 1. A readable overview, with a full-width match frame instead of an upscaled portrait.
-    story += [p('PLAYER REPORT', 9, MUTED, True), Spacer(1, 6), p(safe(name), 32, GREEN, True),
-              Spacer(1, 5), p(safe(' | '.join(str(x) for x in (
-                  profile.get('position'), f'Age {profile["age"]}' if profile.get('age') else None,
-                  profile.get('current_club')) if x)), 11, MUTED), Spacer(1, 17)]
-    value = f'{score["value"]:.1f}/10' if score['value'] is not None else 'Not rated'
-    score_copy = [p('OVERALL SCORE', 9, GREEN, True), p(value, 31, GREEN, True)]
-    score_note = [p('A starting point for development', 14, GREEN, True), Spacer(1, 4),
-                  p(f'{score["rated_skills"]}/{score["total_skills"]} skills rated. '
-                    f'{score["weighted_coverage_pct"]:g}% of the weighted rubric covered.', 10),
-                  Spacer(1, 4), p('Provisional score from this clip. Full-match level and long-term potential remain unassessed.', 9, MUTED)]
-    story += [table([[score_copy, score_note]], [157, WIDTH - 157], shade=True, padding=13), Spacer(1, 18)]
-    cover = next((a for a in actions if a['title'] == 'Goal' and action_image(a, comments, resolve)), None)
-    cover = cover or next((a for a in actions if action_image(a, comments, resolve)), None)
-    if cover:
-        overview = [p('The performance at a glance', 19, GREEN, True), Spacer(1, 9),
-                    p(safe(full['parent_summary']['paragraphs'][0]), 11), Spacer(1, 20),
-                    p('Inside the report', 15, GREEN, True), Spacer(1, 8)]
-        for title, desc in [('Key actions', 'The finishing and passing moments from this video.'),
-                            ('Skills & academy reference', 'All four categories in one place.'),
-                            ('What to work on next', 'Three priorities and practical exercises.'),
-                            ('Evidence & method', 'The complete log and the basis for every grade.')]:
-            overview += [p(title, 11, GREEN, True), p(desc, 9, MUTED), Spacer(1, 10)]
-        photo = [fitted_image(action_image(cover, comments, resolve), 211, 354), Spacer(1, 5),
-                 p('MATCH FRAME / ' + safe(cover['title']).upper(), 8, MUTED, True)]
-        story += [table([[photo, overview]], [228, WIDTH - 228], padding=0), Spacer(1, 17)]
-    else:
-        story += [p('The performance at a glance', 17, GREEN, True), Spacer(1, 6),
-                  p(safe(full['parent_summary']['paragraphs'][0]), 11), Spacer(1, 15)]
-    counts = full['verified_stats']['observed_counts']
-    cells = [[p(str(counts.get(key, 0)), 21, GREEN, True), p(title, 9, MUTED)]
-             for key, title in [('goals', 'Goal' if counts.get('goals') == 1 else 'Goals'),
-                                ('assists', 'Assists'), ('shots', 'Shots, incl. goals'), ('total_actions', 'Action segments')]]
-    story += [table([cells], [WIDTH / 4] * 4, shade=True, padding=9), Spacer(1, 10),
-              p(f'Also recorded: {counts.get("key_passes", 0)} ' + ('key pass' if counts.get('key_passes') == 1 else 'key passes') + ', excluding assists; '
-                f'{counts.get("duels_contested", 0)} duels, with no win total established.', 8.5, MUTED), Spacer(1, 6),
-              p(f'Based on the submitted {safe(pub["duration"])} video. Counts describe this clip; '
-                'they are not full-match totals. Technical notes and evidence follow in the appendix.', 8.5, MUTED)]
+    # Preserve the original Premium V2 cover grid and its existing card renderers.
+    story.append(ClassicOverview(report, resolve))
 
     # 2. Keep the five key actions together, with no split image or caption.
     if actions:
@@ -173,9 +218,14 @@ def build_sequence_pdf(report, output_path, resolve):
                 if cards:
                     cards.append('')
                     widths.append(gap)
-                cards.append(action_card(action, index, comments, resolve, col_width, 300 if compact else 407))
+                content = action_card(action, index, comments, resolve, col_width - 20, 300 if compact else 407)
+                cards.append(table([[content]], [col_width], padding=10))
                 widths.append(col_width)
-            story += [KeepTogether(table([cards], widths, padding=0)), Spacer(1, 17)]
+            grid = Table([cards], colWidths=widths)
+            grid.setStyle(TableStyle([('VALIGN', (0, 0), (-1, -1), 'TOP'),
+                ('LEFTPADDING', (0, 0), (-1, -1), 0), ('RIGHTPADDING', (0, 0), (-1, -1), 0),
+                ('TOPPADDING', (0, 0), (-1, -1), 0), ('BOTTOMPADDING', (0, 0), (-1, -1), 0)]))
+            story += [KeepTogether(grid), Spacer(1, 17)]
             if compact and any(a.get('contact_interval_ms') for a in actions[start:end]):
                 story += [p('Foot side is unresolved for the crowded releases. No weak-foot grade is assigned.', 9, MUTED)]
             if compact and assists_only:
@@ -203,8 +253,9 @@ def build_sequence_pdf(report, output_path, resolve):
     story += [PageBreak()] + section('04', 'What to work on next', 'Choose one focus at a time. Practise it, then look for it in the next video.')
     priorities = full.get('development_priorities_detailed') or []
     for i, priority in enumerate(priorities, 1):
-        story.append(KeepTogether([p(f'{i:02d} / {safe(priority["name"])}', 17, GREEN, True), Spacer(1, 5),
-            p(safe(priority['issue']), 10), Spacer(1, 5), p('<b>Try this:</b> ' + safe(priority['how_to_improve']), 10), Spacer(1, 18)]))
+        content = [CardHeading(f'{i:02d} / {priority["name"]}', WIDTH - 24),
+            p(safe(priority['issue']), 10), Spacer(1, 5), p('<b>Try this:</b> ' + safe(priority['how_to_improve']), 10)]
+        story += [KeepTogether(table([[content]], [WIDTH], padding=12)), Spacer(1, 9)]
     story += [p('A simple practice week', 17, GREEN, True), Spacer(1, 8)]
     drills = (full.get('training_plan') or {}).get('exercises') or []
     # Use retained exercises as general practice, without promising a future performance gain.
@@ -252,20 +303,19 @@ def build_sequence_pdf(report, output_path, resolve):
 
     def page_frame(c, doc):
         c.saveState()
-        c.setFillColor(GREEN)
-        c.setFont(DISPLAY, 10)
-        c.drawString(MARGIN, PAGE_H - 27, 'SCOUTMEPLAY')
-        c.setFont(BODY, 7.5)
-        c.setFillColor(MUTED)
-        c.drawRightString(PAGE_W - MARGIN, PAGE_H - 27, pub['date'])
-        c.setStrokeColor(LINE)
-        c.line(MARGIN, 31, PAGE_W - MARGIN, 31)
-        c.setFont(BODY, 7.5)
-        c.drawString(MARGIN, 19, name + ' / Player report')
-        c.drawRightString(PAGE_W - MARGIN, 19, str(doc.page))
+        _page_bg(c)
+        if doc.page == 1:
+            _header(c, pub['date'])
+        else:
+            _mini_header(c, name)
         c.restoreState()
 
-    doc = SimpleDocTemplate(str(output_path), pagesize=A4, leftMargin=MARGIN, rightMargin=MARGIN,
-        topMargin=49, bottomMargin=45, title=f'ScoutMePlay - {name}', author='ScoutMePlay',
-        allowSplitting=1)
-    doc.build(story, onFirstPage=page_frame, onLaterPages=page_frame)
+    doc = BaseDocTemplate(str(output_path), pagesize=A4, title=f'ScoutMePlay - {name}', author='ScoutMePlay')
+    def frame(top):
+        return Frame(MARGIN, 34, WIDTH, PAGE_H - top - 34,
+                     leftPadding=0, rightPadding=0, topPadding=0, bottomPadding=0)
+    doc.addPageTemplates([
+        PageTemplate('Cover', frames=[frame(80)], onPage=page_frame, autoNextPageTemplate='Body'),
+        PageTemplate('Body', frames=[frame(58)], onPage=page_frame),
+    ])
+    doc.build(story, canvasmaker=NumberedCanvas)

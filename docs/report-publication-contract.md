@@ -48,6 +48,9 @@ withheld even when an observed aggregate can be calculated.
 - All key scoring actions and the complete chronological event log are retained.
   The PDF groups the overview, all key actions, all four skill categories with
   their academy reference, and development/training in consecutive sections.
+  Keep the existing Premium V2 cream/green palette, rounded cards, branding,
+  fonts and profile/summary/circular-score cover grid. Grouping and copy edits
+  must not replace this established visual design.
   Images retain the complete source aspect ratio; a full match frame replaces
   an enlarged identity crop on the cover. Short shared editorial summaries
   appear in the main report; the measured-height appendix preserves the full

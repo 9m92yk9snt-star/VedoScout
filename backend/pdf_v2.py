@@ -683,11 +683,26 @@ def draw_cover_image(c, path, x, y, w, h, radius=0):
 PAD = 12.0  # inner card padding
 
 
-def _hero_card(c, d, pd, x, y, w, h, photo_path):
+def _hero_card(c, d, pd, x, y, w, h, photo_path, contain_photo=False):
     card(c, x, y, w, h)
     hp = 138.0  # photo band height
     py = y + h - hp
-    if not (photo_path and draw_cover_image(c, photo_path, x + 1, py, w - 2, hp - 1, radius=8)):
+    photo_ok = False
+    if photo_path and contain_photo:
+        try:
+            with PILImage.open(photo_path) as image:
+                iw, ih = image.size
+            scale = min((w - 2) / iw, (hp - 1) / ih)
+            c.setFillColor(FOREST)
+            c.roundRect(x + 1, py, w - 2, hp - 1, 8, stroke=0, fill=1)
+            c.drawImage(str(photo_path), x + (w - iw * scale) / 2, py + (hp - 1 - ih * scale) / 2,
+                        iw * scale, ih * scale, mask='auto')
+            photo_ok = True
+        except (OSError, TypeError, ValueError):
+            pass
+    elif photo_path:
+        photo_ok = draw_cover_image(c, photo_path, x + 1, py, w - 2, hp - 1, radius=8)
+    if not photo_ok:
         c.saveState()
         c.setFillColor(HexColor("#0F2A1A"))
         c.roundRect(x + 1, py, w - 2, hp - 1, 8, stroke=0, fill=1)

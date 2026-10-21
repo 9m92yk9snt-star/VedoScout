@@ -116,10 +116,11 @@ def test_pdf_consumes_identical_shared_view_and_all_events(tmp_path):
     assert all(e['event_id'] in text for e in r['canonical_events']['events'])
     assert 'Stronger than' not in text and 'None\'' not in text
     assert 'full ScoutMe Pro Benchmarked Analysis' not in text
-    skills_page = next(p.extract_text() for p in reader.pages if 'Skills & academy reference' in p.extract_text())
-    assert all(label in skills_page for label in ('Technique', 'Game understanding', 'Physical', 'Mentality', 'Academy reference'))
+    skills_page = next(p.extract_text().upper() for p in reader.pages if 'SKILLS & ACADEMY REFERENCE' in p.extract_text().upper())
+    assert all(label in skills_page for label in ('TECHNIQUE', 'GAME UNDERSTANDING', 'PHYSICAL', 'MENTALITY', 'ACADEMY REFERENCE'))
     first_page = reader.pages[0].extract_text()
-    assert 'OVERALL SCORE' in first_page and 'COMPLETE ACTION TIMELINE' not in first_page
+    assert all(label in first_page for label in ("SCOUT'S FIRST IMPRESSION", 'OVERALL OBSERVED', 'MATCH STATS', 'ACADEMY RUBRIC REFERENCE'))
+    assert 'COMPLETE ACTION TIMELINE' not in first_page
     assert 'Contact window' not in '\n'.join(p.extract_text() for p in reader.pages[:5])
 
 
@@ -132,6 +133,24 @@ def test_pdf_images_keep_entire_frame_aspect_ratio(tmp_path):
     assert rendered.drawWidth / rendered.drawHeight == pytest.approx(1600 / 900)
     assert rendered.drawWidth <= 300 and rendered.drawHeight <= 100
     assert fitted_image(None, 300, 100).getPlainText().startswith('Image unavailable')
+
+
+def test_original_pdf_theme_and_native_frames_survive_paginated_render(tmp_path):
+    from PIL import Image
+    from pypdf import PdfReader
+    from pypdf.generic import ContentStream
+    from pdf_v2 import build_pdf_v2, CREAM
+    source = tmp_path / 'native-frame.jpg'
+    Image.new('RGB', (1600, 900), '#32794b').save(source)
+    output = tmp_path / 'classic-report.pdf'
+    build_pdf_v2(publish_report(example()), str(output), image_resolver=lambda _: str(source))
+    reader = PdfReader(output)
+    fills = [tuple(float(n) for n in args) for args, op in ContentStream(reader.pages[0].get_contents(), reader).operations if op == b'rg']
+    assert any(rgb == pytest.approx(CREAM.rgb(), abs=.00001) for rgb in fills)
+    assert all(image.image.size == (1600, 900) for image in reader.pages[0].images)
+    assert len(reader.pages[0].images) == 1
+    assert sum(len(page.get('/Annots', [])) for page in reader.pages) == 5
+    assert f'PAGE {len(reader.pages)} / {len(reader.pages)}' in reader.pages[-1].extract_text()
 
 
 def test_non_sequence_reports_keep_existing_contract():
