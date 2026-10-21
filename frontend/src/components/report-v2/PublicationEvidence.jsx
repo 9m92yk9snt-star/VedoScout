@@ -2,13 +2,18 @@ import React, { useEffect } from 'react';
 
 export default function PublicationEvidence({ publication, onPlayAt }) {
   useEffect(() => {
-    const id = window.location.hash.slice(1);
-    if (!publication?.key_actions?.some(action => `event-${action.event_id}` === id)) return;
-    const target = document.getElementById(id);
-    if (target) {
-      target.open = true;
-      target.scrollIntoView?.({ block: 'start' });
-    }
+    const openLinkedAction = () => {
+      const id = window.location.hash.slice(1);
+      if (!publication?.key_actions?.some(action => `event-${action.event_id}` === id)) return;
+      const target = document.getElementById(id);
+      if (target) {
+        target.open = true;
+        target.scrollIntoView?.({ block: 'start' });
+      }
+    };
+    openLinkedAction();
+    window.addEventListener('hashchange', openLinkedAction);
+    return () => window.removeEventListener('hashchange', openLinkedAction);
   }, [publication]);
   if (!publication) return null;
   const score = publication.score;
@@ -25,7 +30,7 @@ export default function PublicationEvidence({ publication, onPlayAt }) {
     </div>}
     <p className="mt-3 text-xs">{publication.stats_definitions}</p>
     <h3 className="mt-5 font-bold">Documented key actions</h3>
-    <div className="mt-2 space-y-3">{publication.key_actions.map(action => <details id={`event-${action.event_id}`} key={action.event_id} className="rounded-xl border border-[#E5DFCE] p-3" data-testid={`key-action-${action.event_id}`}>
+    <div className="mt-2 space-y-3">{publication.key_actions.map(action => <details id={`event-${action.event_id}`} key={action.event_id} className="scroll-mt-36 rounded-xl border border-[#E5DFCE] p-3" data-testid={`key-action-${action.event_id}`}>
       <summary className="cursor-pointer font-bold">{action.timestamp} · {action.title}</summary>
       <p className="mt-2 text-sm">{action.description}</p>
       {action.contact_interval_ms && <p className="mt-2 text-xs">Contact window: {action.contact_interval_ms.map(t => (t / 1000).toFixed(3)).join('–')} s. Foot side is not established.</p>}

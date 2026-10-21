@@ -3,6 +3,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { deriveV2 } from './derive';
 import PublicationEvidence from './PublicationEvidence';
 import { DreamPathSection } from './dreampath';
+import { PremiumMobileCategories } from './categories';
 
 const publication = {
   date: '20 OCTOBER 2026', duration: '01:17',
@@ -47,4 +48,77 @@ test('stable PDF evidence link opens its matching action after data loads',()=>{
   expect(document.getElementById('event-action-2').open).toBe(true);
   expect(document.getElementById('event-action-0').open).toBe(false);
   window.history.replaceState({},'', '/');
+});
+
+
+function mobileReport() {
+  const report = {id:'mobile-publication', report_publication:publication,
+    full_report:{scores:{overall_development:null}}, player_details:{player_name:'Test Player',age:11}};
+  const d = deriveV2(report);
+  return {report, props:{report,d,pd:report.player_details,photoCandidates:[],topStrengths:[],
+    snapshotMoments:publication.view.snapshotMoments,videoHighlight:{timestamp:'00:56'},
+    playAt:jest.fn(), reportDate:publication.date}};
+}
+
+test('PDF event links reveal their exact evidence on mobile',async()=>{
+  window.history.replaceState({},'', '#event-action-2');
+  const {props}=mobileReport();
+  render(<PremiumMobileCategories {...props}/>);
+  expect(await screen.findByTestId('publication-evidence')).toBeTruthy();
+  expect(document.getElementById('event-action-2').open).toBe(true);
+  expect(document.getElementById('event-action-0').open).toBe(false);
+  fireEvent.click(screen.getByRole('button',{name:'Watch evidence · 00:38',hidden:true}));
+  expect(props.playAt).toHaveBeenCalledWith('00:38',{eventId:'action-2',evidenceId:'proof-2'});
+  expect(screen.getByTestId('pm-cat-evidence-toggle').textContent).toContain('24');
+  window.history.replaceState({},'', '/');
+});
+
+test('mobile academy bars use the same qualified rubric as desktop and PDF',()=>{
+  const {props}=mobileReport();
+  props.d.ageComparison=[{name:'Shooting',label:'Academy',width:76}];
+  props.d.ageBracket='U11-U12';
+  render(<PremiumMobileCategories {...props}/>);
+  fireEvent.click(screen.getByTestId('pm-cat-impact-toggle'));
+  const reference=screen.getByTestId('v2-age-comparison-card');
+  expect(reference.textContent).toContain('Academy rubric reference');
+  expect(reference.textContent).toContain('not population percentiles');
+  expect(reference.textContent).not.toContain('compares to other players');
+});
+
+
+test('changing a PDF event link on an already open report reveals the new exact action',()=>{
+  window.history.replaceState({},'', '#event-action-0');
+  render(<PublicationEvidence publication={publication}/>);
+  expect(document.getElementById('event-action-0').open).toBe(true);
+  window.history.replaceState({},'', '#event-action-3');
+  fireEvent(window,new HashChangeEvent('hashchange'));
+  expect(document.getElementById('event-action-3').open).toBe(true);
+  window.history.replaceState({},'', '/');
+});
+
+
+test('mobile Sequence categories keep native skill groups and backend weighted scores',()=>{
+  const {props}=mobileReport();
+  props.report.full_report={scores:{technical:7.4,tactical:8.5,mentality:8.0},
+    technical:{passing:{score:7},shooting:{score:8}},
+    tactical:{decision_making:{score:8.5}},mentality:{confidence:{score:8.0}}};
+  props.report.score_meaning={skills:[{key:'decision_making',category:'tactical',label:'Decision Making',score:8.5,lines:[]}]};
+  render(<PremiumMobileCategories {...props}/>);
+  expect(screen.getByTestId('pm-cat-tech-toggle').textContent).toContain('7.4');
+  expect(screen.getByTestId('pm-cat-iq-toggle').textContent).toContain('MENTALITY');
+  expect(screen.getByTestId('pm-cat-iq-toggle').textContent).not.toContain('8.5');
+  fireEvent.click(screen.getByTestId('pm-cat-tact-toggle'));
+  expect(screen.getByTestId('sm-skill-card-decision_making')).toBeTruthy();
+});
+
+
+test('legacy mobile reports keep their original IQ grouping and visible-skill averages',()=>{
+  const {props}=mobileReport();
+  delete props.report.report_publication;
+  props.report.full_report={scores:{technical:7.4},technical:{passing:{score:7},shooting:{score:8}},
+    tactical:{decision_making:{score:8.5}},mentality:{confidence:{score:8}}};
+  render(<PremiumMobileCategories {...props}/>);
+  expect(screen.getByTestId('pm-cat-tech-toggle').textContent).toContain('7.5');
+  expect(screen.getByTestId('pm-cat-iq-toggle').textContent).toContain('FOOTBALL IQ & MENTALITY');
+  expect(screen.queryByTestId('pm-cat-tact-toggle')).toBeNull();
 });

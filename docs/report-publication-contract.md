@@ -92,9 +92,12 @@ analysis, model requests, merge or deployment is performed.
 
 Tests cover projection immutability/idempotence, invalid grades, missing evidence,
 unknown foot, date/age references, exact frame joins, complete logs, PDF/shared-view
-parity, key-action navigation, and withholding recruitment placement. Browser
-visual review of the changed web UI remains required: the cloud browser could
-not connect to the local preview server in this session.
+parity, key-action navigation, and withholding recruitment placement. The Premium report component was reviewed in a local Chromium browser at
+375px, 390px and 1440px using the retained Orman500 publication. All five
+PDF event links open their exact action at every width, the aggregate is 7.6,
+mobile category scores match the published backend values, and no horizontal
+overflow or JavaScript errors were observed. This is an isolated local component
+review, not verification of the deployed site or production media delivery.
 
 Top-strength copy pairs the linked observed action with its possible football value.
 General team benefits are phrased as possibilities, never as unobserved outcomes;
@@ -112,3 +115,15 @@ observations use “In the video” rather than treating an observation as a def
 The academy card explains the retained score and reference in player language;
 weights, coverage, version and export detail remain in the online source data.
 This is an editorial presentation change, not a new assessment or pipeline run.
+
+## Mobile publication parity
+
+Sequence mobile reports use the same four native skill categories and backend
+weighted category scores as the published data. Legacy reports retain their
+original IQ grouping and displayed-skill averages. The mobile academy card
+identifies a coaching rubric, not measured peer percentiles. The evidence badge
+counts distinct event IDs rather than counting a snapshot and timeline row twice.
+The shared publication evidence panel is present on mobile as well as desktop.
+Known event hashes open the mobile evidence category and the exact action; hash
+changes also work while a report is already open. Other hashes cannot select
+unrelated actions. Sticky-header spacing keeps the target readable.
