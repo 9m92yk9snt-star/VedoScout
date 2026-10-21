@@ -18,7 +18,12 @@ def canonical_bundle(result, manifest, receipts):
     source = manifest["source_video_sha256"]
     if result.get("source_video_sha256") != source:
         raise ValueError("SEQUENCE_SOURCE_MISMATCH")
-    if result.get("status") != "MODEL_OBSERVATIONS_RETURNED" or not result.get("fresh_end_to_end_run"):
+    retry_ids = result.get("retry_reused_packet_ids") or []
+    exact_retry = (result.get("execution_mode") == "EXACT_REQUEST_RETRY" and bool(retry_ids)
+                   and len(set(retry_ids)) == len(retry_ids)
+                   and result.get("retry_reused_jobs") == len(retry_ids)
+                   and set(retry_ids) == {r["packet_id"] for r in receipts if r.get("retry_payload_verified") is True})
+    if result.get("status") != "MODEL_OBSERVATIONS_RETURNED" or not (result.get("fresh_end_to_end_run") or exact_retry):
         raise ValueError("SEQUENCE_RUN_INCOMPLETE")
     if result.get("historical_action_results_used"):
         raise ValueError("SEQUENCE_HISTORY_NOT_ALLOWED")

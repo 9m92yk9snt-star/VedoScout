@@ -14,6 +14,7 @@ on:
   pull_request:
     paths:
       - 'backend/sequence_report_*.py'
+      - 'backend/sequence_run_checkpoint.py'
       - 'backend/scripts/run_sequence_report_trial.py'
       - 'backend/scripts/probe_question_scope.py'
       - 'backend/tests/test_sequence_report.py'

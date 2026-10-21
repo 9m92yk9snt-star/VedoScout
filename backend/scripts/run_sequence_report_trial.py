@@ -33,6 +33,8 @@ class ReportStore:
         self.doc.update(deepcopy(update.get("$set") or {}))
         for key in update.get("$unset") or {}:
             self.doc.pop(key, None)
+        for key, operation in (update.get("$push") or {}).items():
+            self.doc[key] = (self.doc.get(key, []) + deepcopy(operation["$each"]))[operation["$slice"]:]
         if "full_report_status" in (update.get("$set") or {}):
             self.states.append(update["$set"]["full_report_status"])
 

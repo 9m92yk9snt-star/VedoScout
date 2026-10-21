@@ -38,6 +38,7 @@ SOURCE_MODULES = (
     "report_publication.py", "pdf_v2.py", "score_meaning.py", "score_context.py", "snapshot_card.py", "progression.py",
     "scripts/review_report_publication.py",
     "sequence_report_adapter.py", "sequence_report_runtime.py", "sequence_pilot.py", "sequence_pilot_transport.py",
+    "sequence_run_checkpoint.py",
     "scripts/run_sequence_pilot.py",
     "source_frame_cache.py", "analysis_jobs.py", "ordered_vision_reviews.py",
     "sequence_observation_context.py", "saved_shot_sequence.py", "scripts/review_source_window.py", "attack_sequence_search.py",
@@ -313,6 +314,8 @@ def build_export(doc, output, *, upload_dir, source_root, environment="unspecifi
             if doc.get("analysis_engine") == "SEQUENCE_V1":
                 add_json("sequence/audit.json", cleaned.get("sequence_audit"))
                 add_json("sequence/timings.json", cleaned.get("sequence_timings"))
+                add_json("sequence/failures.json", cleaned.get("sequence_failures"))
+                add_json("sequence/retry.json", cleaned.get("sequence_retry"))
                 if not doc.get("sequence_audit"):
                     absent("sequence/audit.json", "not_stored; no replayable sequence receipts")
             for key in ("anchors", "canonical_events", "football_sequence_analysis", "fix10a_trace_manifest"):

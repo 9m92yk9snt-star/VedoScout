@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - 'backend/sequence_pilot*.py'
+      - 'backend/sequence_run_checkpoint.py'
       - 'backend/scripts/run_sequence_pilot.py'
       - 'backend/scripts/probe_sequence_detail.py'
       - 'backend/scripts/probe_native_play.py'
