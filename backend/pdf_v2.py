@@ -1066,8 +1066,20 @@ def _snapshot_page(c, d, report_doc, page_no, total_pages, resolve):
     for k, (px, pyy) in zip(("strength", "noticed", "hidden", "develop"), pos):
         if moments.get(k):
             _snapshot_moment_card(c, moments[k], px, pyy, cw2, ch, resolve)
-    _snapshot_progress_strip(c, (d.get("snapshot") or {}).get("progressNote") or "On the right track!",
-                             M, M, CW, strip_h)
+    extra = d.get('videoHighlight') if d.get('publication') else None
+    if extra and extra.get('eventId'):
+        from urllib.parse import quote
+        card(c, M, M, CW, strip_h, fill=SOFT)
+        c.setFillColor(FOREST)
+        c.setFont(F_BOLD, 8)
+        c.drawString(M + PAD, M + strip_h - 14, extra.get('timestamp', '') + ' - ' + extra.get('title', 'ACTION').upper())
+        draw_par(c, esc(extra.get('caption', '')), M + 108, M + strip_h - 8, CW - 120,
+                 _style(F_BODY, 7, BODY, leading=9), max_h=strip_h - 12)
+        url = 'https://scoutmeplay.com/report/' + quote(str(report_doc.get('id') or ''), safe='') + '#event-' + quote(extra['eventId'], safe='')
+        c.linkURL(url, (M, M, M + CW, M + strip_h), relative=0)
+    else:
+        _snapshot_progress_strip(c, (d.get("snapshot") or {}).get("progressNote") or "On the right track!",
+                                 M, M, CW, strip_h)
     _page_footer(c, page_no, total_pages)
     c.showPage()
 
@@ -1123,6 +1135,66 @@ def _age_comparison_card(c, comp, bracket, x, y, w, h, rubric=False):
         c.drawRightString(x + w - PAD, ty - 8, str(r["label"]))
         draw_bar(c, x + PAD, ty - 16.5, w - 2 * PAD, 4.4, r["width"], fg=FOREST)
         ty -= row_h
+
+
+def _development_panel(c, d, x, top, w):
+    """One shared frame; measured rows keep observation and advice together."""
+    col_w = (w - 3 * PAD) / 2
+    body = _style(F_BODY, 7.2, BODY, leading=10)
+    def para(text):
+        p = Paragraph(esc(text or ''), body)
+        return p, p.wrap(col_w, H)[1]
+    strengths = [(a, *para(a.get('note'))) for a in d.get('topStrengths') or []]
+    priorities = [(a, *para(a.get('issue')), *para(a.get('howTo'))) for a in d.get('devPriorities') or []]
+    left_h = sum(20 + ph + 16 for _, _, ph in strengths)
+    right_h = sum(20 + 12 + oh + 8 + 12 + ah + 16 for _, _, oh, _, ah in priorities)
+    height = 72 + max(left_h, right_h, 50)
+    y = top - height
+    card(c, x, y, w, height)
+    card_title(c, x + PAD, top - PAD, 'Strengths & Next Development Steps', w - 2 * PAD)
+    left, right = x + PAD, x + 2 * PAD + col_w
+    c.setStrokeColor(BORDER)
+    c.setLineWidth(.6)
+    c.line(x + w / 2, top - 46, x + w / 2, y + PAD)
+    for bx, heading in ((left, 'TOP STRENGTHS'), (right, 'NEXT TRAINING FOCUS')):
+        c.setFillColor(FOREST)
+        c.setFont(F_BOLD, 7.6)
+        c.drawString(bx, top - 48, heading)
+    def title(bx, yy, name, score):
+        c.setFillColor(INK)
+        c.setFont(F_BOLD, 8.4)
+        c.drawString(bx, yy - 9, name)
+        if score is not None:
+            c.setFillColor(GREEN)
+            c.setFont(F_BOLD, 7)
+            c.drawRightString(bx + col_w, yy - 9, f'{score:.1f}/10')
+    yy = top - 59
+    for row, p, ph in strengths:
+        title(left, yy, row['name'], row.get('score'))
+        p.drawOn(c, left, yy - 20 - ph)
+        used = 20 + ph
+        if row.get('timestamp'):
+            c.setFillColor(GREEN)
+            c.setFont(F_BODY, 6.5)
+            c.drawString(left, yy - used - 10, 'Video ' + row['timestamp'])
+        yy -= used + 16
+    yy = top - 59
+    for row, op, oh, ap, ah in priorities:
+        title(right, yy, row['name'], row.get('score'))
+        yy -= 20
+        c.setFillColor(MUTED)
+        c.setFont(F_BOLD, 6.3)
+        c.drawString(right, yy - 7, 'IN THE VIDEO')
+        yy -= 12
+        op.drawOn(c, right, yy - oh)
+        yy -= oh + 8
+        c.setFillColor(GREEN)
+        c.setFont(F_BOLD, 6.3)
+        c.drawString(right, yy - 7, 'NEXT TRAINING FOCUS')
+        yy -= 12
+        ap.drawOn(c, right, yy - ah)
+        yy -= ah + 16
+    return height
 
 
 def _top_strengths_card(c, strengths, x, y, w, h, resolve):
@@ -2372,31 +2444,35 @@ def _sm_rich_card(c, s, x, y, w, h):
     _sm_chips_row(c, s, x + PAD, y + 11, w - 2 * PAD)
 
 
-def _publication_score_notes(c, sm, x, y, w, h):
+def _publication_score_notes(c, sm, x, top, w):
     """Concise score context and evidence navigation in the original lower card."""
     from urllib.parse import quote
     pub = sm['publication']
     score = pub['score']
-    card(c, x, y, w, h)
-    ty = y + h - PAD
-    ty -= card_title(c, x + PAD, ty, "Score & Academy Reference", w - 2 * PAD)
-    lines = [
-        f"{score['rated_skills']}/{score['total_skills']} skills rated; {score['weighted_coverage_pct']}% of rubric weight covered. Unrated skills are excluded.",
-        "Observed clip only. Position priorities carry weight 2; other skills weight 1.",
-    ]
     comp = score.get('comparison')
+    value = f"{score['value']:.1f}/10" if score['value'] is not None else 'Not assessed'
     if comp:
-        lines.append(comp['bracket'] + ': ' + ' | '.join(f"{r['label']} {r['min']}-{r['max']}" for r in comp['ranges']))
-    lines += ["Coaching rubric v1, not measured peer percentiles or an academy-admission prediction.",
-              "Unconfirmed foot-side observations are excluded from weak-foot grading.",
-              "Full observations and supporting evidence are retained in the online report and evidence export."]
-    for line in lines:
-        used = draw_par(c, esc(line), x + PAD, ty, w - 2 * PAD,
-                        _style(F_BODY, 6.6, BODY, leading=8.5))
-        ty -= used + 3
+        lines = [f"{value} falls in the {comp['label']} reference range for the observed skills ({comp['bracket']})."]
+    else:
+        lines = [f"Observed skill score: {value}."]
+    story = pub.get('narrative') or {}
+    if story.get('score_explanation'):
+        lines.append(story['score_explanation'])
+    lines.append('The reference is a coaching guide. This clip does not establish academy readiness or long-term potential.')
+    style = _style(F_BODY, 7.2, BODY, leading=10)
+    paragraphs = [Paragraph(esc(line), style) for line in lines]
+    heights = [p.wrap(w - 2 * PAD, H)[1] for p in paragraphs]
+    h = PAD + 25 + sum(ph + 5 for ph in heights) + 43
+    y = top - h
+    card(c, x, y, w, h)
+    ty = top - PAD
+    ty -= card_title(c, x + PAD, ty, 'Academy Reference', w - 2 * PAD)
+    for paragraph, ph in zip(paragraphs, heights):
+        paragraph.drawOn(c, x + PAD, ty - ph)
+        ty -= ph + 5
     c.setFillColor(FOREST)
     c.setFont(F_BOLD, 6.6)
-    c.drawString(x + PAD, y + 25, "OPEN KEY-ACTION EVIDENCE (account access may be required)")
+    c.drawString(x + PAD, y + 25, "VIEW THE KEY ACTIONS")
     actions = pub['key_actions'][:5]
     for i, action in enumerate(actions):
         bx = x + PAD + i * ((w - 2 * PAD) / max(1, len(actions)))
@@ -2486,7 +2562,7 @@ def _score_meaning_page(c, sm, player_name, page_no, total_pages):
         yy -= h_sk + GAP
 
     if sm.get("publication"):
-        _publication_score_notes(c, sm, M, yy - 153, CW, 153)
+        _publication_score_notes(c, sm, M, yy, CW)
 
     if disc and yy - M >= h_disc:
         c.saveState()
@@ -3066,7 +3142,7 @@ def build_pdf_v2(report_doc: dict, output_path: str, image_resolver=None, promo:
     gyg = gyg if isinstance(gyg, dict) and (gyg.get("lessons") or []) else None
     has_p4 = bool(mm.get("trail") or fifa_lens or prog)
     sequence = bool(report_doc.get('report_publication'))
-    total_pages = 5 + int(has_p4) + int(bool(sm or sctx)) + int(bool(pp))
+    total_pages = (4 if sequence else 5) + int(has_p4) + int(bool(sm or sctx)) + int(bool(pp))
     if not sequence:
         total_pages += int(bool(gyg)) + int(has_print)
 
@@ -3087,7 +3163,7 @@ def build_pdf_v2(report_doc: dict, output_path: str, image_resolver=None, promo:
         extra = next((a for a in report_doc["report_publication"]["key_actions"] if a["event_id"] not in shown), None)
         if extra:
             comment = next((v for v in report_doc["full_report"].get("video_comments", []) if v.get("event_id") == extra["event_id"]), {})
-            d["videoHighlight"] = {"timestamp": extra["timestamp"], "caption": extra["summary"],
+            d["videoHighlight"] = {"timestamp": extra["timestamp"], "caption": extra["summary"], "title": extra["title"],
                 "thumb": comment.get("frame_url") if comment.get("proof_frame_verified") else None, "eventId": extra["event_id"]}
 
 
@@ -3149,13 +3225,16 @@ def build_pdf_v2(report_doc: dict, output_path: str, image_resolver=None, promo:
         _page_bg(c)
         mh = _mini_header(c, player_name)
         row3_top = H - M - mh - 4
-        h3 = 360
-        cs1 = 305
-        _top_strengths_card(c, d["topStrengths"], M, row3_top - h3, cs1, h3, resolve)
-        _dev_priorities_card(c, d["devPriorities"], M + cs1 + GAP, row3_top - h3, CW - cs1 - GAP, h3)
+        if sequence:
+            h3 = _development_panel(c, d, M, row3_top, CW)
+        else:
+            h3 = 360
+            cs1 = 305
+            _top_strengths_card(c, d["topStrengths"], M, row3_top - h3, cs1, h3, resolve)
+            _dev_priorities_card(c, d["devPriorities"], M + cs1 + GAP, row3_top - h3, CW - cs1 - GAP, h3)
 
         row4_top = row3_top - h3 - GAP
-        h4 = 330
+        h4 = 250 if sequence else 330
         cw3 = (CW - 2 * GAP) / 3
         _roadmap_card(c, d["roadmap"], M, row4_top - h4, cw3, h4)
         _training_week_card(c, d["trainingWeek"], M + cw3 + GAP, row4_top - h4, cw3, h4)
@@ -3333,8 +3412,8 @@ def build_pdf_v2(report_doc: dict, output_path: str, image_resolver=None, promo:
         c.showPage()
         page_no += 1
 
-    # Only sequence changes: move original templates as units; do not redesign their grids.
-    pages = (render_cover, render_scores, render_progress, render_snapshot, render_outlook, render_training, render_parents, render_certificate) if sequence else (render_cover, render_snapshot, render_training, render_outlook, render_progress, render_scores, render_education, render_parents, render_printables, render_certificate)
+    # Keep original cover/Snapshot; consolidate only the approved Sequence development panels.
+    pages = (render_cover, render_scores, render_progress, render_snapshot, render_training, render_parents, render_certificate) if sequence else (render_cover, render_snapshot, render_training, render_outlook, render_progress, render_scores, render_education, render_parents, render_printables, render_certificate)
     for render in pages:
         render()
     c.save()

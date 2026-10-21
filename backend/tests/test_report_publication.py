@@ -120,6 +120,11 @@ def test_concise_pdf_uses_shared_facts_and_keeps_full_audit_in_data(tmp_path):
     assert all(any(url.endswith('#event-' + a['event_id']) for url in links) for a in r['report_publication']['key_actions'])
     assert 'GROW YOUR GAME' not in text and 'NEXT MATCH MISSIONS' not in text
     assert 'KEY ACTIONS' in text
+    assert 'NOTES FOR THE COACH' not in text and 'NEXT LEVEL OUTLOOK' not in text
+    assert 'STRENGTHS & NEXT DEVELOPMENT STEPS' in text
+    assert 'IN THE VIDEO' in text and 'NEXT TRAINING FOCUS' in text
+    assert 'rubric weight' not in text and 'carry weight' not in text
+    assert r['report_publication']['score']['method']  # method remains in source data
     assert all(f'PAGE {i + 1} / {len(reader.pages)}' in p.extract_text() for i,p in enumerate(reader.pages))
     assert 'Stronger than' not in text and 'None\'' not in text
     assert 'full ScoutMe Pro Benchmarked Analysis' not in text
@@ -166,7 +171,7 @@ def test_original_pdf_theme_and_native_frames_survive_paginated_render(tmp_path)
     assert any(rgb == pytest.approx(CREAM.rgb(), abs=.00001) for rgb in fills)
     assert all(image.image.size == (1600, 900) for image in reader.pages[0].images)
     assert len(reader.pages[0].images) == 1
-    assert sum(len(page.get('/Annots', [])) for page in reader.pages) == 5
+    assert len({a.get_object()['/A']['/URI'] for p in reader.pages for a in p.get('/Annots', [])}) == 5
     assert f'PAGE {len(reader.pages)} / {len(reader.pages)}' in reader.pages[-1].extract_text()
 
 
@@ -174,7 +179,7 @@ def test_original_cover_snapshot_and_training_grids_are_preserved(monkeypatch, t
     import pdf_v2 as pdf
     captured = {}
     for name in ('_hero_card', '_parent_summary_card', '_overall_score_card', '_snapshot_moment_card',
-                 '_top_strengths_card', '_dev_priorities_card', '_roadmap_card', '_training_week_card', '_parent_tips_card', '_sm_rich_card'):
+                 '_development_panel', '_roadmap_card', '_training_week_card', '_parent_tips_card', '_sm_rich_card'):
         original = getattr(pdf, name)
         def wrapper(*args, _original=original, _name=name, **kwargs):
             captured.setdefault(_name, []).append(args)
@@ -189,13 +194,15 @@ def test_original_cover_snapshot_and_training_grids_are_preserved(monkeypatch, t
     assert snapshot[0][0] == snapshot[2][0] == 26
     assert snapshot[1][0] == snapshot[3][0] == pytest.approx(26 + (pdf.CW + pdf.GAP) / 2)
     assert snapshot[0][1] == snapshot[1][1] and snapshot[2][1] == snapshot[3][1]
-    assert all(args[4:6] == pytest.approx((305, 360)) for args in captured['_top_strengths_card'])
+    assert len(captured['_development_panel']) == 1
+    assert captured['_development_panel'][0][2] == 26
+    assert captured['_development_panel'][0][4] == pytest.approx(pdf.CW)
     grouped = captured['_sm_rich_card']
     assert [args[1]['category'] for args in grouped] == ['technical', 'tactical', 'physical', 'mentality']
     assert all(args[5] == 128 for args in grouped)
     assert all(s['category'] == args[1]['category'] for args in grouped for s in args[1]['category_skills'])
     assert sum(len(args[1]['category_skills']) for args in grouped) == 4
-    assert all(args[5] == 330 for key in ('_roadmap_card', '_training_week_card', '_parent_tips_card') for args in captured[key])
+    assert all(args[5] == 250 for key in ('_roadmap_card', '_training_week_card', '_parent_tips_card') for args in captured[key])
 
 
 def test_non_sequence_reports_keep_existing_contract():

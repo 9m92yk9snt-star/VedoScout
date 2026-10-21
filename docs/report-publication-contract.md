@@ -46,26 +46,23 @@ withheld even when an observed aggregate can be calculated.
   text remain in raw evidence. Contact brackets remain brackets, not invented
   exact contact instants or foot-side conclusions.
 - All key scoring actions and the complete chronological event log are retained.
-  Group the original Premium V2 page templates as complete units: overview and
-  skill categories, snapshot and remaining action highlight, then training,
-  and parent support. Omit the separate lesson and duplicate printable training
-  pages in the concise Sequence PDF. Preserve retained grids and dimensions,
-  including the 2x2 snapshot and the strengths/priorities plus 3-column training
-  page. Reuse the existing rendering functions; matching colours alone is not
-  sufficient. No replacement page renderer or new visual design is permitted.
-  Fit images inside their original image areas, retaining the source aspect
-  ratio and the existing profile-photo slot. Shared player-story paragraphs use retained, identity-bound observations and
-  record their event references. The score explanation names the strongest retained
-  ratings in plain language; the method remains in the scores section. Prefer larger
-  existing full-body identity crops over the first tiny video crop, excluding partial
-  references; preserve uploaded user photos. Pitch graphics stay behind the original
-  photo slot, never over the player or match evidence. No invented photo detail.
-  Short shared editorial summaries appear in the PDF. Keep all skill scores within their category in the original
-  four score cards, with academy reference ranges and evidence links in the
-  original lower card. Do not print technical IDs or the full audit log. The full
-  log and skill evidence remain in the online report and evidence export; five
-  short key-action links navigate to the authenticated report. This is selection
-  of shared facts, not a second assessment.
+  Preserve the Premium V2 palette, fonts, cover and 2x2 Snapshot geometry.
+  Group related player content as described in the consolidated PDF contract
+  below: one shared strengths/training frame replaces two separate cards;
+  empty coach/outlook boxes and their separate page are omitted. Training cards
+  retain their original three-column arrangement with shorter content-sized
+  panels. No unrelated redesign or replacement report renderer is permitted.
+  Fit source images without distorting their aspect ratio. Shared player-story
+  paragraphs use retained, identity-bound observations and record event references.
+  Score explanations name the strongest retained ratings in plain language.
+  Prefer larger existing full-body identity crops over a tiny video crop,
+  excluding partial references; preserve uploaded user photos. Pitch graphics
+  stay behind the original photo slot, never over the player or match evidence.
+  Keep skill scores grouped by category in the original four score cards.
+  Explain the academy reference in player language; detailed calculation weights
+  and coverage remain in the online report and evidence export. Do not print
+  internal IDs or a full audit log. Key-action links lead to the authenticated
+  report. These are editorial selections of shared facts, not a new assessment.
 - Shots include goals. Key passes are explicitly defined here as teammate-shot
   passes without a goal, with assists counted separately. Observed duels are
   distinguished from wins. Action segments are not ball touches.
@@ -102,3 +99,16 @@ not connect to the local preview server in this session.
 Top-strength copy pairs the linked observed action with its possible football value.
 General team benefits are phrased as possibilities, never as unobserved outcomes;
 ratings, action links, thumbnails and original card geometry remain unchanged.
+
+## Consolidated reader-facing PDF
+
+The Sequence PDF keeps the cover and four large Snapshot images. A remaining
+key action occupies the existing Snapshot footer with its exact event link.
+Empty coach/outlook cards and their separate page are omitted. A single shared
+frame groups strengths and training priorities, with measured text heights, a
+quiet column divider and small score labels. Unreadable strength thumbnails are
+omitted from the PDF; image bindings remain in the shared data. Training
+observations use “In the video” rather than treating an observation as a deficit.
+The academy card explains the retained score and reference in player language;
+weights, coverage, version and export detail remain in the online source data.
+This is an editorial presentation change, not a new assessment or pipeline run.
