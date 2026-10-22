@@ -89,13 +89,19 @@ def test_actual_new_reply_cannot_approve_shot_with_an_explicit_target_contact_qu
     assert not next(e for e in observed["events"] if e["kind"] == "SHOT")["proof_eligible"]
 
 
-def test_generic_outcome_planner_reproduces_actual_successful_navigation_and_refuses_ambiguity():
+def test_generic_outcome_planner_preserves_actual_navigation_with_earlier_anatomical_context():
     from scripts.resume_fresh_outcome import p
     saved, parents = current_review()
     jobs = p.plan_outcome_reviews({}, saved["result"], parents)
     assert len(jobs) == 1
     actual = actual_outcome()["result"]["job"]
-    assert all(actual[k] == value for k,value in jobs[0].items())
+    # The historical paid request stays unchanged. The new planner only adds
+    # approach pixels before release; roles, outcome navigation and bounds stay.
+    assert all(actual[k] == value for k,value in jobs[0].items() if k != "detail_start_ms")
+    shot = next(e for e in saved["result"]["events"] if e["kind"] == "SHOT"
+                and e["selected_player"] is True and e["outcome"] == "UNKNOWN")
+    assert jobs[0]["detail_start_ms"] == max(jobs[0]["start_ms"], shot["contact_interval_ms"][0]-1200)
+    assert jobs[0]["detail_start_ms"] < actual["detail_start_ms"]
     assert p.plan_outcome_reviews({}, saved["result"], parents, limit=0) == []
     assert p.plan_outcome_reviews({}, saved["result"], parents+parents) == []
     assert p.plan_outcome_reviews({}, {**saved["result"],"questions":[]}, parents) == []
