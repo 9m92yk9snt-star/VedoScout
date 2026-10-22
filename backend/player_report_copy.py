@@ -3,6 +3,11 @@
 The action is a retained observation. Football value and practice are coaching
 advice, never extra detected actions or claims about academy selection.
 """
+import re
+
+
+_PRESSURE_FINISH = re.compile(r'under (?:\w+[- ]?){0,3}pressure|while (?:being )?challenged|challenged by')
+_AFTER_CARRY = re.compile(r'\b(?:after|following)\b[^.!?]{0,50}\b(?:dribble|carry)\b')
 
 # Focus, practice, and a target for the NEXT session (never a measured result).
 PRACTICE = {
@@ -61,7 +66,7 @@ PRACTICE = {
 VALUE = {
     'DRIBBLE': 'That helps you move the attack forward with the ball.',
     'PASS': 'Finding a teammate helps your team keep the attack moving.',
-    'GOAL': 'Finishing after a carry makes your forward runs a direct threat.',
+    'GOAL': 'Your finish gives the attack its end product.',
     'SHOT': 'Your finish gives the attack a chance to score.',
     'ASSIST': 'Your pass helps a teammate turn the chance into a goal.',
     'RECOVERY': 'Winning possession gives your team another chance to build.',
@@ -72,22 +77,54 @@ VALUE = {
 }
 
 
-def action_lesson(event):
+def _movement_types(event):
+    return {m.get('type') for m in event.get('movement_observations') or []
+            if isinstance(m, dict) and m.get('decision') == 'SUPPORTED'}
+
+
+def _following_pass(event, events):
+    actor = event.get('actor_visual_id')
+    end = event.get('end_ms')
+    if not actor or not isinstance(end, int):
+        return None
+    return next((e for e in events if e.get('actor_visual_id') == actor
+                 and e.get('canonical_event_type') == 'PASS' and e.get('canonical_outcome') == 'COMPLETED'
+                 and isinstance(e.get('canonical_ms'), int) and 0 <= e['canonical_ms']-end <= 2000), None)
+
+
+def action_lesson(event, events=()):
     kind = event.get('canonical_event_type')
     text = ' '.join(event.get('details') or []).lower()
     outcome = event.get('canonical_outcome')
+    value = VALUE.get('DRIBBLE' if kind == 'CARRY' else kind, 'Watch how the next phase of play develops.')
     if kind == 'GOAL':
-        fact = 'You finish your dribble with a goal.' if 'dribble' in text else 'You finish the attack with a goal.'
+        if 'close-range' in text and _PRESSURE_FINISH.search(text):
+            fact = 'You get a close-range finish away under pressure and score.'
+            value = 'Getting the shot away keeps a crowded attack dangerous.'
+        elif _AFTER_CARRY.search(text):
+            fact = 'You finish your forward carry with a goal.'
+            value = 'Your finish turns ball progression into a goal threat.'
+        else:
+            fact = 'You finish the attack with a goal.'
     elif kind == 'ASSIST':
         fact = "Your final pass sets up a teammate's goal."
     elif kind in {'DRIBBLE', 'CARRY'}:
-        movements = {m['type'] for m in event.get('movement_observations') or []}
-        if movements.intersection({'SHIELD_TURN', 'PROTECTIVE_TURN'}):
-            fact = 'You turn while using your body to protect the ball.'
+        movements = _movement_types(event)
+        if movements.intersection({'SHIELD_TURN', 'PROTECTIVE_TURN'}) and 'DIRECTION_REVERSAL' in movements:
+            fact = 'You shield the ball as you turn, then change direction again.'
+            value = 'This gives you another route before your next pass or carry.'
+            if _following_pass(event, events):
+                fact = 'You shield the ball, change direction again and then find a teammate.'
+                value = 'You use the turn to set up the next team action.'
+        elif movements.intersection({'SHIELD_TURN', 'PROTECTIVE_TURN'}):
+            fact = 'You put your body between the opponent and the ball as you turn.'
+            value = 'Protecting the ball can give you time to choose your next action.'
         elif 'DIRECTION_REVERSAL' in movements:
             fact = 'You turn back with the ball to find another route.'
+            value = 'Changing your route can open a passing lane or a way forward.'
         elif 'DIRECTION_CHANGE' in movements:
-            fact = 'You change direction with the ball to find another route.'
+            fact = 'You change direction with the ball.'
+            value = 'A new direction can give you another passing or carrying option.'
         elif 'shield' in text or 'protect' in text:
             fact = 'You use your body to protect the ball under pressure.'
         elif 'turn' in text:
@@ -100,7 +137,8 @@ def action_lesson(event):
         fact = ('You slow your carry and find a teammate with a pass.' if 'slows' in text
                 else 'You connect with a teammate through your pass.') if outcome == 'COMPLETED' else 'You look to connect the attack with a pass.'
     elif kind == 'RECOVERY':
-        fact = 'You regain the ball and give your team possession.'
+        fact = ('You regain the ball and give your team possession.' if outcome == 'COMPLETED'
+                else 'You compete to regain possession of the ball.')
     elif kind == 'SHOT':
         fact = 'You test the goalkeeper with a shot.' if outcome == 'SAVED' else 'You take the opportunity to shoot.'
     elif kind == 'DUEL':
@@ -116,7 +154,7 @@ def action_lesson(event):
     if (kind in {'GOAL', 'SHOT', 'ASSIST', 'PASS'} and event.get('foot') in {'LEFT', 'RIGHT'}
             and event.get('foot_verification') == 'SOURCE_ANATOMICAL_SEQUENCE_SUPPORTED'):
         fact = fact.rstrip('.') + f" using your {event['foot'].lower()} foot."
-    return fact, VALUE.get('DRIBBLE' if kind == 'CARRY' else kind, 'Watch how the next phase of play develops.')
+    return fact, value
 
 
 def practice(key):
@@ -124,14 +162,14 @@ def practice(key):
     return focus, f'{drill} {target}'
 
 
-def skill_lesson(skill, event):
+def skill_lesson(skill, event, events=()):
     """Explain the football quality, rather than repeating an event description."""
-    fact, value = action_lesson(event)
+    fact, value = action_lesson(event, events)
     key, kind = skill['key'], event.get('canonical_event_type')
     text = ' '.join(event.get('details') or []).lower()
-    if key == 'ball_control' and kind == 'DRIBBLE':
-        fact = 'You keep the ball within reach as you work through pressure.'
-        value = 'That gives you a chance to choose your next move while staying on the ball.'
+    if key == 'ball_control' and kind in {'DRIBBLE', 'CARRY'} and _movement_types(event):
+        fact = 'You keep the ball available as you turn and adjust your route.'
+        value = 'That control helps you prepare another touch instead of rushing the ball away.'
     elif key == 'body_control' and any(word in text for word in ('shield', 'protect')):
         fact = 'You place your body between your opponent and the ball.'
         value = 'Your body position helps you protect possession while you look for a way out.'
@@ -142,9 +180,44 @@ def skill_lesson(skill, event):
         fact = 'You compete for the ball with opponents challenging around you.'
         value = 'That willingness to stay in the contest gives you a chance to keep the attack alive.'
     elif key == 'one_v_one' and kind == 'DRIBBLE':
-        fact = 'You take on a direct challenge while carrying the ball.'
-        value = 'Handling that pressure can help you progress past your immediate opponent.'
+        value = 'Build on that ball protection by changing pace after your turn.'
+    elif key == 'first_touch' and any(w in text for w in ('receiv', 'takes a pass')):
+        fact = 'You receive the pass and turn into your next action.'
+        value = 'A useful first touch sets up the pass, carry or finish that follows.'
+    elif key == 'work_rate' and kind == 'RECOVERY' and event.get('canonical_outcome') == 'COMPLETED':
+        value = 'Your recovery effort gives your team another possession to build from.'
     return fact, value
+
+
+def _assessment_copy(skill, events, by_id):
+    supporting = list({r['event_id']: by_id[r['event_id']] for r in skill['evidence']
+                       if r.get('event_id') in by_id}.values())
+    fact, value = skill_lesson(skill, supporting[0], events)
+    why = f'{fact} {value}'
+    if skill['key'] == 'shooting':
+        goals = [e for e in supporting if e.get('canonical_event_type') == 'GOAL']
+        if len(goals) == 2:
+            why = 'Your two goals show you finishing moves successfully. The grade reflects those finishes in this video.'
+        elif len(goals) == 1:
+            why = f'{action_lesson(goals[0], events)[0]} Your finishing grade reflects this successful outcome.'
+    elif skill['key'] == 'passing' and len(supporting) == 1:
+        why = 'Your completed pass gives you a useful example to build on. Practise making the next pass easy for your teammate to take forward.' if supporting[0].get('canonical_outcome') == 'COMPLETED' else why
+    return fact, value, why
+
+
+def _repair_home_instructions(package):
+    # A saved report may already contain a technical placeholder instead of a
+    # drill step. Restore only this known exercise, as generic future practice;
+    # never reconstruct a match fact from a filtered sentence.
+    for drill in package.get('home_drills') or []:
+        if (not isinstance(drill, dict) or str(drill.get('name', '')).lower() != 'wall ball'
+                or str(drill.get('targets', '')).lower() != 'first touch'):
+            continue
+        steps = drill.get('steps')
+        if isinstance(steps, list) and 'The verified evidence is insufficient to assess this claim.' in steps:
+            drill['steps'] = ['Stand a few steps from the wall.',
+                'Pass with your right foot and control the rebound with your left.',
+                'Pass with your left foot and control with your right. Repeat.']
 
 
 def apply_player_copy(doc, events, skills, bound):
@@ -153,6 +226,18 @@ def apply_player_copy(doc, events, skills, bound):
     view = pub['view']
     by_id = {e['event_id']: e for e in events}
     comments = {c.get('event_id'): c for c in full.get('video_comments', [])}
+    def lesson(event):
+        return action_lesson(event, events)
+    def skill_copy(skill, event):
+        return skill_lesson(skill, event, events)
+    # Grades stay attached to their original source events. Replace over-broad
+    # match/ability claims in the displayed explanation, not the grade or audit.
+    for skill in skills:
+        fact, value, why = _assessment_copy(skill, events, by_id)
+        original = full[skill['category']][skill['key']]
+        original.update(notes=f'{fact} {value}', why_this_score=why, verdict=why)
+        for row in skill['evidence']:
+            row['what'] = skill_copy(skill, by_id[row['event_id']])[0]
     available = [s for s in skills if s['key'] in PRACTICE and any(e['proof_verified'] for e in s['evidence'])]
     ranked = sorted(available, key=lambda s: (-s['score'], s['key']))
     def evidence(skill):
@@ -163,24 +248,41 @@ def apply_player_copy(doc, events, skills, bound):
     qualities = ' and '.join(label(s['key']) for s in top)
     opening = f'Your {qualities} stand out in this video.' if top else 'Choose a moment from your video to discuss with your coach.'
     story, ids = [opening], []
+    goals = [e for e in events if e['canonical_event_type'] == 'GOAL' and bound(e)['proof_verified']]
+    if len(goals) > 1:
+        goal_line = 'You score twice in this video.' if len(goals) == 2 else f'You score {len(goals)} goals in this video.'
+        if any('under pressure' in lesson(e)[0] for e in goals):
+            goal_line += ' One finish comes under close pressure.'
+        story.append(goal_line)
+        ids.extend(e['event_id'] for e in goals)
+    movements = [e for e in events if _movement_types(e) and bound(e)['proof_verified']]
+    if movements:
+        move = max(movements, key=lambda e: (bool(_following_pass(e, events)),
+                   len(_movement_types(e)), e.get('canonical_outcome') == 'COMPLETED'))
+        fact, value = lesson(move)
+        story.append(f'{fact} {value}')
+        ids.append(move['event_id'])
     for skill in ranked:
+        if len(story) >= 3:
+            break
         ev = evidence(skill)
         if ev['event_id'] in ids:
             continue
-        fact, value = skill_lesson(skill, by_id[ev['event_id']])
+        fact, value = skill_copy(skill, by_id[ev['event_id']])
         story.append(f'{fact} {value}')
         ids.append(ev['event_id'])
         if len(story) == 3:
             break
-    goal = next((e for e in events if e['canonical_event_type'] == 'GOAL'
+    goal = next((e for e in events if len(goals) <= 1 and e['canonical_event_type'] == 'GOAL'
                  and e['event_id'] not in ids and bound(e)['proof_verified']), None)
     if goal:
-        story.append(action_lesson(goal)[0])
+        story.append(lesson(goal)[0])
         ids.append(goal['event_id'])
     explanation = (f'Your strongest qualities here are {qualities}. Keep building these into your game.'
                    if top else 'Use the moments in your video to choose a training goal with your coach.')
-    full['parent_summary'] = {'headline': 'Your football strengths', 'paragraphs': story, 'good_news': explanation}
-    view['parentSummary'] = {'headline': 'Your football strengths', 'paragraphs': story, 'goodNews': explanation}
+    good_news = 'Choose one of these moments, practise its next action and take it into your next match.'
+    full['parent_summary'] = {'headline': 'Your football strengths', 'paragraphs': story, 'good_news': good_news}
+    view['parentSummary'] = {'headline': 'Your football strengths', 'paragraphs': story, 'goodNews': good_news}
     full['executive_summary'] = ' '.join(story)
     full['final_summary'] = full['executive_summary']
     full['coach_notes'] = story
@@ -199,7 +301,7 @@ def apply_player_copy(doc, events, skills, bound):
     view['topStrengths'] = []
     for skill in ranked[:4]:
         ev = evidence(skill)
-        fact, value = skill_lesson(skill, by_id[ev['event_id']])
+        fact, value = skill_copy(skill, by_id[ev['event_id']])
         c = comments.get(ev['event_id'], {})
         view['topStrengths'].append({'name': skill['label'], 'score': skill['score'], 'category': skill['category'],
             'note': f'{fact} {value}', 'observation': fact, 'teamContribution': value,
@@ -217,13 +319,17 @@ def apply_player_copy(doc, events, skills, bound):
         if ev is None:
             continue
         used.add(ev['event_id'])
-        fact, _ = action_lesson(by_id[ev['event_id']])
+        fact, _ = skill_copy(skill, by_id[ev['event_id']])
         focus, drill = practice(skill['key'])
+        if skill['key'] == 'passing' and len(skill['evidence']) == 1:
+            focus = 'Build on your pass by helping the receiver play forward.'
         priorities.append({'name': skill['label'], 'score': skill['score'], 'issue': fact,
             'how_to_improve': drill, 'focus': focus, 'event_id': ev['event_id'], 'evidence': [ev]})
         if len(priorities) == 3:
             break
     full['development_priorities_detailed'] = priorities
+    if priorities:
+        pub['training_focus'] = priorities[0]['focus']
     view['devPriorities'] = [{'name': p['name'], 'score': p['score'], 'issue': p['issue'],
                              'howTo': p['how_to_improve']} for p in priorities]
     # Keep the original snapshot grid, selecting a range of football qualities.
@@ -234,13 +340,13 @@ def apply_player_copy(doc, events, skills, bound):
             break
         if ev['event_id'] not in {a['event_id'] for a in selected}:
             e = by_id[ev['event_id']]
-            selected.append({**bound(e), 'title': skill['label'], 'summary': action_lesson(e)[0]})
+            selected.append({**bound(e), 'title': skill['label'], 'summary': lesson(e)[0]})
     full['snapshot_moments'], view['snapshotMoments'] = [], []
     for key, action in zip(('strength', 'noticed', 'hidden', 'develop'), selected):
         e = by_id[action['event_id']]
         c = comments.get(e['event_id'], {})
         supporting_skill = next((s for s in ranked if s['label'] == action['title']), None)
-        fact, value = skill_lesson(supporting_skill, e) if supporting_skill else action_lesson(e)
+        fact, value = skill_copy(supporting_skill, e) if supporting_skill else lesson(e)
         thumb = c.get('frame_url') if c.get('proof_frame_verified') else None
         full['snapshot_moments'].append({**bound(e), 'key': key, 'label': 'Verified action',
             'title': action['title'], 'desc': f'{fact} {value}', 'frame_url': thumb})
@@ -248,11 +354,11 @@ def apply_player_copy(doc, events, skills, bound):
             'desc': f'{fact} {value}', 'timestamp': action['timestamp'], 'thumb': thumb, 'annot': 'circle',
             'eventId': e['event_id'], 'evidenceId': action.get('evidence_id')})
     for row in full['action_timeline']:
-        row['description'] = ' '.join(action_lesson(by_id[row['event_id']]))
+        row['description'] = ' '.join(lesson(by_id[row['event_id']]))
     for row in view['actionTimeline']:
-        row['description'] = ' '.join(action_lesson(by_id[row['eventId']]))
+        row['description'] = ' '.join(lesson(by_id[row['eventId']]))
     for action in pub['key_actions']:
-        fact, value = action_lesson(by_id[action['event_id']])
+        fact, value = lesson(by_id[action['event_id']])
         action.update(description=f'{fact} {value}', summary=fact, football_value=value,
                       learning_focus=pub['training_focus'])
     # Existing stat rows remain the same size and number. Football contributions
@@ -266,9 +372,8 @@ def apply_player_copy(doc, events, skills, bound):
     for s in doc['score_meaning']['skills']:
         if s['key'] not in PRACTICE:
             continue
-        fact, value = action_lesson(by_id[s['evidence']['event_id']])
         skill = next(row for row in skills if row['key'] == s['key'])
-        fact, value = skill_lesson(skill, by_id[s['evidence']['event_id']])
+        fact, value = skill_copy(skill, by_id[s['evidence']['event_id']])
         s['lines'] = [f'{fact} {value}']
         s['evidence']['what'] = fact
         s['looks_for'] = practice(s['key'])[0]
@@ -279,7 +384,7 @@ def apply_player_copy(doc, events, skills, bound):
     full['grow_your_game'] = {'lessons': [], 'homework_plan': []}
     for skill in top:
         ev = evidence(skill)
-        fact, value = action_lesson(by_id[ev['event_id']])
+        fact, value = skill_copy(skill, by_id[ev['event_id']])
         focus, drill = practice(skill['key'])
         full['grow_your_game']['lessons'].append({'topic_id': skill['key'], 'title': skill['label'],
             'category': skill['category'], 'moments': [ev], 'what_happened': fact,
@@ -294,9 +399,10 @@ def apply_player_copy(doc, events, skills, bound):
             'twelve_months': 'Choose a new challenge with your coach as your game develops.'}
     if top:
         full['parent_value_metrics'] = {'involvement': {'quality': top[0]['label'],
-            'note': action_lesson(by_id[evidence(top[0])['event_id']])[1]}, 'top_minutes': []}
+            'note': lesson(by_id[evidence(top[0])['event_id']])[1]}, 'top_minutes': []}
     full['match_stats']['coverage_note'] = 'Your goals, passes and carries from this video, ready to review with your coach.'
     package = full.get('parents_package') or {}
+    _repair_home_instructions(package)
     if package.get('message_to_player'):
         package['message_to_player']['body'] = f'{opening} {pub["training_focus"]} Keep enjoying your football.'
     full['parents_package'] = package

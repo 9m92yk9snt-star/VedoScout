@@ -12,7 +12,7 @@ import math
 import re
 from zoneinfo import ZoneInfo
 
-VERSION = 5
+VERSION = 6
 CATEGORIES = ('technical', 'tactical', 'physical', 'mentality')
 EXPECTED_SKILLS = {
     'technical': ('first_touch', 'ball_control', 'dribbling', 'passing', 'shooting', 'weak_foot', 'one_v_one'),
