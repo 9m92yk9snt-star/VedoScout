@@ -2,7 +2,7 @@
 from copy import deepcopy
 
 import pytest
-from player_report_copy import action_lesson, skill_lesson
+from player_report_copy import action_lesson, skill_lesson, observed_outlook
 from report_fact_authority import apply, NEUTRAL
 from test_report_publication import example, publish_report
 
@@ -121,3 +121,43 @@ def test_saved_damaged_wall_drill_is_repaired_without_changing_facts_or_scores()
     assert result['report_publication']['score']['value'] == 7.8
     assert report == original
     assert result == publish_report(result)
+
+
+@pytest.mark.parametrize('score,count', [(7.4, 4), (0, 0), (9, 5), (10, 5), (None, 0)])
+def test_outlook_symbols_use_the_existing_score_without_inventing_potential(score, count):
+    outlook = observed_outlook(score, {'score': 9, 'label': 'Shooting'}, 'Passing', 'You finish the attack.')
+    assert outlook['currentDots'] == outlook['stars'] == count
+    assert outlook['potentialHeading'] == 'Shooting'
+    assert outlook['potentialDots'] == 5
+    assert outlook['longTermHeading'] == 'Rating in this video'
+    assert outlook['longTerm'] == (f'{score:.1f}/10' if score is not None else 'Not assessed')
+
+
+def test_web_pdf_and_saved_outlook_share_scores_and_labels():
+    from pdf_v2 import derive_v2
+    report = publish_report(example())
+    outlook = report['report_publication']['view']['scoutOutlook']
+    assert outlook == report['full_report']['scout_outlook']['display']
+    assert outlook == derive_v2(report)['scoutOutlook']
+    assert outlook['currentLabel'] == '7.8/10'
+    assert outlook['stars'] == outlook['currentDots'] == 4
+    assert report == publish_report(report)
+
+
+def test_pdf_outlook_renders_the_current_score_and_explicit_star_count():
+    import io
+    from unittest.mock import patch
+    from reportlab.pdfgen.canvas import Canvas
+    from pypdf import PdfReader
+    from pdf_v2 import _scout_outlook_card
+    output = io.BytesIO()
+    canvas = Canvas(output)
+    outlook = observed_outlook(7.4, {'score': 9, 'label': 'Shooting'}, 'Passing', 'You finish the attack.')
+    with patch('pdf_v2.draw_stars_row') as stars:
+        _scout_outlook_card(canvas, outlook, 20, 20, 180, 250)
+        assert stars.call_args.args[3] == 4
+    canvas.save()
+    text = PdfReader(output).pages[0].extract_text()
+    assert '7.4/10' in text and '9.0/10' in text
+    assert 'RATING IN THIS VIDEO' in text
+    assert 'LONG-TERM POTENTIAL' not in text

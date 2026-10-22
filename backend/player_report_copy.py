@@ -220,6 +220,21 @@ def _repair_home_instructions(package):
                 'Pass with your left foot and control with your right. Repeat.']
 
 
+def observed_outlook(score, strongest, focus, explanation):
+    """Five symbols display existing grades, never a future-potential grade."""
+    def symbols(value):
+        return max(0, min(5, int(value / 2 + .5))) if value is not None else 0
+    def grade(value):
+        return f'{value:.1f}/10' if value is not None else 'Not assessed'
+    best = strongest['score'] if strongest else None
+    return {'currentHeading': 'Skills in this video', 'currentLabel': grade(score),
+        'currentDots': symbols(score), 'potentialHeading': strongest['label'] if strongest else 'Standout skill',
+        'potentialLabel': grade(best), 'potentialDots': symbols(best),
+        'readinessHeading': 'Next training focus', 'readiness': focus,
+        'longTermHeading': 'Rating in this video', 'longTerm': grade(score),
+        'stars': symbols(score), 'longTermNote': explanation}
+
+
 def apply_player_copy(doc, events, skills, bound):
     """Keep existing card fields/geometry; replace diagnostics with coaching."""
     full, pub = doc['full_report'], doc['report_publication']
@@ -330,6 +345,18 @@ def apply_player_copy(doc, events, skills, bound):
     full['development_priorities_detailed'] = priorities
     if priorities:
         pub['training_focus'] = priorities[0]['focus']
+    strongest = ranked[0] if ranked else None
+    outlook = observed_outlook(pub['score']['value'], strongest,
+        priorities[0]['name'] if priorities else 'Choose a focus with your coach',
+        ' '.join(skill_copy(strongest, by_id[evidence(strongest)['event_id']])) if strongest
+        else 'Choose a moment from your video to discuss with your coach.')
+    view['scoutOutlook'] = outlook
+    full['scout_outlook'] = {
+        'current_level_label': outlook['currentLabel'], 'current_level_dots': outlook['currentDots'],
+        'potential_level_label': outlook['potentialLabel'], 'potential_level_dots': outlook['potentialDots'],
+        'recruitment_readiness': outlook['readiness'], 'long_term_potential': outlook['longTerm'],
+        'long_term_note': outlook['longTermNote'], 'assessment_scope': 'THIS_VIDEO',
+        'display': dict(outlook)}
     view['devPriorities'] = [{'name': p['name'], 'score': p['score'], 'issue': p['issue'],
                              'howTo': p['how_to_improve']} for p in priorities]
     # Keep the original snapshot grid, selecting a range of football qualities.

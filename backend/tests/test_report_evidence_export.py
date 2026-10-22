@@ -564,6 +564,6 @@ def test_export_retains_raw_scores_and_separately_exposes_publication(case):
     assert doc == original
     assert read(case, "report.json")["full_report"]["scores"]["overall_development"] is None
     published = read(case, "publication/current.json")
-    assert published["report_publication"]["version"] == 6
+    assert published["report_publication"]["version"] == 7
     assert published["full_report"]["match_stats"]["observed_goals"] == 0
     assert "not a historical" in published["note"]

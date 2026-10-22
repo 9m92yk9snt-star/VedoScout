@@ -4,6 +4,7 @@ import { deriveV2 } from './derive';
 import PublicationEvidence from './PublicationEvidence';
 import { DreamPathSection } from './dreampath';
 import { PremiumMobileCategories } from './categories';
+import { ScoutOutlookCard } from './sections';
 
 // These are retained-data rendering tests; sharing must never call the API.
 jest.mock('../../lib/api', () => ({ post: jest.fn(() => {
@@ -22,6 +23,27 @@ const publication = {
     actionTimeline:Array.from({length:24},(_,i)=>({eventId:`action-${i}`,timestamp:`00:${i}`,title:'Action',description:'Test Player'})),
     matchStats:[{label:'Video Analysed',value:'01:17',pct:0}],scoutOutlook:{currentLabel:'Full playing level not assessed',currentDots:0}},
 };
+
+test('current video assessment fills the existing circles and stars with explicit scores',()=>{
+  const outlook = {currentHeading:'Skills in this video',currentLabel:'7.4/10',currentDots:4,
+    potentialHeading:'Shooting',potentialLabel:'9.0/10',potentialDots:5,
+    readinessHeading:'Next training focus',readiness:'Passing',
+    longTermHeading:'Rating in this video',longTerm:'7.4/10',stars:4,
+    longTermNote:'You finish the attack with a goal.'};
+  render(<ScoutOutlookCard scoutOutlook={outlook}/>);
+  const card=screen.getByTestId('v2-scout-outlook-card');
+  expect(screen.getAllByText('7.4/10')).toHaveLength(2);
+  expect(screen.getByText('9.0/10')).toBeTruthy();
+  expect(card.querySelectorAll('span[class~="bg-[#12402A]"]')).toHaveLength(9);
+  expect(card.querySelectorAll('svg[class~="fill-[#E8B32C]"]')).toHaveLength(4);
+  expect(card.textContent).not.toMatch(/Potential Level|Long-Term Potential|Not assessed/);
+});
+
+test('an explicit zero star assessment cannot fall back to three stars',()=>{
+  render(<ScoutOutlookCard scoutOutlook={{currentLabel:'0.0/10',currentDots:0,
+    potentialLabel:'Not assessed',potentialDots:0,longTerm:'0.0/10',stars:0}}/>);
+  expect(screen.getByTestId('v2-scout-outlook-card').querySelectorAll('svg[class~="fill-[#E8B32C]"]')).toHaveLength(0);
+});
 
 test('frontend uses shared fields without slicing or substituting moments',()=>{
   const d=deriveV2({report_publication:publication,full_report:{scores:{overall_development:null}},player_details:{player_name:'Test Player'}});
