@@ -80,7 +80,7 @@ def action_lesson(event):
         fact = 'You finish your dribble with a goal.' if 'dribble' in text else 'You finish the attack with a goal.'
     elif kind == 'ASSIST':
         fact = "Your final pass sets up a teammate's goal."
-    elif kind == 'DRIBBLE':
+    elif kind in {'DRIBBLE', 'CARRY'}:
         movements = {m['type'] for m in event.get('movement_observations') or []}
         if movements.intersection({'SHIELD_TURN', 'PROTECTIVE_TURN'}):
             fact = 'You turn while using your body to protect the ball.'
@@ -113,7 +113,7 @@ def action_lesson(event):
         fact = 'You continue your run after the goal.' if 'post-goal' in text else 'You move to stay involved in the play.'
     else:
         fact = 'The play continues around you.'
-    return fact, VALUE.get(kind, 'Watch how the next phase of play develops.')
+    return fact, VALUE.get('DRIBBLE' if kind == 'CARRY' else kind, 'Watch how the next phase of play develops.')
 
 
 def practice(key):

@@ -108,11 +108,12 @@ def test_supported_movement_does_not_override_contact_or_scorer_uncertainty():
     assert result['target_events'] == []
 
 
-def test_movement_player_text_is_shared_by_existing_web_and_pdf_publication():
+@pytest.mark.parametrize('kind', ['DRIBBLE', 'CARRY'])
+def test_movement_player_text_is_shared_by_existing_web_and_pdf_publication(kind):
     from test_report_publication import example, publish_report
     doc = example()
     event = doc['canonical_events']['events'][0]
-    event.update(canonical_event_type='DRIBBLE', canonical_outcome='INCOMPLETE',
+    event.update(canonical_event_type=kind, canonical_outcome='INCOMPLETE',
                  movement_observations=[movement()])
     report = publish_report(doc)
     sentence = 'You turn while using your body to protect the ball.'
