@@ -29,6 +29,9 @@ _TIMESTAMP = re.compile(r"\b(\d{1,2}):(\d{2})\b")
 _CATEGORIES = ("technical", "tactical", "physical", "mentality")
 _ADVICE = {"training_plan", "next_match_missions", "development_roadmap",
            "development_priorities_detailed", "parent_tips", "benchmarks"}
+_HOME_STEP = re.compile(r"^full_report\.parents_package\.home_drills\[\d+\]\.steps\[\d+\]$")
+_COMMAND = re.compile(r"^(?:Then[, ]+)?(?:pass|play|stand|control|receive|repeat|dribble|turn|push|stop|set|try|use|keep|aim|start|alternate)\b", re.I)
+_MATCH_REFERENCE = re.compile(r"\b(?:video|clip|match|observed|recorded|demonstrated|showed|scored|used|beat|earlier)\b|\b(?:as|like) you (?:did|have|were)\b|\b\d{1,2}:\d{2}\b", re.I)
 _SCORING_WORDS = r"(?:shots?|shooting|goals?|assists?|finishing|skud|afslutninger|m\u00e5l)"
 _ABSENCE = re.compile(
     rf"\b(?:no|zero|0|without|lacks?|lacking|ingen|nul)\s+(?:any\s+)?(?:observed\s+|verified\s+)?{_SCORING_WORDS}\b"
@@ -182,6 +185,14 @@ def apply(full, canonical):
         parts = re.split(r"(?<=[.!?])\s+", text)
         keep = []
         for sentence in parts:
+            # A foot mentioned in a future exercise is not a claim about the
+            # striking foot in the match. Keep this exception local to pure
+            # imperative drill steps; mixed or past-tense claims still pass
+            # through the ordinary evidence checks sentence by sentence.
+            if (_HOME_STEP.fullmatch(path) and _COMMAND.match(sentence.strip())
+                    and not _MATCH_REFERENCE.search(sentence)):
+                keep.append(sentence)
+                continue
             timed = _ms(sentence)
             relevant = (_matching(allowed, {"timestamp": sentence}) if timed is not None else allowed)
             sentence = strip_foot_modifiers(sentence, {e.get("foot") for e in relevant})

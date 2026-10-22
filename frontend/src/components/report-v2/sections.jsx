@@ -390,25 +390,25 @@ export function ScoutOutlookCard({ scoutOutlook }) {
       <div className="grid grid-cols-[1.05fr_1fr] gap-4">
         <div>
           <div className="mb-3.5">
-            <div className="text-[10px] font-extrabold tracking-[0.13em] uppercase text-[#8B957F]">Current Level</div>
+            <div className="text-[10px] font-extrabold tracking-[0.13em] uppercase text-[#8B957F]">{scoutOutlook.currentHeading || "Current Level"}</div>
             <div className="text-[14px] font-extrabold mt-0.5">{scoutOutlook.currentLabel}</div>
             <Dots n={scoutOutlook.currentDots} />
           </div>
           <div className="mb-3.5">
-            <div className="text-[10px] font-extrabold tracking-[0.13em] uppercase text-[#8B957F]">Potential Level</div>
+            <div className="text-[10px] font-extrabold tracking-[0.13em] uppercase text-[#8B957F]">{scoutOutlook.potentialHeading || "Potential Level"}</div>
             <div className="text-[14px] font-extrabold mt-0.5">{scoutOutlook.potentialLabel}</div>
             <Dots n={scoutOutlook.potentialDots} />
           </div>
           <div>
-            <div className="text-[10px] font-extrabold tracking-[0.13em] uppercase text-[#8B957F]">Recruitment Readiness</div>
+            <div className="text-[10px] font-extrabold tracking-[0.13em] uppercase text-[#8B957F]">{scoutOutlook.readinessHeading || "Recruitment Readiness"}</div>
             <div className="text-[14px] font-extrabold mt-0.5">{scoutOutlook.readiness}</div>
           </div>
         </div>
         <div className="border-l border-[#E5DFCE] pl-4 text-center">
-          <div className="text-[10px] font-extrabold tracking-[0.13em] uppercase text-[#8B957F]">Long-Term Potential</div>
+          <div className="text-[10px] font-extrabold tracking-[0.13em] uppercase text-[#8B957F]">{scoutOutlook.longTermHeading || "Long-Term Potential"}</div>
           <div className="flex justify-center gap-1 my-2">
             {[1, 2, 3, 4, 5].map((i) => (
-              <Star key={i} className={`w-4 h-4 ${i <= (scoutOutlook.longTerm === "Not assessed" ? 0 : scoutOutlook.longTerm === "High" ? 5 : scoutOutlook.longTerm === "Medium" ? 4 : 3) ? "text-[#E8B32C] fill-[#E8B32C]" : "text-[#DCE3D2]"}`} />
+              <Star key={i} className={`w-4 h-4 ${i <= (scoutOutlook.stars ?? (scoutOutlook.longTerm === "Not assessed" ? 0 : scoutOutlook.longTerm === "High" ? 5 : scoutOutlook.longTerm === "Medium" ? 4 : 3)) ? "text-[#E8B32C] fill-[#E8B32C]" : "text-[#DCE3D2]"}`} />
             ))}
           </div>
           <div className="text-[16px] font-extrabold text-[#12402A]">{scoutOutlook.longTerm}</div>
