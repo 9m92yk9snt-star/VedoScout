@@ -36,7 +36,7 @@ export function ParentValueMetricsCard({ metrics, onPlayAt }) {
     <V2Card testid="v2-parent-metrics-card">
       <V2Title
         icon={HeartHandshake}
-        right={<span className="text-[10px] font-extrabold tracking-[0.14em] text-[#CCFF00] bg-[#12402A] px-2.5 py-1 rounded-[5px] hidden md:block">EVIDENCE ONLY · NEVER GUESSED</span>}
+        right={<span className="text-[10px] font-extrabold tracking-[0.14em] text-[#CCFF00] bg-[#12402A] px-2.5 py-1 rounded-[5px] hidden md:block">YOUR FOOTBALL · YOUR DEVELOPMENT</span>}
       >
         What Parents Ask
       </V2Title>
@@ -44,8 +44,8 @@ export function ParentValueMetricsCard({ metrics, onPlayAt }) {
         {inv && (
           <MetricTile
             icon={Activity}
-            label="Involvement"
-            value={inv.actions_observed != null ? `${inv.actions_observed} actions` : inv.touches_observed != null ? `${inv.touches_observed} touches` : "—"}
+            label={inv.quality ? "Standout quality" : "Involvement"}
+            value={inv.quality || (inv.actions_observed != null ? `${inv.actions_observed} actions` : inv.touches_observed != null ? `${inv.touches_observed} touches` : "—")}
             note={[inv.touches_per_minute != null ? `≈ ${inv.touches_per_minute}/min.` : null, inv.note].filter(Boolean).join(" ")}
             testid="v2-pm-involvement"
           />

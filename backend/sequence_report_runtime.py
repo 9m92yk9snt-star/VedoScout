@@ -336,7 +336,7 @@ async def generate(video, doc, *, template, writer=write_facts, discovery=discov
                           "retained_source_analysis_seconds": audit["original_source_analysis_seconds"] if retained else None}
         prompt = assessment_prompt(template, bundle, doc.get("player_details"),
                                    {"coverage_status": "PARTIAL", "engine": adapter.ENGINE,
-                                    "anatomical_foot_side": "UNVERIFIED; do not grade weak foot or settle left/right"})
+                                    "anatomical_foot_side": "Use LEFT/RIGHT only from the bound canonical event's supported foot field. UNKNOWN and probable candidates must not become foot claims. A preferred-foot profile is not contact proof. Do not grade overall weak-foot ability from isolated contacts."})
         audit["writer_prompt_sha256"] = hashlib.sha256(prompt.encode()).hexdigest()
         if checkpoint:
             await checkpoint({"canonical_events": bundle, "sequence_audit": audit,

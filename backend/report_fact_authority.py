@@ -7,6 +7,7 @@ is never converted into a claim that the player scored zero.
 import re
 import math
 from copy import deepcopy
+from sequence_foot_evidence import foot_text_supported, strip_foot_modifiers
 
 VERSION = 2
 NEUTRAL = "The verified evidence is insufficient to assess this claim."
@@ -113,6 +114,8 @@ def _matching(events, row):
 
 
 def _supports(text, events):
+    if not foot_text_supported(text, {e.get("foot") for e in events}):
+        return False
     if text in {NEUTRAL, MISSING_ACTIONS, QUALITY_NOTE}:
         return True
     for claim in _SCORING_COUNT.finditer(text):
@@ -181,6 +184,7 @@ def apply(full, canonical):
         for sentence in parts:
             timed = _ms(sentence)
             relevant = (_matching(allowed, {"timestamp": sentence}) if timed is not None else allowed)
+            sentence = strip_foot_modifiers(sentence, {e.get("foot") for e in relevant})
             if not _supports(sentence, relevant):
                 removed.append(path)
             else:
@@ -217,8 +221,10 @@ def apply(full, canonical):
                 if not isinstance(row, dict):
                     continue
                 matches = _matching(events, row)
-                if len(matches) == 1 and _skill_supports(name, matches) and _supports(str(row.get("what") or ""), matches):
+                wording = strip_foot_modifiers(str(row.get("what") or ""), {e.get("foot") for e in matches})
+                if len(matches) == 1 and _skill_supports(name, matches) and _supports(wording, matches):
                     qualified = deepcopy(row)
+                    qualified["what"] = wording
                     qualified["canonical_event_ids"] = [e["event_id"] for e in matches if e.get("event_id")]
                     if matches[0].get("event_id"):
                         qualified["event_id"] = matches[0]["event_id"]

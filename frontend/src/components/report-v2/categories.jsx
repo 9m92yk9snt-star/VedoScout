@@ -402,8 +402,8 @@ export function PremiumMobileCategories({
       ),
     },
     {
-      key: "evidence", icon: Video, title: "SCOUT EVIDENCE",
-      desc: "Every photo moment and video clip behind the ratings.",
+      key: "evidence", icon: Video, title: "YOUR GAME IN ACTION",
+      desc: "Watch your strengths and learn what to take into training.",
       chip: evidenceCount > 0 ? { type: "count", value: evidenceCount, icon: Video } : null,
       has: true,
       body: () => (

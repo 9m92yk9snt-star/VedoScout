@@ -10,6 +10,8 @@ import hashlib
 from canonical_output_authority import project_event
 from evidence_authority import attach_event_evidence_authority, apply_fail_closed_proof_authority, _iter_structured_rows
 from verified_stats import apply_verified_stats_authority
+from sequence_foot_evidence import assess_foot, filter_foot_prose
+from sequence_action_evidence import supported_movements, MOVEMENT_TEXT
 
 ENGINE = "SEQUENCE_V1"
 
@@ -74,6 +76,30 @@ def canonical_bundle(result, manifest, receipts):
         proof_times = [frames[f] for f in cited] + [raw["start_ms"], raw["end_ms"]]
         if isinstance(outcome_ms, int):
             proof_times.append(outcome_ms)
+        # Revalidate the source-cited claim rather than trusting a naked foot
+        # label in the intermediate event or a writer's preferred-foot guess.
+        claim = deepcopy(raw.get("anatomical_foot")) if raw["kind"] in {"SHOT", "PASS", "CROSS"} else None
+        if isinstance(claim, dict) and raw.get("foot_question_unresolved"):
+            claim["assessment"] = "UNCERTAIN"
+        foot = assess_foot(claim, actor=raw["actor"],
+                          interval=interval, frames=frames,
+                          bounds=(max(0, raw["start_ms"]-2000), raw["end_ms"]))
+        if foot["foot"] in {"LEFT", "RIGHT"}:
+            foot_frames = [r["frame"] for key in ("orientation_evidence", "right_leg_evidence",
+                "left_leg_evidence", "contact_evidence") for r in foot["foot_evidence"][key]]
+            cited += list(dict.fromkeys(foot_frames))
+            proof_times.extend(frames[f] for f in foot_frames)
+        description = filter_foot_prose(raw.get("details", ""), foot["foot"]) if isinstance(raw.get("details"), str) else ""
+        movements = supported_movements(raw.get("movement_observations"), actor=raw["actor"],
+            frames=frames, bounds=(raw["start_ms"], raw["end_ms"])) if raw["kind"] in {"DRIBBLE", "CARRY"} else []
+        for movement in movements:
+            movement_frames = [movement["before_frame"], *movement["movement_frames"], movement["after_frame"]]
+            cited += [f for f in movement_frames if f not in cited]
+            proof_times.extend(frames[f] for f in movement_frames)
+        movement_details = list(dict.fromkeys(MOVEMENT_TEXT[m["type"]] for m in movements))
+        if foot["foot"] in {"LEFT", "RIGHT"}:
+            verb = "Shoots" if raw["kind"] == "SHOT" else "Plays the ball"
+            description = (description + f" {verb} with the {foot['foot'].lower()} foot.").strip()
         events.append({
             "event_id": raw["event_id"], "canonical_ms": ms,
             "start_ms": raw["start_ms"], "end_ms": raw["end_ms"],
@@ -85,8 +111,9 @@ def canonical_bundle(result, manifest, receipts):
             "global_target_id": "GLOBAL_TARGET", "actor_local_track_id": None,
             "actor_visual_id": raw["actor_scope"] + ":" + raw["actor"],
             "identity_resolution": "ORIGINAL_SELECTION_SEQUENCE_CONTINUITY",
-            "details": [raw["details"]] if isinstance(raw.get("details"), str) else [],
-            "foot": "UNKNOWN", "foot_verification": "ANATOMICAL_SIDE_NOT_VERIFIED",
+            "details": movement_details + ([description] if description else []),
+            "movement_observations": movements,
+            **foot,
             "source_video_sha256": source,
             "source_action_ids": deepcopy(raw.get("source_action_keys") or []),
             "source_sequence_ids": deepcopy(raw.get("source_packet_ids") or []),
@@ -119,8 +146,8 @@ def build_report(prose, bundle):
                 row.pop(key, None)
     weak_foot = (full.get("technical") or {}).get("weak_foot")
     if isinstance(weak_foot, dict):
-        # The sequence contract has no verified anatomical side. A writer's
-        # event citation cannot manufacture weak-foot evidence from UNKNOWN.
+        # An isolated foot contact does not establish overall weak-foot ability.
+        # Keep this grade withheld until a separate skill-evidence policy exists.
         weak_foot["evidence"] = []
     # Writer has no authority over events, physical metrics, evidence or totals.
     for key in ("match_stats", "verified_stats", "movement_map", "pace_metrics", "heatmap", "speed_metrics",

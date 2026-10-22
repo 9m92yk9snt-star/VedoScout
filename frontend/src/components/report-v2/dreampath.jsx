@@ -76,8 +76,8 @@ export function DreamPathSection({ report, d, playerName }) {
   const dp = deriveDreamPath(report, d);
   if (report?.report_publication) return <section data-testid="dream-path-section" className="mb-4 rounded-2xl bg-[#0B1F14] p-6 text-white">
     <h2 className="font-barlow font-black text-2xl">{playerName}'s road to the dream</h2>
-    <p className="mt-2">Use the observed skills and linked evidence to choose the next training goal with your coach.</p>
-    <p className="mt-2 text-sm text-white/70">Academy rubric references describe this clip. Full playing level and recruitment readiness are not established.</p>
+    <p className="mt-2">Build on your strengths, practise your next step and take it into your next match.</p>
+    <p className="mt-2 text-sm text-white/70">Use the academy skill guide and your coach's feedback to choose the next challenge for your football.</p>
     {(d.devPriorities || []).map(p => <p className="mt-3 text-sm" key={p.name}><strong>{p.name}:</strong> {p.howTo}</p>)}
   </section>;
   const first = (playerName || "").split(" ")[0] || "Player";

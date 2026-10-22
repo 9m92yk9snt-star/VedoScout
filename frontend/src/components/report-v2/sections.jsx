@@ -53,7 +53,7 @@ export function AgeComparisonCard({ ageComparison, ageBracket, rubric = false })
   if (!ageComparison?.length) return null;
   return (
     <V2Card testid="v2-age-comparison-card">
-      <V2Title icon={Medal}>{rubric ? "Academy rubric reference" : "Comparison To Players Your Age"}{ageBracket ? ` (${ageBracket})` : ""}</V2Title>
+      <V2Title icon={Medal}>{rubric ? "Academy skill guide" : "Comparison To Players Your Age"}{ageBracket ? ` (${ageBracket})` : ""}</V2Title>
       {ageComparison.map((c, i) => (
         <div key={i} className={`flex items-center gap-3 py-[10px] ${i < ageComparison.length - 1 ? "border-b border-[#EFEADB]" : ""}`}>
           <div className="text-[13px] font-semibold w-[130px] shrink-0 truncate">{c.name}</div>
@@ -63,7 +63,7 @@ export function AgeComparisonCard({ ageComparison, ageBracket, rubric = false })
           <div className="text-[13px] font-extrabold text-[#12402A] w-[100px] text-right">{c.label}</div>
         </div>
       ))}
-      <div className="text-[10.5px] text-[#93A08F] mt-2.5">{rubric ? "Bars show scores on the coaching rubric, not population percentiles." : "These bars show how your child compares to other players his age."}</div>
+      <div className="text-[10.5px] text-[#93A08F] mt-2.5">{rubric ? "ScoutMePlay coaching guide for the skills shown at your age." : "These bars show how your child compares to other players his age."}</div>
     </V2Card>
   );
 }
