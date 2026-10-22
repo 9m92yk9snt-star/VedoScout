@@ -121,3 +121,13 @@ def test_movement_player_text_is_shared_by_existing_web_and_pdf_publication(kind
     web = next(r for r in report['report_publication']['view']['actionTimeline'] if r['eventId'] == event['event_id'])
     assert sentence in full['description']
     assert web['description'] == full['description']
+
+
+@pytest.mark.parametrize('side', ['LEFT', 'RIGHT'])
+def test_player_copy_preserves_supported_foot_but_does_not_promote_naked_side(side):
+    event = {'canonical_event_type': 'GOAL', 'details': [], 'foot': side}
+    assert 'foot' not in action_lesson(event)[0]
+    event['foot_verification'] = 'SOURCE_ANATOMICAL_SEQUENCE_SUPPORTED'
+    assert f'using your {side.lower()} foot' in action_lesson(event)[0]
+    event['foot'] = 'UNKNOWN'
+    assert 'foot' not in action_lesson(event)[0]

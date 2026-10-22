@@ -113,6 +113,9 @@ def action_lesson(event):
         fact = 'You continue your run after the goal.' if 'post-goal' in text else 'You move to stay involved in the play.'
     else:
         fact = 'The play continues around you.'
+    if (kind in {'GOAL', 'SHOT', 'ASSIST', 'PASS'} and event.get('foot') in {'LEFT', 'RIGHT'}
+            and event.get('foot_verification') == 'SOURCE_ANATOMICAL_SEQUENCE_SUPPORTED'):
+        fact = fact.rstrip('.') + f" using your {event['foot'].lower()} foot."
     return fact, VALUE.get('DRIBBLE' if kind == 'CARRY' else kind, 'Watch how the next phase of play develops.')
 
 
