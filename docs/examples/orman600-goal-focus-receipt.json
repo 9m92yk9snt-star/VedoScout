@@ -1,0 +1,3648 @@
+{
+  "scope": "SINGLE_USER_LOCATED_SOURCE_PACKET",
+  "source_video_sha256": "db97b9dc0e2cda68f6c4619405270006e7ab31eeb44e73bd7ed432b1a8d0de38",
+  "implementation_commit": "715e6605348c2ffcc6b490c8c7f28e068c5eb2cf",
+  "prompt_sha256": "e402cdf929e30fb66c800d2eb3c4c7795ca15b4f0cbb1700facea5ec371cc3cd",
+  "expected_answers_used_as_input": false,
+  "historical_action_results_used": false,
+  "fresh_end_to_end_timing": false,
+  "source_frames": [
+    {
+      "frame_id": "s000011267",
+      "media_ms": 11267
+    },
+    {
+      "frame_id": "s000011400",
+      "media_ms": 11400
+    },
+    {
+      "frame_id": "s000011500",
+      "media_ms": 11500
+    },
+    {
+      "frame_id": "s000011633",
+      "media_ms": 11633
+    },
+    {
+      "frame_id": "s000011767",
+      "media_ms": 11767
+    },
+    {
+      "frame_id": "s000011800",
+      "media_ms": 11800
+    },
+    {
+      "frame_id": "s000011900",
+      "media_ms": 11900
+    },
+    {
+      "frame_id": "s000012000",
+      "media_ms": 12000
+    },
+    {
+      "frame_id": "s000012133",
+      "media_ms": 12133
+    },
+    {
+      "frame_id": "s000012267",
+      "media_ms": 12267
+    },
+    {
+      "frame_id": "s000012400",
+      "media_ms": 12400
+    },
+    {
+      "frame_id": "s000012500",
+      "media_ms": 12500
+    },
+    {
+      "frame_id": "s000012633",
+      "media_ms": 12633
+    },
+    {
+      "frame_id": "s000012767",
+      "media_ms": 12767
+    },
+    {
+      "frame_id": "s000012900",
+      "media_ms": 12900
+    },
+    {
+      "frame_id": "s000013000",
+      "media_ms": 13000
+    },
+    {
+      "frame_id": "s000013133",
+      "media_ms": 13133
+    },
+    {
+      "frame_id": "s000013267",
+      "media_ms": 13267
+    },
+    {
+      "frame_id": "s000013400",
+      "media_ms": 13400
+    },
+    {
+      "frame_id": "s000013500",
+      "media_ms": 13500
+    },
+    {
+      "frame_id": "s000013633",
+      "media_ms": 13633
+    },
+    {
+      "frame_id": "s000013767",
+      "media_ms": 13767
+    },
+    {
+      "frame_id": "s000013900",
+      "media_ms": 13900
+    },
+    {
+      "frame_id": "s000014000",
+      "media_ms": 14000
+    },
+    {
+      "frame_id": "s000014133",
+      "media_ms": 14133
+    },
+    {
+      "frame_id": "s000014267",
+      "media_ms": 14267
+    },
+    {
+      "frame_id": "s000014400",
+      "media_ms": 14400
+    },
+    {
+      "frame_id": "s000014500",
+      "media_ms": 14500
+    },
+    {
+      "frame_id": "s000014633",
+      "media_ms": 14633
+    },
+    {
+      "frame_id": "s000014767",
+      "media_ms": 14767
+    },
+    {
+      "frame_id": "s000014900",
+      "media_ms": 14900
+    },
+    {
+      "frame_id": "s000015000",
+      "media_ms": 15000
+    },
+    {
+      "frame_id": "s000015133",
+      "media_ms": 15133
+    },
+    {
+      "frame_id": "s000015267",
+      "media_ms": 15267
+    },
+    {
+      "frame_id": "s000015300",
+      "media_ms": 15300
+    },
+    {
+      "frame_id": "s000015400",
+      "media_ms": 15400
+    },
+    {
+      "frame_id": "s000015433",
+      "media_ms": 15433
+    },
+    {
+      "frame_id": "s000015467",
+      "media_ms": 15467
+    },
+    {
+      "frame_id": "s000015500",
+      "media_ms": 15500
+    },
+    {
+      "frame_id": "s000015533",
+      "media_ms": 15533
+    },
+    {
+      "frame_id": "s000015567",
+      "media_ms": 15567
+    },
+    {
+      "frame_id": "s000015600",
+      "media_ms": 15600
+    },
+    {
+      "frame_id": "s000015633",
+      "media_ms": 15633
+    },
+    {
+      "frame_id": "s000015667",
+      "media_ms": 15667
+    },
+    {
+      "frame_id": "s000015700",
+      "media_ms": 15700
+    },
+    {
+      "frame_id": "s000015733",
+      "media_ms": 15733
+    },
+    {
+      "frame_id": "s000015767",
+      "media_ms": 15767
+    },
+    {
+      "frame_id": "s000015800",
+      "media_ms": 15800
+    },
+    {
+      "frame_id": "s000015833",
+      "media_ms": 15833
+    },
+    {
+      "frame_id": "s000015867",
+      "media_ms": 15867
+    },
+    {
+      "frame_id": "s000015900",
+      "media_ms": 15900
+    },
+    {
+      "frame_id": "s000015933",
+      "media_ms": 15933
+    },
+    {
+      "frame_id": "s000015967",
+      "media_ms": 15967
+    },
+    {
+      "frame_id": "s000016000",
+      "media_ms": 16000
+    },
+    {
+      "frame_id": "s000016033",
+      "media_ms": 16033
+    },
+    {
+      "frame_id": "s000016067",
+      "media_ms": 16067
+    },
+    {
+      "frame_id": "s000016100",
+      "media_ms": 16100
+    },
+    {
+      "frame_id": "s000016133",
+      "media_ms": 16133
+    },
+    {
+      "frame_id": "s000016167",
+      "media_ms": 16167
+    },
+    {
+      "frame_id": "s000016200",
+      "media_ms": 16200
+    },
+    {
+      "frame_id": "s000016233",
+      "media_ms": 16233
+    },
+    {
+      "frame_id": "s000016267",
+      "media_ms": 16267
+    },
+    {
+      "frame_id": "s000016300",
+      "media_ms": 16300
+    },
+    {
+      "frame_id": "s000016333",
+      "media_ms": 16333
+    },
+    {
+      "frame_id": "s000016367",
+      "media_ms": 16367
+    },
+    {
+      "frame_id": "s000016400",
+      "media_ms": 16400
+    },
+    {
+      "frame_id": "s000016433",
+      "media_ms": 16433
+    },
+    {
+      "frame_id": "s000016467",
+      "media_ms": 16467
+    },
+    {
+      "frame_id": "s000016500",
+      "media_ms": 16500
+    },
+    {
+      "frame_id": "s000016533",
+      "media_ms": 16533
+    },
+    {
+      "frame_id": "s000016567",
+      "media_ms": 16567
+    },
+    {
+      "frame_id": "s000016600",
+      "media_ms": 16600
+    },
+    {
+      "frame_id": "s000016633",
+      "media_ms": 16633
+    },
+    {
+      "frame_id": "s000016667",
+      "media_ms": 16667
+    },
+    {
+      "frame_id": "s000016700",
+      "media_ms": 16700
+    },
+    {
+      "frame_id": "s000016733",
+      "media_ms": 16733
+    },
+    {
+      "frame_id": "s000016767",
+      "media_ms": 16767
+    },
+    {
+      "frame_id": "s000016800",
+      "media_ms": 16800
+    },
+    {
+      "frame_id": "s000016833",
+      "media_ms": 16833
+    },
+    {
+      "frame_id": "s000016867",
+      "media_ms": 16867
+    },
+    {
+      "frame_id": "s000016900",
+      "media_ms": 16900
+    },
+    {
+      "frame_id": "s000016933",
+      "media_ms": 16933
+    },
+    {
+      "frame_id": "s000016967",
+      "media_ms": 16967
+    },
+    {
+      "frame_id": "s000017000",
+      "media_ms": 17000
+    },
+    {
+      "frame_id": "s000017033",
+      "media_ms": 17033
+    },
+    {
+      "frame_id": "s000017067",
+      "media_ms": 17067
+    },
+    {
+      "frame_id": "s000017100",
+      "media_ms": 17100
+    },
+    {
+      "frame_id": "s000017133",
+      "media_ms": 17133
+    },
+    {
+      "frame_id": "s000017167",
+      "media_ms": 17167
+    },
+    {
+      "frame_id": "s000017200",
+      "media_ms": 17200
+    },
+    {
+      "frame_id": "s000017233",
+      "media_ms": 17233
+    },
+    {
+      "frame_id": "s000017267",
+      "media_ms": 17267
+    },
+    {
+      "frame_id": "s000017300",
+      "media_ms": 17300
+    },
+    {
+      "frame_id": "s000017333",
+      "media_ms": 17333
+    },
+    {
+      "frame_id": "s000017367",
+      "media_ms": 17367
+    },
+    {
+      "frame_id": "s000017400",
+      "media_ms": 17400
+    },
+    {
+      "frame_id": "s000017433",
+      "media_ms": 17433
+    },
+    {
+      "frame_id": "s000017467",
+      "media_ms": 17467
+    },
+    {
+      "frame_id": "s000017500",
+      "media_ms": 17500
+    },
+    {
+      "frame_id": "s000017533",
+      "media_ms": 17533
+    },
+    {
+      "frame_id": "s000017567",
+      "media_ms": 17567
+    },
+    {
+      "frame_id": "s000017600",
+      "media_ms": 17600
+    },
+    {
+      "frame_id": "s000017633",
+      "media_ms": 17633
+    },
+    {
+      "frame_id": "s000017667",
+      "media_ms": 17667
+    },
+    {
+      "frame_id": "s000017700",
+      "media_ms": 17700
+    },
+    {
+      "frame_id": "s000017733",
+      "media_ms": 17733
+    },
+    {
+      "frame_id": "s000017767",
+      "media_ms": 17767
+    },
+    {
+      "frame_id": "s000017800",
+      "media_ms": 17800
+    },
+    {
+      "frame_id": "s000017833",
+      "media_ms": 17833
+    },
+    {
+      "frame_id": "s000017867",
+      "media_ms": 17867
+    },
+    {
+      "frame_id": "s000017900",
+      "media_ms": 17900
+    },
+    {
+      "frame_id": "s000017933",
+      "media_ms": 17933
+    },
+    {
+      "frame_id": "s000017967",
+      "media_ms": 17967
+    },
+    {
+      "frame_id": "s000018000",
+      "media_ms": 18000
+    },
+    {
+      "frame_id": "s000018033",
+      "media_ms": 18033
+    },
+    {
+      "frame_id": "s000018067",
+      "media_ms": 18067
+    },
+    {
+      "frame_id": "s000018100",
+      "media_ms": 18100
+    },
+    {
+      "frame_id": "s000018133",
+      "media_ms": 18133
+    },
+    {
+      "frame_id": "s000018267",
+      "media_ms": 18267
+    },
+    {
+      "frame_id": "s000018400",
+      "media_ms": 18400
+    },
+    {
+      "frame_id": "s000018500",
+      "media_ms": 18500
+    },
+    {
+      "frame_id": "s000018633",
+      "media_ms": 18633
+    },
+    {
+      "frame_id": "s000018767",
+      "media_ms": 18767
+    },
+    {
+      "frame_id": "s000018900",
+      "media_ms": 18900
+    },
+    {
+      "frame_id": "s000019000",
+      "media_ms": 19000
+    },
+    {
+      "frame_id": "s000019133",
+      "media_ms": 19133
+    },
+    {
+      "frame_id": "s000019267",
+      "media_ms": 19267
+    },
+    {
+      "frame_id": "s000019400",
+      "media_ms": 19400
+    },
+    {
+      "frame_id": "s000019500",
+      "media_ms": 19500
+    },
+    {
+      "frame_id": "s000019633",
+      "media_ms": 19633
+    },
+    {
+      "frame_id": "s000019767",
+      "media_ms": 19767
+    },
+    {
+      "frame_id": "s000019900",
+      "media_ms": 19900
+    },
+    {
+      "frame_id": "s000020000",
+      "media_ms": 20000
+    },
+    {
+      "frame_id": "s000020133",
+      "media_ms": 20133
+    },
+    {
+      "frame_id": "s000020267",
+      "media_ms": 20267
+    },
+    {
+      "frame_id": "s000020400",
+      "media_ms": 20400
+    },
+    {
+      "frame_id": "s000020500",
+      "media_ms": 20500
+    },
+    {
+      "frame_id": "s000020633",
+      "media_ms": 20633
+    },
+    {
+      "frame_id": "s000020767",
+      "media_ms": 20767
+    },
+    {
+      "frame_id": "s000020900",
+      "media_ms": 20900
+    },
+    {
+      "frame_id": "s000021000",
+      "media_ms": 21000
+    },
+    {
+      "frame_id": "s000021133",
+      "media_ms": 21133
+    },
+    {
+      "frame_id": "s000021267",
+      "media_ms": 21267
+    },
+    {
+      "frame_id": "s000021400",
+      "media_ms": 21400
+    },
+    {
+      "frame_id": "s000021500",
+      "media_ms": 21500
+    },
+    {
+      "frame_id": "s000021633",
+      "media_ms": 21633
+    },
+    {
+      "frame_id": "s000021767",
+      "media_ms": 21767
+    }
+  ],
+  "references": [
+    {
+      "reference_id": "r1",
+      "media_ms": 2933,
+      "sha256": "776a1baa0545acc7497568897f834dfa683e77ab6ea6bcba2242370e31add0aa"
+    },
+    {
+      "reference_id": "r2",
+      "media_ms": 17700,
+      "sha256": "6c0ec3cc386f0c1a14ed3e4f41dd1ee1669d57e33addef764e9d81cd7e84d11e"
+    },
+    {
+      "reference_id": "r3",
+      "media_ms": 29534,
+      "sha256": "00e70919666d8b657e857dd0bfda6b400d0e03807a6363c062c9145b7da0fce4"
+    },
+    {
+      "reference_id": "r4",
+      "media_ms": 7400,
+      "sha256": "74700ca4ab5a0a79cf56feb4ab766c8144c1ac05fda6e768faa3f5c8fc0123f6"
+    },
+    {
+      "reference_id": "r5",
+      "media_ms": 8833,
+      "sha256": "7d39647aa27adebfd433f615bdb847f3bdfc942334ab1d25de5a3e106120bf6e"
+    },
+    {
+      "reference_id": "r6",
+      "media_ms": 11800,
+      "sha256": "bf05205b4eeb4fe7c0546ade6b6380afdfc78b1da633d8bcc7c22bd6a054f54e"
+    },
+    {
+      "reference_id": "r7",
+      "media_ms": 15300,
+      "sha256": "4ddfc381d539955518bfd4a2faba47b02569845a78349a48a9f9e0076ba32e85"
+    },
+    {
+      "reference_id": "r8",
+      "media_ms": 22700,
+      "sha256": "56d4467f3dcb19b897fbf3e7e07661636855f0aa73a101fb2d552f7ff7357ab8"
+    },
+    {
+      "reference_id": "r9",
+      "media_ms": 24633,
+      "sha256": "fe99ab78da123acd79507171c970079c70ad052f3f4154575e7f3d05dbb13895"
+    },
+    {
+      "reference_id": "r10",
+      "media_ms": 26600,
+      "sha256": "16e55d02246cc15c4b1a13e7831c568ce649f38480692c8e110c9ea359de99b7"
+    }
+  ],
+  "packet": {
+    "packet_id": "question_scope_probe",
+    "phase": "FOLLOWUP",
+    "contact_sequence_evidence": true,
+    "start_ms": 11267,
+    "end_ms": 21899,
+    "core_start_ms": 11267,
+    "core_end_ms": 21900,
+    "reference_ids": [
+      "r1",
+      "r2",
+      "r3",
+      "r4",
+      "r5",
+      "r6",
+      "r7",
+      "r8",
+      "r9",
+      "r10"
+    ],
+    "detail_start_ms": 15400,
+    "detail_end_ms": 18100,
+    "question": {
+      "reason": "CONTACT",
+      "focus_ms": 16600,
+      "instruction": "Observe this user-located source window afresh using the full play and original selections. Follow all actors and the active ball through the visible outcome. Use the question scope contract; keep uncertainty where the images are insufficient. No expected result is supplied."
+    },
+    "source_crop_box": [
+      0,
+      877,
+      1080,
+      1257
+    ],
+    "native_crop_count": 82,
+    "extra_detail_frame_ms": [],
+    "frame_ids": [
+      "s000011267",
+      "s000011400",
+      "s000011500",
+      "s000011633",
+      "s000011767",
+      "s000011800",
+      "s000011900",
+      "s000012000",
+      "s000012133",
+      "s000012267",
+      "s000012400",
+      "s000012500",
+      "s000012633",
+      "s000012767",
+      "s000012900",
+      "s000013000",
+      "s000013133",
+      "s000013267",
+      "s000013400",
+      "s000013500",
+      "s000013633",
+      "s000013767",
+      "s000013900",
+      "s000014000",
+      "s000014133",
+      "s000014267",
+      "s000014400",
+      "s000014500",
+      "s000014633",
+      "s000014767",
+      "s000014900",
+      "s000015000",
+      "s000015133",
+      "s000015267",
+      "s000015300",
+      "s000015400",
+      "s000015433",
+      "s000015467",
+      "s000015500",
+      "s000015533",
+      "s000015567",
+      "s000015600",
+      "s000015633",
+      "s000015667",
+      "s000015700",
+      "s000015733",
+      "s000015767",
+      "s000015800",
+      "s000015833",
+      "s000015867",
+      "s000015900",
+      "s000015933",
+      "s000015967",
+      "s000016000",
+      "s000016033",
+      "s000016067",
+      "s000016100",
+      "s000016133",
+      "s000016167",
+      "s000016200",
+      "s000016233",
+      "s000016267",
+      "s000016300",
+      "s000016333",
+      "s000016367",
+      "s000016400",
+      "s000016433",
+      "s000016467",
+      "s000016500",
+      "s000016533",
+      "s000016567",
+      "s000016600",
+      "s000016633",
+      "s000016667",
+      "s000016700",
+      "s000016733",
+      "s000016767",
+      "s000016800",
+      "s000016833",
+      "s000016867",
+      "s000016900",
+      "s000016933",
+      "s000016967",
+      "s000017000",
+      "s000017033",
+      "s000017067",
+      "s000017100",
+      "s000017133",
+      "s000017167",
+      "s000017200",
+      "s000017233",
+      "s000017267",
+      "s000017300",
+      "s000017333",
+      "s000017367",
+      "s000017400",
+      "s000017433",
+      "s000017467",
+      "s000017500",
+      "s000017533",
+      "s000017567",
+      "s000017600",
+      "s000017633",
+      "s000017667",
+      "s000017700",
+      "s000017733",
+      "s000017767",
+      "s000017800",
+      "s000017833",
+      "s000017867",
+      "s000017900",
+      "s000017933",
+      "s000017967",
+      "s000018000",
+      "s000018033",
+      "s000018067",
+      "s000018100",
+      "s000018133",
+      "s000018267",
+      "s000018400",
+      "s000018500",
+      "s000018633",
+      "s000018767",
+      "s000018900",
+      "s000019000",
+      "s000019133",
+      "s000019267",
+      "s000019400",
+      "s000019500",
+      "s000019633",
+      "s000019767",
+      "s000019900",
+      "s000020000",
+      "s000020133",
+      "s000020267",
+      "s000020400",
+      "s000020500",
+      "s000020633",
+      "s000020767",
+      "s000020900",
+      "s000021000",
+      "s000021133",
+      "s000021267",
+      "s000021400",
+      "s000021500",
+      "s000021633",
+      "s000021767"
+    ]
+  },
+  "native_detail_policy": "local_half_q50",
+  "bundle_sha256": "8d6d84ebf5636095eb9f0c55654dbd2971cf8437b03c5ea162a0ba2253231905",
+  "goal_focus_instruction": "GOAL-ATTRIBUTION REVIEW PRIORITY. Independently assess the selected player's attack and the active ball's visible goal outcome. The sole evaluation priority is whether a selected-player GOAL is supported; do not spend this review resolving anatomical foot. There is no expected scorer or required answer. Keep the supplied plays/actions/people/questions JSON contract. Evaluate separately (1) the releasing actor from the approach, body/limb motion and ball departure, (2) continuity of that active ball into the goal, (3) any goalkeeper or defender intervention and its visible effect. Follow the sequence before and after each occlusion. Distinguish an observed touch from a hypothetical possible touch, and a failed clearance from controlled opponent possession or a decisive redirection. An exact boot-ball frame, unknown striking foot, keeper movement, or brief occlusion alone neither proves nor disproves attribution. If a later touch is unclear, assess whether the existing images establish the ball was already travelling into the goal before it; do not assume every possible brush changes the scorer, and do not assume an obscured intervention is harmless. Return GOAL and contact_actor_unique=true only if the source sequence supports them; otherwise retain the specific uncertainty. Add a top-level goal_review object containing releasing_actor, actor_assessment (SUPPORTED/UNCERTAIN), ball_in_goal_assessment (SUPPORTED/UNCERTAIN), intervention_assessment, attribution_assessment (SUPPORTED/UNCERTAIN), and evidence arrays of {frame,fact} for release, ball path and any intervention. Explain the strongest competing attribution and which supplied frames exclude it or why it remains unresolved. Do not invent a contact or goal-line crossing time. No earlier model answer, user scorer label or desired result is supplied.",
+  "comparison": "PR50 image bytes, order and base prompt unchanged; one appended focus instruction",
+  "request_audit": {
+    "payload_sha256": "22ce92c67e98e99724ce43634dd509bb5ad18548562457c74265ec6049038da6",
+    "payload_bytes": 9214968,
+    "explicit_image_count": 183,
+    "images": [
+      {
+        "sha256": "776a1baa0545acc7497568897f834dfa683e77ab6ea6bcba2242370e31add0aa",
+        "bytes": 7887
+      },
+      {
+        "sha256": "6c0ec3cc386f0c1a14ed3e4f41dd1ee1669d57e33addef764e9d81cd7e84d11e",
+        "bytes": 2407
+      },
+      {
+        "sha256": "00e70919666d8b657e857dd0bfda6b400d0e03807a6363c062c9145b7da0fce4",
+        "bytes": 4365
+      },
+      {
+        "sha256": "74700ca4ab5a0a79cf56feb4ab766c8144c1ac05fda6e768faa3f5c8fc0123f6",
+        "bytes": 12188
+      },
+      {
+        "sha256": "7d39647aa27adebfd433f615bdb847f3bdfc942334ab1d25de5a3e106120bf6e",
+        "bytes": 7899
+      },
+      {
+        "sha256": "bf05205b4eeb4fe7c0546ade6b6380afdfc78b1da633d8bcc7c22bd6a054f54e",
+        "bytes": 5434
+      },
+      {
+        "sha256": "4ddfc381d539955518bfd4a2faba47b02569845a78349a48a9f9e0076ba32e85",
+        "bytes": 5080
+      },
+      {
+        "sha256": "56d4467f3dcb19b897fbf3e7e07661636855f0aa73a101fb2d552f7ff7357ab8",
+        "bytes": 2661
+      },
+      {
+        "sha256": "fe99ab78da123acd79507171c970079c70ad052f3f4154575e7f3d05dbb13895",
+        "bytes": 10118
+      },
+      {
+        "sha256": "16e55d02246cc15c4b1a13e7831c568ce649f38480692c8e110c9ea359de99b7",
+        "bytes": 5796
+      },
+      {
+        "sha256": "9008cb0ab600368ff6e306180285c51d1f95bd546a1489bd395b774c7d349692",
+        "bytes": 149257
+      },
+      {
+        "sha256": "8713bb6140dc601f12994dedee32752e800d9f8df4a7d254ac7b0ad539d0bd5d",
+        "bytes": 178319
+      },
+      {
+        "sha256": "5261ba7709cc19684569d021d761a2cd9514536794ae485c36fe581638ef62d3",
+        "bytes": 145561
+      },
+      {
+        "sha256": "745dd3f2d00375f55f194fd313583447a9151af1adbacb2bd336675825b8b8b8",
+        "bytes": 46016
+      },
+      {
+        "sha256": "99100efc593674e0a506d3d59f552bba4a92e485ec67f2d6f8522c27f4081738",
+        "bytes": 46432
+      },
+      {
+        "sha256": "15fa521722edd632e5cd0d818a15e2b9ff3a50660cbfc8a4bd7da7e1500f3cab",
+        "bytes": 46976
+      },
+      {
+        "sha256": "51b882aae322df5a104855f452f840fa94b5279d3035566136fa8c622c96cf8b",
+        "bytes": 47653
+      },
+      {
+        "sha256": "c6d4dc939f6072266e8ca7c18d37a7c684265d8bb60deef2967a8442a262ffe6",
+        "bytes": 48159
+      },
+      {
+        "sha256": "cbca4d6b241cb1815a8d1dc216fa44b8e971f5c45b6854f9c001830106bc5fc3",
+        "bytes": 48062
+      },
+      {
+        "sha256": "c396c1b76857c9291072bde906a02c73240e30772e1319731892091cb70b9f81",
+        "bytes": 48338
+      },
+      {
+        "sha256": "95431f24b6eb6ff0393533439a8b255f739723d8f6df3a2ed38b474c882dbe85",
+        "bytes": 48069
+      },
+      {
+        "sha256": "69be371cc1aa6f528da0b3c783e3e7551a95f4b6a135fd850f8f2813742e2474",
+        "bytes": 48398
+      },
+      {
+        "sha256": "1d420e8bf33d7168eeafcce97ac54204aa912276e4877f99744a6475418f4d21",
+        "bytes": 48449
+      },
+      {
+        "sha256": "a71a95985163d3be8b90e480cf1c2c9103be217c73c127155b52a3e8ccd20934",
+        "bytes": 48256
+      },
+      {
+        "sha256": "ae657dbc0dc85832016ee6ff920e38b85e3892c89aac27762f3cab56e769a4f2",
+        "bytes": 48170
+      },
+      {
+        "sha256": "f24c7f6f2c5dab65b1b0c986e7878f96ffad621e7e98234d88e3fc5cbe9bafc1",
+        "bytes": 47815
+      },
+      {
+        "sha256": "f117f67d2f0d6b39849f4129497cf40db866f3fbe8a2a4dd21bf6b58ed5c6f79",
+        "bytes": 47539
+      },
+      {
+        "sha256": "5d4d7549177a940f24af328501a6d5ddd8b9d3b47722017b92b225ce23ea6103",
+        "bytes": 47946
+      },
+      {
+        "sha256": "69362a45e79d5ca94d85994539ec945ba96524e0ba980944b51723d08959a8f5",
+        "bytes": 48015
+      },
+      {
+        "sha256": "e61027365f8671f6167af8b7ecb0ab2431f958aca406ad8cfd98441d3d5c87b1",
+        "bytes": 48267
+      },
+      {
+        "sha256": "0337aa6411a40872bf69e63d262c8dc8f4ded0aa75d8e94022935f4d08b929b8",
+        "bytes": 48268
+      },
+      {
+        "sha256": "592f76457e016f04ab61d27e8880900863312e430cdcca565bd884cb070d4de1",
+        "bytes": 48650
+      },
+      {
+        "sha256": "43b765d4accc09d7cb941028d6751d95dfa21191a8ef46ed2aed090211d5d469",
+        "bytes": 48734
+      },
+      {
+        "sha256": "70bff563e96bc070f3c1471c5441fc25e674b948b2689867419b35fe68963b30",
+        "bytes": 48728
+      },
+      {
+        "sha256": "843c438900c89fdbc0ea81aec457da647506a80069f0e3468d8d3d0bccf3902d",
+        "bytes": 49295
+      },
+      {
+        "sha256": "571317b8307c9b46dab11d237fbc2518605cae66b480e03e805565609ff7656a",
+        "bytes": 49456
+      },
+      {
+        "sha256": "3fcb9fcdb75461dfc61dadacf499c8f28bf368f234df082ee49c38da5f62e3f5",
+        "bytes": 49308
+      },
+      {
+        "sha256": "92fe71442c52b79b41631e39a10f485c4de4c4dc8b535731167c770ed6b8d365",
+        "bytes": 46962
+      },
+      {
+        "sha256": "f48ceafcdece5e8c8705abbcb8e59111c1ef7a473d4fd6ea0a097c42331558ae",
+        "bytes": 47022
+      },
+      {
+        "sha256": "3da68e95ba12d7ecf63aac31836b7f625a12ebeffff5613706639c493fdef019",
+        "bytes": 47894
+      },
+      {
+        "sha256": "55f7776f36c766068d35ec47e200eae4edac2c05b65b617b624b3f104b9a386d",
+        "bytes": 48147
+      },
+      {
+        "sha256": "c97355d5620b10997a72e78fc982ba73d41eab5b40b273cbb99a70c33da03d5b",
+        "bytes": 47854
+      },
+      {
+        "sha256": "2358d0ef5410f8b964669100d1818857f552f5a1ae9cafa561e56ee56fe2d11a",
+        "bytes": 47295
+      },
+      {
+        "sha256": "aaef9c325f6051a2288e714f15088c60412769214356584d05f053b9bb9fed60",
+        "bytes": 46995
+      },
+      {
+        "sha256": "c2bd9d8f25796ebf855edf57eaa34e6a00d202e73c5500307e4ecd31109c02de",
+        "bytes": 41164
+      },
+      {
+        "sha256": "5d7db63f4d35679d8d5789010e1a54af9346a5059d6aa485d6f74a530cb58548",
+        "bytes": 40578
+      },
+      {
+        "sha256": "286036ef81a360880bc4412c213e5cffde9f1f84e6f2576bf25d8f55353c7a19",
+        "bytes": 39650
+      },
+      {
+        "sha256": "e2f30dc278335dfbabafb290c0251a403b21b61b2ce89811804a2e8afd88f461",
+        "bytes": 39483
+      },
+      {
+        "sha256": "0ff3179a4135e766a7a4fed4ab111890a3dc8f6c4129a5032f51b54c0cbcb145",
+        "bytes": 38208
+      },
+      {
+        "sha256": "15be148b378c3f1ef296d30f735109ab20eba29c320365e89549155db27f98c4",
+        "bytes": 29053
+      },
+      {
+        "sha256": "9b5abe9f29c285a11fcb214af60e800e0805a1bf33f7af39fc8e90cad1a06539",
+        "bytes": 29031
+      },
+      {
+        "sha256": "de24ae5e0eb33a2a7454ad4a1522db2f1f1069cfe1e4e363acbf43aee78232f5",
+        "bytes": 28294
+      },
+      {
+        "sha256": "1e939f36f58f57584c41197c4ee43e43b47b823b081d6e4637bdafec861cbaa6",
+        "bytes": 36632
+      },
+      {
+        "sha256": "b8f2a093b45355ccb08872f79f271a42a116e7d6db494dd21cb8d7726c602979",
+        "bytes": 28366
+      },
+      {
+        "sha256": "f6da08ea6cfaf5c31f6a216376b43c9ba4fd07dcce040f3776c11a3c063d4aee",
+        "bytes": 24584
+      },
+      {
+        "sha256": "739a311d629782ba1cc3072c86d71030745323ed3c50df3ecb75ac15e9b04273",
+        "bytes": 25508
+      },
+      {
+        "sha256": "807620b579cd8ea5e06c99c8f737216de5257cf3695c74bddcbffea1ac7ad75a",
+        "bytes": 24817
+      },
+      {
+        "sha256": "5433d98def4d07294bce8f80dba8eb7cbc1ccff916796baa316ef0300b174fda",
+        "bytes": 33127
+      },
+      {
+        "sha256": "7d5429fa3888cb38ae08aacc19f915801d9d77be28700781f38917ca3d08a99c",
+        "bytes": 25403
+      },
+      {
+        "sha256": "eda4d91852be229b39bff906d23b258c7cf64472141f53d3aeacc64a800f0278",
+        "bytes": 25613
+      },
+      {
+        "sha256": "7fb4aa9348e1dffc328ba59f2d0bc66fc5eb297ce34c10868e168279d620cb98",
+        "bytes": 26441
+      },
+      {
+        "sha256": "2b3f2cc589c2f6e83a18bc1d61d755aca70aadfeaf5697c556a54c42107b61cd",
+        "bytes": 26742
+      },
+      {
+        "sha256": "5dd1bb5c8abd8e9ecd55365d1b60647bec567646440fef53fc93f1334c13f504",
+        "bytes": 33843
+      },
+      {
+        "sha256": "b13549b55e34c5ff859d5c2f4fb14d4253d9b54aeea2e2d6478bad2cf5237d1a",
+        "bytes": 26611
+      },
+      {
+        "sha256": "dce491a493bea010ee06851b72e0752458bb735ec497ed621bdacda8d8cbe56a",
+        "bytes": 26700
+      },
+      {
+        "sha256": "81ec4647c61db2d232f8fe71f7f9eb10d62616b26a330cfc5cbccf249946b145",
+        "bytes": 27143
+      },
+      {
+        "sha256": "314706aae95347a8760a519f0294ab7ba0ac477d48f672532a1d7eb31e959264",
+        "bytes": 27084
+      },
+      {
+        "sha256": "209c908c4ff3da0529eeeaa9457b2dac3b9539850b76a488782191737c6a505c",
+        "bytes": 35097
+      },
+      {
+        "sha256": "38935e335aaa85b38134d9719b2e803d0982975092793dd2f9586e8b9ed619ed",
+        "bytes": 27855
+      },
+      {
+        "sha256": "4f8318ad4c5949ae135e08c9af5d7feb99dc295de1f8ee2390a3520d040b1ba2",
+        "bytes": 28360
+      },
+      {
+        "sha256": "00f9c12e50a19c935122b55de7a05a0742af9641fc56c7dd189759d541180b07",
+        "bytes": 29160
+      },
+      {
+        "sha256": "29e6283556de01ed0774e2897c2b40e0cf0ae8c4715637e8d7b985a8d535c8dc",
+        "bytes": 36025
+      },
+      {
+        "sha256": "192423a2f552fb43e0083443cb237b7104f2200ec8d70de8d2fb16788f7a4e9f",
+        "bytes": 29321
+      },
+      {
+        "sha256": "75b0344f7b4b58286e0d6df8f63a7c9d8fa0070cb8f9e764382b14950081acea",
+        "bytes": 30367
+      },
+      {
+        "sha256": "d930633399fbf989782148800825200e1910c7c5e96dc1dd76c80933dab67943",
+        "bytes": 30728
+      },
+      {
+        "sha256": "014ce4fb870b8f12cd08e13964f9bd7f58ea8e6ad5227514f33194a3fa999fb7",
+        "bytes": 31280
+      },
+      {
+        "sha256": "5802226a798ae85490fb3cc0b2a72cfbd8b2895ba13e9c3ad62a2520b084f947",
+        "bytes": 38812
+      },
+      {
+        "sha256": "0c8e0ad21962cbed1b5c83d3ef1bd4adcfdd74a47184d39fcb85a3597da295dd",
+        "bytes": 31605
+      },
+      {
+        "sha256": "485d43024c49919ad96a5d606169ae67e7bf9aaf6a8c0e73a292cfbdb8444ede",
+        "bytes": 31645
+      },
+      {
+        "sha256": "e91e4877c175e6f5bc3407ccafe63d14d8411c1b5dd77ec810d7dd72fb3d6e67",
+        "bytes": 31899
+      },
+      {
+        "sha256": "5191b3607a6d77ab5d11146ef5339a69abab158cda3bcdaa772ce6e5fd591a72",
+        "bytes": 31848
+      },
+      {
+        "sha256": "050f2ddd6fefce8bdb567924ae6b7998a2114de903c449e7b80f3fa904a5ef8a",
+        "bytes": 39335
+      },
+      {
+        "sha256": "126245c669438132b65561c9a30ed3142662800568528e0da79b4c48b7479fcf",
+        "bytes": 31863
+      },
+      {
+        "sha256": "7f0238b3c735e6026903c863498f13fc707ff22db22b6822d04d3472188fd271",
+        "bytes": 31968
+      },
+      {
+        "sha256": "85fcc381f45dac9620720b35c4d8dccc5885d26bb1358cbec51b2e07bdfd68b4",
+        "bytes": 31868
+      },
+      {
+        "sha256": "df8f09a9f05105abd92427b2a6307e7c8b3cae1869ec3a9cc7ac8939961d7b76",
+        "bytes": 32093
+      },
+      {
+        "sha256": "27de1cff9518516721aa880ec158637e4dcb829163ef38d9fcca37cd6a8e3773",
+        "bytes": 39175
+      },
+      {
+        "sha256": "5b6d6cf3fae951646a52eb9848c1b79ce7bc9fa8910ae293c4b7a77d510b920c",
+        "bytes": 32133
+      },
+      {
+        "sha256": "823aa378f73c71ea16bd4dcfb69076c642700511d46c381cf1fd5c225c859693",
+        "bytes": 32436
+      },
+      {
+        "sha256": "ed1b21e25fe6e10559ed6055e5134f1b09f9d90a0c551682634abf38aa59e8df",
+        "bytes": 32342
+      },
+      {
+        "sha256": "e5e7a060f0751f25c63d8cc43272b3a5adefa6f3d32ad1b84c374dbdac442aa5",
+        "bytes": 38772
+      },
+      {
+        "sha256": "61f7faa857786386dbe17153d3d51b7710b63d1ba226776ef0d7bc0a586e0d03",
+        "bytes": 32282
+      },
+      {
+        "sha256": "c8e2e3dc518d175d43602a8dc7f55feb43f9e027b47f56e6dacc4173cbb64685",
+        "bytes": 32348
+      },
+      {
+        "sha256": "746bb2a2860ec6247bbec9f7a8515f3c5557e68df8524e96928247f5d7858f9f",
+        "bytes": 32334
+      },
+      {
+        "sha256": "e8478d8948c4e9b8e2f9a669b9b1f2c508f846374ae4396d263e2ecd2c06c0f1",
+        "bytes": 32364
+      },
+      {
+        "sha256": "2150289908ca25c695bb09199d852404fdd5a92cecfa35e4b1ee2725ff224e2e",
+        "bytes": 38309
+      },
+      {
+        "sha256": "a97e3f2ba7d342408e86e916f8099d31256f9e72e8533a6f5786c71795f71613",
+        "bytes": 32697
+      },
+      {
+        "sha256": "f66b906ce744882234aa33b9daa2f36ea274cdffb18c7d61d60f406301aa368e",
+        "bytes": 32758
+      },
+      {
+        "sha256": "0a9ac01a77d93ec81b1003af08712fdad7617e34474fb4c044e9bd59c79e1db3",
+        "bytes": 33216
+      },
+      {
+        "sha256": "a43bd785c14e40830657fc82798c59006c2c8a8cd5a73ed7b8420dd13bf2fef9",
+        "bytes": 33103
+      },
+      {
+        "sha256": "7e6195e194a6c1d64a06f7ce99e0c31b0261ddb156cd464242299af7ee85c88d",
+        "bytes": 38644
+      },
+      {
+        "sha256": "e5c85c00cea055f81a421ecec3a0a49710fd7f17a7a7e72d5672e23bf81e5ab2",
+        "bytes": 32939
+      },
+      {
+        "sha256": "a5ed4de6e0dad286f7b3005581734d67137d287fee330d111edd9a1b73add81f",
+        "bytes": 32950
+      },
+      {
+        "sha256": "8f1a6a0605b62188c948ca8d33aeeb7e4b79756dc29f0d50299efa0fed9df63f",
+        "bytes": 32933
+      },
+      {
+        "sha256": "26e9e52b43911d81184a44cbfc9712bdeb74467f3280741341ca0223f56094d8",
+        "bytes": 33042
+      },
+      {
+        "sha256": "9bef671bd1bb578f6b6a825a892fc41060360758e041ff8425b71634a30ce1c9",
+        "bytes": 38593
+      },
+      {
+        "sha256": "83b0299e420361d9974902c740265843515e68b81c95b12e138bec6e50cf8eeb",
+        "bytes": 33107
+      },
+      {
+        "sha256": "458a19c6383ac4e84db1bb4118659d028fb8c3fdd07c17027903d94b44883c22",
+        "bytes": 33074
+      },
+      {
+        "sha256": "99b3e9807967599150691163bd3a3fde97482e5a248aaa31d7bdd8e50220504e",
+        "bytes": 33081
+      },
+      {
+        "sha256": "34693e6cf99c74dc0bc8b88289e7997ca6aa78a706cd0d14412151ca9f6706c1",
+        "bytes": 38704
+      },
+      {
+        "sha256": "1f6e355a55862a11498379b51975051d036834c938b20150249aeec06258753e",
+        "bytes": 33167
+      },
+      {
+        "sha256": "88a28c6146f7981d0509a4133adcb63a8a12adc987fa3c4a91c930a083be1e97",
+        "bytes": 33148
+      },
+      {
+        "sha256": "20f635cfef0a1ef79f774d2182d5257be21e0e50a3d8b40e46e3e21ede29779b",
+        "bytes": 33299
+      },
+      {
+        "sha256": "8b023f546e1707063c053b0c3b303cac56f5ee60f43a10b6506c7fc63bf24385",
+        "bytes": 33612
+      },
+      {
+        "sha256": "160ea13c099c3756a37f29df6f52cd8819708daa9b3cb680484a13c0ccc6c043",
+        "bytes": 38681
+      },
+      {
+        "sha256": "d95aecc7374293c8ad4e5f6bbe0ece5bd6c9bc2f4ff43d2f8f779d740c897527",
+        "bytes": 33276
+      },
+      {
+        "sha256": "5b310e814cd61527a18fe336a05a2846d518b269bd9ec8f113a7aefd6ec2ef84",
+        "bytes": 33421
+      },
+      {
+        "sha256": "42a09527879b52462a1fafc7ce8ce03646a9e07b8d303b188debd9b0d5d9639a",
+        "bytes": 33590
+      },
+      {
+        "sha256": "9f305bcc9e4b71d82f8e5f21e3d6fe90999dcd0e3c310a075a3f5c39db589c48",
+        "bytes": 33900
+      },
+      {
+        "sha256": "a9704e44b065c4dc2918ec94f61e09ee85c579fefc34cb80738b53d1d2d9669f",
+        "bytes": 39204
+      },
+      {
+        "sha256": "22ea044361a9fc11e4eb9ccd76d9e456f5f86c890e34c57b4459aa72512279df",
+        "bytes": 33967
+      },
+      {
+        "sha256": "c956dca104f9a392aa487fc842c36903b0b54d122ba95410faa6188eaeb9befc",
+        "bytes": 33939
+      },
+      {
+        "sha256": "a9e1e04e8111749539e4c2950ef0da4f4179052edbb2c5d7dee91d5de44db3ff",
+        "bytes": 33828
+      },
+      {
+        "sha256": "e10f5b4a83f81ad23dde228bad06da1b83b31ba1a116266c19f63293222ff791",
+        "bytes": 33971
+      },
+      {
+        "sha256": "1cd0be06801e9722d2adedec59a5367f4d22206e8e8f7d257c29667a9c66b0c5",
+        "bytes": 39184
+      },
+      {
+        "sha256": "499a0e92f664aa9995470d61694b4e954071bde304c55360bdd9455c43b2c67e",
+        "bytes": 33782
+      },
+      {
+        "sha256": "cb3f707cd99aa189356214d7de65f64a6524cf2218b6c6c3b8a5a8403bdaafdc",
+        "bytes": 34030
+      },
+      {
+        "sha256": "60b0cc435bf077a6f32a1597c9d52dfe0661beaf84442bde3bf6db3ef06154a4",
+        "bytes": 34070
+      },
+      {
+        "sha256": "e4723d91e4048fdb30004c6ac58c55ff8be5206f4af5bfa38273d3e03eb85535",
+        "bytes": 39115
+      },
+      {
+        "sha256": "0107444d632c33f355ad027aceff2ac9f0055f7ec0e14cd19d98580ecb86788c",
+        "bytes": 34236
+      },
+      {
+        "sha256": "3e1c2b78bf735f141d7130af6658bcb5c13136735d2e1209126f1b7aeb681b02",
+        "bytes": 34105
+      },
+      {
+        "sha256": "74a77956be1fe025502eef07c50c286fecf1e2ba8f261c13c36f202a6e86c80e",
+        "bytes": 34383
+      },
+      {
+        "sha256": "90f2bca705c91964e0dd16ab4c3b4375cfac3d0e2c2b67c871baa72b504bfb36",
+        "bytes": 34054
+      },
+      {
+        "sha256": "a5fe7b330832d25e579ecd2114787d787aa9974ba82a2192cdcff70f3946c16f",
+        "bytes": 39116
+      },
+      {
+        "sha256": "0ac511b2fd423006b201414b4dc132c5e6c34071ec9f2aba5fba36ad5bb299a7",
+        "bytes": 34278
+      },
+      {
+        "sha256": "c7068a2de7aef7f28fc7758ccaf9e47cee058375bcb88ddf8807911a3498bda3",
+        "bytes": 33816
+      },
+      {
+        "sha256": "5b2c02ae6950d111b640817fcbb4f7119ff8e3f02fb78c655a5ace473845a293",
+        "bytes": 39000
+      },
+      {
+        "sha256": "5c2ebf7d734f3b5ab78e782a91e12b542ef14bf11b5a07db77edfccca21126f7",
+        "bytes": 33938
+      },
+      {
+        "sha256": "cf2e72070cb5336aa080ffec7560fe99bbbe780451cf62203a9b4f06d83705b9",
+        "bytes": 33786
+      },
+      {
+        "sha256": "20c3ab1cf71472683380229faea39a1a88444711684943cc3a15d15943a4602b",
+        "bytes": 39055
+      },
+      {
+        "sha256": "e973fb96fe43b947810b6ab30a6c161f69eb13d005cd6a699c4fa288cc7ac919",
+        "bytes": 34157
+      },
+      {
+        "sha256": "134ff0022dc9f5750d83b1fd1009a909a6a5c4cfaff10771c1dde0dd6078acad",
+        "bytes": 34343
+      },
+      {
+        "sha256": "c056375d2f109b73e156f85ab56423369a06d4b9251c34d868d93bfd4124a6b6",
+        "bytes": 34555
+      },
+      {
+        "sha256": "cb90ccc46e8ef1b916c5dc5cb357855db2763a13ae60edbe9dc192a131a6f592",
+        "bytes": 34150
+      },
+      {
+        "sha256": "5eef185e7d80ee3589a678a7592200668f237219e6b38f9e4c41e70f0f7bbc47",
+        "bytes": 39069
+      },
+      {
+        "sha256": "332532a7f719b5abc625bb4b0f29e7ebd38385fae384ef096d0090ec5a312972",
+        "bytes": 34372
+      },
+      {
+        "sha256": "b766d9c26b6e53c4e7f942786e973d0ff25702a4bdb13787f3594b999145352e",
+        "bytes": 34180
+      },
+      {
+        "sha256": "3623bb814e7d959785df0ff70a71a169d717cd3ebcd2c6c04f1c5d43aaef6438",
+        "bytes": 33991
+      },
+      {
+        "sha256": "fa334757046399936ca38c578d0e9145a95171cb92de722812a8e77a4a2b5184",
+        "bytes": 39191
+      },
+      {
+        "sha256": "b33a09eb21b63729ed15d363344be3f143a0052301541b06f31d699ffdeb875d",
+        "bytes": 33651
+      },
+      {
+        "sha256": "46a6f9137e822c25480beab4aca94835d62e048a56009462dabf4622ffb48438",
+        "bytes": 33930
+      },
+      {
+        "sha256": "14163be46b6224af4723f47461e8108299cd0d830e38a5d710ed239bdaaab3e2",
+        "bytes": 33854
+      },
+      {
+        "sha256": "e9fd009475733198a3fde92408f8714369fc5d812b6130c8b4b9196a30228c09",
+        "bytes": 33842
+      },
+      {
+        "sha256": "62ffed42fad1f982ad2581811016cd1c03b9c3c5f9e3dd1537a32a3220b398fd",
+        "bytes": 39380
+      },
+      {
+        "sha256": "707c1e2f42c944504f74c396a8689e55ab0e75db5b319f2e756464ebd9e68754",
+        "bytes": 38602
+      },
+      {
+        "sha256": "d98033ef62fd6bf37f67a43cbbc296aae1ea5847e11dcc525a1c5c20a5b9d6c6",
+        "bytes": 34578
+      },
+      {
+        "sha256": "9caa3bb6b2120c1b55121fd2d295155baba0fae62d3721276255d32040985d20",
+        "bytes": 36740
+      },
+      {
+        "sha256": "1525cb70d5fe7417a934a76e1b79af2641122fc71e179554b9d1516424eb348b",
+        "bytes": 40783
+      },
+      {
+        "sha256": "ee31ec9868d9b59b1585846dd26d48178001ff49f3f4b47e802e20617e113c99",
+        "bytes": 41756
+      },
+      {
+        "sha256": "9741c49722a36726a668b03ce2ba9ccec0f4ac6def2d2c2eff054e0b1ac1c9d8",
+        "bytes": 36072
+      },
+      {
+        "sha256": "5b9318482889c96346fb2b37def69f4eec4a13006f2325cbb2f28bb155735109",
+        "bytes": 35366
+      },
+      {
+        "sha256": "2e998b98c2f438e44285c7180690deef0b0adebc647e8dbe96ca20d9111f1699",
+        "bytes": 37512
+      },
+      {
+        "sha256": "7ad9449193895bd8b3cb243f9644885e59929d2d5e48871868060c50c31f60e7",
+        "bytes": 39004
+      },
+      {
+        "sha256": "76a7ca29b865bb81d48630f8d853c6c7a5b3a1ac73e6cd2a88805fa7924b3fb2",
+        "bytes": 40223
+      },
+      {
+        "sha256": "3ada4134465512ebb67dd72cef437a8581fdde2c690ff857a95bbc91ff4cefcf",
+        "bytes": 40401
+      },
+      {
+        "sha256": "30c2d991cb54eada22722c9a1b5d1cdb70ac16cbdf4efa70b99377938cc671f7",
+        "bytes": 40694
+      },
+      {
+        "sha256": "93c49c0a15e4e0d50ebd175e6be64ffd66f6fa2426c061bdd87ef3a684345c17",
+        "bytes": 40555
+      },
+      {
+        "sha256": "8a25d2724cb1c23285a4453cd05d787657315cbc3ddc76bbe054c19b376fe879",
+        "bytes": 41094
+      },
+      {
+        "sha256": "b311c62b6acef4a70049227a94a797ab5ed2a03f727ea77dd62cef784a6b62c8",
+        "bytes": 40620
+      },
+      {
+        "sha256": "dc02c1f54d1adf82d5755557c9ac12fce506a6ab9a2b38f5e850b05ad5201e87",
+        "bytes": 40583
+      },
+      {
+        "sha256": "9243d86ee382e4f9b8ee80f3701b0dd6daf921d85cc2b59202050bc3d495d72b",
+        "bytes": 40450
+      },
+      {
+        "sha256": "16b42ab56093c4e1bb2908691fd3c8270d68615db2bfe2ed5decc29beeebb996",
+        "bytes": 41030
+      },
+      {
+        "sha256": "8f5b18c180635a8f2e97d1054ad9bb7a627eb5c0eafa596c00c5c0fe95da2f2e",
+        "bytes": 41303
+      },
+      {
+        "sha256": "3005dbb5b4f5c047ea901653116b34b6c14aab19a83f7758cada5a9009bc34f1",
+        "bytes": 40935
+      },
+      {
+        "sha256": "588ed9914d53c408e355641ff102f9f2c501204e4ae41dbb8ceb78bdece42e1e",
+        "bytes": 40872
+      },
+      {
+        "sha256": "ee5db1e54001465f8161a8b1e1579de85f08b3716ce1d29dd914cf4ec0e8edb3",
+        "bytes": 41522
+      },
+      {
+        "sha256": "dcd5ca33e6a9e9e699b43eddbe3cf9d8c35abdcd20b56578df3dd7884e78959a",
+        "bytes": 42114
+      },
+      {
+        "sha256": "9fc9df26e227259bdda58a4948da5c2a5dfd0b94d46c8758e63216a0c5e3717b",
+        "bytes": 39967
+      },
+      {
+        "sha256": "9184de3ffd02d910a1baa8c002111226566d1d9768a7ed272401eacb65f37c09",
+        "bytes": 42353
+      },
+      {
+        "sha256": "abfba17491390f4e26ae59e100ea887dbeb8ec770f3ce31db38c5ed7071e47a0",
+        "bytes": 43427
+      },
+      {
+        "sha256": "45d80977df782daadddeb0f414b34ad1019f2186de69722d9fe318eea68decd8",
+        "bytes": 43941
+      },
+      {
+        "sha256": "9b54a7cd11722b541008d924ecb9e2da58c2c8173a6546e0556a2f98047b5b2c",
+        "bytes": 44194
+      },
+      {
+        "sha256": "eab6410ae90c72bbf2d137e0c56efe7a12c37224ae3370c4f6cc15d41e20b61c",
+        "bytes": 44684
+      }
+    ],
+    "frame_sampling_in_provider_metadata": false,
+    "videos": [],
+    "requested_image_detail": "high"
+  },
+  "status": "COMPLETED",
+  "model_calls": 1,
+  "production_changed": false,
+  "independently_verified": false,
+  "receipt": {
+    "packet_id": "orman600_goal_focus",
+    "provider": "emergent",
+    "requested_model": "gpt-6-astra",
+    "origin": "LIVE_MODEL_REQUEST",
+    "status": "COMPLETED",
+    "requested_reasoning_effort": "medium",
+    "payload_sha256": "22ce92c67e98e99724ce43634dd509bb5ad18548562457c74265ec6049038da6",
+    "payload_bytes": 9214968,
+    "explicit_image_count": 183,
+    "images": [
+      {
+        "sha256": "776a1baa0545acc7497568897f834dfa683e77ab6ea6bcba2242370e31add0aa",
+        "bytes": 7887
+      },
+      {
+        "sha256": "6c0ec3cc386f0c1a14ed3e4f41dd1ee1669d57e33addef764e9d81cd7e84d11e",
+        "bytes": 2407
+      },
+      {
+        "sha256": "00e70919666d8b657e857dd0bfda6b400d0e03807a6363c062c9145b7da0fce4",
+        "bytes": 4365
+      },
+      {
+        "sha256": "74700ca4ab5a0a79cf56feb4ab766c8144c1ac05fda6e768faa3f5c8fc0123f6",
+        "bytes": 12188
+      },
+      {
+        "sha256": "7d39647aa27adebfd433f615bdb847f3bdfc942334ab1d25de5a3e106120bf6e",
+        "bytes": 7899
+      },
+      {
+        "sha256": "bf05205b4eeb4fe7c0546ade6b6380afdfc78b1da633d8bcc7c22bd6a054f54e",
+        "bytes": 5434
+      },
+      {
+        "sha256": "4ddfc381d539955518bfd4a2faba47b02569845a78349a48a9f9e0076ba32e85",
+        "bytes": 5080
+      },
+      {
+        "sha256": "56d4467f3dcb19b897fbf3e7e07661636855f0aa73a101fb2d552f7ff7357ab8",
+        "bytes": 2661
+      },
+      {
+        "sha256": "fe99ab78da123acd79507171c970079c70ad052f3f4154575e7f3d05dbb13895",
+        "bytes": 10118
+      },
+      {
+        "sha256": "16e55d02246cc15c4b1a13e7831c568ce649f38480692c8e110c9ea359de99b7",
+        "bytes": 5796
+      },
+      {
+        "sha256": "9008cb0ab600368ff6e306180285c51d1f95bd546a1489bd395b774c7d349692",
+        "bytes": 149257
+      },
+      {
+        "sha256": "8713bb6140dc601f12994dedee32752e800d9f8df4a7d254ac7b0ad539d0bd5d",
+        "bytes": 178319
+      },
+      {
+        "sha256": "5261ba7709cc19684569d021d761a2cd9514536794ae485c36fe581638ef62d3",
+        "bytes": 145561
+      },
+      {
+        "sha256": "745dd3f2d00375f55f194fd313583447a9151af1adbacb2bd336675825b8b8b8",
+        "bytes": 46016
+      },
+      {
+        "sha256": "99100efc593674e0a506d3d59f552bba4a92e485ec67f2d6f8522c27f4081738",
+        "bytes": 46432
+      },
+      {
+        "sha256": "15fa521722edd632e5cd0d818a15e2b9ff3a50660cbfc8a4bd7da7e1500f3cab",
+        "bytes": 46976
+      },
+      {
+        "sha256": "51b882aae322df5a104855f452f840fa94b5279d3035566136fa8c622c96cf8b",
+        "bytes": 47653
+      },
+      {
+        "sha256": "c6d4dc939f6072266e8ca7c18d37a7c684265d8bb60deef2967a8442a262ffe6",
+        "bytes": 48159
+      },
+      {
+        "sha256": "cbca4d6b241cb1815a8d1dc216fa44b8e971f5c45b6854f9c001830106bc5fc3",
+        "bytes": 48062
+      },
+      {
+        "sha256": "c396c1b76857c9291072bde906a02c73240e30772e1319731892091cb70b9f81",
+        "bytes": 48338
+      },
+      {
+        "sha256": "95431f24b6eb6ff0393533439a8b255f739723d8f6df3a2ed38b474c882dbe85",
+        "bytes": 48069
+      },
+      {
+        "sha256": "69be371cc1aa6f528da0b3c783e3e7551a95f4b6a135fd850f8f2813742e2474",
+        "bytes": 48398
+      },
+      {
+        "sha256": "1d420e8bf33d7168eeafcce97ac54204aa912276e4877f99744a6475418f4d21",
+        "bytes": 48449
+      },
+      {
+        "sha256": "a71a95985163d3be8b90e480cf1c2c9103be217c73c127155b52a3e8ccd20934",
+        "bytes": 48256
+      },
+      {
+        "sha256": "ae657dbc0dc85832016ee6ff920e38b85e3892c89aac27762f3cab56e769a4f2",
+        "bytes": 48170
+      },
+      {
+        "sha256": "f24c7f6f2c5dab65b1b0c986e7878f96ffad621e7e98234d88e3fc5cbe9bafc1",
+        "bytes": 47815
+      },
+      {
+        "sha256": "f117f67d2f0d6b39849f4129497cf40db866f3fbe8a2a4dd21bf6b58ed5c6f79",
+        "bytes": 47539
+      },
+      {
+        "sha256": "5d4d7549177a940f24af328501a6d5ddd8b9d3b47722017b92b225ce23ea6103",
+        "bytes": 47946
+      },
+      {
+        "sha256": "69362a45e79d5ca94d85994539ec945ba96524e0ba980944b51723d08959a8f5",
+        "bytes": 48015
+      },
+      {
+        "sha256": "e61027365f8671f6167af8b7ecb0ab2431f958aca406ad8cfd98441d3d5c87b1",
+        "bytes": 48267
+      },
+      {
+        "sha256": "0337aa6411a40872bf69e63d262c8dc8f4ded0aa75d8e94022935f4d08b929b8",
+        "bytes": 48268
+      },
+      {
+        "sha256": "592f76457e016f04ab61d27e8880900863312e430cdcca565bd884cb070d4de1",
+        "bytes": 48650
+      },
+      {
+        "sha256": "43b765d4accc09d7cb941028d6751d95dfa21191a8ef46ed2aed090211d5d469",
+        "bytes": 48734
+      },
+      {
+        "sha256": "70bff563e96bc070f3c1471c5441fc25e674b948b2689867419b35fe68963b30",
+        "bytes": 48728
+      },
+      {
+        "sha256": "843c438900c89fdbc0ea81aec457da647506a80069f0e3468d8d3d0bccf3902d",
+        "bytes": 49295
+      },
+      {
+        "sha256": "571317b8307c9b46dab11d237fbc2518605cae66b480e03e805565609ff7656a",
+        "bytes": 49456
+      },
+      {
+        "sha256": "3fcb9fcdb75461dfc61dadacf499c8f28bf368f234df082ee49c38da5f62e3f5",
+        "bytes": 49308
+      },
+      {
+        "sha256": "92fe71442c52b79b41631e39a10f485c4de4c4dc8b535731167c770ed6b8d365",
+        "bytes": 46962
+      },
+      {
+        "sha256": "f48ceafcdece5e8c8705abbcb8e59111c1ef7a473d4fd6ea0a097c42331558ae",
+        "bytes": 47022
+      },
+      {
+        "sha256": "3da68e95ba12d7ecf63aac31836b7f625a12ebeffff5613706639c493fdef019",
+        "bytes": 47894
+      },
+      {
+        "sha256": "55f7776f36c766068d35ec47e200eae4edac2c05b65b617b624b3f104b9a386d",
+        "bytes": 48147
+      },
+      {
+        "sha256": "c97355d5620b10997a72e78fc982ba73d41eab5b40b273cbb99a70c33da03d5b",
+        "bytes": 47854
+      },
+      {
+        "sha256": "2358d0ef5410f8b964669100d1818857f552f5a1ae9cafa561e56ee56fe2d11a",
+        "bytes": 47295
+      },
+      {
+        "sha256": "aaef9c325f6051a2288e714f15088c60412769214356584d05f053b9bb9fed60",
+        "bytes": 46995
+      },
+      {
+        "sha256": "c2bd9d8f25796ebf855edf57eaa34e6a00d202e73c5500307e4ecd31109c02de",
+        "bytes": 41164
+      },
+      {
+        "sha256": "5d7db63f4d35679d8d5789010e1a54af9346a5059d6aa485d6f74a530cb58548",
+        "bytes": 40578
+      },
+      {
+        "sha256": "286036ef81a360880bc4412c213e5cffde9f1f84e6f2576bf25d8f55353c7a19",
+        "bytes": 39650
+      },
+      {
+        "sha256": "e2f30dc278335dfbabafb290c0251a403b21b61b2ce89811804a2e8afd88f461",
+        "bytes": 39483
+      },
+      {
+        "sha256": "0ff3179a4135e766a7a4fed4ab111890a3dc8f6c4129a5032f51b54c0cbcb145",
+        "bytes": 38208
+      },
+      {
+        "sha256": "15be148b378c3f1ef296d30f735109ab20eba29c320365e89549155db27f98c4",
+        "bytes": 29053
+      },
+      {
+        "sha256": "9b5abe9f29c285a11fcb214af60e800e0805a1bf33f7af39fc8e90cad1a06539",
+        "bytes": 29031
+      },
+      {
+        "sha256": "de24ae5e0eb33a2a7454ad4a1522db2f1f1069cfe1e4e363acbf43aee78232f5",
+        "bytes": 28294
+      },
+      {
+        "sha256": "1e939f36f58f57584c41197c4ee43e43b47b823b081d6e4637bdafec861cbaa6",
+        "bytes": 36632
+      },
+      {
+        "sha256": "b8f2a093b45355ccb08872f79f271a42a116e7d6db494dd21cb8d7726c602979",
+        "bytes": 28366
+      },
+      {
+        "sha256": "f6da08ea6cfaf5c31f6a216376b43c9ba4fd07dcce040f3776c11a3c063d4aee",
+        "bytes": 24584
+      },
+      {
+        "sha256": "739a311d629782ba1cc3072c86d71030745323ed3c50df3ecb75ac15e9b04273",
+        "bytes": 25508
+      },
+      {
+        "sha256": "807620b579cd8ea5e06c99c8f737216de5257cf3695c74bddcbffea1ac7ad75a",
+        "bytes": 24817
+      },
+      {
+        "sha256": "5433d98def4d07294bce8f80dba8eb7cbc1ccff916796baa316ef0300b174fda",
+        "bytes": 33127
+      },
+      {
+        "sha256": "7d5429fa3888cb38ae08aacc19f915801d9d77be28700781f38917ca3d08a99c",
+        "bytes": 25403
+      },
+      {
+        "sha256": "eda4d91852be229b39bff906d23b258c7cf64472141f53d3aeacc64a800f0278",
+        "bytes": 25613
+      },
+      {
+        "sha256": "7fb4aa9348e1dffc328ba59f2d0bc66fc5eb297ce34c10868e168279d620cb98",
+        "bytes": 26441
+      },
+      {
+        "sha256": "2b3f2cc589c2f6e83a18bc1d61d755aca70aadfeaf5697c556a54c42107b61cd",
+        "bytes": 26742
+      },
+      {
+        "sha256": "5dd1bb5c8abd8e9ecd55365d1b60647bec567646440fef53fc93f1334c13f504",
+        "bytes": 33843
+      },
+      {
+        "sha256": "b13549b55e34c5ff859d5c2f4fb14d4253d9b54aeea2e2d6478bad2cf5237d1a",
+        "bytes": 26611
+      },
+      {
+        "sha256": "dce491a493bea010ee06851b72e0752458bb735ec497ed621bdacda8d8cbe56a",
+        "bytes": 26700
+      },
+      {
+        "sha256": "81ec4647c61db2d232f8fe71f7f9eb10d62616b26a330cfc5cbccf249946b145",
+        "bytes": 27143
+      },
+      {
+        "sha256": "314706aae95347a8760a519f0294ab7ba0ac477d48f672532a1d7eb31e959264",
+        "bytes": 27084
+      },
+      {
+        "sha256": "209c908c4ff3da0529eeeaa9457b2dac3b9539850b76a488782191737c6a505c",
+        "bytes": 35097
+      },
+      {
+        "sha256": "38935e335aaa85b38134d9719b2e803d0982975092793dd2f9586e8b9ed619ed",
+        "bytes": 27855
+      },
+      {
+        "sha256": "4f8318ad4c5949ae135e08c9af5d7feb99dc295de1f8ee2390a3520d040b1ba2",
+        "bytes": 28360
+      },
+      {
+        "sha256": "00f9c12e50a19c935122b55de7a05a0742af9641fc56c7dd189759d541180b07",
+        "bytes": 29160
+      },
+      {
+        "sha256": "29e6283556de01ed0774e2897c2b40e0cf0ae8c4715637e8d7b985a8d535c8dc",
+        "bytes": 36025
+      },
+      {
+        "sha256": "192423a2f552fb43e0083443cb237b7104f2200ec8d70de8d2fb16788f7a4e9f",
+        "bytes": 29321
+      },
+      {
+        "sha256": "75b0344f7b4b58286e0d6df8f63a7c9d8fa0070cb8f9e764382b14950081acea",
+        "bytes": 30367
+      },
+      {
+        "sha256": "d930633399fbf989782148800825200e1910c7c5e96dc1dd76c80933dab67943",
+        "bytes": 30728
+      },
+      {
+        "sha256": "014ce4fb870b8f12cd08e13964f9bd7f58ea8e6ad5227514f33194a3fa999fb7",
+        "bytes": 31280
+      },
+      {
+        "sha256": "5802226a798ae85490fb3cc0b2a72cfbd8b2895ba13e9c3ad62a2520b084f947",
+        "bytes": 38812
+      },
+      {
+        "sha256": "0c8e0ad21962cbed1b5c83d3ef1bd4adcfdd74a47184d39fcb85a3597da295dd",
+        "bytes": 31605
+      },
+      {
+        "sha256": "485d43024c49919ad96a5d606169ae67e7bf9aaf6a8c0e73a292cfbdb8444ede",
+        "bytes": 31645
+      },
+      {
+        "sha256": "e91e4877c175e6f5bc3407ccafe63d14d8411c1b5dd77ec810d7dd72fb3d6e67",
+        "bytes": 31899
+      },
+      {
+        "sha256": "5191b3607a6d77ab5d11146ef5339a69abab158cda3bcdaa772ce6e5fd591a72",
+        "bytes": 31848
+      },
+      {
+        "sha256": "050f2ddd6fefce8bdb567924ae6b7998a2114de903c449e7b80f3fa904a5ef8a",
+        "bytes": 39335
+      },
+      {
+        "sha256": "126245c669438132b65561c9a30ed3142662800568528e0da79b4c48b7479fcf",
+        "bytes": 31863
+      },
+      {
+        "sha256": "7f0238b3c735e6026903c863498f13fc707ff22db22b6822d04d3472188fd271",
+        "bytes": 31968
+      },
+      {
+        "sha256": "85fcc381f45dac9620720b35c4d8dccc5885d26bb1358cbec51b2e07bdfd68b4",
+        "bytes": 31868
+      },
+      {
+        "sha256": "df8f09a9f05105abd92427b2a6307e7c8b3cae1869ec3a9cc7ac8939961d7b76",
+        "bytes": 32093
+      },
+      {
+        "sha256": "27de1cff9518516721aa880ec158637e4dcb829163ef38d9fcca37cd6a8e3773",
+        "bytes": 39175
+      },
+      {
+        "sha256": "5b6d6cf3fae951646a52eb9848c1b79ce7bc9fa8910ae293c4b7a77d510b920c",
+        "bytes": 32133
+      },
+      {
+        "sha256": "823aa378f73c71ea16bd4dcfb69076c642700511d46c381cf1fd5c225c859693",
+        "bytes": 32436
+      },
+      {
+        "sha256": "ed1b21e25fe6e10559ed6055e5134f1b09f9d90a0c551682634abf38aa59e8df",
+        "bytes": 32342
+      },
+      {
+        "sha256": "e5e7a060f0751f25c63d8cc43272b3a5adefa6f3d32ad1b84c374dbdac442aa5",
+        "bytes": 38772
+      },
+      {
+        "sha256": "61f7faa857786386dbe17153d3d51b7710b63d1ba226776ef0d7bc0a586e0d03",
+        "bytes": 32282
+      },
+      {
+        "sha256": "c8e2e3dc518d175d43602a8dc7f55feb43f9e027b47f56e6dacc4173cbb64685",
+        "bytes": 32348
+      },
+      {
+        "sha256": "746bb2a2860ec6247bbec9f7a8515f3c5557e68df8524e96928247f5d7858f9f",
+        "bytes": 32334
+      },
+      {
+        "sha256": "e8478d8948c4e9b8e2f9a669b9b1f2c508f846374ae4396d263e2ecd2c06c0f1",
+        "bytes": 32364
+      },
+      {
+        "sha256": "2150289908ca25c695bb09199d852404fdd5a92cecfa35e4b1ee2725ff224e2e",
+        "bytes": 38309
+      },
+      {
+        "sha256": "a97e3f2ba7d342408e86e916f8099d31256f9e72e8533a6f5786c71795f71613",
+        "bytes": 32697
+      },
+      {
+        "sha256": "f66b906ce744882234aa33b9daa2f36ea274cdffb18c7d61d60f406301aa368e",
+        "bytes": 32758
+      },
+      {
+        "sha256": "0a9ac01a77d93ec81b1003af08712fdad7617e34474fb4c044e9bd59c79e1db3",
+        "bytes": 33216
+      },
+      {
+        "sha256": "a43bd785c14e40830657fc82798c59006c2c8a8cd5a73ed7b8420dd13bf2fef9",
+        "bytes": 33103
+      },
+      {
+        "sha256": "7e6195e194a6c1d64a06f7ce99e0c31b0261ddb156cd464242299af7ee85c88d",
+        "bytes": 38644
+      },
+      {
+        "sha256": "e5c85c00cea055f81a421ecec3a0a49710fd7f17a7a7e72d5672e23bf81e5ab2",
+        "bytes": 32939
+      },
+      {
+        "sha256": "a5ed4de6e0dad286f7b3005581734d67137d287fee330d111edd9a1b73add81f",
+        "bytes": 32950
+      },
+      {
+        "sha256": "8f1a6a0605b62188c948ca8d33aeeb7e4b79756dc29f0d50299efa0fed9df63f",
+        "bytes": 32933
+      },
+      {
+        "sha256": "26e9e52b43911d81184a44cbfc9712bdeb74467f3280741341ca0223f56094d8",
+        "bytes": 33042
+      },
+      {
+        "sha256": "9bef671bd1bb578f6b6a825a892fc41060360758e041ff8425b71634a30ce1c9",
+        "bytes": 38593
+      },
+      {
+        "sha256": "83b0299e420361d9974902c740265843515e68b81c95b12e138bec6e50cf8eeb",
+        "bytes": 33107
+      },
+      {
+        "sha256": "458a19c6383ac4e84db1bb4118659d028fb8c3fdd07c17027903d94b44883c22",
+        "bytes": 33074
+      },
+      {
+        "sha256": "99b3e9807967599150691163bd3a3fde97482e5a248aaa31d7bdd8e50220504e",
+        "bytes": 33081
+      },
+      {
+        "sha256": "34693e6cf99c74dc0bc8b88289e7997ca6aa78a706cd0d14412151ca9f6706c1",
+        "bytes": 38704
+      },
+      {
+        "sha256": "1f6e355a55862a11498379b51975051d036834c938b20150249aeec06258753e",
+        "bytes": 33167
+      },
+      {
+        "sha256": "88a28c6146f7981d0509a4133adcb63a8a12adc987fa3c4a91c930a083be1e97",
+        "bytes": 33148
+      },
+      {
+        "sha256": "20f635cfef0a1ef79f774d2182d5257be21e0e50a3d8b40e46e3e21ede29779b",
+        "bytes": 33299
+      },
+      {
+        "sha256": "8b023f546e1707063c053b0c3b303cac56f5ee60f43a10b6506c7fc63bf24385",
+        "bytes": 33612
+      },
+      {
+        "sha256": "160ea13c099c3756a37f29df6f52cd8819708daa9b3cb680484a13c0ccc6c043",
+        "bytes": 38681
+      },
+      {
+        "sha256": "d95aecc7374293c8ad4e5f6bbe0ece5bd6c9bc2f4ff43d2f8f779d740c897527",
+        "bytes": 33276
+      },
+      {
+        "sha256": "5b310e814cd61527a18fe336a05a2846d518b269bd9ec8f113a7aefd6ec2ef84",
+        "bytes": 33421
+      },
+      {
+        "sha256": "42a09527879b52462a1fafc7ce8ce03646a9e07b8d303b188debd9b0d5d9639a",
+        "bytes": 33590
+      },
+      {
+        "sha256": "9f305bcc9e4b71d82f8e5f21e3d6fe90999dcd0e3c310a075a3f5c39db589c48",
+        "bytes": 33900
+      },
+      {
+        "sha256": "a9704e44b065c4dc2918ec94f61e09ee85c579fefc34cb80738b53d1d2d9669f",
+        "bytes": 39204
+      },
+      {
+        "sha256": "22ea044361a9fc11e4eb9ccd76d9e456f5f86c890e34c57b4459aa72512279df",
+        "bytes": 33967
+      },
+      {
+        "sha256": "c956dca104f9a392aa487fc842c36903b0b54d122ba95410faa6188eaeb9befc",
+        "bytes": 33939
+      },
+      {
+        "sha256": "a9e1e04e8111749539e4c2950ef0da4f4179052edbb2c5d7dee91d5de44db3ff",
+        "bytes": 33828
+      },
+      {
+        "sha256": "e10f5b4a83f81ad23dde228bad06da1b83b31ba1a116266c19f63293222ff791",
+        "bytes": 33971
+      },
+      {
+        "sha256": "1cd0be06801e9722d2adedec59a5367f4d22206e8e8f7d257c29667a9c66b0c5",
+        "bytes": 39184
+      },
+      {
+        "sha256": "499a0e92f664aa9995470d61694b4e954071bde304c55360bdd9455c43b2c67e",
+        "bytes": 33782
+      },
+      {
+        "sha256": "cb3f707cd99aa189356214d7de65f64a6524cf2218b6c6c3b8a5a8403bdaafdc",
+        "bytes": 34030
+      },
+      {
+        "sha256": "60b0cc435bf077a6f32a1597c9d52dfe0661beaf84442bde3bf6db3ef06154a4",
+        "bytes": 34070
+      },
+      {
+        "sha256": "e4723d91e4048fdb30004c6ac58c55ff8be5206f4af5bfa38273d3e03eb85535",
+        "bytes": 39115
+      },
+      {
+        "sha256": "0107444d632c33f355ad027aceff2ac9f0055f7ec0e14cd19d98580ecb86788c",
+        "bytes": 34236
+      },
+      {
+        "sha256": "3e1c2b78bf735f141d7130af6658bcb5c13136735d2e1209126f1b7aeb681b02",
+        "bytes": 34105
+      },
+      {
+        "sha256": "74a77956be1fe025502eef07c50c286fecf1e2ba8f261c13c36f202a6e86c80e",
+        "bytes": 34383
+      },
+      {
+        "sha256": "90f2bca705c91964e0dd16ab4c3b4375cfac3d0e2c2b67c871baa72b504bfb36",
+        "bytes": 34054
+      },
+      {
+        "sha256": "a5fe7b330832d25e579ecd2114787d787aa9974ba82a2192cdcff70f3946c16f",
+        "bytes": 39116
+      },
+      {
+        "sha256": "0ac511b2fd423006b201414b4dc132c5e6c34071ec9f2aba5fba36ad5bb299a7",
+        "bytes": 34278
+      },
+      {
+        "sha256": "c7068a2de7aef7f28fc7758ccaf9e47cee058375bcb88ddf8807911a3498bda3",
+        "bytes": 33816
+      },
+      {
+        "sha256": "5b2c02ae6950d111b640817fcbb4f7119ff8e3f02fb78c655a5ace473845a293",
+        "bytes": 39000
+      },
+      {
+        "sha256": "5c2ebf7d734f3b5ab78e782a91e12b542ef14bf11b5a07db77edfccca21126f7",
+        "bytes": 33938
+      },
+      {
+        "sha256": "cf2e72070cb5336aa080ffec7560fe99bbbe780451cf62203a9b4f06d83705b9",
+        "bytes": 33786
+      },
+      {
+        "sha256": "20c3ab1cf71472683380229faea39a1a88444711684943cc3a15d15943a4602b",
+        "bytes": 39055
+      },
+      {
+        "sha256": "e973fb96fe43b947810b6ab30a6c161f69eb13d005cd6a699c4fa288cc7ac919",
+        "bytes": 34157
+      },
+      {
+        "sha256": "134ff0022dc9f5750d83b1fd1009a909a6a5c4cfaff10771c1dde0dd6078acad",
+        "bytes": 34343
+      },
+      {
+        "sha256": "c056375d2f109b73e156f85ab56423369a06d4b9251c34d868d93bfd4124a6b6",
+        "bytes": 34555
+      },
+      {
+        "sha256": "cb90ccc46e8ef1b916c5dc5cb357855db2763a13ae60edbe9dc192a131a6f592",
+        "bytes": 34150
+      },
+      {
+        "sha256": "5eef185e7d80ee3589a678a7592200668f237219e6b38f9e4c41e70f0f7bbc47",
+        "bytes": 39069
+      },
+      {
+        "sha256": "332532a7f719b5abc625bb4b0f29e7ebd38385fae384ef096d0090ec5a312972",
+        "bytes": 34372
+      },
+      {
+        "sha256": "b766d9c26b6e53c4e7f942786e973d0ff25702a4bdb13787f3594b999145352e",
+        "bytes": 34180
+      },
+      {
+        "sha256": "3623bb814e7d959785df0ff70a71a169d717cd3ebcd2c6c04f1c5d43aaef6438",
+        "bytes": 33991
+      },
+      {
+        "sha256": "fa334757046399936ca38c578d0e9145a95171cb92de722812a8e77a4a2b5184",
+        "bytes": 39191
+      },
+      {
+        "sha256": "b33a09eb21b63729ed15d363344be3f143a0052301541b06f31d699ffdeb875d",
+        "bytes": 33651
+      },
+      {
+        "sha256": "46a6f9137e822c25480beab4aca94835d62e048a56009462dabf4622ffb48438",
+        "bytes": 33930
+      },
+      {
+        "sha256": "14163be46b6224af4723f47461e8108299cd0d830e38a5d710ed239bdaaab3e2",
+        "bytes": 33854
+      },
+      {
+        "sha256": "e9fd009475733198a3fde92408f8714369fc5d812b6130c8b4b9196a30228c09",
+        "bytes": 33842
+      },
+      {
+        "sha256": "62ffed42fad1f982ad2581811016cd1c03b9c3c5f9e3dd1537a32a3220b398fd",
+        "bytes": 39380
+      },
+      {
+        "sha256": "707c1e2f42c944504f74c396a8689e55ab0e75db5b319f2e756464ebd9e68754",
+        "bytes": 38602
+      },
+      {
+        "sha256": "d98033ef62fd6bf37f67a43cbbc296aae1ea5847e11dcc525a1c5c20a5b9d6c6",
+        "bytes": 34578
+      },
+      {
+        "sha256": "9caa3bb6b2120c1b55121fd2d295155baba0fae62d3721276255d32040985d20",
+        "bytes": 36740
+      },
+      {
+        "sha256": "1525cb70d5fe7417a934a76e1b79af2641122fc71e179554b9d1516424eb348b",
+        "bytes": 40783
+      },
+      {
+        "sha256": "ee31ec9868d9b59b1585846dd26d48178001ff49f3f4b47e802e20617e113c99",
+        "bytes": 41756
+      },
+      {
+        "sha256": "9741c49722a36726a668b03ce2ba9ccec0f4ac6def2d2c2eff054e0b1ac1c9d8",
+        "bytes": 36072
+      },
+      {
+        "sha256": "5b9318482889c96346fb2b37def69f4eec4a13006f2325cbb2f28bb155735109",
+        "bytes": 35366
+      },
+      {
+        "sha256": "2e998b98c2f438e44285c7180690deef0b0adebc647e8dbe96ca20d9111f1699",
+        "bytes": 37512
+      },
+      {
+        "sha256": "7ad9449193895bd8b3cb243f9644885e59929d2d5e48871868060c50c31f60e7",
+        "bytes": 39004
+      },
+      {
+        "sha256": "76a7ca29b865bb81d48630f8d853c6c7a5b3a1ac73e6cd2a88805fa7924b3fb2",
+        "bytes": 40223
+      },
+      {
+        "sha256": "3ada4134465512ebb67dd72cef437a8581fdde2c690ff857a95bbc91ff4cefcf",
+        "bytes": 40401
+      },
+      {
+        "sha256": "30c2d991cb54eada22722c9a1b5d1cdb70ac16cbdf4efa70b99377938cc671f7",
+        "bytes": 40694
+      },
+      {
+        "sha256": "93c49c0a15e4e0d50ebd175e6be64ffd66f6fa2426c061bdd87ef3a684345c17",
+        "bytes": 40555
+      },
+      {
+        "sha256": "8a25d2724cb1c23285a4453cd05d787657315cbc3ddc76bbe054c19b376fe879",
+        "bytes": 41094
+      },
+      {
+        "sha256": "b311c62b6acef4a70049227a94a797ab5ed2a03f727ea77dd62cef784a6b62c8",
+        "bytes": 40620
+      },
+      {
+        "sha256": "dc02c1f54d1adf82d5755557c9ac12fce506a6ab9a2b38f5e850b05ad5201e87",
+        "bytes": 40583
+      },
+      {
+        "sha256": "9243d86ee382e4f9b8ee80f3701b0dd6daf921d85cc2b59202050bc3d495d72b",
+        "bytes": 40450
+      },
+      {
+        "sha256": "16b42ab56093c4e1bb2908691fd3c8270d68615db2bfe2ed5decc29beeebb996",
+        "bytes": 41030
+      },
+      {
+        "sha256": "8f5b18c180635a8f2e97d1054ad9bb7a627eb5c0eafa596c00c5c0fe95da2f2e",
+        "bytes": 41303
+      },
+      {
+        "sha256": "3005dbb5b4f5c047ea901653116b34b6c14aab19a83f7758cada5a9009bc34f1",
+        "bytes": 40935
+      },
+      {
+        "sha256": "588ed9914d53c408e355641ff102f9f2c501204e4ae41dbb8ceb78bdece42e1e",
+        "bytes": 40872
+      },
+      {
+        "sha256": "ee5db1e54001465f8161a8b1e1579de85f08b3716ce1d29dd914cf4ec0e8edb3",
+        "bytes": 41522
+      },
+      {
+        "sha256": "dcd5ca33e6a9e9e699b43eddbe3cf9d8c35abdcd20b56578df3dd7884e78959a",
+        "bytes": 42114
+      },
+      {
+        "sha256": "9fc9df26e227259bdda58a4948da5c2a5dfd0b94d46c8758e63216a0c5e3717b",
+        "bytes": 39967
+      },
+      {
+        "sha256": "9184de3ffd02d910a1baa8c002111226566d1d9768a7ed272401eacb65f37c09",
+        "bytes": 42353
+      },
+      {
+        "sha256": "abfba17491390f4e26ae59e100ea887dbeb8ec770f3ce31db38c5ed7071e47a0",
+        "bytes": 43427
+      },
+      {
+        "sha256": "45d80977df782daadddeb0f414b34ad1019f2186de69722d9fe318eea68decd8",
+        "bytes": 43941
+      },
+      {
+        "sha256": "9b54a7cd11722b541008d924ecb9e2da58c2c8173a6546e0556a2f98047b5b2c",
+        "bytes": 44194
+      },
+      {
+        "sha256": "eab6410ae90c72bbf2d137e0c56efe7a12c37224ae3370c4f6cc15d41e20b61c",
+        "bytes": 44684
+      }
+    ],
+    "frame_sampling_in_provider_metadata": false,
+    "videos": [],
+    "requested_image_detail": "high",
+    "model_version": "gpt-6-astra",
+    "response_id": "chatcmpl-Ebc8WxnKnel8CKtRYpaNOq2g5kDY4",
+    "usage": {
+      "completion_tokens": 6416,
+      "prompt_tokens": 86799,
+      "total_tokens": 93215,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": 0,
+        "audio_tokens": 0,
+        "reasoning_tokens": 2047,
+        "rejected_prediction_tokens": 0
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": 0,
+        "cached_tokens": 0
+      }
+    },
+    "raw_response": "{\n  \"plays\": [\n    {\n      \"start_frame\": \"s000011267\",\n      \"end_frame\": \"s000021767\",\n      \"people\": [\n        {\n          \"person_id\": \"p1\",\n          \"selected\": true,\n          \"kit_consistent\": true,\n          \"reference_ids\": [\"r2\", \"r4\", \"r5\", \"r6\", \"r7\", \"r10\"],\n          \"evidence_frames\": [\"s000011800\", \"s000014400\", \"s000015300\", \"s000015833\", \"s000016300\", \"s000017700\"],\n          \"appearance\": \"Short dark-haired player in white, blue number 10, black undersleeves and gloves, white socks and light-coloured boots.\"\n        },\n        {\n          \"person_id\": \"p2\",\n          \"selected\": false,\n          \"kit_consistent\": true,\n          \"reference_ids\": [],\n          \"evidence_frames\": [\"s000012400\", \"s000012767\", \"s000013633\", \"s000018100\"],\n          \"appearance\": \"White number 6, dark head covering, black undersleeves; smaller than white number 4.\"\n        },\n        {\n          \"person_id\": \"p3\",\n          \"selected\": false,\n          \"kit_consistent\": true,\n          \"reference_ids\": [],\n          \"evidence_frames\": [\"s000015300\", \"s000015733\", \"s000016300\", \"s000017000\"],\n          \"appearance\": \"Light-haired red number 7, black shorts and black socks; defender immediately ahead of white 10 near goal.\"\n        },\n        {\n          \"person_id\": \"p4\",\n          \"selected\": false,\n          \"kit_consistent\": true,\n          \"reference_ids\": [],\n          \"evidence_frames\": [\"s000015400\", \"s000016900\", \"s000017133\"],\n          \"appearance\": \"Red number 16, dark hair, black shorts and socks, pale boots; follows white 10 and approaches the goalmouth.\"\n        },\n        {\n          \"person_id\": \"p5\",\n          \"selected\": false,\n          \"kit_consistent\": true,\n          \"reference_ids\": [],\n          \"evidence_frames\": [\"s000015400\", \"s000016400\", \"s000017267\", \"s000017467\"],\n          \"appearance\": \"Taller red-shirted defender with dark head covering, black shorts and socks; arrives behind number 16 and moves inside the goal.\"\n        },\n        {\n          \"person_id\": \"p6\",\n          \"selected\": false,\n          \"kit_consistent\": true,\n          \"reference_ids\": [],\n          \"evidence_frames\": [\"s000015400\", \"s000016600\", \"s000016833\", \"s000018900\"],\n          \"appearance\": \"Goalkeeper in blue/purple long-sleeved kit, dark leggings, gloves and light boots.\"\n        },\n        {\n          \"person_id\": \"p7\",\n          \"selected\": false,\n          \"kit_consistent\": true,\n          \"reference_ids\": [],\n          \"evidence_frames\": [\"s000012767\", \"s000013400\"],\n          \"appearance\": \"Short dark-haired opponent in red and black who challenges white 6 during the buildup.\"\n        },\n        {\n          \"person_id\": \"p8\",\n          \"selected\": false,\n          \"kit_consistent\": true,\n          \"reference_ids\": [],\n          \"evidence_frames\": [\"s000014000\", \"s000014267\", \"s000014500\"],\n          \"appearance\": \"Taller light-haired red number 15, black shorts and socks, positioned between white 6 and white 10 during the pass.\"\n        }\n      ],\n      \"actions\": [\n        {\n          \"action_id\": \"a1\",\n          \"kind\": \"DUEL\",\n          \"actor\": \"p1\",\n          \"start_frame\": \"s000011267\",\n          \"contact_frame\": null,\n          \"end_frame\": \"s000012400\",\n          \"actor_evidence_frames\": [\"s000011767\", \"s000011800\", \"s000012133\"],\n          \"ball_id\": \"b1\",\n          \"outcome\": \"INCOMPLETE\",\n          \"receiver\": null,\n          \"receiver_frame\": null,\n          \"receiver_is_teammate\": null,\n          \"finisher\": null,\n          \"shot_frame\": null,\n          \"outcome_frame\": \"s000012400\",\n          \"same_active_ball\": true,\n          \"continuous_play\": true,\n          \"outcome_evidence\": [\n            {\n              \"frame\": \"s000011800\",\n              \"fact\": \"White 10 reaches into a crowded contest with red opponents and another white player.\"\n            },\n            {\n              \"frame\": \"s000012400\",\n              \"fact\": \"The ball comes out toward white 6, rather than remaining under white 10's control.\"\n            }\n          ],\n          \"details\": \"White 10 challenges around the crowded ball and then moves left to offer an outlet. The overlapping legs do not establish an individual extraction touch; no pass or recovery is attributed to white 10 here.\"\n        },\n        {\n          \"action_id\": \"a2\",\n          \"kind\": \"RECOVERY\",\n          \"actor\": \"p2\",\n          \"start_frame\": \"s000012400\",\n          \"contact_frame\": null,\n          \"end_frame\": \"s000013633\",\n          \"actor_evidence_frames\": [\"s000012633\", \"s000012767\", \"s000013400\", \"s000013633\"],\n          \"ball_id\": \"b1\",\n          \"outcome\": \"COMPLETED\",\n          \"receiver\": null,\n          \"receiver_frame\": null,\n          \"receiver_is_teammate\": null,\n          \"finisher\": null,\n          \"shot_frame\": null,\n          \"outcome_frame\": \"s000013633\",\n          \"same_active_ball\": true,\n          \"continuous_play\": true,\n          \"outcome_evidence\": [\n            {\n              \"frame\": \"s000012767\",\n              \"fact\": \"White 6 has the ball immediately beside his feet as the red challenger closes.\"\n            },\n            {\n              \"frame\": \"s000013633\",\n              \"fact\": \"White 6 has turned with the ball still in front of him and the challenger behind his shoulder.\"\n            }\n          ],\n          \"details\": \"White 6 gathers the ball emerging from the initial contest, shields it from p7 and turns left with short touches.\"\n        },\n        {\n          \"action_id\": \"a3\",\n          \"kind\": \"PASS\",\n          \"actor\": \"p2\",\n          \"start_frame\": \"s000013633\",\n          \"contact_frame\": null,\n          \"contact_before_frame\": \"s000013633\",\n          \"contact_after_frame\": \"s000013767\",\n          \"contact_actor_unique\": true,\n          \"contact_evidence\": [\n            {\n              \"frame\": \"s000013633\",\n              \"fact\": \"White 6 has the ball at his feet and opens his body toward the teammate on the left.\"\n            },\n            {\n              \"frame\": \"s000013767\",\n              \"fact\": \"His leg extends through the release and the ball is already travelling left, clear of the nearby challenger.\"\n            }\n          ],\n          \"end_frame\": \"s000014267\",\n          \"actor_evidence_frames\": [\"s000013633\", \"s000013767\"],\n          \"ball_id\": \"b1\",\n          \"outcome\": \"TEAMMATE_GOAL\",\n          \"receiver\": \"p1\",\n          \"receiver_frame\": \"s000014133\",\n          \"receiver_is_teammate\": true,\n          \"finisher\": \"p1\",\n          \"shot_frame\": null,\n          \"outcome_frame\": \"s000017000\",\n          \"same_active_ball\": true,\n          \"continuous_play\": true,\n          \"outcome_evidence\": [\n            {\n              \"frame\": \"s000014133\",\n              \"fact\": \"The leftward ball reaches white 10 beside red 15.\"\n            },\n            {\n              \"frame\": \"s000014400\",\n              \"fact\": \"White 10, with his number visible, turns into the attack with the ball.\"\n            },\n            {\n              \"frame\": \"s000015300\",\n              \"fact\": \"The same white 10 pursues his forward touch toward goal with defenders alongside and ahead.\"\n            },\n            {\n              \"frame\": \"s000017000\",\n              \"fact\": \"After white 10's close-range release, the moving ball is inside the goal, beyond the goalkeeper.\"\n            }\n          ],\n          \"details\": \"Ground pass left to white 10, who receives, dribbles and eventually finishes. Red 15 approaches the passing lane but does not establish controlled possession or an intervening pass. The subsequent challenge by red 7 is retained separately; no additional teammate pass occurs. The finishing contact is bracketed in a6 rather than assigned an invented exact frame.\"\n        },\n        {\n          \"action_id\": \"a4\",\n          \"kind\": \"DRIBBLE\",\n          \"actor\": \"p1\",\n          \"start_frame\": \"s000014133\",\n          \"contact_frame\": null,\n          \"end_frame\": \"s000015400\",\n          \"actor_evidence_frames\": [\"s000014400\", \"s000014767\", \"s000015000\", \"s000015300\"],\n          \"ball_id\": \"b1\",\n          \"outcome\": \"COMPLETED\",\n          \"receiver\": null,\n          \"receiver_frame\": null,\n          \"receiver_is_teammate\": null,\n          \"finisher\": null,\n          \"shot_frame\": null,\n          \"outcome_frame\": \"s000015400\",\n          \"same_active_ball\": true,\n          \"continuous_play\": true,\n          \"outcome_evidence\": [\n            {\n              \"frame\": \"s000014767\",\n              \"fact\": \"White 10 emerges from the nearby red challenge with the ball just ahead.\"\n            },\n            {\n              \"frame\": \"s000015000\",\n              \"fact\": \"White 10 pushes the ball forward and accelerates after it.\"\n            },\n            {\n              \"frame\": \"s000015400\",\n              \"fact\": \"White 10 continues toward goal behind the ball, with red 7 cutting across ahead and another defender chasing.\"\n            }\n          ],\n          \"details\": \"Receives on the left, turns past pressure and advances with successive touches and a forward run. The camera pans with this uninterrupted attack.\"\n        },\n        {\n          \"action_id\": \"a5\",\n          \"kind\": \"DUEL\",\n          \"actor\": \"p1\",\n          \"start_frame\": \"s000015400\",\n          \"contact_frame\": null,\n          \"end_frame\": \"s000016533\",\n          \"actor_evidence_frames\": [\"s000015767\", \"s000015967\", \"s000016233\", \"s000016400\"],\n          \"ball_id\": \"b1\",\n          \"outcome\": \"COMPLETED\",\n          \"receiver\": null,\n          \"receiver_frame\": null,\n          \"receiver_is_teammate\": false,\n          \"finisher\": null,\n          \"shot_frame\": null,\n          \"outcome_frame\": \"s000016533\",\n          \"same_active_ball\": true,\n          \"continuous_play\": true,\n          \"outcome_evidence\": [\n            {\n              \"frame\": \"s000015767\",\n              \"fact\": \"Red 7 is between white 10 and the ball; white 10 closes on his right side.\"\n            },\n            {\n              \"frame\": \"s000016233\",\n              \"fact\": \"White 10 reaches alongside red 7 with the ball between their feet.\"\n            },\n            {\n              \"frame\": \"s000016533\",\n              \"fact\": \"White 10 remains engaged at the ball immediately in front of the goalkeeper.\"\n            }\n          ],\n          \"details\": \"White 10 challenges the shielding red 7 and stretches around him. The ball remains in this close contest rather than being passed to another attacker. The earlier reaching movements are not substituted for the later finishing release.\"\n        },\n        {\n          \"action_id\": \"a6\",\n          \"kind\": \"SHOT\",\n          \"actor\": \"p1\",\n          \"start_frame\": \"s000016533\",\n          \"contact_frame\": null,\n          \"contact_before_frame\": \"s000016533\",\n          \"contact_after_frame\": \"s000016767\",\n          \"contact_actor_unique\": true,\n          \"contact_evidence\": [\n            {\n              \"frame\": \"s000016533\",\n              \"fact\": \"White 10's lower leg reaches to the ball from behind and beside red 7; red 7 remains on the other side of it.\"\n            },\n            {\n              \"frame\": \"s000016767\",\n              \"fact\": \"White 10 is falling after the reaching motion and the ball has departed across the goalkeeper toward the open goalmouth; red 7 is moving away from that departure.\"\n            }\n          ],\n          \"end_frame\": \"s000017000\",\n          \"actor_evidence_frames\": [\"s000016300\", \"s000016533\", \"s000016600\", \"s000016767\", \"s000016967\"],\n          \"ball_id\": \"b1\",\n          \"outcome\": \"GOAL\",\n          \"receiver\": null,\n          \"receiver_frame\": null,\n          \"receiver_is_teammate\": null,\n          \"finisher\": \"p1\",\n          \"shot_frame\": null,\n          \"outcome_frame\": \"s000017000\",\n          \"same_active_ball\": true,\n          \"continuous_play\": true,\n          \"outcome_evidence\": [\n            {\n              \"frame\": \"s000016800\",\n              \"fact\": \"The active ball is clear of the goalkeeper's feet and continues rightward into the goalmouth.\"\n            },\n            {\n              \"frame\": \"s000016900\",\n              \"fact\": \"The ball continues beyond the goalkeeper toward the interior of the goal; neither approaching red defender has reached it.\"\n            },\n            {\n              \"frame\": \"s000017000\",\n              \"fact\": \"The ball is inside the goal beyond the front goal-line plane, before the taller red defender's later kicking movement.\"\n            },\n            {\n              \"frame\": \"s000017467\",\n              \"fact\": \"The same ball reappears beside the defender inside the goal after his attempted clearance.\"\n            },\n            {\n              \"frame\": \"s000018633\",\n              \"fact\": \"The ball remains in the right-hand portion of the goal as the goalkeeper follows it.\"\n            }\n          ],\n          \"details\": \"White 10 pokes a close-range finish out of the duel with red 7 and falls. His reaching motion and the ball's departure establish the releasing actor despite overlapping legs obscuring the exact instant. The goalkeeper spreads his legs but does not stop or visibly redirect the departing ball. The ball travels into the goal before the later defender's attempted clearance. That subsequent intervention does not establish an own goal or a different finisher. White 10 later gets up; white 6 joins him. Those reactions are not used as goal evidence.\"\n        },\n        {\n          \"action_id\": \"a7\",\n          \"kind\": \"OTHER\",\n          \"actor\": \"p5\",\n          \"start_frame\": \"s000017033\",\n          \"contact_frame\": null,\n          \"contact_before_frame\": \"s000017267\",\n          \"contact_after_frame\": \"s000017467\",\n          \"contact_actor_unique\": true,\n          \"contact_evidence\": [\n            {\n              \"frame\": \"s000017267\",\n              \"fact\": \"The taller red defender is inside the goal, swinging a leg toward the ball behind red 16.\"\n            },\n            {\n              \"frame\": \"s000017467\",\n              \"fact\": \"The ball reappears beside that defender after the swing, still within the goal.\"\n            }\n          ],\n          \"end_frame\": \"s000018133\",\n          \"actor_evidence_frames\": [\"s000017267\", \"s000017333\", \"s000017467\"],\n          \"ball_id\": \"b1\",\n          \"outcome\": \"INCOMPLETE\",\n          \"receiver\": null,\n          \"receiver_frame\": null,\n          \"receiver_is_teammate\": null,\n          \"finisher\": null,\n          \"shot_frame\": null,\n          \"outcome_frame\": \"s000018133\",\n          \"same_active_ball\": true,\n          \"continuous_play\": true,\n          \"outcome_evidence\": [\n            {\n              \"frame\": \"s000017633\",\n              \"fact\": \"The ball rises within the goal after the defender's kicking movement.\"\n            },\n            {\n              \"frame\": \"s000018133\",\n              \"fact\": \"The ball is still in the goal and the goalkeeper follows it to the right.\"\n            }\n          ],\n          \"details\": \"Late, unsuccessful clearance attempt from inside the goal. Red 16 partially obscures the contact, but the taller defender's swing and the ball's reappearance identify the actor. This occurs after the active ball has already entered, not as the action that creates the goal.\"\n        }\n      ],\n      \"questions\": []\n    }\n  ],\n  \"goal_review\": {\n    \"releasing_actor\": \"p1\",\n    \"actor_assessment\": \"SUPPORTED\",\n    \"ball_in_goal_assessment\": \"SUPPORTED\",\n    \"intervention_assessment\": \"Red 7 contests and shields before the finish. White 10's reaching action produces the departing ball. The goalkeeper's spread does not visibly stop or decisively redirect it. The taller red defender makes a later unsuccessful clearance attempt inside the goal, after the ball has entered.\",\n    \"attribution_assessment\": \"SUPPORTED\",\n    \"release_evidence\": [\n      {\n        \"frame\": \"s000016300\",\n        \"fact\": \"Readable white number 10 connects the selected attacker to the player reaching alongside red 7.\"\n      },\n      {\n        \"frame\": \"s000016533\",\n        \"fact\": \"White 10 reaches into the ball while red 7 occupies the opposite side; the goalkeeper is beyond them.\"\n      },\n      {\n        \"frame\": \"s000016767\",\n        \"fact\": \"White 10 falls following the reach, and the ball emerges across the goalkeeper toward the goal interior.\"\n      }\n    ],\n    \"ball_path_evidence\": [\n      {\n        \"frame\": \"s000016800\",\n        \"fact\": \"The moving ball is visible beyond the goalkeeper's feet.\"\n      },\n      {\n        \"frame\": \"s000016900\",\n        \"fact\": \"The same ball continues into the goalmouth without a new attacker receiving or striking it.\"\n      },\n      {\n        \"frame\": \"s000017000\",\n        \"fact\": \"The ball is inside the goal before the later clearance attempt.\"\n      },\n      {\n        \"frame\": \"s000017467\",\n        \"fact\": \"Following a brief obstruction by red 16, the ball reappears with the taller defender inside the goal.\"\n      },\n      {\n        \"frame\": \"s000018633\",\n        \"fact\": \"The active ball remains within the right side of the goal, with the goalkeeper following.\"\n      }\n    ],\n    \"intervention_evidence\": [\n      {\n        \"frame\": \"s000016600\",\n        \"fact\": \"The goalkeeper spreads his stance in front of white 10's close-range attempt.\"\n      },\n      {\n        \"frame\": \"s000016833\",\n        \"fact\": \"The ball continues away from the goalkeeper; no stopping or decisive redirection is visible.\"\n      },\n      {\n        \"frame\": \"s000017000\",\n        \"fact\": \"The ball is already inside before the taller red defender reaches it.\"\n      },\n      {\n        \"frame\": \"s000017333\",\n        \"fact\": \"The taller defender swings a leg inside the goal, partly hidden by red 16.\"\n      },\n      {\n        \"frame\": \"s000017633\",\n        \"fact\": \"The attempted clearance leaves the ball bouncing within the goal.\"\n      }\n    ],\n    \"strongest_competing_attribution\": \"The strongest alternative is that a red defender supplied the decisive scoring touch. Red 7's proximity alone does not establish that: white 10's reaching motion, subsequent fall and the ball's departure across the goalkeeper support white 10 as the releaser. The taller defender's later kick is visible, but s000016900–s000017000 place the active ball inside the goal before his s000017267–s000017467 clearance sequence. The goalkeeper's movement likewise does not establish a save or a new scoring redirection. The exact finishing touch is therefore bracketed rather than assigned a fabricated contact frame.\"\n  }\n}",
+    "response_sha256": "67a65ac8d847e32dd4920fb65d8cca20c833d78bb8bb282f3b61913b2e02abc5",
+    "elapsed_seconds": 121.532
+  },
+  "observations": {
+    "plays": [
+      {
+        "start_frame": "s000011267",
+        "end_frame": "s000021767",
+        "people": [
+          {
+            "person_id": "p1",
+            "selected": true,
+            "kit_consistent": true,
+            "reference_ids": [
+              "r2",
+              "r4",
+              "r5",
+              "r6",
+              "r7",
+              "r10"
+            ],
+            "evidence_frames": [
+              "s000011800",
+              "s000014400",
+              "s000015300",
+              "s000015833",
+              "s000016300",
+              "s000017700"
+            ],
+            "appearance": "Short dark-haired player in white, blue number 10, black undersleeves and gloves, white socks and light-coloured boots."
+          },
+          {
+            "person_id": "p2",
+            "selected": false,
+            "kit_consistent": true,
+            "reference_ids": [],
+            "evidence_frames": [
+              "s000012400",
+              "s000012767",
+              "s000013633",
+              "s000018100"
+            ],
+            "appearance": "White number 6, dark head covering, black undersleeves; smaller than white number 4."
+          },
+          {
+            "person_id": "p3",
+            "selected": false,
+            "kit_consistent": true,
+            "reference_ids": [],
+            "evidence_frames": [
+              "s000015300",
+              "s000015733",
+              "s000016300",
+              "s000017000"
+            ],
+            "appearance": "Light-haired red number 7, black shorts and black socks; defender immediately ahead of white 10 near goal."
+          },
+          {
+            "person_id": "p4",
+            "selected": false,
+            "kit_consistent": true,
+            "reference_ids": [],
+            "evidence_frames": [
+              "s000015400",
+              "s000016900",
+              "s000017133"
+            ],
+            "appearance": "Red number 16, dark hair, black shorts and socks, pale boots; follows white 10 and approaches the goalmouth."
+          },
+          {
+            "person_id": "p5",
+            "selected": false,
+            "kit_consistent": true,
+            "reference_ids": [],
+            "evidence_frames": [
+              "s000015400",
+              "s000016400",
+              "s000017267",
+              "s000017467"
+            ],
+            "appearance": "Taller red-shirted defender with dark head covering, black shorts and socks; arrives behind number 16 and moves inside the goal."
+          },
+          {
+            "person_id": "p6",
+            "selected": false,
+            "kit_consistent": true,
+            "reference_ids": [],
+            "evidence_frames": [
+              "s000015400",
+              "s000016600",
+              "s000016833",
+              "s000018900"
+            ],
+            "appearance": "Goalkeeper in blue/purple long-sleeved kit, dark leggings, gloves and light boots."
+          },
+          {
+            "person_id": "p7",
+            "selected": false,
+            "kit_consistent": true,
+            "reference_ids": [],
+            "evidence_frames": [
+              "s000012767",
+              "s000013400"
+            ],
+            "appearance": "Short dark-haired opponent in red and black who challenges white 6 during the buildup."
+          },
+          {
+            "person_id": "p8",
+            "selected": false,
+            "kit_consistent": true,
+            "reference_ids": [],
+            "evidence_frames": [
+              "s000014000",
+              "s000014267",
+              "s000014500"
+            ],
+            "appearance": "Taller light-haired red number 15, black shorts and socks, positioned between white 6 and white 10 during the pass."
+          }
+        ],
+        "actions": [
+          {
+            "action_id": "a1",
+            "kind": "DUEL",
+            "actor": "p1",
+            "start_frame": "s000011267",
+            "contact_frame": null,
+            "end_frame": "s000012400",
+            "actor_evidence_frames": [
+              "s000011767",
+              "s000011800",
+              "s000012133"
+            ],
+            "ball_id": "b1",
+            "outcome": "INCOMPLETE",
+            "receiver": null,
+            "receiver_frame": null,
+            "receiver_is_teammate": null,
+            "finisher": null,
+            "shot_frame": null,
+            "outcome_frame": "s000012400",
+            "same_active_ball": true,
+            "continuous_play": true,
+            "outcome_evidence": [
+              {
+                "frame": "s000011800",
+                "fact": "White 10 reaches into a crowded contest with red opponents and another white player."
+              },
+              {
+                "frame": "s000012400",
+                "fact": "The ball comes out toward white 6, rather than remaining under white 10's control."
+              }
+            ],
+            "details": "White 10 challenges around the crowded ball and then moves left to offer an outlet. The overlapping legs do not establish an individual extraction touch; no pass or recovery is attributed to white 10 here."
+          },
+          {
+            "action_id": "a2",
+            "kind": "RECOVERY",
+            "actor": "p2",
+            "start_frame": "s000012400",
+            "contact_frame": null,
+            "end_frame": "s000013633",
+            "actor_evidence_frames": [
+              "s000012633",
+              "s000012767",
+              "s000013400",
+              "s000013633"
+            ],
+            "ball_id": "b1",
+            "outcome": "COMPLETED",
+            "receiver": null,
+            "receiver_frame": null,
+            "receiver_is_teammate": null,
+            "finisher": null,
+            "shot_frame": null,
+            "outcome_frame": "s000013633",
+            "same_active_ball": true,
+            "continuous_play": true,
+            "outcome_evidence": [
+              {
+                "frame": "s000012767",
+                "fact": "White 6 has the ball immediately beside his feet as the red challenger closes."
+              },
+              {
+                "frame": "s000013633",
+                "fact": "White 6 has turned with the ball still in front of him and the challenger behind his shoulder."
+              }
+            ],
+            "details": "White 6 gathers the ball emerging from the initial contest, shields it from p7 and turns left with short touches."
+          },
+          {
+            "action_id": "a3",
+            "kind": "PASS",
+            "actor": "p2",
+            "start_frame": "s000013633",
+            "contact_frame": null,
+            "contact_before_frame": "s000013633",
+            "contact_after_frame": "s000013767",
+            "contact_actor_unique": true,
+            "contact_evidence": [
+              {
+                "frame": "s000013633",
+                "fact": "White 6 has the ball at his feet and opens his body toward the teammate on the left."
+              },
+              {
+                "frame": "s000013767",
+                "fact": "His leg extends through the release and the ball is already travelling left, clear of the nearby challenger."
+              }
+            ],
+            "end_frame": "s000014267",
+            "actor_evidence_frames": [
+              "s000013633",
+              "s000013767"
+            ],
+            "ball_id": "b1",
+            "outcome": "TEAMMATE_GOAL",
+            "receiver": "p1",
+            "receiver_frame": "s000014133",
+            "receiver_is_teammate": true,
+            "finisher": "p1",
+            "shot_frame": null,
+            "outcome_frame": "s000017000",
+            "same_active_ball": true,
+            "continuous_play": true,
+            "outcome_evidence": [
+              {
+                "frame": "s000014133",
+                "fact": "The leftward ball reaches white 10 beside red 15."
+              },
+              {
+                "frame": "s000014400",
+                "fact": "White 10, with his number visible, turns into the attack with the ball."
+              },
+              {
+                "frame": "s000015300",
+                "fact": "The same white 10 pursues his forward touch toward goal with defenders alongside and ahead."
+              },
+              {
+                "frame": "s000017000",
+                "fact": "After white 10's close-range release, the moving ball is inside the goal, beyond the goalkeeper."
+              }
+            ],
+            "details": "Ground pass left to white 10, who receives, dribbles and eventually finishes. Red 15 approaches the passing lane but does not establish controlled possession or an intervening pass. The subsequent challenge by red 7 is retained separately; no additional teammate pass occurs. The finishing contact is bracketed in a6 rather than assigned an invented exact frame."
+          },
+          {
+            "action_id": "a4",
+            "kind": "DRIBBLE",
+            "actor": "p1",
+            "start_frame": "s000014133",
+            "contact_frame": null,
+            "end_frame": "s000015400",
+            "actor_evidence_frames": [
+              "s000014400",
+              "s000014767",
+              "s000015000",
+              "s000015300"
+            ],
+            "ball_id": "b1",
+            "outcome": "COMPLETED",
+            "receiver": null,
+            "receiver_frame": null,
+            "receiver_is_teammate": null,
+            "finisher": null,
+            "shot_frame": null,
+            "outcome_frame": "s000015400",
+            "same_active_ball": true,
+            "continuous_play": true,
+            "outcome_evidence": [
+              {
+                "frame": "s000014767",
+                "fact": "White 10 emerges from the nearby red challenge with the ball just ahead."
+              },
+              {
+                "frame": "s000015000",
+                "fact": "White 10 pushes the ball forward and accelerates after it."
+              },
+              {
+                "frame": "s000015400",
+                "fact": "White 10 continues toward goal behind the ball, with red 7 cutting across ahead and another defender chasing."
+              }
+            ],
+            "details": "Receives on the left, turns past pressure and advances with successive touches and a forward run. The camera pans with this uninterrupted attack."
+          },
+          {
+            "action_id": "a5",
+            "kind": "DUEL",
+            "actor": "p1",
+            "start_frame": "s000015400",
+            "contact_frame": null,
+            "end_frame": "s000016533",
+            "actor_evidence_frames": [
+              "s000015767",
+              "s000015967",
+              "s000016233",
+              "s000016400"
+            ],
+            "ball_id": "b1",
+            "outcome": "COMPLETED",
+            "receiver": null,
+            "receiver_frame": null,
+            "receiver_is_teammate": false,
+            "finisher": null,
+            "shot_frame": null,
+            "outcome_frame": "s000016533",
+            "same_active_ball": true,
+            "continuous_play": true,
+            "outcome_evidence": [
+              {
+                "frame": "s000015767",
+                "fact": "Red 7 is between white 10 and the ball; white 10 closes on his right side."
+              },
+              {
+                "frame": "s000016233",
+                "fact": "White 10 reaches alongside red 7 with the ball between their feet."
+              },
+              {
+                "frame": "s000016533",
+                "fact": "White 10 remains engaged at the ball immediately in front of the goalkeeper."
+              }
+            ],
+            "details": "White 10 challenges the shielding red 7 and stretches around him. The ball remains in this close contest rather than being passed to another attacker. The earlier reaching movements are not substituted for the later finishing release."
+          },
+          {
+            "action_id": "a6",
+            "kind": "SHOT",
+            "actor": "p1",
+            "start_frame": "s000016533",
+            "contact_frame": null,
+            "contact_before_frame": "s000016533",
+            "contact_after_frame": "s000016767",
+            "contact_actor_unique": true,
+            "contact_evidence": [
+              {
+                "frame": "s000016533",
+                "fact": "White 10's lower leg reaches to the ball from behind and beside red 7; red 7 remains on the other side of it."
+              },
+              {
+                "frame": "s000016767",
+                "fact": "White 10 is falling after the reaching motion and the ball has departed across the goalkeeper toward the open goalmouth; red 7 is moving away from that departure."
+              }
+            ],
+            "end_frame": "s000017000",
+            "actor_evidence_frames": [
+              "s000016300",
+              "s000016533",
+              "s000016600",
+              "s000016767",
+              "s000016967"
+            ],
+            "ball_id": "b1",
+            "outcome": "GOAL",
+            "receiver": null,
+            "receiver_frame": null,
+            "receiver_is_teammate": null,
+            "finisher": "p1",
+            "shot_frame": null,
+            "outcome_frame": "s000017000",
+            "same_active_ball": true,
+            "continuous_play": true,
+            "outcome_evidence": [
+              {
+                "frame": "s000016800",
+                "fact": "The active ball is clear of the goalkeeper's feet and continues rightward into the goalmouth."
+              },
+              {
+                "frame": "s000016900",
+                "fact": "The ball continues beyond the goalkeeper toward the interior of the goal; neither approaching red defender has reached it."
+              },
+              {
+                "frame": "s000017000",
+                "fact": "The ball is inside the goal beyond the front goal-line plane, before the taller red defender's later kicking movement."
+              },
+              {
+                "frame": "s000017467",
+                "fact": "The same ball reappears beside the defender inside the goal after his attempted clearance."
+              },
+              {
+                "frame": "s000018633",
+                "fact": "The ball remains in the right-hand portion of the goal as the goalkeeper follows it."
+              }
+            ],
+            "details": "White 10 pokes a close-range finish out of the duel with red 7 and falls. His reaching motion and the ball's departure establish the releasing actor despite overlapping legs obscuring the exact instant. The goalkeeper spreads his legs but does not stop or visibly redirect the departing ball. The ball travels into the goal before the later defender's attempted clearance. That subsequent intervention does not establish an own goal or a different finisher. White 10 later gets up; white 6 joins him. Those reactions are not used as goal evidence."
+          },
+          {
+            "action_id": "a7",
+            "kind": "OTHER",
+            "actor": "p5",
+            "start_frame": "s000017033",
+            "contact_frame": null,
+            "contact_before_frame": "s000017267",
+            "contact_after_frame": "s000017467",
+            "contact_actor_unique": true,
+            "contact_evidence": [
+              {
+                "frame": "s000017267",
+                "fact": "The taller red defender is inside the goal, swinging a leg toward the ball behind red 16."
+              },
+              {
+                "frame": "s000017467",
+                "fact": "The ball reappears beside that defender after the swing, still within the goal."
+              }
+            ],
+            "end_frame": "s000018133",
+            "actor_evidence_frames": [
+              "s000017267",
+              "s000017333",
+              "s000017467"
+            ],
+            "ball_id": "b1",
+            "outcome": "INCOMPLETE",
+            "receiver": null,
+            "receiver_frame": null,
+            "receiver_is_teammate": null,
+            "finisher": null,
+            "shot_frame": null,
+            "outcome_frame": "s000018133",
+            "same_active_ball": true,
+            "continuous_play": true,
+            "outcome_evidence": [
+              {
+                "frame": "s000017633",
+                "fact": "The ball rises within the goal after the defender's kicking movement."
+              },
+              {
+                "frame": "s000018133",
+                "fact": "The ball is still in the goal and the goalkeeper follows it to the right."
+              }
+            ],
+            "details": "Late, unsuccessful clearance attempt from inside the goal. Red 16 partially obscures the contact, but the taller defender's swing and the ball's reappearance identify the actor. This occurs after the active ball has already entered, not as the action that creates the goal."
+          }
+        ],
+        "questions": []
+      }
+    ],
+    "goal_review": {
+      "releasing_actor": "p1",
+      "actor_assessment": "SUPPORTED",
+      "ball_in_goal_assessment": "SUPPORTED",
+      "intervention_assessment": "Red 7 contests and shields before the finish. White 10's reaching action produces the departing ball. The goalkeeper's spread does not visibly stop or decisively redirect it. The taller red defender makes a later unsuccessful clearance attempt inside the goal, after the ball has entered.",
+      "attribution_assessment": "SUPPORTED",
+      "release_evidence": [
+        {
+          "frame": "s000016300",
+          "fact": "Readable white number 10 connects the selected attacker to the player reaching alongside red 7."
+        },
+        {
+          "frame": "s000016533",
+          "fact": "White 10 reaches into the ball while red 7 occupies the opposite side; the goalkeeper is beyond them."
+        },
+        {
+          "frame": "s000016767",
+          "fact": "White 10 falls following the reach, and the ball emerges across the goalkeeper toward the goal interior."
+        }
+      ],
+      "ball_path_evidence": [
+        {
+          "frame": "s000016800",
+          "fact": "The moving ball is visible beyond the goalkeeper's feet."
+        },
+        {
+          "frame": "s000016900",
+          "fact": "The same ball continues into the goalmouth without a new attacker receiving or striking it."
+        },
+        {
+          "frame": "s000017000",
+          "fact": "The ball is inside the goal before the later clearance attempt."
+        },
+        {
+          "frame": "s000017467",
+          "fact": "Following a brief obstruction by red 16, the ball reappears with the taller defender inside the goal."
+        },
+        {
+          "frame": "s000018633",
+          "fact": "The active ball remains within the right side of the goal, with the goalkeeper following."
+        }
+      ],
+      "intervention_evidence": [
+        {
+          "frame": "s000016600",
+          "fact": "The goalkeeper spreads his stance in front of white 10's close-range attempt."
+        },
+        {
+          "frame": "s000016833",
+          "fact": "The ball continues away from the goalkeeper; no stopping or decisive redirection is visible."
+        },
+        {
+          "frame": "s000017000",
+          "fact": "The ball is already inside before the taller red defender reaches it."
+        },
+        {
+          "frame": "s000017333",
+          "fact": "The taller defender swings a leg inside the goal, partly hidden by red 16."
+        },
+        {
+          "frame": "s000017633",
+          "fact": "The attempted clearance leaves the ball bouncing within the goal."
+        }
+      ],
+      "strongest_competing_attribution": "The strongest alternative is that a red defender supplied the decisive scoring touch. Red 7's proximity alone does not establish that: white 10's reaching motion, subsequent fall and the ball's departure across the goalkeeper support white 10 as the releaser. The taller defender's later kick is visible, but s000016900–s000017000 place the active ball inside the goal before his s000017267–s000017467 clearance sequence. The goalkeeper's movement likewise does not establish a save or a new scoring redirection. The exact finishing touch is therefore bracketed rather than assigned a fabricated contact frame."
+    }
+  },
+  "resolved": {
+    "events": [
+      {
+        "event_id": "3b6111968bdca453f214",
+        "source_packet_ids": [
+          "question_scope_probe"
+        ],
+        "source_action_keys": [
+          "question_scope_probe:0:a1"
+        ],
+        "source_video_sha256": "db97b9dc0e2cda68f6c4619405270006e7ab31eeb44e73bd7ed432b1a8d0de38",
+        "kind": "DUEL",
+        "event_type": "DUEL",
+        "outcome": "INCOMPLETE",
+        "start_ms": 11267,
+        "end_ms": 12400,
+        "contact_ms": null,
+        "contact_interval_ms": null,
+        "contact_basis": "UNRESOLVED",
+        "contact_evidence": [],
+        "outcome_ms": 12400,
+        "selected_player": true,
+        "actor": "p1",
+        "actor_scope": "question_scope_probe:0",
+        "actor_evidence_frames": [
+          "s000011767",
+          "s000011800",
+          "s000012133"
+        ],
+        "reference_ids": [
+          "r2",
+          "r4",
+          "r5",
+          "r6",
+          "r7",
+          "r10"
+        ],
+        "outcome_evidence": [
+          {
+            "frame": "s000011800",
+            "fact": "White 10 reaches into a crowded contest with red opponents and another white player."
+          },
+          {
+            "frame": "s000012400",
+            "fact": "The ball comes out toward white 6, rather than remaining under white 10's control."
+          }
+        ],
+        "receiver": null,
+        "finisher": null,
+        "reason": "VISIBLE_ACTION",
+        "details": "White 10 challenges around the crowded ball and then moves left to offer an outlet. The overlapping legs do not establish an individual extraction touch; no pass or recovery is attributed to white 10 here.",
+        "receipts": [
+          {
+            "packet_id": "orman600_goal_focus",
+            "payload_sha256": "22ce92c67e98e99724ce43634dd509bb5ad18548562457c74265ec6049038da6",
+            "response_sha256": "67a65ac8d847e32dd4920fb65d8cca20c833d78bb8bb282f3b61913b2e02abc5",
+            "origin": "LIVE_MODEL_REQUEST"
+          }
+        ],
+        "review_phase": "FOLLOWUP",
+        "proof_eligible": true,
+        "model_requested_clarification": false,
+        "answers_source_action_keys": []
+      },
+      {
+        "event_id": "290cba591959591171d8",
+        "source_packet_ids": [
+          "question_scope_probe"
+        ],
+        "source_action_keys": [
+          "question_scope_probe:0:a2"
+        ],
+        "source_video_sha256": "db97b9dc0e2cda68f6c4619405270006e7ab31eeb44e73bd7ed432b1a8d0de38",
+        "kind": "RECOVERY",
+        "event_type": "RECOVERY",
+        "outcome": "COMPLETED",
+        "start_ms": 12400,
+        "end_ms": 13633,
+        "contact_ms": null,
+        "contact_interval_ms": null,
+        "contact_basis": "UNRESOLVED",
+        "contact_evidence": [],
+        "outcome_ms": 13633,
+        "selected_player": false,
+        "actor": "p2",
+        "actor_scope": "question_scope_probe:0",
+        "actor_evidence_frames": [
+          "s000012633",
+          "s000012767",
+          "s000013400",
+          "s000013633"
+        ],
+        "reference_ids": [],
+        "outcome_evidence": [
+          {
+            "frame": "s000012767",
+            "fact": "White 6 has the ball immediately beside his feet as the red challenger closes."
+          },
+          {
+            "frame": "s000013633",
+            "fact": "White 6 has turned with the ball still in front of him and the challenger behind his shoulder."
+          }
+        ],
+        "receiver": null,
+        "finisher": null,
+        "reason": "VISIBLE_ACTION",
+        "details": "White 6 gathers the ball emerging from the initial contest, shields it from p7 and turns left with short touches.",
+        "receipts": [
+          {
+            "packet_id": "orman600_goal_focus",
+            "payload_sha256": "22ce92c67e98e99724ce43634dd509bb5ad18548562457c74265ec6049038da6",
+            "response_sha256": "67a65ac8d847e32dd4920fb65d8cca20c833d78bb8bb282f3b61913b2e02abc5",
+            "origin": "LIVE_MODEL_REQUEST"
+          }
+        ],
+        "review_phase": "FOLLOWUP",
+        "proof_eligible": false,
+        "model_requested_clarification": false,
+        "answers_source_action_keys": []
+      },
+      {
+        "event_id": "c2f922c004509f980768",
+        "source_packet_ids": [
+          "question_scope_probe"
+        ],
+        "source_action_keys": [
+          "question_scope_probe:0:a3"
+        ],
+        "source_video_sha256": "db97b9dc0e2cda68f6c4619405270006e7ab31eeb44e73bd7ed432b1a8d0de38",
+        "kind": "PASS",
+        "event_type": "PASS",
+        "outcome": "UNKNOWN",
+        "start_ms": 13633,
+        "end_ms": 14267,
+        "contact_ms": null,
+        "contact_interval_ms": [
+          13633,
+          13767
+        ],
+        "contact_basis": "BRACKETED_VISUAL_SEQUENCE",
+        "contact_evidence": [
+          {
+            "frame": "s000013633",
+            "fact": "White 6 has the ball at his feet and opens his body toward the teammate on the left."
+          },
+          {
+            "frame": "s000013767",
+            "fact": "His leg extends through the release and the ball is already travelling left, clear of the nearby challenger."
+          }
+        ],
+        "outcome_ms": 17000,
+        "selected_player": false,
+        "actor": "p2",
+        "actor_scope": "question_scope_probe:0",
+        "actor_evidence_frames": [
+          "s000013633",
+          "s000013767"
+        ],
+        "reference_ids": [],
+        "outcome_evidence": [
+          {
+            "frame": "s000014133",
+            "fact": "The leftward ball reaches white 10 beside red 15."
+          },
+          {
+            "frame": "s000014400",
+            "fact": "White 10, with his number visible, turns into the attack with the ball."
+          },
+          {
+            "frame": "s000015300",
+            "fact": "The same white 10 pursues his forward touch toward goal with defenders alongside and ahead."
+          },
+          {
+            "frame": "s000017000",
+            "fact": "After white 10's close-range release, the moving ball is inside the goal, beyond the goalkeeper."
+          }
+        ],
+        "receiver": "p1",
+        "finisher": "p1",
+        "reason": "DIRECT_ASSIST_LINK_MISSING",
+        "details": "Ground pass left to white 10, who receives, dribbles and eventually finishes. Red 15 approaches the passing lane but does not establish controlled possession or an intervening pass. The subsequent challenge by red 7 is retained separately; no additional teammate pass occurs. The finishing contact is bracketed in a6 rather than assigned an invented exact frame.",
+        "receipts": [
+          {
+            "packet_id": "orman600_goal_focus",
+            "payload_sha256": "22ce92c67e98e99724ce43634dd509bb5ad18548562457c74265ec6049038da6",
+            "response_sha256": "67a65ac8d847e32dd4920fb65d8cca20c833d78bb8bb282f3b61913b2e02abc5",
+            "origin": "LIVE_MODEL_REQUEST"
+          }
+        ],
+        "review_phase": "FOLLOWUP",
+        "proof_eligible": false,
+        "model_requested_clarification": false,
+        "answers_source_action_keys": []
+      },
+      {
+        "event_id": "10b243464b67c626b197",
+        "source_packet_ids": [
+          "question_scope_probe"
+        ],
+        "source_action_keys": [
+          "question_scope_probe:0:a4"
+        ],
+        "source_video_sha256": "db97b9dc0e2cda68f6c4619405270006e7ab31eeb44e73bd7ed432b1a8d0de38",
+        "kind": "DRIBBLE",
+        "event_type": "DRIBBLE",
+        "outcome": "COMPLETED",
+        "start_ms": 14133,
+        "end_ms": 15400,
+        "contact_ms": null,
+        "contact_interval_ms": null,
+        "contact_basis": "UNRESOLVED",
+        "contact_evidence": [],
+        "outcome_ms": 15400,
+        "selected_player": true,
+        "actor": "p1",
+        "actor_scope": "question_scope_probe:0",
+        "actor_evidence_frames": [
+          "s000014400",
+          "s000014767",
+          "s000015000",
+          "s000015300"
+        ],
+        "reference_ids": [
+          "r2",
+          "r4",
+          "r5",
+          "r6",
+          "r7",
+          "r10"
+        ],
+        "outcome_evidence": [
+          {
+            "frame": "s000014767",
+            "fact": "White 10 emerges from the nearby red challenge with the ball just ahead."
+          },
+          {
+            "frame": "s000015000",
+            "fact": "White 10 pushes the ball forward and accelerates after it."
+          },
+          {
+            "frame": "s000015400",
+            "fact": "White 10 continues toward goal behind the ball, with red 7 cutting across ahead and another defender chasing."
+          }
+        ],
+        "receiver": null,
+        "finisher": null,
+        "reason": "VISIBLE_ACTION",
+        "details": "Receives on the left, turns past pressure and advances with successive touches and a forward run. The camera pans with this uninterrupted attack.",
+        "receipts": [
+          {
+            "packet_id": "orman600_goal_focus",
+            "payload_sha256": "22ce92c67e98e99724ce43634dd509bb5ad18548562457c74265ec6049038da6",
+            "response_sha256": "67a65ac8d847e32dd4920fb65d8cca20c833d78bb8bb282f3b61913b2e02abc5",
+            "origin": "LIVE_MODEL_REQUEST"
+          }
+        ],
+        "review_phase": "FOLLOWUP",
+        "proof_eligible": true,
+        "model_requested_clarification": false,
+        "answers_source_action_keys": []
+      },
+      {
+        "event_id": "b40be1a83999a355c30b",
+        "source_packet_ids": [
+          "question_scope_probe"
+        ],
+        "source_action_keys": [
+          "question_scope_probe:0:a5"
+        ],
+        "source_video_sha256": "db97b9dc0e2cda68f6c4619405270006e7ab31eeb44e73bd7ed432b1a8d0de38",
+        "kind": "DUEL",
+        "event_type": "DUEL",
+        "outcome": "COMPLETED",
+        "start_ms": 15400,
+        "end_ms": 16533,
+        "contact_ms": null,
+        "contact_interval_ms": null,
+        "contact_basis": "UNRESOLVED",
+        "contact_evidence": [],
+        "outcome_ms": 16533,
+        "selected_player": true,
+        "actor": "p1",
+        "actor_scope": "question_scope_probe:0",
+        "actor_evidence_frames": [
+          "s000015767",
+          "s000015967",
+          "s000016233",
+          "s000016400"
+        ],
+        "reference_ids": [
+          "r2",
+          "r4",
+          "r5",
+          "r6",
+          "r7",
+          "r10"
+        ],
+        "outcome_evidence": [
+          {
+            "frame": "s000015767",
+            "fact": "Red 7 is between white 10 and the ball; white 10 closes on his right side."
+          },
+          {
+            "frame": "s000016233",
+            "fact": "White 10 reaches alongside red 7 with the ball between their feet."
+          },
+          {
+            "frame": "s000016533",
+            "fact": "White 10 remains engaged at the ball immediately in front of the goalkeeper."
+          }
+        ],
+        "receiver": null,
+        "finisher": null,
+        "reason": "VISIBLE_ACTION",
+        "details": "White 10 challenges the shielding red 7 and stretches around him. The ball remains in this close contest rather than being passed to another attacker. The earlier reaching movements are not substituted for the later finishing release.",
+        "receipts": [
+          {
+            "packet_id": "orman600_goal_focus",
+            "payload_sha256": "22ce92c67e98e99724ce43634dd509bb5ad18548562457c74265ec6049038da6",
+            "response_sha256": "67a65ac8d847e32dd4920fb65d8cca20c833d78bb8bb282f3b61913b2e02abc5",
+            "origin": "LIVE_MODEL_REQUEST"
+          }
+        ],
+        "review_phase": "FOLLOWUP",
+        "proof_eligible": true,
+        "model_requested_clarification": false,
+        "answers_source_action_keys": []
+      },
+      {
+        "event_id": "f7e4bd5c0fa708c46ce6",
+        "source_packet_ids": [
+          "question_scope_probe"
+        ],
+        "source_action_keys": [
+          "question_scope_probe:0:a6"
+        ],
+        "source_video_sha256": "db97b9dc0e2cda68f6c4619405270006e7ab31eeb44e73bd7ed432b1a8d0de38",
+        "kind": "SHOT",
+        "event_type": "GOAL",
+        "outcome": "GOAL",
+        "start_ms": 16533,
+        "end_ms": 17000,
+        "contact_ms": null,
+        "contact_interval_ms": [
+          16533,
+          16767
+        ],
+        "contact_basis": "BRACKETED_VISUAL_SEQUENCE",
+        "contact_evidence": [
+          {
+            "frame": "s000016533",
+            "fact": "White 10's lower leg reaches to the ball from behind and beside red 7; red 7 remains on the other side of it."
+          },
+          {
+            "frame": "s000016767",
+            "fact": "White 10 is falling after the reaching motion and the ball has departed across the goalkeeper toward the open goalmouth; red 7 is moving away from that departure."
+          }
+        ],
+        "outcome_ms": 17000,
+        "selected_player": true,
+        "actor": "p1",
+        "actor_scope": "question_scope_probe:0",
+        "actor_evidence_frames": [
+          "s000016533",
+          "s000016600",
+          "s000016767",
+          "s000016967"
+        ],
+        "reference_ids": [
+          "r2",
+          "r4",
+          "r5",
+          "r6",
+          "r7",
+          "r10"
+        ],
+        "outcome_evidence": [
+          {
+            "frame": "s000016800",
+            "fact": "The active ball is clear of the goalkeeper's feet and continues rightward into the goalmouth."
+          },
+          {
+            "frame": "s000016900",
+            "fact": "The ball continues beyond the goalkeeper toward the interior of the goal; neither approaching red defender has reached it."
+          },
+          {
+            "frame": "s000017000",
+            "fact": "The ball is inside the goal beyond the front goal-line plane, before the taller red defender's later kicking movement."
+          },
+          {
+            "frame": "s000017467",
+            "fact": "The same ball reappears beside the defender inside the goal after his attempted clearance."
+          },
+          {
+            "frame": "s000018633",
+            "fact": "The ball remains in the right-hand portion of the goal as the goalkeeper follows it."
+          }
+        ],
+        "receiver": null,
+        "finisher": "p1",
+        "reason": "VISIBLE_SHOT_OUTCOME",
+        "details": "White 10 pokes a close-range finish out of the duel with red 7 and falls. His reaching motion and the ball's departure establish the releasing actor despite overlapping legs obscuring the exact instant. The goalkeeper spreads his legs but does not stop or visibly redirect the departing ball. The ball travels into the goal before the later defender's attempted clearance. That subsequent intervention does not establish an own goal or a different finisher. White 10 later gets up; white 6 joins him. Those reactions are not used as goal evidence.",
+        "receipts": [
+          {
+            "packet_id": "orman600_goal_focus",
+            "payload_sha256": "22ce92c67e98e99724ce43634dd509bb5ad18548562457c74265ec6049038da6",
+            "response_sha256": "67a65ac8d847e32dd4920fb65d8cca20c833d78bb8bb282f3b61913b2e02abc5",
+            "origin": "LIVE_MODEL_REQUEST"
+          }
+        ],
+        "review_phase": "FOLLOWUP",
+        "proof_eligible": true,
+        "actor_context_frames": [
+          "s000016300"
+        ],
+        "model_requested_clarification": false,
+        "answers_source_action_keys": []
+      },
+      {
+        "event_id": "3dd400ec04fd11640f08",
+        "source_packet_ids": [
+          "question_scope_probe"
+        ],
+        "source_action_keys": [
+          "question_scope_probe:0:a7"
+        ],
+        "source_video_sha256": "db97b9dc0e2cda68f6c4619405270006e7ab31eeb44e73bd7ed432b1a8d0de38",
+        "kind": "OTHER",
+        "event_type": "OTHER",
+        "outcome": "INCOMPLETE",
+        "start_ms": 17033,
+        "end_ms": 18133,
+        "contact_ms": null,
+        "contact_interval_ms": [
+          17267,
+          17467
+        ],
+        "contact_basis": "BRACKETED_VISUAL_SEQUENCE",
+        "contact_evidence": [
+          {
+            "frame": "s000017267",
+            "fact": "The taller red defender is inside the goal, swinging a leg toward the ball behind red 16."
+          },
+          {
+            "frame": "s000017467",
+            "fact": "The ball reappears beside that defender after the swing, still within the goal."
+          }
+        ],
+        "outcome_ms": 18133,
+        "selected_player": false,
+        "actor": "p5",
+        "actor_scope": "question_scope_probe:0",
+        "actor_evidence_frames": [
+          "s000017267",
+          "s000017333",
+          "s000017467"
+        ],
+        "reference_ids": [],
+        "outcome_evidence": [
+          {
+            "frame": "s000017633",
+            "fact": "The ball rises within the goal after the defender's kicking movement."
+          },
+          {
+            "frame": "s000018133",
+            "fact": "The ball is still in the goal and the goalkeeper follows it to the right."
+          }
+        ],
+        "receiver": null,
+        "finisher": null,
+        "reason": "VISIBLE_ACTION",
+        "details": "Late, unsuccessful clearance attempt from inside the goal. Red 16 partially obscures the contact, but the taller defender's swing and the ball's reappearance identify the actor. This occurs after the active ball has already entered, not as the action that creates the goal.",
+        "receipts": [
+          {
+            "packet_id": "orman600_goal_focus",
+            "payload_sha256": "22ce92c67e98e99724ce43634dd509bb5ad18548562457c74265ec6049038da6",
+            "response_sha256": "67a65ac8d847e32dd4920fb65d8cca20c833d78bb8bb282f3b61913b2e02abc5",
+            "origin": "LIVE_MODEL_REQUEST"
+          }
+        ],
+        "review_phase": "FOLLOWUP",
+        "proof_eligible": false,
+        "model_requested_clarification": false,
+        "answers_source_action_keys": []
+      }
+    ],
+    "target_events": [
+      {
+        "event_id": "3b6111968bdca453f214",
+        "source_packet_ids": [
+          "question_scope_probe"
+        ],
+        "source_action_keys": [
+          "question_scope_probe:0:a1"
+        ],
+        "source_video_sha256": "db97b9dc0e2cda68f6c4619405270006e7ab31eeb44e73bd7ed432b1a8d0de38",
+        "kind": "DUEL",
+        "event_type": "DUEL",
+        "outcome": "INCOMPLETE",
+        "start_ms": 11267,
+        "end_ms": 12400,
+        "contact_ms": null,
+        "contact_interval_ms": null,
+        "contact_basis": "UNRESOLVED",
+        "contact_evidence": [],
+        "outcome_ms": 12400,
+        "selected_player": true,
+        "actor": "p1",
+        "actor_scope": "question_scope_probe:0",
+        "actor_evidence_frames": [
+          "s000011767",
+          "s000011800",
+          "s000012133"
+        ],
+        "reference_ids": [
+          "r2",
+          "r4",
+          "r5",
+          "r6",
+          "r7",
+          "r10"
+        ],
+        "outcome_evidence": [
+          {
+            "frame": "s000011800",
+            "fact": "White 10 reaches into a crowded contest with red opponents and another white player."
+          },
+          {
+            "frame": "s000012400",
+            "fact": "The ball comes out toward white 6, rather than remaining under white 10's control."
+          }
+        ],
+        "receiver": null,
+        "finisher": null,
+        "reason": "VISIBLE_ACTION",
+        "details": "White 10 challenges around the crowded ball and then moves left to offer an outlet. The overlapping legs do not establish an individual extraction touch; no pass or recovery is attributed to white 10 here.",
+        "receipts": [
+          {
+            "packet_id": "orman600_goal_focus",
+            "payload_sha256": "22ce92c67e98e99724ce43634dd509bb5ad18548562457c74265ec6049038da6",
+            "response_sha256": "67a65ac8d847e32dd4920fb65d8cca20c833d78bb8bb282f3b61913b2e02abc5",
+            "origin": "LIVE_MODEL_REQUEST"
+          }
+        ],
+        "review_phase": "FOLLOWUP",
+        "proof_eligible": true,
+        "model_requested_clarification": false,
+        "answers_source_action_keys": []
+      },
+      {
+        "event_id": "10b243464b67c626b197",
+        "source_packet_ids": [
+          "question_scope_probe"
+        ],
+        "source_action_keys": [
+          "question_scope_probe:0:a4"
+        ],
+        "source_video_sha256": "db97b9dc0e2cda68f6c4619405270006e7ab31eeb44e73bd7ed432b1a8d0de38",
+        "kind": "DRIBBLE",
+        "event_type": "DRIBBLE",
+        "outcome": "COMPLETED",
+        "start_ms": 14133,
+        "end_ms": 15400,
+        "contact_ms": null,
+        "contact_interval_ms": null,
+        "contact_basis": "UNRESOLVED",
+        "contact_evidence": [],
+        "outcome_ms": 15400,
+        "selected_player": true,
+        "actor": "p1",
+        "actor_scope": "question_scope_probe:0",
+        "actor_evidence_frames": [
+          "s000014400",
+          "s000014767",
+          "s000015000",
+          "s000015300"
+        ],
+        "reference_ids": [
+          "r2",
+          "r4",
+          "r5",
+          "r6",
+          "r7",
+          "r10"
+        ],
+        "outcome_evidence": [
+          {
+            "frame": "s000014767",
+            "fact": "White 10 emerges from the nearby red challenge with the ball just ahead."
+          },
+          {
+            "frame": "s000015000",
+            "fact": "White 10 pushes the ball forward and accelerates after it."
+          },
+          {
+            "frame": "s000015400",
+            "fact": "White 10 continues toward goal behind the ball, with red 7 cutting across ahead and another defender chasing."
+          }
+        ],
+        "receiver": null,
+        "finisher": null,
+        "reason": "VISIBLE_ACTION",
+        "details": "Receives on the left, turns past pressure and advances with successive touches and a forward run. The camera pans with this uninterrupted attack.",
+        "receipts": [
+          {
+            "packet_id": "orman600_goal_focus",
+            "payload_sha256": "22ce92c67e98e99724ce43634dd509bb5ad18548562457c74265ec6049038da6",
+            "response_sha256": "67a65ac8d847e32dd4920fb65d8cca20c833d78bb8bb282f3b61913b2e02abc5",
+            "origin": "LIVE_MODEL_REQUEST"
+          }
+        ],
+        "review_phase": "FOLLOWUP",
+        "proof_eligible": true,
+        "model_requested_clarification": false,
+        "answers_source_action_keys": []
+      },
+      {
+        "event_id": "b40be1a83999a355c30b",
+        "source_packet_ids": [
+          "question_scope_probe"
+        ],
+        "source_action_keys": [
+          "question_scope_probe:0:a5"
+        ],
+        "source_video_sha256": "db97b9dc0e2cda68f6c4619405270006e7ab31eeb44e73bd7ed432b1a8d0de38",
+        "kind": "DUEL",
+        "event_type": "DUEL",
+        "outcome": "COMPLETED",
+        "start_ms": 15400,
+        "end_ms": 16533,
+        "contact_ms": null,
+        "contact_interval_ms": null,
+        "contact_basis": "UNRESOLVED",
+        "contact_evidence": [],
+        "outcome_ms": 16533,
+        "selected_player": true,
+        "actor": "p1",
+        "actor_scope": "question_scope_probe:0",
+        "actor_evidence_frames": [
+          "s000015767",
+          "s000015967",
+          "s000016233",
+          "s000016400"
+        ],
+        "reference_ids": [
+          "r2",
+          "r4",
+          "r5",
+          "r6",
+          "r7",
+          "r10"
+        ],
+        "outcome_evidence": [
+          {
+            "frame": "s000015767",
+            "fact": "Red 7 is between white 10 and the ball; white 10 closes on his right side."
+          },
+          {
+            "frame": "s000016233",
+            "fact": "White 10 reaches alongside red 7 with the ball between their feet."
+          },
+          {
+            "frame": "s000016533",
+            "fact": "White 10 remains engaged at the ball immediately in front of the goalkeeper."
+          }
+        ],
+        "receiver": null,
+        "finisher": null,
+        "reason": "VISIBLE_ACTION",
+        "details": "White 10 challenges the shielding red 7 and stretches around him. The ball remains in this close contest rather than being passed to another attacker. The earlier reaching movements are not substituted for the later finishing release.",
+        "receipts": [
+          {
+            "packet_id": "orman600_goal_focus",
+            "payload_sha256": "22ce92c67e98e99724ce43634dd509bb5ad18548562457c74265ec6049038da6",
+            "response_sha256": "67a65ac8d847e32dd4920fb65d8cca20c833d78bb8bb282f3b61913b2e02abc5",
+            "origin": "LIVE_MODEL_REQUEST"
+          }
+        ],
+        "review_phase": "FOLLOWUP",
+        "proof_eligible": true,
+        "model_requested_clarification": false,
+        "answers_source_action_keys": []
+      },
+      {
+        "event_id": "f7e4bd5c0fa708c46ce6",
+        "source_packet_ids": [
+          "question_scope_probe"
+        ],
+        "source_action_keys": [
+          "question_scope_probe:0:a6"
+        ],
+        "source_video_sha256": "db97b9dc0e2cda68f6c4619405270006e7ab31eeb44e73bd7ed432b1a8d0de38",
+        "kind": "SHOT",
+        "event_type": "GOAL",
+        "outcome": "GOAL",
+        "start_ms": 16533,
+        "end_ms": 17000,
+        "contact_ms": null,
+        "contact_interval_ms": [
+          16533,
+          16767
+        ],
+        "contact_basis": "BRACKETED_VISUAL_SEQUENCE",
+        "contact_evidence": [
+          {
+            "frame": "s000016533",
+            "fact": "White 10's lower leg reaches to the ball from behind and beside red 7; red 7 remains on the other side of it."
+          },
+          {
+            "frame": "s000016767",
+            "fact": "White 10 is falling after the reaching motion and the ball has departed across the goalkeeper toward the open goalmouth; red 7 is moving away from that departure."
+          }
+        ],
+        "outcome_ms": 17000,
+        "selected_player": true,
+        "actor": "p1",
+        "actor_scope": "question_scope_probe:0",
+        "actor_evidence_frames": [
+          "s000016533",
+          "s000016600",
+          "s000016767",
+          "s000016967"
+        ],
+        "reference_ids": [
+          "r2",
+          "r4",
+          "r5",
+          "r6",
+          "r7",
+          "r10"
+        ],
+        "outcome_evidence": [
+          {
+            "frame": "s000016800",
+            "fact": "The active ball is clear of the goalkeeper's feet and continues rightward into the goalmouth."
+          },
+          {
+            "frame": "s000016900",
+            "fact": "The ball continues beyond the goalkeeper toward the interior of the goal; neither approaching red defender has reached it."
+          },
+          {
+            "frame": "s000017000",
+            "fact": "The ball is inside the goal beyond the front goal-line plane, before the taller red defender's later kicking movement."
+          },
+          {
+            "frame": "s000017467",
+            "fact": "The same ball reappears beside the defender inside the goal after his attempted clearance."
+          },
+          {
+            "frame": "s000018633",
+            "fact": "The ball remains in the right-hand portion of the goal as the goalkeeper follows it."
+          }
+        ],
+        "receiver": null,
+        "finisher": "p1",
+        "reason": "VISIBLE_SHOT_OUTCOME",
+        "details": "White 10 pokes a close-range finish out of the duel with red 7 and falls. His reaching motion and the ball's departure establish the releasing actor despite overlapping legs obscuring the exact instant. The goalkeeper spreads his legs but does not stop or visibly redirect the departing ball. The ball travels into the goal before the later defender's attempted clearance. That subsequent intervention does not establish an own goal or a different finisher. White 10 later gets up; white 6 joins him. Those reactions are not used as goal evidence.",
+        "receipts": [
+          {
+            "packet_id": "orman600_goal_focus",
+            "payload_sha256": "22ce92c67e98e99724ce43634dd509bb5ad18548562457c74265ec6049038da6",
+            "response_sha256": "67a65ac8d847e32dd4920fb65d8cca20c833d78bb8bb282f3b61913b2e02abc5",
+            "origin": "LIVE_MODEL_REQUEST"
+          }
+        ],
+        "review_phase": "FOLLOWUP",
+        "proof_eligible": true,
+        "actor_context_frames": [
+          "s000016300"
+        ],
+        "model_requested_clarification": false,
+        "answers_source_action_keys": []
+      }
+    ],
+    "counts": {
+      "DUEL": 2,
+      "DRIBBLE": 1,
+      "GOAL": 1
+    },
+    "questions": [
+      {
+        "reason": "RECEIVER",
+        "action_id": "a3",
+        "start_ms": 11267,
+        "end_ms": 21767,
+        "focus_ms": 14133,
+        "source_action_key": "question_scope_probe:0:a3",
+        "source_packet_id": "question_scope_probe",
+        "explicit_model_question": false,
+        "target_related": null,
+        "scope": "ACTION",
+        "question": "",
+        "after_ms": null
+      }
+    ],
+    "conflicts": []
+  }
+}
