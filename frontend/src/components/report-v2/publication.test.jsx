@@ -32,10 +32,12 @@ test('frontend uses shared fields without slicing or substituting moments',()=>{
 test('all five key actions preserve exact proof IDs; unverified proof cannot play',()=>{
   const play=jest.fn();
   render(<PublicationEvidence publication={publication} onPlayAt={play}/>);
-  expect(screen.getByTestId('publication-evidence').textContent).toContain('13/25 skills rated');
+  expect(screen.getByTestId('publication-evidence').textContent).not.toContain('13/25 skills rated');
+  expect(screen.getByTestId('publication-evidence').textContent).not.toContain('Evidence reference:');
+  expect(screen.getByTestId('publication-evidence').textContent).not.toContain('Contact window:');
   expect(screen.getByTestId('academy-reference').textContent).toContain('Coaching rubric');
   expect(document.querySelectorAll('details')).toHaveLength(5);
-  fireEvent.click(screen.getAllByRole('button',{name:/Watch evidence/,hidden:true})[0]);
+  fireEvent.click(screen.getAllByRole('button',{name:/Watch this moment/,hidden:true})[0]);
   expect(play).toHaveBeenCalledWith('00:24',{eventId:'action-0',evidenceId:'proof-0'});
   expect(document.querySelectorAll('button')).toHaveLength(4);
 });
@@ -43,7 +45,7 @@ test('all five key actions preserve exact proof IDs; unverified proof cannot pla
 test('provisional rubric score cannot place player on recruitment ladder',()=>{
   render(<DreamPathSection report={{report_publication:publication}} d={{devPriorities:[]}} playerName="Test Player"/>);
   expect(screen.queryByText('YOU ARE HERE')).toBeNull();
-  expect(screen.getByText(/recruitment readiness are not established/)).toBeTruthy();
+  expect(screen.getByText(/choose the next challenge for your football/)).toBeTruthy();
 });
 
 
@@ -72,7 +74,7 @@ test('PDF event links reveal their exact evidence on mobile',async()=>{
   expect(await screen.findByTestId('publication-evidence')).toBeTruthy();
   expect(document.getElementById('event-action-2').open).toBe(true);
   expect(document.getElementById('event-action-0').open).toBe(false);
-  fireEvent.click(screen.getByRole('button',{name:'Watch evidence · 00:38',hidden:true}));
+  fireEvent.click(screen.getByRole('button',{name:'Watch this moment · 00:38',hidden:true}));
   expect(props.playAt).toHaveBeenCalledWith('00:38',{eventId:'action-2',evidenceId:'proof-2'});
   expect(screen.getByTestId('pm-cat-evidence-toggle').textContent).toContain('24');
   window.history.replaceState({},'', '/');
@@ -85,8 +87,8 @@ test('mobile academy bars use the same qualified rubric as desktop and PDF',()=>
   render(<PremiumMobileCategories {...props}/>);
   fireEvent.click(screen.getByTestId('pm-cat-impact-toggle'));
   const reference=screen.getByTestId('v2-age-comparison-card');
-  expect(reference.textContent).toContain('Academy rubric reference');
-  expect(reference.textContent).toContain('not population percentiles');
+  expect(reference.textContent).toContain('Academy skill guide');
+  expect(reference.textContent).toContain('ScoutMePlay coaching guide');
   expect(reference.textContent).not.toContain('compares to other players');
 });
 

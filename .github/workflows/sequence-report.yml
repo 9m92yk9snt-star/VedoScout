@@ -14,14 +14,19 @@ on:
   pull_request:
     paths:
       - 'backend/sequence_report_*.py'
+      - 'backend/sequence_foot_evidence.py'
+      - 'backend/sequence_action_evidence.py'
       - 'backend/sequence_run_checkpoint.py'
       - 'backend/scripts/run_sequence_report_trial.py'
       - 'backend/scripts/probe_question_scope.py'
       - 'backend/tests/test_sequence_report.py'
+      - 'backend/tests/test_sequence_foot_evidence.py'
+      - 'backend/tests/test_sequence_action_evidence.py'
       - 'backend/tests/test_sequence_only.py'
       - 'backend/evidence_authority.py'
       - 'backend/server.py'
       - 'backend/report_publication.py'
+      - 'backend/player_report_copy.py'
       - 'backend/pdf_v2.py'
       - 'backend/tests/test_report_publication.py'
       - '.github/workflows/sequence-report.yml'
@@ -42,7 +47,7 @@ jobs:
         with:
           python-version: '3.12'
       - run: python -m pip install 'numpy<3' 'opencv-python-headless<5' 'Pillow>=10,<15' 'pytest>=8,<10' 'python-dotenv>=1,<2' 'reportlab>=4,<5' 'pypdf>=5,<7'
-      - run: python -m pytest backend/tests/test_sequence_report.py backend/tests/test_sequence_only.py backend/tests/test_report_publication.py -q
+      - run: python -m pytest backend/tests/test_sequence_report.py backend/tests/test_sequence_foot_evidence.py backend/tests/test_sequence_action_evidence.py backend/tests/test_sequence_only.py backend/tests/test_report_publication.py -q
 
   question_scope_probe:
     if: >-

@@ -1,0 +1,859 @@
+{
+  "scope": "HISTORICAL_OFFLINE_REGRESSION_ONLY",
+  "source_video_sha256": "db97b9dc0e2cda68f6c4619405270006e7ab31eeb44e73bd7ed432b1a8d0de38",
+  "packet": {
+    "packet_id": "question_scope_probe",
+    "phase": "FOLLOWUP",
+    "contact_sequence_evidence": true,
+    "start_ms": 11267,
+    "end_ms": 21899,
+    "core_start_ms": 11267,
+    "core_end_ms": 21900,
+    "reference_ids": [
+      "r1",
+      "r2",
+      "r3",
+      "r4",
+      "r5",
+      "r6",
+      "r7",
+      "r8",
+      "r9",
+      "r10"
+    ],
+    "detail_start_ms": 15400,
+    "detail_end_ms": 18100,
+    "question": {
+      "reason": "CONTACT",
+      "focus_ms": 16600,
+      "instruction": "Observe this user-located source window afresh using the full play and original selections. Follow all actors and the active ball through the visible outcome. Use the question scope contract; keep uncertainty where the images are insufficient. No expected result is supplied."
+    },
+    "source_crop_box": [
+      0,
+      877,
+      1080,
+      1257
+    ],
+    "native_crop_count": 82,
+    "extra_detail_frame_ms": [],
+    "frame_ids": [
+      "s000011267",
+      "s000011400",
+      "s000011500",
+      "s000011633",
+      "s000011767",
+      "s000011800",
+      "s000011900",
+      "s000012000",
+      "s000012133",
+      "s000012267",
+      "s000012400",
+      "s000012500",
+      "s000012633",
+      "s000012767",
+      "s000012900",
+      "s000013000",
+      "s000013133",
+      "s000013267",
+      "s000013400",
+      "s000013500",
+      "s000013633",
+      "s000013767",
+      "s000013900",
+      "s000014000",
+      "s000014133",
+      "s000014267",
+      "s000014400",
+      "s000014500",
+      "s000014633",
+      "s000014767",
+      "s000014900",
+      "s000015000",
+      "s000015133",
+      "s000015267",
+      "s000015300",
+      "s000015400",
+      "s000015433",
+      "s000015467",
+      "s000015500",
+      "s000015533",
+      "s000015567",
+      "s000015600",
+      "s000015633",
+      "s000015667",
+      "s000015700",
+      "s000015733",
+      "s000015767",
+      "s000015800",
+      "s000015833",
+      "s000015867",
+      "s000015900",
+      "s000015933",
+      "s000015967",
+      "s000016000",
+      "s000016033",
+      "s000016067",
+      "s000016100",
+      "s000016133",
+      "s000016167",
+      "s000016200",
+      "s000016233",
+      "s000016267",
+      "s000016300",
+      "s000016333",
+      "s000016367",
+      "s000016400",
+      "s000016433",
+      "s000016467",
+      "s000016500",
+      "s000016533",
+      "s000016567",
+      "s000016600",
+      "s000016633",
+      "s000016667",
+      "s000016700",
+      "s000016733",
+      "s000016767",
+      "s000016800",
+      "s000016833",
+      "s000016867",
+      "s000016900",
+      "s000016933",
+      "s000016967",
+      "s000017000",
+      "s000017033",
+      "s000017067",
+      "s000017100",
+      "s000017133",
+      "s000017167",
+      "s000017200",
+      "s000017233",
+      "s000017267",
+      "s000017300",
+      "s000017333",
+      "s000017367",
+      "s000017400",
+      "s000017433",
+      "s000017467",
+      "s000017500",
+      "s000017533",
+      "s000017567",
+      "s000017600",
+      "s000017633",
+      "s000017667",
+      "s000017700",
+      "s000017733",
+      "s000017767",
+      "s000017800",
+      "s000017833",
+      "s000017867",
+      "s000017900",
+      "s000017933",
+      "s000017967",
+      "s000018000",
+      "s000018033",
+      "s000018067",
+      "s000018100",
+      "s000018133",
+      "s000018267",
+      "s000018400",
+      "s000018500",
+      "s000018633",
+      "s000018767",
+      "s000018900",
+      "s000019000",
+      "s000019133",
+      "s000019267",
+      "s000019400",
+      "s000019500",
+      "s000019633",
+      "s000019767",
+      "s000019900",
+      "s000020000",
+      "s000020133",
+      "s000020267",
+      "s000020400",
+      "s000020500",
+      "s000020633",
+      "s000020767",
+      "s000020900",
+      "s000021000",
+      "s000021133",
+      "s000021267",
+      "s000021400",
+      "s000021500",
+      "s000021633",
+      "s000021767"
+    ]
+  },
+  "manifest": {
+    "source_video_sha256": "db97b9dc0e2cda68f6c4619405270006e7ab31eeb44e73bd7ed432b1a8d0de38",
+    "frames": [
+      {
+        "frame_id": "s000011267",
+        "media_ms": 11267
+      },
+      {
+        "frame_id": "s000011400",
+        "media_ms": 11400
+      },
+      {
+        "frame_id": "s000011500",
+        "media_ms": 11500
+      },
+      {
+        "frame_id": "s000011633",
+        "media_ms": 11633
+      },
+      {
+        "frame_id": "s000011767",
+        "media_ms": 11767
+      },
+      {
+        "frame_id": "s000011800",
+        "media_ms": 11800
+      },
+      {
+        "frame_id": "s000011900",
+        "media_ms": 11900
+      },
+      {
+        "frame_id": "s000012000",
+        "media_ms": 12000
+      },
+      {
+        "frame_id": "s000012133",
+        "media_ms": 12133
+      },
+      {
+        "frame_id": "s000012267",
+        "media_ms": 12267
+      },
+      {
+        "frame_id": "s000012400",
+        "media_ms": 12400
+      },
+      {
+        "frame_id": "s000012500",
+        "media_ms": 12500
+      },
+      {
+        "frame_id": "s000012633",
+        "media_ms": 12633
+      },
+      {
+        "frame_id": "s000012767",
+        "media_ms": 12767
+      },
+      {
+        "frame_id": "s000012900",
+        "media_ms": 12900
+      },
+      {
+        "frame_id": "s000013000",
+        "media_ms": 13000
+      },
+      {
+        "frame_id": "s000013133",
+        "media_ms": 13133
+      },
+      {
+        "frame_id": "s000013267",
+        "media_ms": 13267
+      },
+      {
+        "frame_id": "s000013400",
+        "media_ms": 13400
+      },
+      {
+        "frame_id": "s000013500",
+        "media_ms": 13500
+      },
+      {
+        "frame_id": "s000013633",
+        "media_ms": 13633
+      },
+      {
+        "frame_id": "s000013767",
+        "media_ms": 13767
+      },
+      {
+        "frame_id": "s000013900",
+        "media_ms": 13900
+      },
+      {
+        "frame_id": "s000014000",
+        "media_ms": 14000
+      },
+      {
+        "frame_id": "s000014133",
+        "media_ms": 14133
+      },
+      {
+        "frame_id": "s000014267",
+        "media_ms": 14267
+      },
+      {
+        "frame_id": "s000014400",
+        "media_ms": 14400
+      },
+      {
+        "frame_id": "s000014500",
+        "media_ms": 14500
+      },
+      {
+        "frame_id": "s000014633",
+        "media_ms": 14633
+      },
+      {
+        "frame_id": "s000014767",
+        "media_ms": 14767
+      },
+      {
+        "frame_id": "s000014900",
+        "media_ms": 14900
+      },
+      {
+        "frame_id": "s000015000",
+        "media_ms": 15000
+      },
+      {
+        "frame_id": "s000015133",
+        "media_ms": 15133
+      },
+      {
+        "frame_id": "s000015267",
+        "media_ms": 15267
+      },
+      {
+        "frame_id": "s000015300",
+        "media_ms": 15300
+      },
+      {
+        "frame_id": "s000015400",
+        "media_ms": 15400
+      },
+      {
+        "frame_id": "s000015433",
+        "media_ms": 15433
+      },
+      {
+        "frame_id": "s000015467",
+        "media_ms": 15467
+      },
+      {
+        "frame_id": "s000015500",
+        "media_ms": 15500
+      },
+      {
+        "frame_id": "s000015533",
+        "media_ms": 15533
+      },
+      {
+        "frame_id": "s000015567",
+        "media_ms": 15567
+      },
+      {
+        "frame_id": "s000015600",
+        "media_ms": 15600
+      },
+      {
+        "frame_id": "s000015633",
+        "media_ms": 15633
+      },
+      {
+        "frame_id": "s000015667",
+        "media_ms": 15667
+      },
+      {
+        "frame_id": "s000015700",
+        "media_ms": 15700
+      },
+      {
+        "frame_id": "s000015733",
+        "media_ms": 15733
+      },
+      {
+        "frame_id": "s000015767",
+        "media_ms": 15767
+      },
+      {
+        "frame_id": "s000015800",
+        "media_ms": 15800
+      },
+      {
+        "frame_id": "s000015833",
+        "media_ms": 15833
+      },
+      {
+        "frame_id": "s000015867",
+        "media_ms": 15867
+      },
+      {
+        "frame_id": "s000015900",
+        "media_ms": 15900
+      },
+      {
+        "frame_id": "s000015933",
+        "media_ms": 15933
+      },
+      {
+        "frame_id": "s000015967",
+        "media_ms": 15967
+      },
+      {
+        "frame_id": "s000016000",
+        "media_ms": 16000
+      },
+      {
+        "frame_id": "s000016033",
+        "media_ms": 16033
+      },
+      {
+        "frame_id": "s000016067",
+        "media_ms": 16067
+      },
+      {
+        "frame_id": "s000016100",
+        "media_ms": 16100
+      },
+      {
+        "frame_id": "s000016133",
+        "media_ms": 16133
+      },
+      {
+        "frame_id": "s000016167",
+        "media_ms": 16167
+      },
+      {
+        "frame_id": "s000016200",
+        "media_ms": 16200
+      },
+      {
+        "frame_id": "s000016233",
+        "media_ms": 16233
+      },
+      {
+        "frame_id": "s000016267",
+        "media_ms": 16267
+      },
+      {
+        "frame_id": "s000016300",
+        "media_ms": 16300
+      },
+      {
+        "frame_id": "s000016333",
+        "media_ms": 16333
+      },
+      {
+        "frame_id": "s000016367",
+        "media_ms": 16367
+      },
+      {
+        "frame_id": "s000016400",
+        "media_ms": 16400
+      },
+      {
+        "frame_id": "s000016433",
+        "media_ms": 16433
+      },
+      {
+        "frame_id": "s000016467",
+        "media_ms": 16467
+      },
+      {
+        "frame_id": "s000016500",
+        "media_ms": 16500
+      },
+      {
+        "frame_id": "s000016533",
+        "media_ms": 16533
+      },
+      {
+        "frame_id": "s000016567",
+        "media_ms": 16567
+      },
+      {
+        "frame_id": "s000016600",
+        "media_ms": 16600
+      },
+      {
+        "frame_id": "s000016633",
+        "media_ms": 16633
+      },
+      {
+        "frame_id": "s000016667",
+        "media_ms": 16667
+      },
+      {
+        "frame_id": "s000016700",
+        "media_ms": 16700
+      },
+      {
+        "frame_id": "s000016733",
+        "media_ms": 16733
+      },
+      {
+        "frame_id": "s000016767",
+        "media_ms": 16767
+      },
+      {
+        "frame_id": "s000016800",
+        "media_ms": 16800
+      },
+      {
+        "frame_id": "s000016833",
+        "media_ms": 16833
+      },
+      {
+        "frame_id": "s000016867",
+        "media_ms": 16867
+      },
+      {
+        "frame_id": "s000016900",
+        "media_ms": 16900
+      },
+      {
+        "frame_id": "s000016933",
+        "media_ms": 16933
+      },
+      {
+        "frame_id": "s000016967",
+        "media_ms": 16967
+      },
+      {
+        "frame_id": "s000017000",
+        "media_ms": 17000
+      },
+      {
+        "frame_id": "s000017033",
+        "media_ms": 17033
+      },
+      {
+        "frame_id": "s000017067",
+        "media_ms": 17067
+      },
+      {
+        "frame_id": "s000017100",
+        "media_ms": 17100
+      },
+      {
+        "frame_id": "s000017133",
+        "media_ms": 17133
+      },
+      {
+        "frame_id": "s000017167",
+        "media_ms": 17167
+      },
+      {
+        "frame_id": "s000017200",
+        "media_ms": 17200
+      },
+      {
+        "frame_id": "s000017233",
+        "media_ms": 17233
+      },
+      {
+        "frame_id": "s000017267",
+        "media_ms": 17267
+      },
+      {
+        "frame_id": "s000017300",
+        "media_ms": 17300
+      },
+      {
+        "frame_id": "s000017333",
+        "media_ms": 17333
+      },
+      {
+        "frame_id": "s000017367",
+        "media_ms": 17367
+      },
+      {
+        "frame_id": "s000017400",
+        "media_ms": 17400
+      },
+      {
+        "frame_id": "s000017433",
+        "media_ms": 17433
+      },
+      {
+        "frame_id": "s000017467",
+        "media_ms": 17467
+      },
+      {
+        "frame_id": "s000017500",
+        "media_ms": 17500
+      },
+      {
+        "frame_id": "s000017533",
+        "media_ms": 17533
+      },
+      {
+        "frame_id": "s000017567",
+        "media_ms": 17567
+      },
+      {
+        "frame_id": "s000017600",
+        "media_ms": 17600
+      },
+      {
+        "frame_id": "s000017633",
+        "media_ms": 17633
+      },
+      {
+        "frame_id": "s000017667",
+        "media_ms": 17667
+      },
+      {
+        "frame_id": "s000017700",
+        "media_ms": 17700
+      },
+      {
+        "frame_id": "s000017733",
+        "media_ms": 17733
+      },
+      {
+        "frame_id": "s000017767",
+        "media_ms": 17767
+      },
+      {
+        "frame_id": "s000017800",
+        "media_ms": 17800
+      },
+      {
+        "frame_id": "s000017833",
+        "media_ms": 17833
+      },
+      {
+        "frame_id": "s000017867",
+        "media_ms": 17867
+      },
+      {
+        "frame_id": "s000017900",
+        "media_ms": 17900
+      },
+      {
+        "frame_id": "s000017933",
+        "media_ms": 17933
+      },
+      {
+        "frame_id": "s000017967",
+        "media_ms": 17967
+      },
+      {
+        "frame_id": "s000018000",
+        "media_ms": 18000
+      },
+      {
+        "frame_id": "s000018033",
+        "media_ms": 18033
+      },
+      {
+        "frame_id": "s000018067",
+        "media_ms": 18067
+      },
+      {
+        "frame_id": "s000018100",
+        "media_ms": 18100
+      },
+      {
+        "frame_id": "s000018133",
+        "media_ms": 18133
+      },
+      {
+        "frame_id": "s000018267",
+        "media_ms": 18267
+      },
+      {
+        "frame_id": "s000018400",
+        "media_ms": 18400
+      },
+      {
+        "frame_id": "s000018500",
+        "media_ms": 18500
+      },
+      {
+        "frame_id": "s000018633",
+        "media_ms": 18633
+      },
+      {
+        "frame_id": "s000018767",
+        "media_ms": 18767
+      },
+      {
+        "frame_id": "s000018900",
+        "media_ms": 18900
+      },
+      {
+        "frame_id": "s000019000",
+        "media_ms": 19000
+      },
+      {
+        "frame_id": "s000019133",
+        "media_ms": 19133
+      },
+      {
+        "frame_id": "s000019267",
+        "media_ms": 19267
+      },
+      {
+        "frame_id": "s000019400",
+        "media_ms": 19400
+      },
+      {
+        "frame_id": "s000019500",
+        "media_ms": 19500
+      },
+      {
+        "frame_id": "s000019633",
+        "media_ms": 19633
+      },
+      {
+        "frame_id": "s000019767",
+        "media_ms": 19767
+      },
+      {
+        "frame_id": "s000019900",
+        "media_ms": 19900
+      },
+      {
+        "frame_id": "s000020000",
+        "media_ms": 20000
+      },
+      {
+        "frame_id": "s000020133",
+        "media_ms": 20133
+      },
+      {
+        "frame_id": "s000020267",
+        "media_ms": 20267
+      },
+      {
+        "frame_id": "s000020400",
+        "media_ms": 20400
+      },
+      {
+        "frame_id": "s000020500",
+        "media_ms": 20500
+      },
+      {
+        "frame_id": "s000020633",
+        "media_ms": 20633
+      },
+      {
+        "frame_id": "s000020767",
+        "media_ms": 20767
+      },
+      {
+        "frame_id": "s000020900",
+        "media_ms": 20900
+      },
+      {
+        "frame_id": "s000021000",
+        "media_ms": 21000
+      },
+      {
+        "frame_id": "s000021133",
+        "media_ms": 21133
+      },
+      {
+        "frame_id": "s000021267",
+        "media_ms": 21267
+      },
+      {
+        "frame_id": "s000021400",
+        "media_ms": 21400
+      },
+      {
+        "frame_id": "s000021500",
+        "media_ms": 21500
+      },
+      {
+        "frame_id": "s000021633",
+        "media_ms": 21633
+      },
+      {
+        "frame_id": "s000021767",
+        "media_ms": 21767
+      }
+    ],
+    "references": [
+      {
+        "reference_id": "r1",
+        "media_ms": 2933,
+        "sha256": "776a1baa0545acc7497568897f834dfa683e77ab6ea6bcba2242370e31add0aa"
+      },
+      {
+        "reference_id": "r2",
+        "media_ms": 17700,
+        "sha256": "6c0ec3cc386f0c1a14ed3e4f41dd1ee1669d57e33addef764e9d81cd7e84d11e"
+      },
+      {
+        "reference_id": "r3",
+        "media_ms": 29534,
+        "sha256": "00e70919666d8b657e857dd0bfda6b400d0e03807a6363c062c9145b7da0fce4"
+      },
+      {
+        "reference_id": "r4",
+        "media_ms": 7400,
+        "sha256": "74700ca4ab5a0a79cf56feb4ab766c8144c1ac05fda6e768faa3f5c8fc0123f6"
+      },
+      {
+        "reference_id": "r5",
+        "media_ms": 8833,
+        "sha256": "7d39647aa27adebfd433f615bdb847f3bdfc942334ab1d25de5a3e106120bf6e"
+      },
+      {
+        "reference_id": "r6",
+        "media_ms": 11800,
+        "sha256": "bf05205b4eeb4fe7c0546ade6b6380afdfc78b1da633d8bcc7c22bd6a054f54e"
+      },
+      {
+        "reference_id": "r7",
+        "media_ms": 15300,
+        "sha256": "4ddfc381d539955518bfd4a2faba47b02569845a78349a48a9f9e0076ba32e85"
+      },
+      {
+        "reference_id": "r8",
+        "media_ms": 22700,
+        "sha256": "56d4467f3dcb19b897fbf3e7e07661636855f0aa73a101fb2d552f7ff7357ab8"
+      },
+      {
+        "reference_id": "r9",
+        "media_ms": 24633,
+        "sha256": "fe99ab78da123acd79507171c970079c70ad052f3f4154575e7f3d05dbb13895"
+      },
+      {
+        "reference_id": "r10",
+        "media_ms": 26600,
+        "sha256": "16e55d02246cc15c4b1a13e7831c568ce649f38480692c8e110c9ea359de99b7"
+      }
+    ]
+  },
+  "goal_focus_instruction": "GOAL-ATTRIBUTION REVIEW PRIORITY. Independently assess the selected player's attack and the active ball's visible goal outcome. The sole evaluation priority is whether a selected-player GOAL is supported; do not spend this review resolving anatomical foot. There is no expected scorer or required answer. Keep the supplied plays/actions/people/questions JSON contract. Evaluate separately (1) the releasing actor from the approach, body/limb motion and ball departure, (2) continuity of that active ball into the goal, (3) any goalkeeper or defender intervention and its visible effect. Follow the sequence before and after each occlusion. Distinguish an observed touch from a hypothetical possible touch, and a failed clearance from controlled opponent possession or a decisive redirection. An exact boot-ball frame, unknown striking foot, keeper movement, or brief occlusion alone neither proves nor disproves attribution. If a later touch is unclear, assess whether the existing images establish the ball was already travelling into the goal before it; do not assume every possible brush changes the scorer, and do not assume an obscured intervention is harmless. Return GOAL and contact_actor_unique=true only if the source sequence supports them; otherwise retain the specific uncertainty. Add a top-level goal_review object containing releasing_actor, actor_assessment (SUPPORTED/UNCERTAIN), ball_in_goal_assessment (SUPPORTED/UNCERTAIN), intervention_assessment, attribution_assessment (SUPPORTED/UNCERTAIN), and evidence arrays of {frame,fact} for release, ball path and any intervention. Explain the strongest competing attribution and which supplied frames exclude it or why it remains unresolved. Do not invent a contact or goal-line crossing time. No earlier model answer, user scorer label or desired result is supplied.",
+  "receipts": [
+    {
+      "packet_id": "orman600_foot_v2",
+      "status": "COMPLETED",
+      "origin": "LIVE_MODEL_REQUEST",
+      "provider": "emergent",
+      "requested_model": "gpt-6-astra",
+      "payload_sha256": "a4dd4603cb1138e24f5b8d21658f42a8a78e4d3978fde4670733954e7f84183f",
+      "response_sha256": "a136527a9aa4384b077078df129e52bec84fe630f82de2fcb99734d50e541e02",
+      "raw_response": "{\n  \"plays\": [\n    {\n      \"start_frame\": \"s000011267\",\n      \"end_frame\": \"s000021767\",\n      \"people\": [\n        {\n          \"person_id\": \"p1\",\n          \"selected\": true,\n          \"kit_consistent\": true,\n          \"reference_ids\": [\"r2\", \"r5\", \"r6\", \"r7\", \"r10\"],\n          \"evidence_frames\": [\"s000011800\", \"s000014400\", \"s000015300\", \"s000016300\", \"s000017700\"],\n          \"appearance\": \"Short dark-haired player in white number 10, black undersleeves and gloves, white socks and light boots.\"\n        },\n        {\n          \"person_id\": \"p2\",\n          \"selected\": false,\n          \"kit_consistent\": true,\n          \"reference_ids\": [],\n          \"evidence_frames\": [\"s000012500\", \"s000013633\", \"s000017700\"],\n          \"appearance\": \"White number 6, dark head covering, black undersleeves and gloves.\"\n        },\n        {\n          \"person_id\": \"p3\",\n          \"selected\": false,\n          \"kit_consistent\": true,\n          \"reference_ids\": [],\n          \"evidence_frames\": [\"s000012133\", \"s000012900\", \"s000013633\"],\n          \"appearance\": \"Shorter red-shirted midfielder, dark hair, black shorts and socks; challenges white number 6.\"\n        },\n        {\n          \"person_id\": \"p4\",\n          \"selected\": false,\n          \"kit_consistent\": true,\n          \"reference_ids\": [],\n          \"evidence_frames\": [\"s000011800\", \"s000014133\", \"s000015400\", \"s000016900\", \"s000017400\"],\n          \"appearance\": \"Taller red-shirted player with dark head covering, black shorts and socks; follows the attack into the goalmouth.\"\n        },\n        {\n          \"person_id\": \"p5\",\n          \"selected\": false,\n          \"kit_consistent\": true,\n          \"reference_ids\": [],\n          \"evidence_frames\": [\"s000015300\", \"s000015733\", \"s000016300\"],\n          \"appearance\": \"Red number 7, uncovered light-brown hair, black shorts and socks; runs immediately ahead of white number 10.\"\n        },\n        {\n          \"person_id\": \"p6\",\n          \"selected\": false,\n          \"kit_consistent\": true,\n          \"reference_ids\": [],\n          \"evidence_frames\": [\"s000014633\", \"s000015400\", \"s000016900\", \"s000017000\"],\n          \"appearance\": \"Red number 16, dark hair, black sleeves, black shorts and socks, pale boots; pursues white number 10.\"\n        },\n        {\n          \"person_id\": \"p7\",\n          \"selected\": false,\n          \"kit_consistent\": true,\n          \"reference_ids\": [],\n          \"evidence_frames\": [\"s000015400\", \"s000016600\", \"s000018767\"],\n          \"appearance\": \"Goalkeeper in blue/purple long-sleeved kit, dark leggings and pale boots; number 1 visible later.\"\n        },\n        {\n          \"person_id\": \"p8\",\n          \"selected\": false,\n          \"kit_consistent\": true,\n          \"reference_ids\": [],\n          \"evidence_frames\": [\"s000011800\", \"s000012267\", \"s000013900\"],\n          \"appearance\": \"Separate white teammate in the initial central crowd, dark lower-leg clothing; number not reliably readable.\"\n        },\n        {\n          \"person_id\": \"p9\",\n          \"selected\": false,\n          \"kit_consistent\": true,\n          \"reference_ids\": [],\n          \"evidence_frames\": [\"s000013900\", \"s000014267\", \"s000014900\"],\n          \"appearance\": \"Taller light-haired red number 15, black shorts and socks; stands between the passing lane and the selected player.\"\n        },\n        {\n          \"person_id\": \"p10\",\n          \"selected\": false,\n          \"kit_consistent\": true,\n          \"reference_ids\": [],\n          \"evidence_frames\": [\"s000015433\", \"s000016900\", \"s000017700\"],\n          \"appearance\": \"White number 4 wearing a blue head covering and black gloves; approaches behind the goalmouth action.\"\n        }\n      ],\n      \"actions\": [\n        {\n          \"action_id\": \"a1\",\n          \"kind\": \"DUEL\",\n          \"actor\": \"p1\",\n          \"start_frame\": \"s000011267\",\n          \"contact_frame\": null,\n          \"end_frame\": \"s000012400\",\n          \"actor_evidence_frames\": [\"s000011767\", \"s000011800\", \"s000012133\"],\n          \"ball_id\": \"b1\",\n          \"outcome\": \"UNKNOWN\",\n          \"receiver\": null,\n          \"receiver_frame\": null,\n          \"receiver_is_teammate\": null,\n          \"finisher\": null,\n          \"shot_frame\": null,\n          \"outcome_frame\": null,\n          \"same_active_ball\": true,\n          \"continuous_play\": true,\n          \"outcome_evidence\": [\n            {\n              \"frame\": \"s000011800\",\n              \"fact\": \"White number 10 reaches into the crowded contest beside another white player and two red players.\"\n            },\n            {\n              \"frame\": \"s000012267\",\n              \"fact\": \"The ball emerges on the right of the crowd, near the shorter red midfielder and white number 6.\"\n            }\n          ],\n          \"details\": \"The selected player contests the ball and then moves left into space. Several legs overlap during the initial touches; no distinct pass or recovery by number 10 is established.\"\n        },\n        {\n          \"action_id\": \"a2\",\n          \"kind\": \"RECOVERY\",\n          \"actor\": \"p2\",\n          \"start_frame\": \"s000012400\",\n          \"contact_frame\": null,\n          \"end_frame\": \"s000013633\",\n          \"actor_evidence_frames\": [\"s000012500\", \"s000012767\", \"s000013400\", \"s000013633\"],\n          \"ball_id\": \"b1\",\n          \"outcome\": \"COMPLETED\",\n          \"receiver\": null,\n          \"receiver_frame\": null,\n          \"receiver_is_teammate\": null,\n          \"finisher\": null,\n          \"shot_frame\": null,\n          \"outcome_frame\": \"s000013633\",\n          \"same_active_ball\": true,\n          \"continuous_play\": true,\n          \"outcome_evidence\": [\n            {\n              \"frame\": \"s000012767\",\n              \"fact\": \"White number 6 has the ball beside his feet as the shorter red player closes.\"\n            },\n            {\n              \"frame\": \"s000013633\",\n              \"fact\": \"Number 6 has turned across the challenger and retains the ball in front of himself.\"\n            }\n          ],\n          \"details\": \"Collects the ball emerging from the crowd, shields against p3 and turns left with short dribbling touches.\"\n        },\n        {\n          \"action_id\": \"a3\",\n          \"kind\": \"PASS\",\n          \"actor\": \"p2\",\n          \"start_frame\": \"s000013633\",\n          \"contact_frame\": null,\n          \"contact_before_frame\": \"s000013633\",\n          \"contact_after_frame\": \"s000013767\",\n          \"contact_actor_unique\": true,\n          \"contact_evidence\": [\n            {\n              \"frame\": \"s000013633\",\n              \"fact\": \"Number 6 has the ball immediately in front of his boot, with the red challenger behind his body.\"\n            },\n            {\n              \"frame\": \"s000013767\",\n              \"fact\": \"Number 6 extends his leg and the ball has departed left along the ground, clear of the challenger.\"\n            }\n          ],\n          \"end_frame\": \"s000014267\",\n          \"actor_evidence_frames\": [\"s000013633\", \"s000013767\"],\n          \"ball_id\": \"b1\",\n          \"outcome\": \"TEAMMATE_SHOT\",\n          \"receiver\": \"p1\",\n          \"receiver_frame\": \"s000014133\",\n          \"receiver_is_teammate\": true,\n          \"finisher\": \"p1\",\n          \"shot_frame\": null,\n          \"outcome_frame\": \"s000016833\",\n          \"same_active_ball\": true,\n          \"continuous_play\": true,\n          \"outcome_evidence\": [\n            {\n              \"frame\": \"s000013900\",\n              \"fact\": \"The ball continues left past the central white teammate.\"\n            },\n            {\n              \"frame\": \"s000014133\",\n              \"fact\": \"The selected white player meets the ball to the left of red number 15.\"\n            },\n            {\n              \"frame\": \"s000014400\",\n              \"fact\": \"The receiver turns with number 10 visible on his back.\"\n            },\n            {\n              \"frame\": \"s000016833\",\n              \"fact\": \"After number 10's close-range attempt, the ball emerges across the goalmouth.\"\n            }\n          ],\n          \"details\": \"Ground pass to the selected player, who receives, dribbles forward and attempts a close-range finish. Red number 15 approaches the passing lane, but no intervening controlled possession or deliberate pass is visible. Retained as teammate shot rather than direct-assist goal because the decisive goalmouth contacts and goal attribution remain unresolved.\"\n        },\n        {\n          \"action_id\": \"a4\",\n          \"kind\": \"DRIBBLE\",\n          \"actor\": \"p1\",\n          \"start_frame\": \"s000014133\",\n          \"contact_frame\": null,\n          \"end_frame\": \"s000015400\",\n          \"actor_evidence_frames\": [\"s000014267\", \"s000014400\", \"s000014900\", \"s000015300\"],\n          \"ball_id\": \"b1\",\n          \"outcome\": \"COMPLETED\",\n          \"receiver\": null,\n          \"receiver_frame\": null,\n          \"receiver_is_teammate\": null,\n          \"finisher\": null,\n          \"shot_frame\": null,\n          \"outcome_frame\": \"s000015400\",\n          \"same_active_ball\": true,\n          \"continuous_play\": true,\n          \"outcome_evidence\": [\n            {\n              \"frame\": \"s000014900\",\n              \"fact\": \"Number 10 advances with the ball ahead of his stride and a red challenger alongside and behind.\"\n            },\n            {\n              \"frame\": \"s000015300\",\n              \"fact\": \"Number 10 pursues his forward touch toward goal; red number 7 is between him and the goalkeeper.\"\n            }\n          ],\n          \"details\": \"Receives and turns, carries leftward through the challenge from p6, then accelerates after a longer forward touch. The camera pans with the same uninterrupted attack.\"\n        },\n        {\n          \"action_id\": \"a5\",\n          \"kind\": \"DUEL\",\n          \"actor\": \"p1\",\n          \"start_frame\": \"s000015400\",\n          \"contact_frame\": null,\n          \"end_frame\": \"s000016600\",\n          \"actor_evidence_frames\": [\"s000015733\", \"s000016000\", \"s000016267\", \"s000016500\"],\n          \"ball_id\": \"b1\",\n          \"outcome\": \"UNKNOWN\",\n          \"receiver\": null,\n          \"receiver_frame\": null,\n          \"receiver_is_teammate\": null,\n          \"finisher\": null,\n          \"shot_frame\": null,\n          \"outcome_frame\": null,\n          \"same_active_ball\": true,\n          \"continuous_play\": true,\n          \"outcome_evidence\": [\n            {\n              \"frame\": \"s000015733\",\n              \"fact\": \"The ball is beside red number 7's stride as white number 10 closes from his right.\"\n            },\n            {\n              \"frame\": \"s000016167\",\n              \"fact\": \"Number 10 reaches a boot toward the ball alongside number 7.\"\n            },\n            {\n              \"frame\": \"s000016500\",\n              \"fact\": \"Both players remain over the ball, with the goalkeeper immediately beyond them.\"\n            }\n          ],\n          \"details\": \"Number 10 runs down the forward ball and challenges number 7, who places his body between the attacker and goal. Number 7's proximity and shielding are visible, but the sequence does not establish a separate controlled interception followed by a pass.\"\n        },\n        {\n          \"action_id\": \"a6\",\n          \"kind\": \"SHOT\",\n          \"actor\": \"p1\",\n          \"start_frame\": \"s000016267\",\n          \"contact_frame\": null,\n          \"contact_before_frame\": \"s000016533\",\n          \"contact_after_frame\": \"s000016833\",\n          \"contact_actor_unique\": false,\n          \"contact_evidence\": [\n            {\n              \"frame\": \"s000016533\",\n              \"fact\": \"Number 10 reaches through the close contest, but his lower legs and the ball overlap red number 7's legs.\"\n            },\n            {\n              \"frame\": \"s000016833\",\n              \"fact\": \"Number 10 is falling and the ball is rolling to the right of the goalkeeper; the exact releasing touch was obscured.\"\n            }\n          ],\n          \"end_frame\": \"s000018767\",\n          \"actor_evidence_frames\": [\"s000016300\", \"s000016533\", \"s000016700\", \"s000016967\"],\n          \"ball_id\": \"b1\",\n          \"outcome\": \"UNKNOWN\",\n          \"receiver\": null,\n          \"receiver_frame\": null,\n          \"receiver_is_teammate\": null,\n          \"finisher\": \"p1\",\n          \"shot_frame\": null,\n          \"outcome_frame\": \"s000018767\",\n          \"same_active_ball\": true,\n          \"continuous_play\": true,\n          \"outcome_evidence\": [\n            {\n              \"frame\": \"s000016833\",\n              \"fact\": \"The active ball emerges on the ground beyond the clustered attacker and defender, to the goalkeeper's right.\"\n            },\n            {\n              \"frame\": \"s000017000\",\n              \"fact\": \"The same ball rolls toward the two red players on the other side of the goalmouth; number 10 is down.\"\n            },\n            {\n              \"frame\": \"s000017300\",\n              \"fact\": \"The taller red player makes a leg swing while the ball is obscured by the nearer red number 16.\"\n            },\n            {\n              \"frame\": \"s000017700\",\n              \"fact\": \"The ball is visible airborne within the goal's netted area, behind the goalmouth players.\"\n            },\n            {\n              \"frame\": \"s000018767\",\n              \"fact\": \"The ball remains inside the right-hand netted area as the goalkeeper follows it.\"\n            }\n          ],\n          \"details\": \"Number 10 attempts a close-range poke while challenged by number 7 and falls. The active ball subsequently ends in the goal, rather than being a stationary spare. However, the overlapping attacker, defender and goalkeeper do not provide a uniquely attributable releasing touch, and the later red player's attempted clearance further complicates attribution. A goal is visibly present in the aftermath, but a clean number-10 goal, a deflected goal and an opponent's decisive touch cannot be separated confidently from these views. No save is inferred merely from the goalkeeper's movement.\"\n        },\n        {\n          \"action_id\": \"a7\",\n          \"kind\": \"OTHER\",\n          \"actor\": \"p4\",\n          \"start_frame\": \"s000017000\",\n          \"contact_frame\": null,\n          \"contact_before_frame\": \"s000017133\",\n          \"contact_after_frame\": \"s000017467\",\n          \"contact_actor_unique\": false,\n          \"contact_evidence\": [\n            {\n              \"frame\": \"s000017133\",\n              \"fact\": \"The taller red player is behind number 16 near the ball's path; the ball is hidden by the nearer player.\"\n            },\n            {\n              \"frame\": \"s000017467\",\n              \"fact\": \"After the taller player's leg swing, the ball reappears near his feet in the goalmouth.\"\n            }\n          ],\n          \"end_frame\": \"s000018767\",\n          \"actor_evidence_frames\": [\"s000017133\", \"s000017300\", \"s000017467\"],\n          \"ball_id\": \"b1\",\n          \"outcome\": \"UNKNOWN\",\n          \"receiver\": null,\n          \"receiver_frame\": null,\n          \"receiver_is_teammate\": null,\n          \"finisher\": null,\n          \"shot_frame\": null,\n          \"outcome_frame\": \"s000018767\",\n          \"same_active_ball\": true,\n          \"continuous_play\": true,\n          \"outcome_evidence\": [\n            {\n              \"frame\": \"s000017300\",\n              \"fact\": \"The taller red player's boot swings across the goalmouth behind number 16.\"\n            },\n            {\n              \"frame\": \"s000017700\",\n              \"fact\": \"The ball is subsequently airborne in the netted area.\"\n            },\n            {\n              \"frame\": \"s000018767\",\n              \"fact\": \"The ball has not been cleared out of the goal and the goalkeeper follows it inside.\"\n            }\n          ],\n          \"details\": \"Apparent goal-line clearance attempt. The swinging player is distinct from red number 16, but the obscured ball prevents confirmation of his actual contact or whether the ball had already crossed the line. The attempt does not produce a visible successful clearance.\"\n        }\n      ],\n      \"questions\": [\n        {\n          \"reason\": \"CONTACT\",\n          \"action_id\": \"a1\",\n          \"scope\": \"ACTION\",\n          \"after_frame\": null,\n          \"question\": \"Which player makes the touch that sends the ball out of the initial crowded contest toward white number 6?\"\n        },\n        {\n          \"reason\": \"CONTACT\",\n          \"action_id\": \"a6\",\n          \"scope\": \"ACTION\",\n          \"after_frame\": null,\n          \"question\": \"During s000016533\u2013s000016833, does white number 10 make the decisive releasing touch, and does red number 7 or the goalkeeper alter the ball before it emerges to the right?\"\n        },\n        {\n          \"reason\": \"OUTCOME\",\n          \"action_id\": \"a6\",\n          \"scope\": \"ACTION\",\n          \"after_frame\": null,\n          \"question\": \"Does the ball cross the goal line from number 10's attempt before the later red player's clearance motion, or does a subsequent opponent touch determine the goal attribution?\"\n        },\n        {\n          \"reason\": \"CONTACT\",\n          \"action_id\": \"a7\",\n          \"scope\": \"ACTION\",\n          \"after_frame\": null,\n          \"question\": \"Does the taller red player's swing during s000017133\u2013s000017467 actually contact the ball behind number 16?\"\n        }\n      ]\n    }\n  ]\n}",
+      "elapsed_seconds": 83.753
+    },
+    {
+      "packet_id": "orman600_goal_focus",
+      "status": "COMPLETED",
+      "origin": "LIVE_MODEL_REQUEST",
+      "provider": "emergent",
+      "requested_model": "gpt-6-astra",
+      "payload_sha256": "22ce92c67e98e99724ce43634dd509bb5ad18548562457c74265ec6049038da6",
+      "response_sha256": "67a65ac8d847e32dd4920fb65d8cca20c833d78bb8bb282f3b61913b2e02abc5",
+      "raw_response": "{\n  \"plays\": [\n    {\n      \"start_frame\": \"s000011267\",\n      \"end_frame\": \"s000021767\",\n      \"people\": [\n        {\n          \"person_id\": \"p1\",\n          \"selected\": true,\n          \"kit_consistent\": true,\n          \"reference_ids\": [\"r2\", \"r4\", \"r5\", \"r6\", \"r7\", \"r10\"],\n          \"evidence_frames\": [\"s000011800\", \"s000014400\", \"s000015300\", \"s000015833\", \"s000016300\", \"s000017700\"],\n          \"appearance\": \"Short dark-haired player in white, blue number 10, black undersleeves and gloves, white socks and light-coloured boots.\"\n        },\n        {\n          \"person_id\": \"p2\",\n          \"selected\": false,\n          \"kit_consistent\": true,\n          \"reference_ids\": [],\n          \"evidence_frames\": [\"s000012400\", \"s000012767\", \"s000013633\", \"s000018100\"],\n          \"appearance\": \"White number 6, dark head covering, black undersleeves; smaller than white number 4.\"\n        },\n        {\n          \"person_id\": \"p3\",\n          \"selected\": false,\n          \"kit_consistent\": true,\n          \"reference_ids\": [],\n          \"evidence_frames\": [\"s000015300\", \"s000015733\", \"s000016300\", \"s000017000\"],\n          \"appearance\": \"Light-haired red number 7, black shorts and black socks; defender immediately ahead of white 10 near goal.\"\n        },\n        {\n          \"person_id\": \"p4\",\n          \"selected\": false,\n          \"kit_consistent\": true,\n          \"reference_ids\": [],\n          \"evidence_frames\": [\"s000015400\", \"s000016900\", \"s000017133\"],\n          \"appearance\": \"Red number 16, dark hair, black shorts and socks, pale boots; follows white 10 and approaches the goalmouth.\"\n        },\n        {\n          \"person_id\": \"p5\",\n          \"selected\": false,\n          \"kit_consistent\": true,\n          \"reference_ids\": [],\n          \"evidence_frames\": [\"s000015400\", \"s000016400\", \"s000017267\", \"s000017467\"],\n          \"appearance\": \"Taller red-shirted defender with dark head covering, black shorts and socks; arrives behind number 16 and moves inside the goal.\"\n        },\n        {\n          \"person_id\": \"p6\",\n          \"selected\": false,\n          \"kit_consistent\": true,\n          \"reference_ids\": [],\n          \"evidence_frames\": [\"s000015400\", \"s000016600\", \"s000016833\", \"s000018900\"],\n          \"appearance\": \"Goalkeeper in blue/purple long-sleeved kit, dark leggings, gloves and light boots.\"\n        },\n        {\n          \"person_id\": \"p7\",\n          \"selected\": false,\n          \"kit_consistent\": true,\n          \"reference_ids\": [],\n          \"evidence_frames\": [\"s000012767\", \"s000013400\"],\n          \"appearance\": \"Short dark-haired opponent in red and black who challenges white 6 during the buildup.\"\n        },\n        {\n          \"person_id\": \"p8\",\n          \"selected\": false,\n          \"kit_consistent\": true,\n          \"reference_ids\": [],\n          \"evidence_frames\": [\"s000014000\", \"s000014267\", \"s000014500\"],\n          \"appearance\": \"Taller light-haired red number 15, black shorts and socks, positioned between white 6 and white 10 during the pass.\"\n        }\n      ],\n      \"actions\": [\n        {\n          \"action_id\": \"a1\",\n          \"kind\": \"DUEL\",\n          \"actor\": \"p1\",\n          \"start_frame\": \"s000011267\",\n          \"contact_frame\": null,\n          \"end_frame\": \"s000012400\",\n          \"actor_evidence_frames\": [\"s000011767\", \"s000011800\", \"s000012133\"],\n          \"ball_id\": \"b1\",\n          \"outcome\": \"INCOMPLETE\",\n          \"receiver\": null,\n          \"receiver_frame\": null,\n          \"receiver_is_teammate\": null,\n          \"finisher\": null,\n          \"shot_frame\": null,\n          \"outcome_frame\": \"s000012400\",\n          \"same_active_ball\": true,\n          \"continuous_play\": true,\n          \"outcome_evidence\": [\n            {\n              \"frame\": \"s000011800\",\n              \"fact\": \"White 10 reaches into a crowded contest with red opponents and another white player.\"\n            },\n            {\n              \"frame\": \"s000012400\",\n              \"fact\": \"The ball comes out toward white 6, rather than remaining under white 10's control.\"\n            }\n          ],\n          \"details\": \"White 10 challenges around the crowded ball and then moves left to offer an outlet. The overlapping legs do not establish an individual extraction touch; no pass or recovery is attributed to white 10 here.\"\n        },\n        {\n          \"action_id\": \"a2\",\n          \"kind\": \"RECOVERY\",\n          \"actor\": \"p2\",\n          \"start_frame\": \"s000012400\",\n          \"contact_frame\": null,\n          \"end_frame\": \"s000013633\",\n          \"actor_evidence_frames\": [\"s000012633\", \"s000012767\", \"s000013400\", \"s000013633\"],\n          \"ball_id\": \"b1\",\n          \"outcome\": \"COMPLETED\",\n          \"receiver\": null,\n          \"receiver_frame\": null,\n          \"receiver_is_teammate\": null,\n          \"finisher\": null,\n          \"shot_frame\": null,\n          \"outcome_frame\": \"s000013633\",\n          \"same_active_ball\": true,\n          \"continuous_play\": true,\n          \"outcome_evidence\": [\n            {\n              \"frame\": \"s000012767\",\n              \"fact\": \"White 6 has the ball immediately beside his feet as the red challenger closes.\"\n            },\n            {\n              \"frame\": \"s000013633\",\n              \"fact\": \"White 6 has turned with the ball still in front of him and the challenger behind his shoulder.\"\n            }\n          ],\n          \"details\": \"White 6 gathers the ball emerging from the initial contest, shields it from p7 and turns left with short touches.\"\n        },\n        {\n          \"action_id\": \"a3\",\n          \"kind\": \"PASS\",\n          \"actor\": \"p2\",\n          \"start_frame\": \"s000013633\",\n          \"contact_frame\": null,\n          \"contact_before_frame\": \"s000013633\",\n          \"contact_after_frame\": \"s000013767\",\n          \"contact_actor_unique\": true,\n          \"contact_evidence\": [\n            {\n              \"frame\": \"s000013633\",\n              \"fact\": \"White 6 has the ball at his feet and opens his body toward the teammate on the left.\"\n            },\n            {\n              \"frame\": \"s000013767\",\n              \"fact\": \"His leg extends through the release and the ball is already travelling left, clear of the nearby challenger.\"\n            }\n          ],\n          \"end_frame\": \"s000014267\",\n          \"actor_evidence_frames\": [\"s000013633\", \"s000013767\"],\n          \"ball_id\": \"b1\",\n          \"outcome\": \"TEAMMATE_GOAL\",\n          \"receiver\": \"p1\",\n          \"receiver_frame\": \"s000014133\",\n          \"receiver_is_teammate\": true,\n          \"finisher\": \"p1\",\n          \"shot_frame\": null,\n          \"outcome_frame\": \"s000017000\",\n          \"same_active_ball\": true,\n          \"continuous_play\": true,\n          \"outcome_evidence\": [\n            {\n              \"frame\": \"s000014133\",\n              \"fact\": \"The leftward ball reaches white 10 beside red 15.\"\n            },\n            {\n              \"frame\": \"s000014400\",\n              \"fact\": \"White 10, with his number visible, turns into the attack with the ball.\"\n            },\n            {\n              \"frame\": \"s000015300\",\n              \"fact\": \"The same white 10 pursues his forward touch toward goal with defenders alongside and ahead.\"\n            },\n            {\n              \"frame\": \"s000017000\",\n              \"fact\": \"After white 10's close-range release, the moving ball is inside the goal, beyond the goalkeeper.\"\n            }\n          ],\n          \"details\": \"Ground pass left to white 10, who receives, dribbles and eventually finishes. Red 15 approaches the passing lane but does not establish controlled possession or an intervening pass. The subsequent challenge by red 7 is retained separately; no additional teammate pass occurs. The finishing contact is bracketed in a6 rather than assigned an invented exact frame.\"\n        },\n        {\n          \"action_id\": \"a4\",\n          \"kind\": \"DRIBBLE\",\n          \"actor\": \"p1\",\n          \"start_frame\": \"s000014133\",\n          \"contact_frame\": null,\n          \"end_frame\": \"s000015400\",\n          \"actor_evidence_frames\": [\"s000014400\", \"s000014767\", \"s000015000\", \"s000015300\"],\n          \"ball_id\": \"b1\",\n          \"outcome\": \"COMPLETED\",\n          \"receiver\": null,\n          \"receiver_frame\": null,\n          \"receiver_is_teammate\": null,\n          \"finisher\": null,\n          \"shot_frame\": null,\n          \"outcome_frame\": \"s000015400\",\n          \"same_active_ball\": true,\n          \"continuous_play\": true,\n          \"outcome_evidence\": [\n            {\n              \"frame\": \"s000014767\",\n              \"fact\": \"White 10 emerges from the nearby red challenge with the ball just ahead.\"\n            },\n            {\n              \"frame\": \"s000015000\",\n              \"fact\": \"White 10 pushes the ball forward and accelerates after it.\"\n            },\n            {\n              \"frame\": \"s000015400\",\n              \"fact\": \"White 10 continues toward goal behind the ball, with red 7 cutting across ahead and another defender chasing.\"\n            }\n          ],\n          \"details\": \"Receives on the left, turns past pressure and advances with successive touches and a forward run. The camera pans with this uninterrupted attack.\"\n        },\n        {\n          \"action_id\": \"a5\",\n          \"kind\": \"DUEL\",\n          \"actor\": \"p1\",\n          \"start_frame\": \"s000015400\",\n          \"contact_frame\": null,\n          \"end_frame\": \"s000016533\",\n          \"actor_evidence_frames\": [\"s000015767\", \"s000015967\", \"s000016233\", \"s000016400\"],\n          \"ball_id\": \"b1\",\n          \"outcome\": \"COMPLETED\",\n          \"receiver\": null,\n          \"receiver_frame\": null,\n          \"receiver_is_teammate\": false,\n          \"finisher\": null,\n          \"shot_frame\": null,\n          \"outcome_frame\": \"s000016533\",\n          \"same_active_ball\": true,\n          \"continuous_play\": true,\n          \"outcome_evidence\": [\n            {\n              \"frame\": \"s000015767\",\n              \"fact\": \"Red 7 is between white 10 and the ball; white 10 closes on his right side.\"\n            },\n            {\n              \"frame\": \"s000016233\",\n              \"fact\": \"White 10 reaches alongside red 7 with the ball between their feet.\"\n            },\n            {\n              \"frame\": \"s000016533\",\n              \"fact\": \"White 10 remains engaged at the ball immediately in front of the goalkeeper.\"\n            }\n          ],\n          \"details\": \"White 10 challenges the shielding red 7 and stretches around him. The ball remains in this close contest rather than being passed to another attacker. The earlier reaching movements are not substituted for the later finishing release.\"\n        },\n        {\n          \"action_id\": \"a6\",\n          \"kind\": \"SHOT\",\n          \"actor\": \"p1\",\n          \"start_frame\": \"s000016533\",\n          \"contact_frame\": null,\n          \"contact_before_frame\": \"s000016533\",\n          \"contact_after_frame\": \"s000016767\",\n          \"contact_actor_unique\": true,\n          \"contact_evidence\": [\n            {\n              \"frame\": \"s000016533\",\n              \"fact\": \"White 10's lower leg reaches to the ball from behind and beside red 7; red 7 remains on the other side of it.\"\n            },\n            {\n              \"frame\": \"s000016767\",\n              \"fact\": \"White 10 is falling after the reaching motion and the ball has departed across the goalkeeper toward the open goalmouth; red 7 is moving away from that departure.\"\n            }\n          ],\n          \"end_frame\": \"s000017000\",\n          \"actor_evidence_frames\": [\"s000016300\", \"s000016533\", \"s000016600\", \"s000016767\", \"s000016967\"],\n          \"ball_id\": \"b1\",\n          \"outcome\": \"GOAL\",\n          \"receiver\": null,\n          \"receiver_frame\": null,\n          \"receiver_is_teammate\": null,\n          \"finisher\": \"p1\",\n          \"shot_frame\": null,\n          \"outcome_frame\": \"s000017000\",\n          \"same_active_ball\": true,\n          \"continuous_play\": true,\n          \"outcome_evidence\": [\n            {\n              \"frame\": \"s000016800\",\n              \"fact\": \"The active ball is clear of the goalkeeper's feet and continues rightward into the goalmouth.\"\n            },\n            {\n              \"frame\": \"s000016900\",\n              \"fact\": \"The ball continues beyond the goalkeeper toward the interior of the goal; neither approaching red defender has reached it.\"\n            },\n            {\n              \"frame\": \"s000017000\",\n              \"fact\": \"The ball is inside the goal beyond the front goal-line plane, before the taller red defender's later kicking movement.\"\n            },\n            {\n              \"frame\": \"s000017467\",\n              \"fact\": \"The same ball reappears beside the defender inside the goal after his attempted clearance.\"\n            },\n            {\n              \"frame\": \"s000018633\",\n              \"fact\": \"The ball remains in the right-hand portion of the goal as the goalkeeper follows it.\"\n            }\n          ],\n          \"details\": \"White 10 pokes a close-range finish out of the duel with red 7 and falls. His reaching motion and the ball's departure establish the releasing actor despite overlapping legs obscuring the exact instant. The goalkeeper spreads his legs but does not stop or visibly redirect the departing ball. The ball travels into the goal before the later defender's attempted clearance. That subsequent intervention does not establish an own goal or a different finisher. White 10 later gets up; white 6 joins him. Those reactions are not used as goal evidence.\"\n        },\n        {\n          \"action_id\": \"a7\",\n          \"kind\": \"OTHER\",\n          \"actor\": \"p5\",\n          \"start_frame\": \"s000017033\",\n          \"contact_frame\": null,\n          \"contact_before_frame\": \"s000017267\",\n          \"contact_after_frame\": \"s000017467\",\n          \"contact_actor_unique\": true,\n          \"contact_evidence\": [\n            {\n              \"frame\": \"s000017267\",\n              \"fact\": \"The taller red defender is inside the goal, swinging a leg toward the ball behind red 16.\"\n            },\n            {\n              \"frame\": \"s000017467\",\n              \"fact\": \"The ball reappears beside that defender after the swing, still within the goal.\"\n            }\n          ],\n          \"end_frame\": \"s000018133\",\n          \"actor_evidence_frames\": [\"s000017267\", \"s000017333\", \"s000017467\"],\n          \"ball_id\": \"b1\",\n          \"outcome\": \"INCOMPLETE\",\n          \"receiver\": null,\n          \"receiver_frame\": null,\n          \"receiver_is_teammate\": null,\n          \"finisher\": null,\n          \"shot_frame\": null,\n          \"outcome_frame\": \"s000018133\",\n          \"same_active_ball\": true,\n          \"continuous_play\": true,\n          \"outcome_evidence\": [\n            {\n              \"frame\": \"s000017633\",\n              \"fact\": \"The ball rises within the goal after the defender's kicking movement.\"\n            },\n            {\n              \"frame\": \"s000018133\",\n              \"fact\": \"The ball is still in the goal and the goalkeeper follows it to the right.\"\n            }\n          ],\n          \"details\": \"Late, unsuccessful clearance attempt from inside the goal. Red 16 partially obscures the contact, but the taller defender's swing and the ball's reappearance identify the actor. This occurs after the active ball has already entered, not as the action that creates the goal.\"\n        }\n      ],\n      \"questions\": []\n    }\n  ],\n  \"goal_review\": {\n    \"releasing_actor\": \"p1\",\n    \"actor_assessment\": \"SUPPORTED\",\n    \"ball_in_goal_assessment\": \"SUPPORTED\",\n    \"intervention_assessment\": \"Red 7 contests and shields before the finish. White 10's reaching action produces the departing ball. The goalkeeper's spread does not visibly stop or decisively redirect it. The taller red defender makes a later unsuccessful clearance attempt inside the goal, after the ball has entered.\",\n    \"attribution_assessment\": \"SUPPORTED\",\n    \"release_evidence\": [\n      {\n        \"frame\": \"s000016300\",\n        \"fact\": \"Readable white number 10 connects the selected attacker to the player reaching alongside red 7.\"\n      },\n      {\n        \"frame\": \"s000016533\",\n        \"fact\": \"White 10 reaches into the ball while red 7 occupies the opposite side; the goalkeeper is beyond them.\"\n      },\n      {\n        \"frame\": \"s000016767\",\n        \"fact\": \"White 10 falls following the reach, and the ball emerges across the goalkeeper toward the goal interior.\"\n      }\n    ],\n    \"ball_path_evidence\": [\n      {\n        \"frame\": \"s000016800\",\n        \"fact\": \"The moving ball is visible beyond the goalkeeper's feet.\"\n      },\n      {\n        \"frame\": \"s000016900\",\n        \"fact\": \"The same ball continues into the goalmouth without a new attacker receiving or striking it.\"\n      },\n      {\n        \"frame\": \"s000017000\",\n        \"fact\": \"The ball is inside the goal before the later clearance attempt.\"\n      },\n      {\n        \"frame\": \"s000017467\",\n        \"fact\": \"Following a brief obstruction by red 16, the ball reappears with the taller defender inside the goal.\"\n      },\n      {\n        \"frame\": \"s000018633\",\n        \"fact\": \"The active ball remains within the right side of the goal, with the goalkeeper following.\"\n      }\n    ],\n    \"intervention_evidence\": [\n      {\n        \"frame\": \"s000016600\",\n        \"fact\": \"The goalkeeper spreads his stance in front of white 10's close-range attempt.\"\n      },\n      {\n        \"frame\": \"s000016833\",\n        \"fact\": \"The ball continues away from the goalkeeper; no stopping or decisive redirection is visible.\"\n      },\n      {\n        \"frame\": \"s000017000\",\n        \"fact\": \"The ball is already inside before the taller red defender reaches it.\"\n      },\n      {\n        \"frame\": \"s000017333\",\n        \"fact\": \"The taller defender swings a leg inside the goal, partly hidden by red 16.\"\n      },\n      {\n        \"frame\": \"s000017633\",\n        \"fact\": \"The attempted clearance leaves the ball bouncing within the goal.\"\n      }\n    ],\n    \"strongest_competing_attribution\": \"The strongest alternative is that a red defender supplied the decisive scoring touch. Red 7's proximity alone does not establish that: white 10's reaching motion, subsequent fall and the ball's departure across the goalkeeper support white 10 as the releaser. The taller defender's later kick is visible, but s000016900\u2013s000017000 place the active ball inside the goal before his s000017267\u2013s000017467 clearance sequence. The goalkeeper's movement likewise does not establish a save or a new scoring redirection. The exact finishing touch is therefore bracketed rather than assigned a fabricated contact frame.\"\n  }\n}",
+      "elapsed_seconds": 121.532
+    }
+  ]
+}

@@ -1109,7 +1109,7 @@ def _age_comparison_card(c, comp, bracket, x, y, w, h, rubric=False):
     card(c, x, y, w, h)
     ty = y + h - PAD
     title_w = w - 2 * PAD
-    ty -= card_title(c, x + PAD, ty, "Academy Rubric Reference" if rubric else "Vs. Players Same Age", title_w)
+    ty -= card_title(c, x + PAD, ty, "Academy Skill Guide" if rubric else "Vs. Players Same Age", title_w)
     if bracket:
         c.saveState()
         bw = c.stringWidth(str(bracket).upper(), F_BOLD, 5.4) + 10
@@ -1125,7 +1125,7 @@ def _age_comparison_card(c, comp, bracket, x, y, w, h, rubric=False):
         return
     row_h = (ty - y - (28 if rubric else 8)) / max(1, len(comp))
     if rubric:
-        draw_par(c, "Coaching rubric, not peer percentiles. Ranges and evidence follow.", x + PAD, y + 20, w - 2 * PAD, _style(F_BODY, 6.2, MUTED, leading=8))
+        draw_par(c, "ScoutMePlay coaching guide for the skills shown at your age.", x + PAD, y + 20, w - 2 * PAD, _style(F_BODY, 6.2, MUTED, leading=8))
     for r in comp:
         c.setFillColor(BODY)
         c.setFont(F_BODY, 7.2)
@@ -2458,7 +2458,7 @@ def _publication_score_notes(c, sm, x, top, w):
     story = pub.get('narrative') or {}
     if story.get('score_explanation'):
         lines.append(story['score_explanation'])
-    lines.append('The reference is a coaching guide. This clip does not establish academy readiness or long-term potential.')
+    lines.append('Use this coaching guide with your coach to build the skills needed in academy football.')
     style = _style(F_BODY, 7.2, BODY, leading=10)
     paragraphs = [Paragraph(esc(line), style) for line in lines]
     heights = [p.wrap(w - 2 * PAD, H)[1] for p in paragraphs]
@@ -2685,14 +2685,15 @@ def _parent_metrics_strip(c, pm, x, y, w, h):
     """'What Parents Ask' — evidence-only involvement/character chips + top minutes."""
     card(c, x, y, w, h)
     ty = y + h - PAD
-    ty -= card_title(c, x + PAD, ty, "What Parents Ask · Evidence Only", w - 2 * PAD)
+    ty -= card_title(c, x + PAD, ty, "What Parents Ask · Your Football", w - 2 * PAD)
     ty -= 4
     chips = []
     inv = pm.get("involvement") or {}
     if inv:
         per = inv.get("touches_per_minute")
-        chips.append((str(inv.get("actions_observed", inv.get("touches_observed", "—"))), "ACTIONS" if "actions_observed" in inv else "TOUCHES",
-                      f"≈{per}/MIN" if per is not None else "INVOLVEMENT"))
+        chips.append((str(inv.get("quality", inv.get("actions_observed", inv.get("touches_observed", "—")))),
+                      "STANDOUT QUALITY" if inv.get("quality") else "ACTIONS" if "actions_observed" in inv else "TOUCHES",
+                      f"≈{per}/MIN" if per is not None else "YOUR FOOTBALL" if inv.get("quality") else "INVOLVEMENT"))
     br = pm.get("bravery") or {}
     if br:
         chips.append((f"{br.get('score')}/10" if br.get("score") is not None else "—", "BRAVERY", "UNDER PRESSURE"))

@@ -12,7 +12,7 @@ import math
 import re
 from zoneinfo import ZoneInfo
 
-VERSION = 4
+VERSION = 5
 CATEGORIES = ('technical', 'tactical', 'physical', 'mentality')
 EXPECTED_SKILLS = {
     'technical': ('first_touch', 'ball_control', 'dribbling', 'passing', 'shooting', 'weak_foot', 'one_v_one'),
@@ -495,4 +495,10 @@ def publish_report(document):
         'narrative': {'event_ids': narrative_events, 'score_explanation': score_explanation},
         'stats_definitions': 'Shots include goals. Key passes lead to a teammate shot without a goal; assists are counted separately. Actions are segments, not ball touches.',
         'content_sha256': signature}
+    from player_report_copy import apply_player_copy
+    apply_player_copy(doc, events, skills, bound)
+    doc['report_publication']['content_sha256'] = hashlib.sha256(json.dumps(facts({
+        'full': doc['full_report'], 'date': date_label, 'review': review_info, 'version': VERSION,
+        'view': doc['report_publication']['view'], 'score_meaning': doc['score_meaning']}),
+        sort_keys=True, default=str).encode()).hexdigest()
     return doc

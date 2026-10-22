@@ -15,6 +15,9 @@ import math
 from pathlib import Path
 import time
 
+from sequence_foot_evidence import INSTRUCTION as FOOT_INSTRUCTION, assess_foot
+from sequence_action_evidence import GOAL_INSTRUCTION, MOVEMENT_INSTRUCTION, supported_movements
+
 VERSION = 1
 PROMPT = """Observe these chronological football source images. Images are actual
 source instants, not playback seconds. First understand each uninterrupted play,
@@ -54,7 +57,7 @@ Return one JSON object:
 "same_active_ball":null,"continuous_play":true,
 "outcome_evidence":[{"frame":"s...","fact":"what is visible"}],
 "details":"what happens, including any visible contradiction"}],
-"questions":[{"reason":"IDENTITY|CONTACT|RECEIVER|OUTCOME","action_id":"a1",
+"questions":[{"reason":"IDENTITY|CONTACT|RECEIVER|OUTCOME|FOOT","action_id":"a1",
 "scope":"ACTION|AFTERMATH","after_frame":null,"question":"specific uncertainty"}]}]}.
 selected, kit_consistent and receiver_is_teammate are true/false/null. For a
 visible teammate goal on a pass include recipient, receiving frame, finisher,
@@ -69,6 +72,10 @@ or after that shot action's end_frame. Identity, contact, save-versus-goal and
 active-ball uncertainty always have scope ACTION. An unknown later possession
 does not itself make an established shooter or save uncertain.
 """
+
+
+PROMPT += "\n" + FOOT_INSTRUCTION
+PROMPT += "\n" + MOVEMENT_INSTRUCTION
 
 
 def digest(path):
@@ -404,6 +411,8 @@ def packet_items(manifest, packet):
             "leave the passer's shot_frame null instead of inventing a frame. Keep recipient, finisher "
             "and passer distinct. Before/after reasoning can establish a touch, but proximity, a keeper "
             "dive or an unseen path alone cannot. Report the observed result even if unsuccessful."})
+    if packet.get("goal_attribution_review"):
+        items.append({"type": "text", "text": GOAL_INSTRUCTION})
     for frame_id in packet["frame_ids"]:
         f = frames[frame_id]
         label = f"Source frame {frame_id}, media_ms={f['media_ms']}"
@@ -543,7 +552,7 @@ def resolve_response(data, manifest, packet, receipt):
         for pid in identity_conflicts:
             people[pid]["selected"] = None
         model_questions = [q for q in play.get("questions") or [] if isinstance(q, dict)
-                           and q.get("reason") in {"IDENTITY", "CONTACT", "RECEIVER", "OUTCOME"}]
+                           and q.get("reason") in {"IDENTITY", "CONTACT", "RECEIVER", "OUTCOME", "FOOT"}]
         def aftermath(q):
             a = next((a for a in play.get("actions") or [] if isinstance(a, dict)
                       and a.get("action_id") == q.get("action_id")), {})
@@ -558,7 +567,8 @@ def resolve_response(data, manifest, packet, receipt):
                     and any(isinstance(f, dict) and ms(f.get("frame")) is not None
                             and interval[1] <= ms(f["frame"]) <= action_end
                             and str(f.get("fact") or "").strip() for f in facts))
-        unresolved_ids = {q.get("action_id") for q in model_questions if not aftermath(q)}
+        unresolved_ids = {q.get("action_id") for q in model_questions
+                          if q.get("reason") != "FOOT" and not aftermath(q)}
         uncertain_finishers = {a.get("actor") for a in play.get("actions") or [] if isinstance(a, dict)
                               and a.get("action_id") in unresolved_ids}
         if identity_conflicts:
@@ -645,6 +655,20 @@ def resolve_response(data, manifest, packet, receipt):
                          {"VISIBLE_SHOT_OUTCOME", "VISIBLE_DIRECT_ASSIST", "VISIBLE_ACTION", "VISIBLE_OPPONENT_RECEIPT"})))}
             if context_evidence:
                 event["actor_context_frames"] = context_evidence
+            if kind in {"DRIBBLE", "CARRY"} and isinstance(action.get("movement_observations"), list):
+                event["movement_observations"] = supported_movements(action["movement_observations"],
+                    actor=action.get("actor"), frames=frames, bounds=(astart, aend))
+            if kind in {"SHOT", "PASS", "CROSS"} and isinstance(action.get("anatomical_foot"), dict):
+                claim = deepcopy(action["anatomical_foot"])
+                if any(q.get("reason") == "FOOT" and q.get("action_id") in {None, action_id}
+                       for q in model_questions):
+                    event["foot_question_unresolved"] = True
+                    claim["assessment"] = "UNCERTAIN"
+                event.update(assess_foot(claim, actor=action.get("actor"),
+                    interval=contact_interval, frames=frames, bounds=(start, end)))
+                # Keep the original claim for canonical revalidation. Probable
+                # side never becomes the public foot value.
+                event["anatomical_foot"] = deepcopy(action["anatomical_foot"])
             uncertain = action_id in unresolved_ids or (event_type == "ASSIST" and action.get("finisher") in uncertain_finishers)
             event["model_requested_clarification"] = uncertain
             if uncertain:
@@ -691,6 +715,11 @@ def reconcile(results, *, sampling_gap_ms=125):
             old = next((e for e in events if same(e)), None)
             if old is None:
                 events.append(row); continue
+            foot_conflict = {e.get("foot") for e in (old, row)
+                             if e.get("foot") in {"LEFT", "RIGHT"}}
+            foot_uncertain = any(e.get("foot_question_unresolved") or
+                (isinstance(e.get("anatomical_foot"), dict) and e.get("foot") == "UNKNOWN")
+                for e in (old, row))
             disagreements = {old["outcome"], row["outcome"]} - {"UNKNOWN"}
             incompatible = len(disagreements) > 1 and not disagreements <= {"COMPLETED", "TEAMMATE_SHOT", "TEAMMATE_GOAL"}
             reviewed_again = row.get("review_phase") == "FOLLOWUP" and old.get("review_phase") != "FOLLOWUP" and row["proof_eligible"]
@@ -715,6 +744,12 @@ def reconcile(results, *, sampling_gap_ms=125):
             old["source_action_keys"] = sorted(set(old["source_action_keys"] + row["source_action_keys"]))
             old["receipts"].extend(row["receipts"])
             old["actor_evidence_frames"] = sorted(set(old["actor_evidence_frames"] + row["actor_evidence_frames"]))
+            if len(foot_conflict) > 1 or foot_uncertain:
+                old.update(foot="UNKNOWN", foot_verification="ANATOMICAL_SIDE_NOT_VERIFIED",
+                           foot_question_unresolved=True)
+                old.pop("foot_evidence", None)
+                old["foot_review"] = {"assessment": "UNCERTAIN", "candidate_side": "UNKNOWN",
+                    "reason": "CONFLICTING_ANATOMICAL_SIDES" if len(foot_conflict) > 1 else "FOOT_QUESTION_UNRESOLVED"}
             contacts = [v for v in (old.get("contact_ms"), row.get("contact_ms")) if v is not None]
             if contacts:
                 old["contact_interval_ms"] = [min(contacts), max(contacts)]
@@ -748,8 +783,8 @@ def plan_contact_reviews(manifest, resolved, *, limit=6, terminal_only=False, co
     events = {key: e for e in resolved["events"] for key in e["source_action_keys"]}
     candidates = []
     for q in resolved["questions"]:
-        if q.get("scope") == "AFTERMATH":
-            continue  # a later rebound possession is not an unresolved release
+        if q.get("scope") == "AFTERMATH" or q.get("reason") == "FOOT":
+            continue  # later possession or foot metadata cannot request a release recheck
         event = events.get(q.get("source_action_key"))
         if event is None:
             continue
@@ -776,14 +811,14 @@ def plan_contact_reviews(manifest, resolved, *, limit=6, terminal_only=False, co
         detail_end = min(hi-1, focus+750)
         if _number(event.get("outcome_ms")) and focus < event["outcome_ms"] <= focus+2000:
             detail_end = min(hi-1, max(detail_end, event["outcome_ms"]))
-        detail_start = max(lo, focus-750)
+        detail_start = max(lo, focus-(1200 if complete_terminal_context and event["kind"] == "SHOT" else 750))
         if (complete_terminal_context and event["kind"] == "SHOT"
                 and event.get("contact_interval_ms")):
             # A shot's release and outcome belong in the same native sequence,
             # even when CONTACT sorts ahead of the separate OUTCOME question.
             before, after = event["contact_interval_ms"]
             focus = min(hi-1, after+750)
-            detail_start, detail_end = max(lo,before-100), min(hi-1,after+1500)
+            detail_start, detail_end = max(lo,before-1200), min(hi-1,after+1500)
         candidates.append((priority, q, focus, base, lo, hi, detail_start, detail_end,
                            [v["frame"] for v in event["outcome_evidence"]]))
     # A coarse reader can call a hidden release a run/duel or an apparent loss.
@@ -795,10 +830,10 @@ def plan_contact_reviews(manifest, resolved, *, limit=6, terminal_only=False, co
             continue
         if (terminal.get("proof_eligible") is True and terminal.get("selected_player") is True
                 and terminal.get("reason") == "VISIBLE_SHOT_OUTCOME"
-                and any(q.get("scope") == "AFTERMATH"
+                and any((q.get("scope") == "AFTERMATH" or q.get("reason") == "FOOT")
                         and q.get("source_action_key") in terminal["source_action_keys"]
                         for q in resolved["questions"])):
-            continue  # this shot's only uncertainty concerns the later possession
+            continue  # only aftermath/foot uncertainty; no unresolved release
         if any(e["actor_scope"] == terminal["actor_scope"] and e.get("proof_eligible")
                and e["event_type"] == "ASSIST" and e.get("finisher") == terminal.get("actor")
                for e in rows):
@@ -834,7 +869,7 @@ def plan_contact_reviews(manifest, resolved, *, limit=6, terminal_only=False, co
         candidates.append(((False, True, 0, lo), q, focus, base, lo, hi, ds, de,
                            [v["frame"] for v in terminal["outcome_evidence"]]))
     jobs, seen = [], set()
-    for _, q, focus, base, lo, hi, ds, de, extra in sorted(candidates, key=lambda x: x[0]):
+    for priority, q, focus, base, lo, hi, ds, de, extra in sorted(candidates, key=lambda x: x[0]):
         if base["packet_id"] in seen or len(jobs) >= limit:
             continue
         seen.add(base["packet_id"])
@@ -842,6 +877,8 @@ def plan_contact_reviews(manifest, resolved, *, limit=6, terminal_only=False, co
             "start_ms": lo, "end_ms": hi-1, "reference_ids": base["reference_ids"][:],
             "question": {**q, "focus_ms": focus}, "replaces_initial_packet_id": base["packet_id"],
             "detail_start_ms": ds, "detail_end_ms": de, "extra_detail_frame_ids": extra})
+        if complete_terminal_context and priority[0] is False:
+            jobs[-1]["goal_attribution_review"] = True
     return jobs
 
 
@@ -867,9 +904,10 @@ def plan_outcome_reviews(manifest, resolved, parents, *, limit=2):
         jobs.append({"packet_id": f"outcome_review_{len(jobs)+1:03}", "phase": "FOLLOWUP", "round": 2,
             "start_ms": parent["start_ms"], "end_ms": parent["end_ms"],
             "reference_ids": parent["reference_ids"][:], "contact_sequence_evidence": True,
+            "goal_attribution_review": True,
             "replaces_review_packet_id": parent["packet_id"] if parent.get("replaces_initial_packet_id") else None,
             "replaces_initial_packet_id": parent.get("replaces_initial_packet_id",parent["packet_id"]),
-            "detail_start_ms": max(parent["start_ms"],before-100),
+            "detail_start_ms": max(parent["start_ms"],before-1200),
             "detail_end_ms": min(parent["end_ms"],after+1500),
             "extra_detail_frame_ids": [v["frame"] for v in event["outcome_evidence"]],
             "question": {"reason":"OUTCOME", "focus_ms":after+750,
