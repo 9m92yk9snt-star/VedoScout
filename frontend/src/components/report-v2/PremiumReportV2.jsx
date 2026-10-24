@@ -33,6 +33,7 @@ import { ScoreMeaningSection } from "./scoremeaning";
 import { ProofPlayerSheet } from "./proofplayer";
 import { CinematicIntro } from "./cinematic";
 import { PremiumMobileCategories } from "./categories";
+import { MatchRoomContext } from "./MatchRoomContext";
 
 const resolveUrl = (url, base) => {
   if (!url) return null;
@@ -255,9 +256,11 @@ export default function PremiumReportV2({ report, assetBase, onDownloadPdf, down
   // Proof mini-player: "see the proof" opens a bottom sheet — the reader's
   // scroll position never moves. Replaces the old scroll-to-video behaviour.
   const [proof, setProof] = useState(null);
+  const [inlineProof, setInlineProof] = useState(null);
   // FIX 01 — authority reports resolve the proof clip by exact IDs only;
   // legacy reports keep the timestamp-string match.
   const playAt = useCallback((ts, ref) => {
+    setInlineProof(null);
     try { videoRef.current?.pause(); } catch { /* noop */ }
     const authority = isAuthorityReport(report.full_report);
     const vc = resolveProofClip(
@@ -272,6 +275,18 @@ export default function PremiumReportV2({ report, assetBase, onDownloadPdf, down
       key: Date.now(),
     });
   }, [report, assetBase]);
+
+  const openMatchRoom = useCallback((skillKey, ts, ref) => {
+    try { videoRef.current?.pause(); } catch { /* noop */ }
+    setProof(null);
+    const vc = resolveProofClip(report.full_report?.video_comments,
+      { ...(ref || {}), timestamp: ts }, isAuthorityReport(report.full_report));
+    setInlineProof({ skillKey, ts: ts || null,
+      clip: vc ? resolveUrl(vc.tele_clip_url, assetBase) : null,
+      clipStart: vc && typeof vc.tele_clip_start === "number" ? vc.tele_clip_start : null,
+      key: `${skillKey}:${Date.now()}` });
+  }, [report, assetBase]);
+  useEffect(() => { setInlineProof(null); setProof(null); }, [report.id]);
 
   const proofFrames = [
     ...(report.full_report?.snapshot_moments || [])
@@ -335,6 +350,8 @@ export default function PremiumReportV2({ report, assetBase, onDownloadPdf, down
   const reportDate = report.report_publication?.date || fmtDate(report.full_generated_at || report.paid_at || report.created_at);
 
   return (
+    <MatchRoomContext.Provider value={{ proof: inlineProof, open: openMatchRoom,
+      close: () => setInlineProof(null), videoUrl, posterUrl, frames: proofFrames, demo: !!report.demo }}>
     <div className="max-w-[1440px] mx-auto text-[#1C2B21]" data-testid="premium-report-v2" style={{ fontFamily: "'DM Sans', sans-serif" }}>
       {showCine && (
         <CinematicIntro
@@ -534,5 +551,6 @@ export default function PremiumReportV2({ report, assetBase, onDownloadPdf, down
         </>
       )}
     </div>
+    </MatchRoomContext.Provider>
   );
 }

@@ -9,12 +9,13 @@ import { tsToSeconds } from "./derive";
 
 const fmt = (s) => `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
 
-export function ProofPlayerSheet({ proof, videoUrl, posterUrl, frames, demo, onClose, onUnlock }) {
+export function ProofPlayerSheet({ proof, videoUrl, posterUrl, frames, demo, onClose, onUnlock, inline = false }) {
   const vidRef = useRef(null);
   const clipRef = useRef(null);
   const [atMoment, setAtMoment] = useState(false);
   const [atClipMoment, setAtClipMoment] = useState(false);
   const [clipFailed, setClipFailed] = useState(false);
+  const [slow, setSlow] = useState(false);
   const sec = tsToSeconds(proof?.ts);
   const startAt = sec != null ? Math.max(0, sec - 4) : 0;
   const locked = !!proof?.locked;
@@ -24,6 +25,11 @@ export function ProofPlayerSheet({ proof, videoUrl, posterUrl, frames, demo, onC
   const clipMomentAt = useClip && clipStart != null && sec != null ? Math.max(0, sec - clipStart) : null;
 
   useEffect(() => { setClipFailed(false); }, [proof?.key]);
+  useEffect(() => {
+    setSlow(false);
+    const original = vidRef.current, clip = clipRef.current;
+    return () => { original?.pause(); clip?.pause(); };
+  }, [proof?.key, useClip]);
 
   useEffect(() => {
     setAtClipMoment(false);
@@ -50,7 +56,7 @@ export function ProofPlayerSheet({ proof, videoUrl, posterUrl, frames, demo, onC
     const onTime = () => setAtMoment(v.currentTime >= sec - 0.3 && v.currentTime <= sec + 2.5);
     v.addEventListener("timeupdate", onTime);
     return () => v.removeEventListener("timeupdate", onTime);
-  }, [proof, demo, locked, videoUrl, sec]);
+  }, [proof, demo, locked, useClip, videoUrl, sec]);
 
   useEffect(() => {
     if (!proof || demo || locked || useClip || !videoUrl) return;
@@ -58,6 +64,7 @@ export function ProofPlayerSheet({ proof, videoUrl, posterUrl, frames, demo, onC
     if (!v) return;
     const seekPlay = () => {
       try { v.currentTime = startAt; } catch { /* noop */ }
+      if (inline) { v.pause(); return; }
       const p = v.play();
       if (p?.catch) p.catch(() => { v.muted = true; v.play().catch(() => {}); });
     };
@@ -66,7 +73,8 @@ export function ProofPlayerSheet({ proof, videoUrl, posterUrl, frames, demo, onC
       v.addEventListener("loadedmetadata", seekPlay, { once: true });
       try { v.load(); } catch { /* noop */ }
     }
-  }, [proof, demo, locked, videoUrl, startAt]);
+    return () => v.removeEventListener("loadedmetadata", seekPlay);
+  }, [proof, demo, locked, useClip, videoUrl, startAt, inline]);
 
   if (!proof) return null;
 
@@ -87,13 +95,13 @@ export function ProofPlayerSheet({ proof, videoUrl, posterUrl, frames, demo, onC
     <div
       key={proof.key}
       data-testid="proof-player-sheet"
-      className="fixed left-0 right-0 bottom-[62px] md:bottom-6 md:left-auto md:right-6 md:w-[430px] z-[85] px-2 md:px-0 smp-proof-slide"
+      className={inline ? "relative w-full mt-4 mb-3" : "fixed left-0 right-0 bottom-[62px] md:bottom-6 md:left-auto md:right-6 md:w-[430px] z-[85] px-2 md:px-0 smp-proof-slide"}
     >
       <div className="bg-[#0D1A0F] rounded-t-[18px] md:rounded-[18px] shadow-[0_-8px_40px_rgba(0,0,0,0.45)] md:shadow-[0_18px_50px_rgba(0,0,0,0.5)] overflow-hidden border border-white/10">
         <div className="w-9 h-1 rounded-full bg-white/20 mx-auto mt-2 md:hidden" aria-hidden />
         <div className="flex items-center justify-between px-4 pt-2 pb-2.5">
           <div className="flex items-center gap-1.5 text-[#CCFF00] text-[11px] font-extrabold tracking-[0.08em] uppercase">
-            {locked ? <Lock className="w-3 h-3" /> : <Play className="w-3 h-3 fill-[#CCFF00]" />} Proof{proof.ts ? ` · ${proof.ts}` : ""}
+            {locked ? <Lock className="w-3 h-3" /> : <Play className="w-3 h-3 fill-[#CCFF00]" />} {inline ? "Match Room · video evidence" : "Proof"}{proof.ts ? ` · ${proof.ts}` : ""}
           </div>
           <button
             type="button"
@@ -130,8 +138,8 @@ export function ProofPlayerSheet({ proof, videoUrl, posterUrl, frames, demo, onC
                   ref={clipRef}
                   src={proof.clip}
                   poster={posterUrl || undefined}
-                  autoPlay
-                  loop
+                  autoPlay={!inline}
+                  loop={!inline}
                   muted
                   controls
                   playsInline
@@ -181,6 +189,19 @@ export function ProofPlayerSheet({ proof, videoUrl, posterUrl, frames, demo, onC
               </>
             )}
           </div>
+          {inline && !demo && !locked && (useClip || videoUrl) && (
+            <div className="flex gap-2 mt-3 px-1" aria-label="Match Room controls">
+              <button type="button" aria-pressed={slow} className="min-h-11 px-3 rounded border border-white/20 text-white text-xs" onClick={() => {
+                const next = !slow, v = useClip ? clipRef.current : vidRef.current;
+                if (v) v.playbackRate = next ? 0.5 : 1;
+                setSlow(next);
+              }}>{slow ? "Normal speed" : "Slow motion · 0.5×"}</button>
+              {sec != null && (!useClip || clipMomentAt != null) && <button type="button" className="min-h-11 px-3 rounded bg-[#CCFF00] text-[#12402A] font-bold text-xs" onClick={() => {
+                const v = useClip ? clipRef.current : vidRef.current;
+                if (v && v.readyState >= 1) { v.pause(); v.currentTime = useClip ? clipMomentAt : sec; }
+              }}>Inspect the moment</button>}
+            </div>
+          )}
           {locked ? (
             <>
               <p data-testid="proof-player-locked-note" className="text-white/65 text-[11px] leading-[1.5] px-1.5 pt-2">
