@@ -312,7 +312,7 @@ export function deriveV2(report) {
   // ---- Scout outlook ----
   const so = full.scout_outlook || {};
   const nextTier = NEXT_TIER[obTier] || obTier;
-  const scoutOutlook = full.report_fact_authority?.status === "REVIEW_REQUIRED" && typeof full.scores?.overall_development !== "number" ? {
+  const scoutOutlook = so.assessment_scope === "THIS_VIDEO" && so.display ? so.display : full.report_fact_authority?.status === "REVIEW_REQUIRED" && typeof full.scores?.overall_development !== "number" ? {
     currentLabel: "Insufficient verified evidence", currentDots: 0,
     potentialLabel: "Not assessed", potentialDots: 0,
     readiness: "Not assessed", longTerm: "Not assessed",

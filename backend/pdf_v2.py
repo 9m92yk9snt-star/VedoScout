@@ -420,6 +420,8 @@ def derive_v2(report):
         scout_outlook = {"currentLabel": "Insufficient verified evidence", "currentDots": 0,
             "potentialLabel": "Not assessed", "potentialDots": 0, "readiness": "Not assessed",
             "longTerm": "Not assessed", "longTermNote": "Further verified match evidence is needed for this assessment."}
+    if so.get('assessment_scope') == 'THIS_VIDEO' and isinstance(so.get('display'), dict):
+        scout_outlook = dict(so['display'])
 
     ms = full.get("match_stats") or None
     match_stats = None
@@ -1443,11 +1445,11 @@ def _scout_outlook_card(c, so, x, y, w, h):
     card(c, x, y, w, h)
     ty = y + h - PAD
     ty -= card_title(c, x + PAD, ty, "Next Level Outlook", w - 2 * PAD)
-    for label, val_key, dots_key in (("CURRENT LEVEL", "currentLabel", "currentDots"),
-                                     ("POTENTIAL LEVEL", "potentialLabel", "potentialDots")):
+    for label, val_key, dots_key in ((so.get('currentHeading', 'CURRENT LEVEL'), "currentLabel", "currentDots"),
+                                     (so.get('potentialHeading', 'POTENTIAL LEVEL'), "potentialLabel", "potentialDots")):
         c.setFillColor(MUTED)
         c.setFont(F_BOLD, 5.8)
-        c.drawString(x + PAD, ty - 7, label)
+        c.drawString(x + PAD, ty - 7, label.upper())
         c.setFillColor(INK)
         c.setFont(F_BOLD, 8.6)
         c.drawString(x + PAD, ty - 19, str(so[val_key]))
@@ -1460,7 +1462,7 @@ def _scout_outlook_card(c, so, x, y, w, h):
     c.roundRect(x + PAD, ty - 30, w - 2 * PAD, 26, 7, stroke=1, fill=1)
     c.setFillColor(MUTED)
     c.setFont(F_BOLD, 5.6)
-    c.drawString(x + PAD + 8, ty - 13, "RECRUITMENT READINESS")
+    c.drawString(x + PAD + 8, ty - 13, so.get('readinessHeading', 'RECRUITMENT READINESS').upper())
     c.setFillColor(GREEN)
     c.setFont(F_BOLD, 8)
     c.drawString(x + PAD + 8, ty - 24, str(so["readiness"]))
@@ -1468,10 +1470,12 @@ def _scout_outlook_card(c, so, x, y, w, h):
     ty -= 40
     c.setFillColor(MUTED)
     c.setFont(F_BOLD, 5.8)
-    c.drawString(x + PAD, ty - 7, "LONG-TERM POTENTIAL")
+    c.drawString(x + PAD, ty - 7, so.get('longTermHeading', 'LONG-TERM POTENTIAL').upper())
     c.setFillColor(INK)
     c.setFont(F_BOLD, 8.6)
     c.drawString(x + PAD, ty - 19, str(so["longTerm"]))
+    if 'stars' in so:
+        draw_stars_row(c, x + w - PAD - 22, ty - 16, so['stars'], r=3, gap=3)
     draw_par(c, esc(so.get("longTermNote") or ""), x + PAD, ty - 24, w - 2 * PAD,
              _style(F_BODY, 6.9, BODY, leading=9.4), max_h=ty - y - 14)
 

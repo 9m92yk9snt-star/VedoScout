@@ -29,6 +29,7 @@ on:
       - 'backend/player_report_copy.py'
       - 'backend/pdf_v2.py'
       - 'backend/tests/test_report_publication.py'
+      - 'backend/tests/test_player_report_copy.py'
       - '.github/workflows/sequence-report.yml'
 
 permissions:
@@ -47,7 +48,7 @@ jobs:
         with:
           python-version: '3.12'
       - run: python -m pip install 'numpy<3' 'opencv-python-headless<5' 'Pillow>=10,<15' 'pytest>=8,<10' 'python-dotenv>=1,<2' 'reportlab>=4,<5' 'pypdf>=5,<7'
-      - run: python -m pytest backend/tests/test_sequence_report.py backend/tests/test_sequence_foot_evidence.py backend/tests/test_sequence_action_evidence.py backend/tests/test_sequence_only.py backend/tests/test_report_publication.py -q
+      - run: python -m pytest backend/tests/test_sequence_report.py backend/tests/test_sequence_foot_evidence.py backend/tests/test_sequence_action_evidence.py backend/tests/test_sequence_only.py backend/tests/test_report_publication.py backend/tests/test_player_report_copy.py -q
 
   question_scope_probe:
     if: >-

@@ -336,7 +336,8 @@ async def generate(video, doc, *, template, writer=write_facts, discovery=discov
                           "retained_source_analysis_seconds": audit["original_source_analysis_seconds"] if retained else None}
         prompt = assessment_prompt(template, bundle, doc.get("player_details"),
                                    {"coverage_status": "PARTIAL", "engine": adapter.ENGINE,
-                                    "anatomical_foot_side": "Use LEFT/RIGHT only from the bound canonical event's supported foot field. UNKNOWN and probable candidates must not become foot claims. A preferred-foot profile is not contact proof. Do not grade overall weak-foot ability from isolated contacts."})
+                                    "anatomical_foot_side": "Use LEFT/RIGHT only from the bound canonical event's supported foot field. UNKNOWN and probable candidates must not become foot claims. A preferred-foot profile is not contact proof. Do not grade overall weak-foot ability from isolated contacts.",
+                                    "coaching_language": "Explain the concrete observed action, its football value and a next practice step. A carry under pressure or direction change does not establish an opponent beaten or a won take-on. Do not justify a 1v1 grade with invented beaten-player counts. One completed pass can support an observation, but limited passing footage is not a weakness. Finishing grades concern the shown attempts, not a full-match conversion rate or long-term academy readiness. Future exercise instructions can use either foot without claiming that foot was observed in the match."})
         audit["writer_prompt_sha256"] = hashlib.sha256(prompt.encode()).hexdigest()
         if checkpoint:
             await checkpoint({"canonical_events": bundle, "sequence_audit": audit,

@@ -54,7 +54,7 @@ def test_distinct_movement_is_not_a_successful_take_on_or_erased_by_later_loss()
     event = bundle['events'][0]
     assert len(event['movement_observations']) == 1
     assert 's000000750' in event['proof']['cited_frames']
-    assert action_lesson(event)[0] == 'You turn while using your body to protect the ball.'
+    assert 'between the opponent and the ball' in action_lesson(event)[0]
     report = adapter.build_report({'summary': 'Synthetic observed turn'}, bundle)
     assert report['match_stats']['successful_dribbles'] is None
     # Canonical publication revalidates the evidence instead of trusting a label.
@@ -116,7 +116,7 @@ def test_movement_player_text_is_shared_by_existing_web_and_pdf_publication(kind
     event.update(canonical_event_type=kind, canonical_outcome='INCOMPLETE',
                  movement_observations=[movement()])
     report = publish_report(doc)
-    sentence = 'You turn while using your body to protect the ball.'
+    sentence = 'You put your body between the opponent and the ball as you turn.'
     full = next(r for r in report['full_report']['action_timeline'] if r['event_id'] == event['event_id'])
     web = next(r for r in report['report_publication']['view']['actionTimeline'] if r['eventId'] == event['event_id'])
     assert sentence in full['description']
