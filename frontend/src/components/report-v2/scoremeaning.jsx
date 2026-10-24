@@ -2,7 +2,8 @@
 // two human sentences, verified video proof, fresh angles (no bare repetition)
 // and position-specific meaning. Data comes from backend score_meaning payload.
 
-import React, { useState } from "react";
+import React, { useState, useContext } from "react";
+import { MatchRoomContext, SkillMatchRoom } from "./MatchRoomContext";
 import {
   Play, Lock, ChevronDown, Sparkles, Compass, Eye, TrendingUp,
   ArrowUpRight, ShieldCheck, ChevronRight,
@@ -137,6 +138,8 @@ function ExpandPanel({ s, position }) {
 
 export function SkillMeaningCard({ s, position, onPlayAt, seekable = true, defaultOpen = false, authority = false }) {
   const [open, setOpen] = useState(defaultOpen);
+  const matchRoom = useContext(MatchRoomContext);
+  const showProof = matchRoom ? (ts, ref) => matchRoom.open(s.key, ts, ref) : onPlayAt;
   return (
     <div
       className="bg-white border border-[#E5DFCE] rounded-[14px] shadow-[0_2px_10px_rgba(30,50,35,0.06)] p-4 md:p-5"
@@ -158,7 +161,8 @@ export function SkillMeaningCard({ s, position, onPlayAt, seekable = true, defau
         <p key={i} className={`text-[13px] leading-[1.58] mt-2 ${i === 0 ? "text-[#174A30] font-semibold" : "text-[#3C4A40]"}`}>{l}</p>
       ))}
       {s.comparison && <p className="mt-3 text-xs font-semibold" data-testid={`academy-skill-${s.key}`}>{s.comparison.bracket} · {s.comparison.label} skill reference</p>}
-      <AngleChips s={s} onPlayAt={onPlayAt} seekable={seekable} authority={authority} />
+      <AngleChips s={s} onPlayAt={showProof} seekable={seekable} authority={authority} />
+      {seekable && <SkillMatchRoom skillKey={s.key} />}
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
