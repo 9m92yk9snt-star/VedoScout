@@ -58,6 +58,7 @@ test('source time produces only short-lived exact-frame marks', () => {
     match_room: raw
   }, 10);
   expect(graphicsAt(room, 10250).ground).toEqual([.45, .8]);
+  expect(graphicsAt(room, 10250).groundTrail).toEqual([[.4, .8], [.45, .8]]);
   expect(graphicsAt(room, 10250).ballTrail).toEqual([[.5, .8], [.6, .7]]);
   expect(graphicsAt(room, 10125)).toBeNull();
   expect(graphicsAt(room, 12000)).toBeNull();

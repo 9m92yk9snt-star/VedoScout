@@ -41,8 +41,10 @@ export function graphicsAt(room, mediaMs) {
   const i = room.samples.indexOf(sample),
     previous = room.samples[i - 1];
   const ballTrail = previous?.ball && sample.ball && sample.camera_static_from_previous && sample.media_ms - previous.media_ms <= 300 && sample.media_ms > previous.media_ms ? [previous.ball, sample.ball] : null;
+  const groundTrail = previous?.ground && sample.ground && sample.camera_static_from_previous && sample.media_ms - previous.media_ms <= 300 && sample.media_ms > previous.media_ms ? [previous.ground, sample.ground] : null;
   return {
     ...sample,
-    ballTrail
+    ballTrail,
+    groundTrail
   };
 }

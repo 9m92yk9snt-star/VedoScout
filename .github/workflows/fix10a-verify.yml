@@ -136,6 +136,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+      - name: Install source video tools
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
       - name: Install source contract dependencies
         run: python -m pip install pytest==9.0.3 pytest-asyncio==1.4.0 numpy==2.4.6 opencv-python-headless==4.13.0.92 pillow==12.2.0 python-dotenv==1.2.2
       - name: Verify Match Room source binding and sequence regressions
