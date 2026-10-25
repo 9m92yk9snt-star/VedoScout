@@ -129,6 +129,20 @@ jobs:
           PYTHONPATH: /tmp/ci_stubs:.
         run: pytest --asyncio-mode=auto -q tests/test_fix09b2_sequence_intelligence.py tests/test_fix10a*.py tests/test_fix10b*.py tests/test_fix13*.py tests/test_fix14_orman10_recovery.py tests/test_fix15_native_goal_reappearance.py tests/test_fix15_native_goal_review.py tests/test_fix15_temporal_goal_context.py tests/test_fix15_contact_role_seed_handoff.py tests/test_fix15_independent_ball_review.py tests/test_fix15_dense_reader_coverage.py tests/test_fix15_direct_goal_transport.py tests/test_fix15_r6_multiball_search.py tests/test_fix31_temporal_video.py tests/test_fix32_edited_portrait_video.py tests/test_fix33_analysis_performance.py tests/test_fix34_saved_shot_sequence.py
 
+  matchroom_contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install source contract dependencies
+        run: python -m pip install pytest==9.0.3 pytest-asyncio==1.4.0 numpy==2.4.6 opencv-python-headless==4.13.0.92 pillow==12.2.0 python-dotenv==1.2.2
+      - name: Verify Match Room source binding and sequence regressions
+        env:
+          PYTHONPATH: backend
+        run: python -m pytest -q backend/tests/test_match_room.py backend/tests/test_sequence_report.py backend/tests/test_sequence_pilot.py backend/tests/test_sequence_only.py
+
   backend_regression:
     runs-on: ubuntu-latest
     services:
@@ -272,7 +286,7 @@ jobs:
         working-directory: frontend
         env:
           CI: 'true'
-        run: yarn test --watchAll=false --runInBand --testPathPattern='(MarkerStudio|ScoutMode|sceneDetect|MarkedCropCanvas|AnalysisWaiting|BackgroundAnalysisTracker|ProfileAnalysisStatus|publication)\.test\.'
+        run: yarn test --watchAll=false --runInBand --testPathPattern='(MarkerStudio|ScoutMode|sceneDetect|MarkedCropCanvas|AnalysisWaiting|BackgroundAnalysisTracker|ProfileAnalysisStatus|publication|MatchRoomContext|matchRoomModel)\.test\.'
       - name: Build frontend
         working-directory: frontend
         env:
