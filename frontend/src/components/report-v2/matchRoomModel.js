@@ -40,8 +40,9 @@ export function graphicsAt(room, mediaMs) {
   if (!sample || Math.abs(sample.media_ms - mediaMs) > 60) return null;
   const i = room.samples.indexOf(sample),
     previous = room.samples[i - 1];
-  const ballTrail = previous?.ball && sample.ball && sample.camera_static_from_previous && sample.media_ms - previous.media_ms <= 300 && sample.media_ms > previous.media_ms ? [previous.ball, sample.ball] : null;
-  const groundTrail = previous?.ground && sample.ground && sample.camera_static_from_previous && sample.media_ms - previous.media_ms <= 300 && sample.media_ms > previous.media_ms ? [previous.ground, sample.ground] : null;
+  const moves = (a,b) => a && b && Math.hypot(b[0]-a[0],b[1]-a[1]) > .008;
+  const ballTrail = moves(previous?.ball,sample.ball) && sample.camera_static_from_previous && sample.media_ms - previous.media_ms <= 300 && sample.media_ms > previous.media_ms ? [previous.ball, sample.ball] : null;
+  const groundTrail = moves(previous?.ground,sample.ground) && sample.camera_static_from_previous && sample.media_ms - previous.media_ms <= 300 && sample.media_ms > previous.media_ms ? [previous.ground, sample.ground] : null;
   return {
     ...sample,
     ballTrail,
