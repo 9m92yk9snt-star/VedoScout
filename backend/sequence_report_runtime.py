@@ -402,6 +402,8 @@ def render_assets(video, full, bundle, directory):
             row.update(frame_time_ms=round(actual_s*1000), frame_time_authority="ACTUAL_MEDIA_PTS",
                        identity_verified=True, identity_verification_status="SEQUENCE_SOURCE_CONTINUITY",
                        telestrated=False, tele_clip_start=start, tele_clip_end=end)
+            from match_room import presentation
+            row["match_room"] = presentation(event, event.get("visual_samples"))
             attach_clip_authority(row, start, end, {row["event_id"]: event["canonical_ms"]})
             assets.append((row, image, clip))
     finally:

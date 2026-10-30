@@ -74,6 +74,8 @@ does not itself make an established shooter or save uncertain.
 """
 
 
+from match_room import INSTRUCTION as MATCH_ROOM_INSTRUCTION
+PROMPT += "\n" + MATCH_ROOM_INSTRUCTION
 PROMPT += "\n" + FOOT_INSTRUCTION
 PROMPT += "\n" + MOVEMENT_INSTRUCTION
 

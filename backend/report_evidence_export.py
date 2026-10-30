@@ -37,7 +37,7 @@ CONFIG_KEYS = ("FULL_REPORT_ENGINE", "IDENTITY_TIMELINE_ENABLED", "IDENTITY_TIME
 SOURCE_MODULES = (
     "report_publication.py", "player_report_copy.py", "pdf_v2.py", "score_meaning.py", "score_context.py", "snapshot_card.py", "progression.py",
     "scripts/review_report_publication.py",
-    "sequence_report_adapter.py", "sequence_report_runtime.py", "sequence_pilot.py", "sequence_pilot_transport.py",
+    "sequence_report_adapter.py", "match_room.py", "sequence_report_runtime.py", "sequence_pilot.py", "sequence_pilot_transport.py",
     "sequence_run_checkpoint.py", "sequence_foot_evidence.py", "sequence_action_evidence.py",
     "scripts/run_sequence_pilot.py",
     "source_frame_cache.py", "analysis_jobs.py", "ordered_vision_reviews.py",
