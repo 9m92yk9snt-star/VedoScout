@@ -275,3 +275,45 @@ Orman700, associating fresh person masks backward/forward from the reviewed
 10.000s player. It uses current-frame person occlusion, release/reception pauses
 and an uncropped horizontal field view. This manually seeded visual fixture is
 not automatic report tracking, and does not fix the separate 24.63s duel.
+
+### Offline duel association review (2026-11-03)
+
+`scripts/matchroom_duel_review.py` is an offline experiment, not a report-worker
+import. It combines forward/backward-checked image features, appearance against
+both original tap masks, and a bounded motion association to a fresh detection.
+Missing detections never become display coordinates. The appearance/motion
+thresholds were explored on this clip and are not validated for arbitrary games.
+
+On the 79 original Orman600 frames at 24.300–26.900s, cached YOLOv8m-seg masks
+and the unchanged original 24.63/26.57s taps yield paths of 70 and 49 frames.
+They share 49 frames without an identity conflict; one reaches both original
+selections. Eleven deliberately wrong selections (five alternatives at the first
+tap and six at the second) are rejected, including the other white teammate.
+Each control rebuilds both appearance references from that control's selections.
+These are same-clip controls, not independent validation footage.
+
+The separate playback review draws the 64 available lower-contour positions and
+hides the marker on the remaining 15 frames. The source-frame review shows white
+10 reacquired after the occlusion. This is not a generated report payload: the
+existing observation-per-segment gate still admits only two 20-frame segments
+(24.367–25.000s and 26.267–26.900s). Middle segments lack a source observation
+under that contract. Full report integration and broader validation remain open.
+
+Selective-inference experiments use the existing nano model in the fixed focused
+view plus the larger model on failures. Fresh inference and association for the
+full window took 35.086s locally (79 nano frames, 13 larger-model frames; 70/51
+path frames, 49 shared, no conflict). Restricting work to the original-tap interval
+and spacing larger-model retries reduced this to 23.724s (57 nano frames, nine
+larger-model frames; 51/41 path frames, 39 shared, no conflict). Source frames were
+already decoded, so neither number is complete report-worker latency. Both are
+incompatible with the existing 22s internal deadline once other work is included.
+A 15fps trial broke continuity and was rejected. No production asset, dependency,
+timeout, observation gate, identity method, ball arrow or event score was changed.
+
+Review model SHA256:
+`20877569fcfc4744855b1d6d05b0cd7031987ae31894af5c7e1e74328d18e653`.
+Original source SHA256:
+`db97b9dc0e2cda68f6c4619405270006e7ab31eeb44e73bd7ed432b1a8d0de38`.
+Reproduction accepts explicit local paths for the source, the two original
+anchors and the checksum-verified model. `--negative-controls` reruns every
+uniquely selectable alternative at each tap. No network or provider call occurs.
