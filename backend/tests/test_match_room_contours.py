@@ -126,3 +126,20 @@ def test_long_missing_foot_interval_still_splits_segments():
         args[1][i][0]['ground'] = None
     args[3].append({**args[3][0], 'media_ms':1396, 'frame_id':'f2'})
     assert len(contours.agree_segments(*args)) == 2
+
+
+def test_pinned_reacquisition_graph_runs_in_the_serving_opencv_runtime():
+    import cv2
+    from match_room_reacquisition import MODEL_PATH, MODEL_SHA256
+    from player_segmentation_assets import ensure_model_asset
+    path=ensure_model_asset(MODEL_PATH,MODEL_SHA256)
+    threads=cv2.getNumThreads()
+    try:
+        cv2.setNumThreads(2)
+        net=cv2.dnn.readNetFromONNX(str(path))
+        net.setInput(np.zeros((1,3,640,640),np.float32))
+        outputs=net.forward(net.getUnconnectedOutLayersNames())
+        assert any(o.ndim==3 and o.shape[1]==116 for o in outputs)
+        assert any(o.ndim==4 and o.shape[1]==32 for o in outputs)
+    finally:
+        cv2.setNumThreads(threads)
