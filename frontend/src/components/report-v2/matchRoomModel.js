@@ -25,6 +25,8 @@ export function roomFor(comment, fallbackSeconds) {
     ground: point(s.ground) && finite(s.player_width) && s.player_width >= .005 && s.player_width <= .4 ? s.ground : null,
     player_width: s.player_width,
     ball: point(s.ball) ? s.ball : null,
+    groundTrail: s.motion_method === 'BACKGROUND_AFFINE_ENDPOINTS' && finite(s.motion_start_ms) && s.media_ms > s.motion_start_ms && s.media_ms-s.motion_start_ms <= 1000 && raw.samples.some(p => p.media_ms === s.motion_start_ms && point(p.ground)) && Array.isArray(s.groundTrail) && s.groundTrail.length === 2 && s.groundTrail.every(point) && point(s.ground) && s.groundTrail[1][0] === s.ground[0] && s.groundTrail[1][1] === s.ground[1] ? s.groundTrail : null,
+    motion_start_ms: s.motion_start_ms,
     camera_static_from_previous: s.camera_static_from_previous === true
   })).sort((a, b) => a.media_ms - b.media_ms) : [];
   const tracking = raw?.tracking;
@@ -44,6 +46,9 @@ export function roomFor(comment, fallbackSeconds) {
   };
 }
 export function graphicsAt(room, mediaMs) {
+  // A source-observed endpoint takes precedence over an optical box proxy.
+  const observed = room.samples.find(s => s.groundTrail && Math.abs(s.media_ms-mediaMs) <= 60);
+  if (observed) return {...observed, ballTrail: null, endpointMotion: true};
   const candidates = (room.tracks || []).filter(rows => mediaMs >= rows[0].media_ms && mediaMs <= rows[rows.length-1].media_ms).map(rows => rows.reduce((a, b) => Math.abs(a.media_ms-mediaMs) <= Math.abs(b.media_ms-mediaMs) ? a : b)).filter(s => Math.abs(s.media_ms-mediaMs) <= 60);
   if (candidates.length) {
     const chosen = candidates.sort((a,b) => b.confidence-a.confidence)[0];

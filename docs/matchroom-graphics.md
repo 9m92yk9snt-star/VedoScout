@@ -66,3 +66,28 @@ is rejected. This is NOT validated continuous coverage and is not rollout-ready.
 The old tracker is present but cannot simply be enabled and described as solved.
 Further work must improve or reacquire body geometry under independent identity
 checks; weakening the disagreement gate is not an acceptable fix.
+
+
+## Observed displacement at a pause
+
+The optional graphics child now also reuses `estimate_camera` on consecutive
+source frames between two same-action observed ground positions, at most 1s
+apart. Each intermediate frame must support the background affine transform;
+cuts, failed transforms or decode gaps suppress the arrow. The actor-endpoint
+horizontal band is excluded from background estimation. The earlier ground
+point is transformed into the later camera view. The resulting arrow means
+observed endpoint displacement, not the hidden path, instantaneous velocity,
+future direction or a ball trajectory.
+
+Source endpoints take precedence over optical box proxies. A dribble/carry may
+get one additional automatic pause at the last supported endpoint, without
+changing its contact/outcome times. At that pause the arrow stays readable.
+Existing factual captions are reused. The continuous optical limitations above
+remain; this change does not claim to fix body tracking through every turn.
+
+Local existing-receipt replay produced one endpoint arrow for Orman600 and three
+for Orman700. These are the same source sequence with different sample spacing,
+not four independent football examples. Runtime was approximately 1.4s per
+source for the camera-only pass. A rendered preview demonstrates three pauses
+for visual inspection; production adds at most one extra pause per action.
+No fresh model requests were made. Sparse/continuous ball tracking is unchanged.

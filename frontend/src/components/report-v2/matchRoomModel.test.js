@@ -114,3 +114,15 @@ test('camera compensated arrow must reference the immediately preceding sample',
   expect(graphicsAt(room,10080).groundTrail).toEqual([[.5,.8],[.4,.8]]);
   expect(graphicsAt(room,10160).groundTrail).toBeNull();
 });
+test('camera corrected source endpoints override a box proxy at the pause',()=>{
+  const samples=raw.samples.map((s,i)=>i?{...s,motion_method:'BACKGROUND_AFFINE_ENDPOINTS',motion_start_ms:10000,groundTrail:[[.5,.8],s.ground]}:s);
+  const room=roomFor({...comment,match_room:{...raw,samples,tracking:tracked}},10);
+  const mark=graphicsAt(room,10250);
+  expect(mark.endpointMotion).toBe(true);
+  expect(mark.groundTrail).toEqual([[.5,.8],[.45,.8]]);
+});
+test('endpoint arrows need the cited earlier sample from this event',()=>{
+  const samples=raw.samples.map((s,i)=>({...s,camera_static_from_previous:false,...(i?{motion_method:'BACKGROUND_AFFINE_ENDPOINTS',motion_start_ms:9900,groundTrail:[[.5,.8],s.ground]}:{})}));
+  const room=roomFor({...comment,match_room:{...raw,samples}},10);
+  expect(graphicsAt(room,10250).groundTrail).toBeNull();
+});

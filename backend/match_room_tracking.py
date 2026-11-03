@@ -95,6 +95,75 @@ def add_motion(segment, motion):
             samples[b]['motion_from_ms'] = a
 
 
+def endpoint_arrow(previous, current, matrix, width, height):
+    """Observed endpoint displacement in the current camera view; not a path."""
+    import numpy as np
+    if not point(previous.get('ground')) or not point(current.get('ground')):
+        return None
+    if not 0 < current['media_ms'] - previous['media_ms'] <= 1000:
+        return None
+    m = np.asarray(matrix, dtype=float)
+    if m.shape != (3, 3) or not np.isfinite(m).all() or width <= 0 or height <= 0:
+        return None
+    p = m @ np.array([previous['ground'][0]*width, previous['ground'][1]*height, 1.])
+    tail = [float(p[0]/width), float(p[1]/height)]
+    tip = current['ground']
+    if not point(tail) or not .008 <= math.dist(tail, tip) <= .3:
+        return None
+    return [tail, tip]
+
+
+def observed_motion(video, observations):
+    """Reuse the background affine estimator between observed source endpoints.
+
+    Every intervening decoded frame must support the camera transform. Exclude
+    a full-height band containing the actor endpoints; no player trajectory is
+    assumed when selecting background pixels. Never connect ball observations.
+    """
+    import cv2
+    import numpy as np
+    from copy import deepcopy
+    from player_tracking import _read_window, _cut_flags
+    from motion_compensation import estimate_camera
+    samples = sorted(deepcopy(observations), key=lambda s: s['media_ms'])
+    cap = cv2.VideoCapture(str(video))
+    try:
+        for previous, current in zip(samples, samples[1:]):
+            if not (point(previous.get('ground')) and point(current.get('ground'))):
+                continue
+            if not 0 < current['media_ms']-previous['media_ms'] <= 1000:
+                continue
+            start, end = previous['media_ms']/1000, current['media_ms']/1000
+            frames = _read_window(cap, start-.02, end+.025, 1/30, seed_time=start)
+            if len(frames) < 2 or abs(frames[0][0]-start) > .025 or abs(frames[-1][0]-end) > .025:
+                continue
+            cuts = _cut_flags(frames)
+            h, w = frames[0][1].shape
+            margin = max(previous.get('player_width', .1), current.get('player_width', .1))
+            left = max(0., min(previous['ground'][0], current['ground'][0])-margin)
+            right = min(1., max(previous['ground'][0], current['ground'][0])+margin)
+            exclude = [(left*w, 0, (right-left)*w, h)]
+            cumulative = np.eye(3)
+            valid = True
+            for i in range(1, len(frames)):
+                if cuts[i] or not 0 < frames[i][0]-frames[i-1][0] <= .12:
+                    valid = False
+                    break
+                matrix, _ = estimate_camera(frames[i-1][1], frames[i][1], exclude)
+                if matrix is None:
+                    valid = False
+                    break
+                cumulative = np.vstack([matrix, [0, 0, 1]]) @ cumulative
+            if valid:
+                arrow = endpoint_arrow(previous, current, cumulative, w, h)
+                if arrow:
+                    current.update(groundTrail=arrow, motion_start_ms=previous['media_ms'],
+                                   motion_method='BACKGROUND_AFFINE_ENDPOINTS')
+    finally:
+        cap.release()
+    return samples
+
+
 def compute(video, anchors, events):
     from player_tracking import track_player
     from motion_compensation import compute_motion_samples
@@ -117,7 +186,8 @@ def compute(video, anchors, events):
                 group['id'] = f'{seed_index}:{len(segments)}'
                 segments.append(group)
         output[event['event_id']] = {'version': 1, 'source_video_sha256': event['source_video_sha256'],
-            'event_id': event['event_id'], 'method': 'TAP_OPTICAL_GROUND_PROXY', 'segments': segments}
+            'event_id': event['event_id'], 'method': 'TAP_OPTICAL_GROUND_PROXY', 'segments': segments,
+            'observed_samples': observed_motion(video, observations)}
     return output
 
 

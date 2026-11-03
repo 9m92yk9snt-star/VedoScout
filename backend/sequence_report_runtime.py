@@ -408,6 +408,18 @@ def render_assets(video, full, bundle, directory, anchors=None):
             row["match_room"] = presentation(event, event.get("visual_samples"))
             row["match_room"]["tracking_status"] = tracking_status
             row["match_room"]["tracking"] = tracks.get(event["event_id"])
+            tracked = tracks.get(event["event_id"]) or {}
+            observed = tracked.get("observed_samples")
+            if isinstance(observed, list):
+                row["match_room"]["samples"] = observed
+                arrows = [s for s in observed if s.get("motion_method") == "BACKGROUND_AFFINE_ENDPOINTS"]
+                if arrows and event.get("canonical_action_type") in {"DRIBBLE", "CARRY"}:
+                    focus = arrows[-1]
+                    stops = row["match_room"]["stops"]
+                    if not any(abs(s["media_ms"]-focus["media_ms"]) <= 60 for s in stops):
+                        stops.append({"media_ms": focus["media_ms"], "label": "Movement", "phase": "action"})
+                        stops.sort(key=lambda s: s["media_ms"])
+
             attach_clip_authority(row, start, end, {row["event_id"]: event["canonical_ms"]})
             assets.append((row, image, clip))
     finally:

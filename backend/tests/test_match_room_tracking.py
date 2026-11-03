@@ -73,14 +73,51 @@ def test_asset_renderer_attaches_event_bound_tracks_without_changing_samples():
     cap=types.SimpleNamespace(release=lambda:None)
     fake_cv=types.SimpleNamespace(VideoCapture=lambda p:cap,imwrite=lambda *a:True)
     fake_time=types.SimpleNamespace(read_frame_at=lambda *a:(True,object(),1.))
-    event={'canonical_ms':1000,'event_id':'e','source_video_sha256':'source','visual_samples':observations(),
+    event={'canonical_action_type':'DRIBBLE','canonical_ms':1000,'event_id':'e','source_video_sha256':'source','visual_samples':observations(),
            'proof':{'proof_start_ms':1000,'proof_end_ms':1200,'frame_ms':1000,'frame_id':'f'}}
     full={'video_comments':[{'event_id':'e','sequence_event_native':True,'source_video_sha256':'source',
            'evidence_time_ms':1000,'source_frame_id':'f','evidence_id':'proof'}]}
-    tracks={'e':{'version':1,'event_id':'e','source_video_sha256':'source','segments':[]}}
+    enhanced=[{**observations()[0], 'motion_method':'BACKGROUND_AFFINE_ENDPOINTS', 'motion_start_ms':1000, 'groundTrail':[[.4,.59],[.45,.59]]}]
+    tracks={'e':{'version':1,'event_id':'e','source_video_sha256':'source','segments':[], 'observed_samples':enhanced}}
     with tempfile.TemporaryDirectory() as directory, patch.dict(sys.modules,{'cv2':fake_cv,'video_timebase':fake_time,'media_binaries':types.SimpleNamespace(FFMPEG_BIN='ffmpeg')}), patch.object(tracking,'bounded_tracks',return_value=(tracks,'COMPLETED')) as build, patch.object(subprocess,'run'):
         namespace['render_assets']('video',full,{'source_video_sha256':'source','events':[event]},directory,[{'t':1}])
         assert build.call_args.args[1]==[{'t':1}]
         room=full['video_comments'][0]['match_room']
         assert room['tracking']==tracks['e']
-        assert room['samples']==event['visual_samples']
+        assert room['samples']==enhanced
+        assert event['visual_samples']==observations()
+        assert [s['media_ms'] for s in room['stops']]==[1000,1080]
+
+
+def test_endpoint_arrow_removes_camera_pan_and_keeps_player_direction():
+    a={'media_ms':1000,'ground':[.4,.8]};b={'media_ms':1200,'ground':[.5,.8]}
+    camera=[[1,0,100],[0,1,0],[0,0,1]]
+    assert tracking.endpoint_arrow(a,b,camera,1000,1000) is None
+    b['ground']=[.47,.8]
+    tail,tip=tracking.endpoint_arrow(a,b,camera,1000,1000)
+    assert tail==[.5,.8] and tip[0]<tail[0]
+
+
+def test_endpoint_arrows_reject_long_gaps_and_invalid_transforms():
+    a={'media_ms':1000,'ground':[.4,.8]};b={'media_ms':2200,'ground':[.5,.8]}
+    identity=[[1,0,0],[0,1,0],[0,0,1]]
+    assert tracking.endpoint_arrow(a,b,identity,1000,1000) is None
+    b['media_ms']=1200
+    assert tracking.endpoint_arrow(a,b,[[float('nan')]*3]*3,1000,1000) is None
+    assert tracking.endpoint_arrow(a,b,identity,0,1000) is None
+
+
+def test_intermediate_camera_failure_does_not_make_endpoint_arrow():
+    import numpy as np
+    from unittest.mock import patch
+    import player_tracking
+    import motion_compensation
+    import cv2
+    frames=[(t,np.zeros((100,100),dtype=np.uint8),None,None) for t in (1.,1.033,1.067,1.1)]
+    obs=[{'media_ms':1000,'ground':[.4,.8],'player_width':.1},
+         {'media_ms':1100,'ground':[.5,.8],'player_width':.1}]
+    cap=type('Cap',(),{'release':lambda self:None})()
+    with patch.object(cv2,'VideoCapture',return_value=cap), patch.object(player_tracking,'_read_window',return_value=frames), patch.object(player_tracking,'_cut_flags',return_value=[False]*4), patch.object(motion_compensation,'estimate_camera',side_effect=[(np.array([[1.,0,0],[0,1.,0]]),20),(None,'features')]):
+        result=tracking.observed_motion('video',obs)
+    assert all('groundTrail' not in row for row in result)
+    assert all('groundTrail' not in row for row in obs)
