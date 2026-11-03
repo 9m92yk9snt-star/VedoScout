@@ -18,7 +18,7 @@ from scripts.run_sequence_report_trial import trial
 from sequence_pilot import original_taps
 
 
-def prepare(source, work):
+def prepare(source, work, tap_index=0):
     work.mkdir(parents=True, exist_ok=False)
     (work / 'video').mkdir()
     parts = sorted((source / 'video-parts').glob('*.bin'))
@@ -38,8 +38,10 @@ def prepare(source, work):
     raw = json.loads((work / 'anchors.json').read_text())['raw_marker_anchors']
     while isinstance(raw, str):
         raw = json.loads(raw)
-    # First original selection only, without using action times or expected answers.
-    selection = {'raw_marker_anchors': [raw[0]]}
+    # One unchanged original selection; never synthesize or combine taps.
+    if type(tap_index) is not int or not 0 <= tap_index < len(raw):
+        raise ValueError('ORIGINAL_TAP_INDEX_REQUIRED')
+    selection = {'raw_marker_anchors': [raw[tap_index]]}
     if len(original_taps(selection)) != 1:
         raise ValueError('EXACTLY_ONE_ORIGINAL_TAP_REQUIRED')
     (work / 'single-tap.json').write_text(json.dumps(selection, indent=2))
@@ -88,10 +90,11 @@ def main():
     parser.add_argument('--work', type=Path, required=True)
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--retry-document', type=Path)
+    parser.add_argument('--tap-index', type=int, default=0)
     parser.add_argument('--recover-missing', action='store_true')
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[2]
-    video, selection = prepare(root / 'testdata/sequence-pilot-orman400', args.work)
+    video, selection = prepare(root / 'testdata/sequence-pilot-orman400', args.work, args.tap_index)
     print(json.dumps({'phase': 'verified_source_ready', 'human_taps': 1,
         'source_bytes': video.stat().st_size, 'historical_results_used': False}), flush=True)
     if not os.environ.get('EMERGENT_LLM_KEY'):

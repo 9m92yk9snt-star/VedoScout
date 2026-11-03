@@ -22,5 +22,23 @@
     "confirmed_ball_positions": 22,
     "status": "IDENTITY_UNRESOLVED_AFTER_CONTEXT_CUT",
     "report_modified": false
+  },
+  "original_selection_check": {
+    "original_tap_seconds": 3.07,
+    "decoded_source_ms": 3083,
+    "existing_person_suggestion_status": "unavailable",
+    "reason": "no_visible_person",
+    "visual_review": "The saved positive point lies beside the white player at the decoded source frame and nearby frames. No correction was invented."
+  },
+  "next_trial": {
+    "selection": "Exactly original anchor index 4 at 21.48 seconds, with its existing original mask; other nine anchors excluded",
+    "selection_validation": "Existing local person suggestion resolves the point; direct source review agrees the point lies on the white player",
+    "fresh_report_required": true,
+    "reuse_old_model_receipts": false
+  },
+  "early_duel_probe": {
+    "run_id": 41724654161,
+    "status": "NOT_STARTED",
+    "reason": "Sparse checkout omitted docs/examples fixtures, failing 18 setup tests. Full checkout restored; no model call occurred."
   }
 }

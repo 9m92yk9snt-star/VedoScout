@@ -45,11 +45,11 @@ def validate(raw, frames):
 
 
 def main():
-    ap=argparse.ArgumentParser();ap.add_argument('--report',type=Path,required=True);ap.add_argument('--work',type=Path,required=True);ap.add_argument('--run-model',action='store_true');ap.add_argument('--event-id');ap.add_argument('--sample-ms',type=int,default=83);args=ap.parse_args()
+    ap=argparse.ArgumentParser();ap.add_argument('--report',type=Path,required=True);ap.add_argument('--work',type=Path,required=True);ap.add_argument('--run-model',action='store_true');ap.add_argument('--tap-index',type=int,default=0);ap.add_argument('--event-id');ap.add_argument('--sample-ms',type=int,default=83);args=ap.parse_args()
     if not 33 <= args.sample_ms <= 125:raise ValueError('BOUNDED_SAMPLE_INTERVAL_REQUIRED')
     doc=pilot.read_json(args.report)
     if doc.get('full_report_status')!='ready':raise ValueError('READY_REPORT_REQUIRED')
-    video,selection=prepare(Path(__file__).resolve().parents[2]/'testdata/sequence-pilot-orman400',args.work)
+    video,selection=prepare(Path(__file__).resolve().parents[2]/'testdata/sequence-pilot-orman400',args.work,args.tap_index)
     bundle=doc['canonical_events']; source=pilot.digest(video)
     if source!=bundle['source_video_sha256'] or selection['raw_marker_anchors']!=doc['raw_marker_anchors']:raise ValueError('SOURCE_SELECTION_MISMATCH')
     rows=doc['full_report']['video_comments']
