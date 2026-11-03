@@ -22,12 +22,12 @@ Omit ground if feet are occluded. Do not estimate hidden positions or destinatio
 Never use reference crops or detail crops as the FULL_FRAME coordinate plane.
 camera_static_from_previous=true ONLY when consecutive samples show the same
 continuous camera view without pan, zoom or cut. Omit uncertain samples entirely.
-For a completed pass, include the visible release and the receiver's first
-controlled touch among these samples. On the release sample set
-ball_phase="RELEASE"; on the controlled-touch sample set ball_phase="RECEIVED"
+For a completed pass, include the visible release and the receiver's first clearly visible
+controlled-ball position after reception among these samples. On the release sample set
+ball_phase="RELEASE"; on that reception sample set ball_phase="RECEIVED"
 and receiver="the receiver actor ID from this action". Keep actor as the action
-actor. Do not label a nearby player, a predicted destination or a later carry
-as the first reception. Omit these fields when the contact is obscured.
+actor. Do not label a nearby player, a predicted destination or an unrelated later carry
+as reception evidence. Omit these fields when the contact is obscured.
 These optional observations must never change event identity, outcome or scores.
 """
 

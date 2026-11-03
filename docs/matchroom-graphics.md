@@ -228,7 +228,8 @@ The frontend independently checks release time, phase, receiver, source/event
 binding and maximum interval. Player display remains the stance glow only.
 
 A local visual-review fixture uses the existing Orman700 PASS at 9.267s and
-reception at 10.000s. Release was manually annotated from the source image;
+visible control after reception at 10.000s. The first touch is partly obscured;
+the preview does not assign its exact time. Release was manually annotated from the source image;
 reception ball position was measured by the existing local segmenter and visually
 reviewed. These annotations are NOT model receipts or written to the report.
 The selected actor's reception-frame stance was also checked with local
