@@ -412,12 +412,12 @@ def render_assets(video, full, bundle, directory, anchors=None):
             observed = tracked.get("observed_samples")
             if isinstance(observed, list):
                 row["match_room"]["samples"] = observed
-                ball_arrows = [s for s in observed if s.get("ball_motion_method") == "BACKGROUND_AFFINE_BALL_ENDPOINTS"]
+                ball_arrows = [s for s in observed if s.get("ball_motion_method") in {"BACKGROUND_AFFINE_BALL_ENDPOINTS", "BACKGROUND_AFFINE_PASS_ENDPOINTS"}]
                 if ball_arrows:
                     focus = ball_arrows[-1]
                     stops = row["match_room"]["stops"]
                     if not any(abs(s["media_ms"]-focus["media_ms"]) <= 60 for s in stops):
-                        stops.append({"media_ms": focus["media_ms"], "label": "Ball movement", "phase": "action"})
+                        stops.append({"media_ms": focus["media_ms"], "label": "Pass direction" if focus.get("ball_motion_method") == "BACKGROUND_AFFINE_PASS_ENDPOINTS" else "Ball movement", "phase": "action"})
                         stops.sort(key=lambda s: s["media_ms"])
 
             attach_clip_authority(row, start, end, {row["event_id"]: event["canonical_ms"]})

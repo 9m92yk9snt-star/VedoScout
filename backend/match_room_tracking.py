@@ -96,7 +96,7 @@ def add_motion(segment, motion):
             samples[b]['motion_from_ms'] = a
 
 
-def endpoint_arrow(previous, current, matrix, width, height, *, field='ground', max_gap=1000):
+def endpoint_arrow(previous, current, matrix, width, height, *, field='ground', max_gap=1000, max_distance=.3):
     """Observed endpoint displacement in the current camera view; not a path."""
     import numpy as np
     if not point(previous.get(field)) or not point(current.get(field)):
@@ -109,12 +109,12 @@ def endpoint_arrow(previous, current, matrix, width, height, *, field='ground', 
     p = m @ np.array([previous[field][0]*width, previous[field][1]*height, 1.])
     tail = [float(p[0]/width), float(p[1]/height)]
     tip = current[field]
-    if not point(tail) or not .008 <= math.dist(tail, tip) <= .3:
+    if not point(tail) or not .008 <= math.dist(tail, tip) <= max_distance:
         return None
     return [tail, tip]
 
 
-def observed_motion(video, observations):
+def observed_motion(video, observations, *, ball_gap_ms=300, separate_bands=False):
     """Reuse the background affine estimator between observed source endpoints.
 
     Every intervening decoded frame must support the camera transform. Exclude
@@ -133,7 +133,7 @@ def observed_motion(video, observations):
         for previous, current in zip(samples, samples[1:]):
             gap = current['media_ms']-previous['media_ms']
             ground = 0 < gap <= 1000 and all(point(s.get('ground')) for s in (previous, current))
-            ball = 0 < gap <= 300 and all(point(s.get('ball')) for s in (previous, current))
+            ball = 0 < gap <= ball_gap_ms and all(point(s.get('ball')) for s in (previous, current))
             if not (ground or ball):
                 continue
             start, end = previous['media_ms']/1000, current['media_ms']/1000
@@ -147,6 +147,8 @@ def observed_motion(video, observations):
             left = max(0., min(endpoints)-margin)
             right = min(1., max(endpoints)+margin)
             exclude = [(left*w, 0, (right-left)*w, h)]
+            if separate_bands:
+                exclude = [(max(0., x-margin)*w, 0, (min(1., x+margin)-max(0., x-margin))*w, h) for x in endpoints]
             cumulative = np.eye(3)
             valid = True
             for i in range(1, len(frames)):
@@ -164,13 +166,43 @@ def observed_motion(video, observations):
                     current.update(groundTrail=arrow, motion_start_ms=previous['media_ms'],
                                    motion_method='BACKGROUND_AFFINE_ENDPOINTS')
                 ball_arrow = endpoint_arrow(previous, current, cumulative, w, h,
-                                            field='ball', max_gap=300) if ball else None
+                                            field='ball', max_gap=ball_gap_ms, max_distance=.8 if ball_gap_ms > 300 else .3) if ball else None
                 if ball_arrow:
                     current.update(ballTrail=ball_arrow, ball_motion_start_ms=previous['media_ms'],
                                    ball_motion_method='BACKGROUND_AFFINE_BALL_ENDPOINTS')
     finally:
         cap.release()
     return samples
+
+
+def pass_motion(video, event, observations):
+    """A confirmed release-to-reception direction, never a predicted pass lane.
+
+    Coordinates still describe only endpoints in the reception camera view.
+    The path between them is not claimed to be straight or fully observed.
+    """
+    if event.get('canonical_action_type') != 'PASS' or event.get('canonical_outcome') != 'COMPLETED':
+        return observations
+    contact = event.get('contact_ms')
+    receiver = (event.get('causal_chain') or {}).get('receiver_visual_id')
+    if not finite(contact) or not isinstance(receiver, str) or not receiver:
+        return observations
+    release = [s for s in observations if s.get('ball_phase') == 'RELEASE' and point(s.get('ball')) and abs(s['media_ms']-contact) <= 80]
+    arrival = [s for s in observations if s.get('ball_phase') == 'RECEIVED' and s.get('receiver') == receiver and point(s.get('ball'))]
+    if len(release) != 1 or len(arrival) != 1:
+        return observations
+    a, b = release[0], arrival[0]
+    start, end = event['proof']['proof_start_ms'], event['proof']['proof_end_ms']
+    if not start <= a['media_ms'] < b['media_ms'] <= end or b['media_ms']-a['media_ms'] > 2000:
+        return observations
+    clean = [{k: v for k, v in s.items() if k not in ('ballTrail', 'ball_motion_start_ms', 'ball_motion_method')} for s in (a, b)]
+    pair = observed_motion(video, clean, ball_gap_ms=2000, separate_bands=True)
+    if not pair[-1].get('ballTrail'):
+        return observations
+    return [{**s, 'ballTrail': pair[-1]['ballTrail'],
+             'ball_motion_start_ms': a['media_ms'],
+             'ball_motion_method': 'BACKGROUND_AFFINE_PASS_ENDPOINTS'}
+            if s is b else s for s in observations]
 
 
 def compute(video, anchors, events, checkpoint=None):
@@ -195,7 +227,7 @@ def compute(video, anchors, events, checkpoint=None):
         start, end = event['proof']['proof_start_ms'], event['proof']['proof_end_ms']
         result = {'version': 1, 'source_video_sha256': event['source_video_sha256'],
                   'event_id': event['event_id'], 'method': 'TAP_OPTICAL_GROUND_PROXY', 'segments': [],
-                  'observed_samples': observed_motion(video, observations)}
+                  'observed_samples': pass_motion(video, event, observed_motion(video, observations))}
         output[event['event_id']] = result
         save()  # keep completed sparse graphics if the optional contour work times out
         diagnostic = {}

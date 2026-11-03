@@ -51,3 +51,11 @@ def test_presentation_preserves_exact_source_times_and_never_invents_stops():
     assert room['samples']==[] and event==before
     event['proof']['outcome_ms']=None
     assert len(presentation(event)['stops'])==1
+
+
+
+def test_pass_phases_need_visible_active_ball_and_explicit_receiver():
+    assert parse([{**ROW,'ball_phase':'RELEASE'}])[0]['ball_phase']=='RELEASE'
+    assert parse([{**ROW,'ball_phase':'RECEIVED','receiver':'p7'}])[0]['receiver']=='p7'
+    assert 'ball_phase' not in parse([{**ROW,'ball_phase':'RECEIVED'}])[0]
+    assert 'ball_phase' not in parse([{**ROW,'ball_phase':'RELEASE','active_ball_verified':False}])[0]

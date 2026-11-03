@@ -171,3 +171,13 @@ test('ball endpoint arrows cannot borrow player geometry, skip observations or o
   expect(graphicsAt(ballRoom(),10320)).toBeNull();
   expect(graphicsAt(ballRoom([{...ballSamples[0],media_ms:9800},{...ballSamples[1],ball_motion_start_ms:9800}]),10250).ballTrail).toBeNull();
 });
+
+test('long pass direction requires the recorded release and receiving actor',()=>{
+  const samples=[{...raw.samples[0],ball_phase:'RELEASE'}, {...raw.samples[1],media_ms:10800,ball_phase:'RECEIVED',receiver:'p7',camera_static_from_previous:false,ball_motion_method:'BACKGROUND_AFFINE_PASS_ENDPOINTS',ball_motion_start_ms:10000,ballTrail:[[.5,.8],[.6,.7]]}];
+  const contract={...raw,action_type:'PASS',action_outcome:'COMPLETED',contact_ms:10000,receiver_visual_id:'p7',samples};
+  const room=r=>roomFor({...comment,match_room:r},10);
+  expect(graphicsAt(room(contract),10800).ballTrail).toEqual([[.5,.8],[.6,.7]]);
+  for(const change of [{action_type:'DRIBBLE'},{action_outcome:'INCOMPLETE'},{receiver_visual_id:'other'},{contact_ms:10500},{samples:[{...samples[0],ball_phase:null},samples[1]]}]) {
+    expect(graphicsAt(room({...contract,...change}),10800).ballTrail).toBeNull();
+  }
+});

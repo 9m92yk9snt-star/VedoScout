@@ -22,6 +22,12 @@ Omit ground if feet are occluded. Do not estimate hidden positions or destinatio
 Never use reference crops or detail crops as the FULL_FRAME coordinate plane.
 camera_static_from_previous=true ONLY when consecutive samples show the same
 continuous camera view without pan, zoom or cut. Omit uncertain samples entirely.
+For a completed pass, include the visible release and the receiver's first
+controlled touch among these samples. On the release sample set
+ball_phase="RELEASE"; on the controlled-touch sample set ball_phase="RECEIVED"
+and receiver="the receiver actor ID from this action". Keep actor as the action
+actor. Do not label a nearby player, a predicted destination or a later carry
+as the first reception. Omit these fields when the contact is obscured.
 These optional observations must never change event identity, outcome or scores.
 """
 
@@ -56,6 +62,10 @@ def samples(rows, *, actor, frames, start, end, allowed=None):
             item.update(ground=row['ground'], player_width=width)
         if point(row.get('ball')) and row.get('active_ball_verified') is True:
             item['ball'] = row['ball']
+            if row.get('ball_phase') == 'RELEASE':
+                item['ball_phase'] = 'RELEASE'
+            elif row.get('ball_phase') == 'RECEIVED' and isinstance(row.get('receiver'), str) and 0 < len(row['receiver']) <= 120:
+                item.update(ball_phase='RECEIVED', receiver=row['receiver'])
         if len(item) > 2:
             item['camera_static_from_previous'] = row.get('camera_static_from_previous') is True
             result[ms] = item
@@ -83,6 +93,10 @@ def presentation(event, samples_=None):
     return {'version': 1, 'event_id': event['event_id'],
             'source_video_sha256': event['source_video_sha256'],
             'coordinate_space': 'FULL_FRAME_NORMALIZED',
+            'action_type': event.get('canonical_action_type'),
+            'action_outcome': event.get('canonical_outcome'),
+            'contact_ms': event.get('contact_ms'),
+            'receiver_visual_id': (event.get('causal_chain') or {}).get('receiver_visual_id'),
             'start_ms': start, 'end_ms': end, 'stops': sorted(stops, key=lambda s:s['media_ms']),
             'samples': samples_ if isinstance(samples_, list) else [],
             'observation': ' '.join(event.get('details') or [])[:1000]}
@@ -112,3 +126,4 @@ def from_receipts(event, manifest, receipts):
         except (ValueError, TypeError, KeyError, IndexError, AttributeError):
             continue
     return []
+

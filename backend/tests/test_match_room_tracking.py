@@ -167,3 +167,21 @@ def test_ball_only_observations_work_without_player_geometry_and_fail_on_camera_
         estimate.side_effect=[(camera,20),(None,'features')]
         assert all('ballTrail' not in row for row in tracking.observed_motion('video',obs))
     assert all('ballTrail' not in row for row in obs)
+
+
+def test_pass_direction_requires_release_receiver_and_camera_proof(monkeypatch):
+    event={'canonical_action_type':'PASS','canonical_outcome':'COMPLETED','contact_ms':1000,
+           'causal_chain':{'receiver_visual_id':'p7'},'proof':{'proof_start_ms':900,'proof_end_ms':2500}}
+    obs=[{'frame_id':'release','media_ms':1000,'ball':[.6,.7],'ball_phase':'RELEASE'},
+         {'frame_id':'reception','media_ms':1800,'ball':[.2,.7],'ball_phase':'RECEIVED','receiver':'p7',
+          'ballTrail':[[.3,.7],[.2,.7]],'ball_motion_method':'BACKGROUND_AFFINE_BALL_ENDPOINTS'}]
+    monkeypatch.setattr(tracking,'observed_motion',lambda video,rows,**kwargs: rows)
+    assert tracking.pass_motion('video',event,obs) == obs  # no old arrow promoted on camera failure
+    def measured(video,rows,**kwargs):
+        assert kwargs == {'ball_gap_ms':2000, 'separate_bands':True}
+        return [rows[0],{**rows[1],'ballTrail':[[.5,.7],[.2,.7]]}]
+    monkeypatch.setattr(tracking,'observed_motion',measured)
+    assert tracking.pass_motion('video',event,obs)[1]['ball_motion_method']=='BACKGROUND_AFFINE_PASS_ENDPOINTS'
+    for change in [{'canonical_action_type':'DRIBBLE'},{'canonical_outcome':'INCOMPLETE'},{'contact_ms':1300},{'causal_chain':{'receiver_visual_id':'other'}}]:
+        assert tracking.pass_motion('video',{**event,**change},obs) == obs
+    assert tracking.pass_motion('video',event,[obs[0],{**obs[1],'media_ms':3300}])[1]['ball_motion_method']=='BACKGROUND_AFFINE_BALL_ENDPOINTS'

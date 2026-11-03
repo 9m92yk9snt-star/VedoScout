@@ -210,3 +210,30 @@ remain. Arrows are reserved for observed ball movement and supported passes.
 The validated 200ms ball displacement is not evidence of an entire pass to a
 receiver: longer pass arrows still require source-bound release/arrival evidence.
 Earlier preview videos showing a dashed player arrow predate this correction.
+
+## Release-to-reception pass direction
+
+Completed PASS events may now add a distinct BACKGROUND_AFFINE_PASS_ENDPOINTS
+arrow. It requires exactly one observed RELEASE within 80ms of canonical contact
+and one observed RECEIVED point naming the canonical receiver, inside the same
+proof window and no more than two seconds later. Every intermediate camera
+estimate must succeed. Old short ball arrows are stripped before this check so
+camera failure cannot promote a stale arrow into a pass. The arrow is displayed
+at reception, with the release location transformed into that camera view; it
+represents endpoint direction, not the hidden trajectory or a prediction.
+
+The existing optional visual-sample instruction now requests these phases;
+missing observations still produce no pass arrow. No new provider call is added.
+The frontend independently checks release time, phase, receiver, source/event
+binding and maximum interval. Player display remains the stance glow only.
+
+A local visual-review fixture uses the existing Orman700 PASS at 9.267s and
+reception at 10.000s. Release was manually annotated from the source image;
+reception ball position was measured by the existing local segmenter and visually
+reviewed. These annotations are NOT model receipts or written to the report.
+The selected actor's reception-frame stance was also checked with local
+segmentation. The preview exercises the production camera and frontend adapters.
+It validates rendering on that fixture, not automatic extraction on future
+uploads. Automatic release/reception extraction and the unresolved duel still
+require further source-video validation. Local tests: 32 backend functions and
+17 frontend model tests pass, plus compilation and diff checks.

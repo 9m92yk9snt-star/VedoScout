@@ -1,6 +1,11 @@
 // All times are original source milliseconds, never playback/rounded badge time.
 const finite = x => typeof x === 'number' && Number.isFinite(x);
 const point = p => Array.isArray(p) && p.length === 2 && p.every(x => finite(x) && x >= 0 && x <= 1);
+function supportedPass(raw, sample) {
+  if (raw.action_type !== 'PASS' || raw.action_outcome !== 'COMPLETED' || !finite(raw.contact_ms) || typeof raw.receiver_visual_id !== 'string' || !raw.receiver_visual_id || sample.ball_phase !== 'RECEIVED' || sample.receiver !== raw.receiver_visual_id) return false;
+  const releases = raw.samples.filter(p => p.ball_phase === 'RELEASE' && point(p.ball) && typeof p.frame_id === 'string' && finite(p.media_ms) && p.media_ms >= raw.start_ms && Math.abs(p.media_ms-raw.contact_ms) <= 80);
+  return releases.length === 1 && releases[0].media_ms === sample.ball_motion_start_ms;
+}
 export function roomFor(comment, fallbackSeconds) {
   const raw = comment?.match_room;
   const bound = raw?.version === 1 && raw.event_id === comment?.event_id && !!raw.source_video_sha256 && raw.source_video_sha256 === comment?.source_video_sha256 && raw.coordinate_space === 'FULL_FRAME_NORMALIZED' && finite(raw.start_ms) && finite(raw.end_ms) && raw.end_ms >= raw.start_ms;
@@ -25,7 +30,7 @@ export function roomFor(comment, fallbackSeconds) {
     ground: point(s.ground) && finite(s.player_width) && s.player_width >= .005 && s.player_width <= .4 ? s.ground : null,
     player_width: s.player_width,
     ball: point(s.ball) ? s.ball : null,
-    ballTrail: s.ball_motion_method === 'BACKGROUND_AFFINE_BALL_ENDPOINTS' && finite(s.ball_motion_start_ms) && s.media_ms > s.ball_motion_start_ms && s.media_ms-s.ball_motion_start_ms <= 300 && raw.samples.some(p => p.media_ms === s.ball_motion_start_ms && p.media_ms >= start && typeof p.frame_id === 'string' && point(p.ball)) && !raw.samples.some(p => finite(p.media_ms) && p.media_ms > s.ball_motion_start_ms && p.media_ms < s.media_ms) && Array.isArray(s.ballTrail) && s.ballTrail.length === 2 && s.ballTrail.every(point) && point(s.ball) && s.ballTrail[1][0] === s.ball[0] && s.ballTrail[1][1] === s.ball[1] ? s.ballTrail : null,
+    ballTrail: (s.ball_motion_method === 'BACKGROUND_AFFINE_BALL_ENDPOINTS' || (s.ball_motion_method === 'BACKGROUND_AFFINE_PASS_ENDPOINTS' && supportedPass(raw,s))) && finite(s.ball_motion_start_ms) && s.media_ms > s.ball_motion_start_ms && s.media_ms-s.ball_motion_start_ms <= (s.ball_motion_method === 'BACKGROUND_AFFINE_PASS_ENDPOINTS' ? 2000 : 300) && raw.samples.some(p => p.media_ms === s.ball_motion_start_ms && p.media_ms >= start && typeof p.frame_id === 'string' && point(p.ball)) && (s.ball_motion_method === 'BACKGROUND_AFFINE_PASS_ENDPOINTS' || !raw.samples.some(p => finite(p.media_ms) && p.media_ms > s.ball_motion_start_ms && p.media_ms < s.media_ms)) && Array.isArray(s.ballTrail) && s.ballTrail.length === 2 && s.ballTrail.every(point) && point(s.ball) && s.ballTrail[1][0] === s.ball[0] && s.ballTrail[1][1] === s.ball[1] ? s.ballTrail : null,
     groundTrail: s.motion_method === 'BACKGROUND_AFFINE_ENDPOINTS' && finite(s.motion_start_ms) && s.media_ms > s.motion_start_ms && s.media_ms-s.motion_start_ms <= 1000 && raw.samples.some(p => p.media_ms === s.motion_start_ms && point(p.ground)) && Array.isArray(s.groundTrail) && s.groundTrail.length === 2 && s.groundTrail.every(point) && point(s.ground) && s.groundTrail[1][0] === s.ground[0] && s.groundTrail[1][1] === s.ground[1] ? s.groundTrail : null,
     motion_start_ms: s.motion_start_ms,
     camera_static_from_previous: s.camera_static_from_previous === true
