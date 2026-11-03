@@ -1,0 +1,40 @@
+name: Match Room fresh pass model probe
+on:
+  pull_request:
+    types: [synchronize]
+    paths: ['.github/workflows/matchroom-pass-auto.yml']
+permissions:
+  contents: read
+jobs:
+  probe:
+    if: >-
+      github.repository == '9m92yk9snt-star/VedoScout' &&
+      github.event.pull_request.number == 55 &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.head.ref == 'codex/matchroom-graphics' &&
+      github.event.before == 'c492d1c0a92042231ff646cad40a4ab7d5c6c864' &&
+      github.run_attempt == 1
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install cryptography
+      - name: Read one source window with the existing sequence reader
+        env:
+          EMERGENT_LLM_KEY: ${{ secrets.EMERGENT_LLM_KEY }}
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: python backend/scripts/probe_matchroom_pass_model.py
+      - name: Preserve source-bound response and parsing results without images
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: matchroom-pass-auto-results
+          path: ${{ runner.temp }}/matchroom-pass-auto-results.json
+          retention-days: 7
+          if-no-files-found: warn
