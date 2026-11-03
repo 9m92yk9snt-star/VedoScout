@@ -14,7 +14,7 @@ jobs:
       github.event.pull_request.draft == true &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.event.pull_request.head.ref == 'codex/matchroom-graphics' &&
-      github.event.before == '1e41aa3a3f201c284bcbf4c3834dd7d7a9ae401e' &&
+      github.event.before == '74f3fb0632e750390c9d9d113bb1f0b7c0bdb27e' &&
       github.run_attempt == 1
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -39,14 +39,14 @@ jobs:
       - name: Restore the unchanged-request checkpoint
         uses: actions/download-artifact@v4
         with:
-          name: matchroom-single-tap-report-41711757873
-          run-id: 41711757873
+          name: matchroom-single-tap-report-41715224954
+          run-id: 41715224954
           github-token: ${{ github.token }}
           path: ${{ runner.temp }}/previous-single-tap
-      - name: Complete the two remaining contact requests and finish the report
+      - name: Observe positions in the first finalized report clip
         env:
           EMERGENT_LLM_KEY: ${{ secrets.EMERGENT_LLM_KEY }}
-        run: python -u backend/scripts/run_matchroom_single_tap_trial.py --work "$RUNNER_TEMP/single-tap-input" --output "$RUNNER_TEMP/single-tap-report" --retry-document "$RUNNER_TEMP/previous-single-tap/single-tap-report/report-document.json" --recover-missing
+        run: python -u backend/scripts/probe_report_positions.py --report "$RUNNER_TEMP/previous-single-tap/single-tap-report/report-document.json" --work "$RUNNER_TEMP/single-tap-input" --run-model
       - name: Preserve report, source-bound graphics and model receipts
         if: always()
         uses: actions/upload-artifact@v4
@@ -55,6 +55,7 @@ jobs:
           path: |
             ${{ runner.temp }}/single-tap-report/
             ${{ runner.temp }}/single-tap-input/single-tap.json
-            ${{ runner.temp }}/single-tap-input/recovery-*.json
+            ${{ runner.temp }}/single-tap-input/positions-result.json
+            ${{ runner.temp }}/single-tap-input/*.jpg
           retention-days: 7
           if-no-files-found: warn
