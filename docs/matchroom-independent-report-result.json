@@ -1,0 +1,243 @@
+{
+  "run_id": 41715224954,
+  "commit": "5e363cae2cd4f6f0db8ff8fb57b30667de562701",
+  "status": "REPORT_READY_GRAPHICS_ACCEPTANCE_FAILED",
+  "report_ready": true,
+  "clips": 8,
+  "one_original_tap": true,
+  "upload_ui_executed": false,
+  "ui_minimum_taps": 3,
+  "source_model_responses": 16,
+  "rows_with_samples": 1,
+  "rows_without_samples": 7,
+  "dense_player_segments": 0,
+  "moving_ball_segments": 0,
+  "duel_reacquisition_verified": false,
+  "ball_direction_verified": false,
+  "renderer_model_inventory": [
+    {
+      "index": 0,
+      "event_id": "af1adf2eedeff72ce905",
+      "source": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+      "start": 30765,
+      "end": 32015,
+      "source_samples": 0,
+      "source_ground_samples": 0,
+      "dense_segments": 0,
+      "moving_ball_segments": 0,
+      "raw_tracking_status": "COMPLETED",
+      "visible_samples": [],
+      "clip": "/api/uploads/frames/sequence-full-report-trial/sequence/evd_2f37cee963e2.mp4",
+      "clipStart": 30.015466
+    },
+    {
+      "index": 1,
+      "event_id": "421c340be60ca0a2d7d1",
+      "source": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+      "start": 43882,
+      "end": 46515,
+      "source_samples": 0,
+      "source_ground_samples": 0,
+      "dense_segments": 0,
+      "moving_ball_segments": 0,
+      "raw_tracking_status": "COMPLETED",
+      "visible_samples": [],
+      "clip": "/api/uploads/frames/sequence-full-report-trial/sequence/evd_54b205b8bf4a.mp4",
+      "clipStart": 43.131608
+    },
+    {
+      "index": 2,
+      "event_id": "cf1352f1e001bbddbef0",
+      "source": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+      "start": 23499,
+      "end": 25016,
+      "source_samples": 0,
+      "source_ground_samples": 0,
+      "dense_segments": 0,
+      "moving_ball_segments": 0,
+      "raw_tracking_status": "COMPLETED",
+      "visible_samples": [],
+      "clip": "/api/uploads/frames/sequence-full-report-trial/sequence/evd_940dfbe37e13.mp4",
+      "clipStart": 22.74909
+    },
+    {
+      "index": 3,
+      "event_id": "60568022158b38c42589",
+      "source": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+      "start": 48631,
+      "end": 52015,
+      "source_samples": 0,
+      "source_ground_samples": 0,
+      "dense_segments": 0,
+      "moving_ball_segments": 0,
+      "raw_tracking_status": "COMPLETED",
+      "visible_samples": [],
+      "clip": "/api/uploads/frames/sequence-full-report-trial/sequence/evd_2b8c8c7ad224.mp4",
+      "clipStart": 47.881418
+    },
+    {
+      "index": 4,
+      "event_id": "ba89b4026873ccb4a1ea",
+      "source": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+      "start": 56014,
+      "end": 57264,
+      "source_samples": 0,
+      "source_ground_samples": 0,
+      "dense_segments": 0,
+      "moving_ball_segments": 0,
+      "raw_tracking_status": "COMPLETED",
+      "visible_samples": [],
+      "clip": "/api/uploads/frames/sequence-full-report-trial/sequence/evd_e827e14a74e4.mp4",
+      "clipStart": 55.264455999999996
+    },
+    {
+      "index": 5,
+      "event_id": "0fc666670ff612a8af2f",
+      "source": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+      "start": 12383,
+      "end": 14016,
+      "source_samples": 0,
+      "source_ground_samples": 0,
+      "dense_segments": 0,
+      "moving_ball_segments": 0,
+      "raw_tracking_status": "COMPLETED",
+      "visible_samples": [],
+      "clip": "/api/uploads/frames/sequence-full-report-trial/sequence/evd_0523f8122f2b.mp4",
+      "clipStart": 11.632868
+    },
+    {
+      "index": 6,
+      "event_id": "3b7c11209bbfc2b65961",
+      "source": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+      "start": 28382,
+      "end": 30882,
+      "source_samples": 0,
+      "source_ground_samples": 0,
+      "dense_segments": 0,
+      "moving_ball_segments": 0,
+      "raw_tracking_status": "COMPLETED",
+      "visible_samples": [],
+      "clip": "/api/uploads/frames/sequence-full-report-trial/sequence/evd_ea65a099c7a2.mp4",
+      "clipStart": 27.632227999999998
+    },
+    {
+      "index": 7,
+      "event_id": "966c91c7243829d6fab0",
+      "source": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+      "start": 7500,
+      "end": 12133,
+      "source_samples": 4,
+      "source_ground_samples": 4,
+      "dense_segments": 0,
+      "moving_ball_segments": 0,
+      "raw_tracking_status": "COMPLETED",
+      "visible_samples": [
+        {
+          "ms": 7750,
+          "graphics": {
+            "media_ms": 7750,
+            "frame_id": "s000007750",
+            "foreground": null,
+            "ground": [
+              0.526,
+              0.634
+            ],
+            "player_width": 0.09,
+            "ball": [
+              0.603,
+              0.624
+            ],
+            "ballTrail": null,
+            "groundTrail": null,
+            "camera_static_from_previous": false
+          },
+          "ball": null
+        },
+        {
+          "ms": 8633,
+          "graphics": {
+            "media_ms": 8633,
+            "frame_id": "s000008633",
+            "foreground": null,
+            "ground": [
+              0.609,
+              0.63
+            ],
+            "player_width": 0.096,
+            "ball": [
+              0.591,
+              0.62
+            ],
+            "ballTrail": null,
+            "groundTrail": [
+              [
+                0.3418464302071358,
+                0.628123189121859
+              ],
+              [
+                0.609,
+                0.63
+              ]
+            ],
+            "motion_start_ms": 7750,
+            "camera_static_from_previous": false,
+            "endpointMotion": true
+          },
+          "ball": null
+        },
+        {
+          "ms": 9750,
+          "graphics": {
+            "media_ms": 9750,
+            "frame_id": "s000009750",
+            "foreground": null,
+            "ground": [
+              0.652,
+              0.654
+            ],
+            "player_width": 0.09,
+            "ball": [
+              0.677,
+              0.629
+            ],
+            "ballTrail": null,
+            "groundTrail": null,
+            "camera_static_from_previous": false
+          },
+          "ball": null
+        },
+        {
+          "ms": 12133,
+          "graphics": {
+            "media_ms": 12133,
+            "frame_id": "s000012133",
+            "foreground": null,
+            "ground": [
+              0.39,
+              0.636
+            ],
+            "player_width": 0.144,
+            "ball": [
+              0.747,
+              0.624
+            ],
+            "ballTrail": null,
+            "groundTrail": null,
+            "camera_static_from_previous": false
+          },
+          "ball": null
+        }
+      ],
+      "clip": "/api/uploads/frames/sequence-full-report-trial/sequence/evd_6c916abe7d4b.mp4",
+      "clipStart": 6.74973
+    }
+  ],
+  "findings": [
+    "Position samples are optional in the model instruction.",
+    "Final action receipts for seven report rows provide no usable position samples.",
+    "Shot samples from an initial response are not inherited after a later review supersedes its action and actor scope.",
+    "Four surviving samples in the eighth row cannot establish a dense track from the original tap at 3.07 seconds.",
+    "COMPLETED tracking_status denotes worker completion, not successful tracking."
+  ],
+  "artifact_sha256": "f2ef159bca97e5dc1cbb1be5077690c2e7c196681871597c77c4f4fe088ca680"
+}
