@@ -363,7 +363,7 @@ async def generate(video, doc, *, template, writer=write_facts, discovery=discov
                                      "before_assets_seconds": round(time.monotonic()-started, 3)}}
 
 
-def render_assets(video, full, bundle, directory):
+def render_assets(video, full, bundle, directory, anchors=None):
     """Actual source PTS and unannotated clips. Zero re-identification calls."""
     import cv2
     import subprocess
@@ -374,6 +374,8 @@ def render_assets(video, full, bundle, directory):
     if pilot.digest(Path(video)) != bundle["source_video_sha256"]:
         raise ValueError("SEQUENCE_ASSET_SOURCE_CHANGED")
     events = {e["event_id"]: e for e in bundle["events"]}
+    from match_room_tracking import bounded_tracks
+    tracks, tracking_status = bounded_tracks(video, anchors or [], [events[r["event_id"]] for r in (full.get("video_comments") or []) if r.get("event_id") in events])
     cap = cv2.VideoCapture(str(video))
     assets = []
     try:
@@ -404,6 +406,8 @@ def render_assets(video, full, bundle, directory):
                        telestrated=False, tele_clip_start=start, tele_clip_end=end)
             from match_room import presentation
             row["match_room"] = presentation(event, event.get("visual_samples"))
+            row["match_room"]["tracking_status"] = tracking_status
+            row["match_room"]["tracking"] = tracks.get(event["event_id"])
             attach_clip_authority(row, start, end, {row["event_id"]: event["canonical_ms"]})
             assets.append((row, image, clip))
     finally:
@@ -416,7 +420,10 @@ async def persist_assets(collection, doc, video, directory, publish):
     full = deepcopy(doc["full_report"])
     if not full.get("video_comments"):
         raise ValueError("SEQUENCE_SOURCE_PROOFS_MISSING")
-    assets = await asyncio.to_thread(render_assets, video, full, doc["canonical_events"], directory)
+    taps = pilot.original_taps({"raw_marker_anchors": doc["raw_marker_anchors"]}) if doc.get("raw_marker_anchors") else []
+    anchors = [{"t": t["requested_ms"]/1000, "box": t["box"], "target_point": t["target_point"],
+                **t["selection_hints"]} for t in taps]
+    assets = await asyncio.to_thread(render_assets, video, full, doc["canonical_events"], directory, anchors)
     for row, image, clip in assets:
         row["frame_url"] = await publish(image, "image/jpeg")
         row["tele_clip_url"] = await publish(clip, "video/mp4")
@@ -431,3 +438,4 @@ async def persist_assets(collection, doc, video, directory, publish):
         "full_report": full, "sequence_timings": timings, "identity_gate_done": True,
         "full_report_status": "finalizing"}})
     return {"checked": len(assets), "hard_rejected": 0, "authority": adapter.ENGINE}
+

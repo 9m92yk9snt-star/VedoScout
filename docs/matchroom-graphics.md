@@ -37,3 +37,32 @@ backend/test_match_room.py and sequence report/pilot/only regressions. CI includ
 both new frontend suites and a dedicated Match Room contract job. Browser QA was attempted with a local development fixture and real video,
 but could not run: the browser executable download was unavailable. No live
 authenticated report playback has been verified.
+
+
+
+## Bounded optical tracking bridge (draft)
+
+Asset generation now reuses `player_tracking.track_player` and
+`motion_compensation.compute_motion_samples` for presentation only. It uses
+original selection hints, at most two 3-second seed windows per displayed event,
+and at most eight events in one owned subprocess with a 25-second hard timeout.
+No legacy reconstruction or new model calls are used. Timeout/error preserves
+sparse graphics and never changes event approval, scores or PDF contents.
+
+Each optical segment must agree with an observed ground position from the same
+event. A later contradicting observation rejects the segment. Gaps above 120ms
+split segments. Independent seed windows stay separate; the frontend hides
+conflicting overlaps. Ground positions are calibrated box proxies, not measured
+foot landmarks. The old fixed downward marker offset has been removed.
+Player arrows show only existing background-affine-compensated displacement;
+failed camera estimates do not produce arrows. Ball arrows retain the original
+observed-ball contract; player motion is never reused as ball motion.
+
+Real-source validation on the 7–9.3s sequence used existing Orman600/700 videos,
+whose hashes match the prior model receipts. The bounded bridge returned no
+accepted segment for Orman600 and only three samples (7.37–7.43s) for Orman700.
+The longer Orman700 optical track conflicts with the 9.2s model observation and
+is rejected. This is NOT validated continuous coverage and is not rollout-ready.
+The old tracker is present but cannot simply be enabled and described as solved.
+Further work must improve or reacquire body geometry under independent identity
+checks; weakening the disagreement gate is not an acceptable fix.

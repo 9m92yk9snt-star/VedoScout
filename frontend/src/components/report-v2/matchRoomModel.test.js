@@ -88,3 +88,29 @@ test('camera motion or sparse observations never produce a direction arrow', () 
     }
   }, 10), 10250).ballTrail).toBeNull();
 });
+
+const tracked = {
+  version:1,event_id:'e1',source_video_sha256:'source',method:'TAP_OPTICAL_GROUND_PROXY',
+  segments:[{reference_frame:'s1',samples:[10000,10080,10160].map(media_ms=>({media_ms,ground:[.4,.8],player_width:.06,confidence:.8}))}]
+};
+const trackedRoom = t => roomFor({...comment,match_room:{...raw,samples:[],tracking:t}},10);
+test('optical segments fill only their own short intervals',()=>{
+  const room=trackedRoom(tracked);
+  expect(graphicsAt(room,10040).groundProxy).toBe(true);
+  expect(graphicsAt(room,10200)).toBeNull();
+});
+test('optical geometry cannot cross event, source or missing frames',()=>{
+  for (const patch of [{event_id:'other'},{source_video_sha256:'other'},{segments:[{reference_frame:'s1',samples:[10000,10080,10500].map(media_ms=>({media_ms,ground:[.4,.8],player_width:.06,confidence:.8}))}]}]) {
+    expect(trackedRoom({...tracked,...patch}).tracks).toEqual([]);
+  }
+});
+test('disagreeing optical windows hide graphics instead of choosing an identity',()=>{
+  const other={...tracked.segments[0],samples:tracked.segments[0].samples.map(s=>({...s,ground:[.7,.8]}))};
+  expect(graphicsAt(trackedRoom({...tracked,segments:[...tracked.segments,other]}),10080)).toBeNull();
+});
+test('camera compensated arrow must reference the immediately preceding sample',()=>{
+  const samples=tracked.segments[0].samples.map((s,i)=>({...s,motion_from_ms:10000,groundTrail:[[.5,.8],[.4,.8]]}));
+  const room=trackedRoom({...tracked,segments:[{reference_frame:'s1',samples}]});
+  expect(graphicsAt(room,10080).groundTrail).toEqual([[.5,.8],[.4,.8]]);
+  expect(graphicsAt(room,10160).groundTrail).toBeNull();
+});

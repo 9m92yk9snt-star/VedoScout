@@ -27,7 +27,16 @@ export function roomFor(comment, fallbackSeconds) {
     ball: point(s.ball) ? s.ball : null,
     camera_static_from_previous: s.camera_static_from_previous === true
   })).sort((a, b) => a.media_ms - b.media_ms) : [];
+  const tracking = raw?.tracking;
+  const tracks = bound && tracking?.version === 1 && tracking.event_id === raw.event_id && tracking.source_video_sha256 === raw.source_video_sha256 && tracking.method === "TAP_OPTICAL_GROUND_PROXY" && Array.isArray(tracking.segments)
+    ? tracking.segments.slice(0, 32).flatMap(segment => {
+      if (!Array.isArray(segment.samples) || typeof segment.reference_frame !== "string") return [];
+      const rows = segment.samples.slice(0, 100).filter(s => finite(s.media_ms) && s.media_ms >= start && s.media_ms <= end && point(s.ground) && finite(s.player_width) && s.player_width >= .005 && s.player_width <= .4 && finite(s.confidence) && s.confidence >= .55);
+      if (rows.length !== segment.samples.length || rows.length < 3 || rows.some((s, i) => i > 0 && (s.media_ms <= rows[i-1].media_ms || s.media_ms - rows[i-1].media_ms > 120))) return [];
+      return [rows.map((s, i) => ({...s, groundProxy: true, ballTrail: null, groundTrail: i > 0 && s.motion_from_ms === rows[i-1].media_ms && Array.isArray(s.groundTrail) && s.groundTrail.length === 2 && s.groundTrail.every(point) && s.groundTrail[1][0] === s.ground[0] && s.groundTrail[1][1] === s.ground[1] ? s.groundTrail : null}))];
+    }) : [];
   return {
+    tracks,
     start,
     end,
     stops: ordered,
@@ -35,6 +44,13 @@ export function roomFor(comment, fallbackSeconds) {
   };
 }
 export function graphicsAt(room, mediaMs) {
+  const candidates = (room.tracks || []).filter(rows => mediaMs >= rows[0].media_ms && mediaMs <= rows[rows.length-1].media_ms).map(rows => rows.reduce((a, b) => Math.abs(a.media_ms-mediaMs) <= Math.abs(b.media_ms-mediaMs) ? a : b)).filter(s => Math.abs(s.media_ms-mediaMs) <= 60);
+  if (candidates.length) {
+    const chosen = candidates.sort((a,b) => b.confidence-a.confidence)[0];
+    // Competing tap windows must agree; do not choose a nearby teammate by confidence.
+    if (candidates.every(s => Math.hypot(s.ground[0]-chosen.ground[0], s.ground[1]-chosen.ground[1]) <= Math.min(s.player_width, chosen.player_width)*.5)) return chosen;
+    return null;
+  }
   // Brief exact-frame marks; never interpolate across occlusion, camera motion or sparse samples.
   const sample = room.samples.reduce((best, s) => Math.abs(s.media_ms - mediaMs) < Math.abs((best?.media_ms ?? Infinity) - mediaMs) ? s : best, null);
   if (!sample || Math.abs(sample.media_ms - mediaMs) > 60) return null;
@@ -49,3 +65,4 @@ export function graphicsAt(room, mediaMs) {
     groundTrail
   };
 }
+
