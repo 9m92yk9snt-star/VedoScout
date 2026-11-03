@@ -207,3 +207,25 @@ test('sparse motion evidence cannot override disagreeing player tracks', () => {
   expect(mark.ground).toBeNull();
   expect(mark.ballTrail).toEqual(sample.ballTrail);
 });
+
+
+test('contour display moves continuously without altering measurements or joining tracks',()=>{
+  const row=(t,x)=>({media_ms:t,ground:[x,.8],player_width:.06,confidence:.9,contourTrack:true});
+  const rows=[row(10000,.4),row(10066,.46),row(10100,.48)];
+  const room={samples:[],tracks:[rows]};
+  expect(Math.abs(graphicsAt(room,10033).ground[0]-.43)).toBeLessThan(1e-10);
+  expect(rows[0].ground).toEqual([.4,.8]);
+  expect(graphicsAt(room,9999)).toBeNull();
+  expect(graphicsAt(room,10101)).toBeNull();
+  expect(graphicsAt({...room,tracks:[[rows[0]],[rows[1],rows[2]]]},10033)).toBeNull();
+  expect(graphicsAt({...room,tracks:[rows,rows.map(s=>({...s,ground:[.8,.8]}))]},10033)).toBeNull();
+});
+
+test('extended display gaps require explicit identity-continuity permission',()=>{
+ const segment={reference_frame:'s1',ground_method:'LOWER_VISIBLE_CONTOUR',seed_ms:[10000,10250],overlap_frames:5,samples:[10000,10033,10200].map(media_ms=>({media_ms,ground:[.4,.8],player_width:.06,confidence:.9}))};
+ const make=seg=>roomFor({...comment,match_room:{...raw,tracking:{version:1,event_id:'e1',source_video_sha256:'source',method:'TAP_BIDIRECTIONAL_INSTANCE_CONTOUR',segments:[seg]}}},10);
+ expect(make(segment).tracks).toEqual([]);
+ const room=make({...segment,presentation_gap_ms:200});
+ expect(graphicsAt(room,10100).ground).toEqual([.4,.8]);
+ expect(make({...segment,presentation_gap_ms:200,samples:segment.samples.map((s,i)=>i===2?{...s,media_ms:10234}:s)}).tracks).toEqual([]);
+});

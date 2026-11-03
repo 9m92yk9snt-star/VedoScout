@@ -317,3 +317,20 @@ Original source SHA256:
 Reproduction accepts explicit local paths for the source, the two original
 anchors and the checksum-verified model. `--negative-controls` reruns every
 uniquely selectable alternative at each tap. No network or provider call occurs.
+
+### Continuous stance presentation
+
+The approved follow-up preview keeps the ellipse visible by visually interpolating
+short missing measurements (up to 200ms), with restrained position smoothing.
+These display points are not new source observations. That revised preview is
+separate from the earlier research ZIP, which retains the unsmoothed experiment.
+
+The report implementation now interpolates position and width between accepted
+contour samples instead of jumping to the nearest sample. Backend segments may
+explicitly grant a 200ms presentation gap only while player identity remains
+supported in every intervening source frame. Lost identity still splits segments;
+independent segments are never joined. Old payloads retain the 75ms contour gap
+limit. Measured endpoints and stored coordinates remain unchanged; no ball data is
+interpolated. Competing tracks still suppress a conflicting marker. This transfers
+the continuous movement behavior, not the offline duel model or its missing-identity
+bridges. Full automatic duel integration remains pending.

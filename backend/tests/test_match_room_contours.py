@@ -31,15 +31,18 @@ def test_paths_must_reach_both_taps_and_agree_on_shared_frames():
     assert contours.agree_segments(*args) == []
 
 
-def test_missing_contour_is_never_interpolated_or_kept_alive():
+def test_missing_foot_measurement_allows_display_bridge_without_inventing_sample():
     args = list(fixture())
     args[1][6][0]['ground'] = None
     args[3].append({**args[3][0], 'media_ms': 1396, 'frame_id':'f2'})
     segments = contours.agree_segments(*args)
-    assert len(segments) == 2
+    assert len(segments) == 1
+    assert segments[0]['presentation_gap_ms'] == 200
     assert all(s['media_ms'] != 1198 for g in segments for s in g['samples'])
-    assert segments[0]['samples'][-1]['media_ms'] == 1165
-    assert segments[1]['samples'][0]['media_ms'] == 1231
+    # A lost identity is different from an unavailable foot measurement.
+    del args[2][0][6]
+    del args[2][1][6]
+    assert len(contours.agree_segments(*args)) == 2
 
 
 def test_source_observation_conflict_rejects_instead_of_moving_contour():
@@ -115,3 +118,11 @@ def test_focused_view_does_not_choose_nearest_or_competing_person(monkeypatch):
     assert all(a['owners'] == [2, 2] for a in attempts)
     monkeypatch.setattr(contours, 'detect_frame', lambda *args: (_ for _ in ()).throw(AssertionError('deadline ignored')))
     assert contours.select_seed_view([frames[0], frames[12]], seeds, object(), deadline=0) == (None, {}, [])
+
+
+def test_long_missing_foot_interval_still_splits_segments():
+    args = list(fixture())
+    for i in range(5,11):
+        args[1][i][0]['ground'] = None
+    args[3].append({**args[3][0], 'media_ms':1396, 'frame_id':'f2'})
+    assert len(contours.agree_segments(*args)) == 2

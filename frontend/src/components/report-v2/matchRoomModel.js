@@ -50,7 +50,7 @@ export function roomFor(comment, fallbackSeconds) {
       const contour = tracking.method === "TAP_BIDIRECTIONAL_INSTANCE_CONTOUR";
       if (contour && (segment.ground_method !== "LOWER_VISIBLE_CONTOUR" || !samples.some(s => s.frame_id === segment.reference_frame) || !Array.isArray(segment.seed_ms) || segment.seed_ms.length !== 2 || !segment.seed_ms.every(t => finite(t) && t >= start && t <= end) || segment.seed_ms[1]-segment.seed_ms[0] < 150 || segment.seed_ms[1]-segment.seed_ms[0] > 2500 || !finite(segment.overlap_frames) || segment.overlap_frames < 5)) return [];
       const rows = segment.samples.slice(0, 100).filter(s => finite(s.media_ms) && s.media_ms >= start && s.media_ms <= end && point(s.ground) && finite(s.player_width) && s.player_width >= .005 && s.player_width <= .4 && finite(s.confidence) && s.confidence >= .55);
-      if (rows.length !== segment.samples.length || rows.length < 3 || rows.some((s, i) => i > 0 && (s.media_ms <= rows[i-1].media_ms || s.media_ms - rows[i-1].media_ms > (contour ? 75 : 120)))) return [];
+      if (rows.length !== segment.samples.length || rows.length < 3 || rows.some((s, i) => i > 0 && (s.media_ms <= rows[i-1].media_ms || s.media_ms - rows[i-1].media_ms > (contour ? (segment.presentation_gap_ms === 200 ? 200 : 75) : 120)))) return [];
       return [rows.map((s, i) => ({...s, player_width: rows.slice(Math.max(0, i-2), i+3).map(r => r.player_width).sort((a,b) => a-b)[Math.floor(rows.slice(Math.max(0, i-2), i+3).length/2)], groundProxy: !contour, contourTrack: contour, ballTrail: null, groundTrail: i > 0 && s.motion_from_ms === rows[i-1].media_ms && Array.isArray(s.groundTrail) && s.groundTrail.length === 2 && s.groundTrail.every(point) && s.groundTrail[1][0] === s.ground[0] && s.groundTrail[1][1] === s.ground[1] ? s.groundTrail : null}))];
     }) : [];
   return {
@@ -60,6 +60,22 @@ export function roomFor(comment, fallbackSeconds) {
     stops: ordered,
     samples
   };
+}
+// Display coordinates only: retain measured samples and never join separate tracks.
+function stanceAt(rows, mediaMs) {
+  if (!rows.length || mediaMs < rows[0].media_ms || mediaMs > rows[rows.length-1].media_ms) return null;
+  const right = rows.findIndex(s => s.media_ms >= mediaMs);
+  const b = rows[right];
+  if (right === 0 || b.media_ms === mediaMs) return b;
+  const a = rows[right-1];
+  if (!a.contourTrack || !b.contourTrack) return mediaMs-a.media_ms <= b.media_ms-mediaMs ? a : b;
+  const gap = b.media_ms-a.media_ms;
+  if (gap <= 0 || gap > 200) return null;
+  const u = (mediaMs-a.media_ms)/gap;
+  return {...a, media_ms:mediaMs, displayInterpolated:true,
+    ground:a.ground.map((v,i) => v+(b.ground[i]-v)*u),
+    player_width:a.player_width+(b.player_width-a.player_width)*u,
+    confidence:Math.min(a.confidence,b.confidence), groundTrail:null};
 }
 export function graphicsAt(room, mediaMs) {
   const nearest = rows => rows.reduce((best, s) => Math.abs(s.media_ms-mediaMs) < Math.abs((best?.media_ms ?? Infinity)-mediaMs) ? s : best, null);
@@ -71,7 +87,7 @@ export function graphicsAt(room, mediaMs) {
   const withBall = mark => mark ? {...mark, ballTrail, foreground: sample?.foreground} : ballTrail ? {...sample, ground:null, groundTrail:null, ballTrail} : null;
   // A source-observed endpoint takes precedence over an optical box proxy.
   const observed = nearest(room.samples.filter(s => s.groundTrail && Math.abs(s.media_ms-mediaMs) <= 60));
-  const candidates = (room.tracks || []).filter(rows => mediaMs >= rows[0].media_ms && mediaMs <= rows[rows.length-1].media_ms).map(rows => rows.reduce((a, b) => Math.abs(a.media_ms-mediaMs) <= Math.abs(b.media_ms-mediaMs) ? a : b)).filter(s => Math.abs(s.media_ms-mediaMs) <= (s.contourTrack ? 40 : 60));
+  const candidates = (room.tracks || []).map(rows => stanceAt(rows, mediaMs)).filter(s => s && Math.abs(s.media_ms-mediaMs) <= (s.contourTrack ? 40 : 60));
   if (candidates.length) {
     const chosen = candidates.sort((a,b) => b.confidence-a.confidence)[0];
     // Competing tap windows must agree; do not choose a nearby teammate by confidence.

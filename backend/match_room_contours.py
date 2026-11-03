@@ -228,11 +228,15 @@ def agree_segments(frames, detections, paths, observations, seeds):
     previous_index = None
     for i, frame in enumerate(frames):
         chosen = paths[0].get(i, paths[1].get(i))
-        if chosen is None or detections[i][chosen]['ground'] is None:
+        if chosen is None:
             previous_index = None
             continue
         row = detections[i][chosen]
-        if previous_index is None or frame['media_ms']-frames[previous_index]['media_ms'] > MAX_GAP_MS:
+        # Identity must remain supported in every intervening frame. A short
+        # missing foot measurement may be bridged by presentation only.
+        if row['ground'] is None:
+            continue
+        if previous_index is None or frame['media_ms']-frames[previous_index]['media_ms'] > 200:
             groups.append([])
         groups[-1].append((i, row))
         previous_index = i
@@ -258,7 +262,7 @@ def agree_segments(frames, detections, paths, observations, seeds):
             accepted.append({'id': f'contour:{len(accepted)}', 'reference_frame': support[0],
                              'reference_frames': support, 'seed_ms': list(seeds),
                              'overlap_frames': len(shared),
-                             'ground_method': 'LOWER_VISIBLE_CONTOUR', 'samples': rows})
+                             'ground_method': 'LOWER_VISIBLE_CONTOUR', 'presentation_gap_ms': 200, 'samples': rows})
     return accepted
 
 
