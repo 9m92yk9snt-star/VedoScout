@@ -8,8 +8,8 @@ assessment copy appears after the sequence. No quiz changes the report score.
 New source reads request up to twelve optional full-frame visual samples per
 response in the existing model request. This adds response content, not another
 model call or tracker. Coordinates are model observations, not independently
-validated tracking. No real model evaluation of their visual accuracy has yet
-been performed for this feature.
+validated tracking. The existing two-source probe and visual checks are recorded below; they
+cover one shared sequence, not broad model accuracy.
 
 The canonical adapter rebuilds graphics from the hashed source receipts and
 exact action/actor scope. It rejects crops, ambiguous samples, missing source
@@ -91,3 +91,58 @@ not four independent football examples. Runtime was approximately 1.4s per
 source for the camera-only pass. A rendered preview demonstrates three pauses
 for visual inspection; production adds at most one extra pause per action.
 No fresh model requests were made. Sparse/continuous ball tracking is unchanged.
+
+
+## Fresh instance contours and two-tap path fusion (2026-11-03, draft)
+
+The bounded presentation worker now reuses the existing pinned YOLOv8n-seg
+asset through `native_player_segmentation.PersonSegmenter`. This performs local
+segmentation inference; it makes no LLM/provider request and does not rerun the
+football analysis. Each displayed contour is measured anew. Optical flow is
+used only to associate detected instances, never to propagate a display mask.
+
+Two original source selection points, 0.15–2.5 seconds apart inside the action,
+start forward/backward paths. At least one path must reach both taps; paths
+must agree for at least five consecutive shared frames. A disagreement rejects
+the contour result. One supported path may complete the other's missing tail.
+Missing/partial/overlapping lower contours split graphics, with no generated
+positions across the gap. Nearly identical masks (>85% IoU) are deduplicated
+before association; distinct overlapping people remain competing candidates.
+
+The mark's height comes from the bottom visible silhouette; its horizontal
+centre spans the visible stance near the ground. It is not a pose estimate or
+proof of physical foot contact. Source ground observations may refer to either
+boot, so validation checks the visible lower body instead of forcing both boots
+onto one coordinate. It never shifts the measured mask to fit the observation.
+Marker width is bounded by body height, and ellipse aspect ratio respects the
+video geometry. Existing source-observed endpoint arrows still take precedence.
+No continuous ball tracking is added.
+
+Processing is limited to one <=3-second window and <=96 decoded frames per
+eligible action, with streamed decoding and packed masks. The whole graphics
+child retains the 25-second hard wall limit and stops new work before that
+limit. Completed event output is checkpointed atomically: timeout preserves
+completed sparse/contour graphics, never a partially written track. Missing
+assets, insufficient taps, no visual observations or failed association retain
+the existing fallback. No guarantee of contours for every action/video is made.
+
+Measured bounded runs on existing source-hash-verified files:
+
+| Input | New contour output | Total graphics time |
+| --- | --- | --- |
+| Orman600, turn | 66/67 frames, 7.000–9.200s; 7.167s omitted | 14.73s |
+| Orman700, same turn | 67/67 frames, 7.000–9.200s | 13.86s |
+| Separate attack, 24.3–26.9s | No accepted new contour segment; optical fallback only, 24.47–24.67s | 14.87s |
+
+The second action used original human-confirmed mask endpoints as evaluation
+references, not newly fabricated LLM observations. This holdout does not pass
+continuous-coverage validation. Keep draft: general coverage, occluded feet,
+ball arrows and live authenticated report playback remain unverified. The
+turn comparison uses the production frontend data adapter on the actual source
+video, rendered as an enlarged side-by-side preview; it is not a live-site test.
+
+Local validation: 26 backend test functions and 14 frontend model tests passed
+in direct harnesses (pytest is unavailable in the local runtime). CI includes
+the new contour suite for full pytest execution. Regression checks cover
+conflicting paths, missing contours, source-observation disagreement, visible
+boot changes, packed masks, cuts, absent inputs and timeout checkpoint recovery.

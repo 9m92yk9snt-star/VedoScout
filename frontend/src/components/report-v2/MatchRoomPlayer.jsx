@@ -152,9 +152,9 @@ export function MatchRoomPlayer({
           last.current = null;
         } else setError(true);
       }} data-testid="match-room-video" />
-      {mark && <svg className="mr-graphics" style={bounds} viewBox="0 0 1000 1000" preserveAspectRatio="none" aria-label={mark.groundProxy ? "Optical player track" : "Observed positions at this source frame"}>
+      {mark && <svg className="mr-graphics" style={bounds} viewBox="0 0 1000 1000" preserveAspectRatio="none" aria-label={mark.contourTrack ? "Measured player contour" : mark.groundProxy ? "Optical player track" : "Observed positions at this source frame"}>
         <defs><radialGradient id={`ground-${id}`}><stop offset="0" stopColor="#d9fc77" stopOpacity=".5" /><stop offset="1" stopColor="#d9fc77" stopOpacity="0" /></radialGradient><marker id={`arrow-${id}`} markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto" viewBox="0 0 6 6"><path d="M0 0L6 3L0 6Z" fill="#d9fc77" /></marker></defs>
-        {mark.ground && <ellipse cx={mark.ground[0] * 1000} cy={Math.min(1, mark.ground[1]) * 1000} rx={mark.player_width * 700} ry={mark.player_width * 150} fill={`url(#ground-${id})`} />}
+        {mark.ground && <ellipse cx={mark.ground[0] * 1000} cy={Math.min(1, mark.ground[1]) * 1000} rx={mark.player_width * 700} ry={mark.player_width * 150 * ratio} fill={`url(#ground-${id})`} />}
         {mark.groundTrail && <line x1={mark.groundTrail[0][0] * 1000} y1={Math.min(1,mark.groundTrail[0][1]) * 1000} x2={mark.groundTrail[1][0] * 1000} y2={Math.min(1,mark.groundTrail[1][1]) * 1000} stroke="#d9fc77" strokeWidth="2" strokeDasharray="4 3" markerEnd={`url(#arrow-${id})`} />}
         {mark.ballTrail && <line x1={mark.ballTrail[0][0] * 1000} y1={mark.ballTrail[0][1] * 1000} x2={mark.ballTrail[1][0] * 1000} y2={mark.ballTrail[1][1] * 1000} stroke="#d9fc77" strokeWidth="2" markerEnd={`url(#arrow-${id})`} />}
       </svg>}

@@ -60,6 +60,17 @@ def test_no_samples_means_no_process(monkeypatch):
     assert tracking.bounded_tracks('video',[{'t':1}],[{}])==({},'NO_TRACK_INPUT')
 
 
+def test_timeout_preserves_atomically_completed_graphics(monkeypatch):
+    import json
+    from pathlib import Path
+    completed={'event':{'event_id':'event','segments':[]}}
+    def timeout(command, **kwargs):
+        Path(command[-1]).write_text(json.dumps(completed))
+        raise subprocess.TimeoutExpired('tracking',25)
+    monkeypatch.setattr(tracking.subprocess,'run',timeout)
+    assert tracking.bounded_tracks('video',[{'t':1}],[{'visual_samples':[{}]}])==(completed,'PARTIAL_TIMEOUT')
+
+
 def test_asset_renderer_attaches_event_bound_tracks_without_changing_samples():
     import ast
     import types

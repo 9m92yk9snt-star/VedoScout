@@ -8,6 +8,7 @@ import math
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 MAX_GAP_MS = 120
@@ -164,20 +165,46 @@ def observed_motion(video, observations):
     return samples
 
 
-def compute(video, anchors, events):
+def compute(video, anchors, events, checkpoint=None):
+    import cv2
     from player_tracking import track_player
     from motion_compensation import compute_motion_samples
+    from match_room_contours import contour_segments, METHOD
+    cv2.setNumThreads(2)
+    deadline = time.monotonic() + TIMEOUT_S - 3
     output = {}
+    def save():
+        if checkpoint is not None:
+            temporary = Path(str(checkpoint)+'.tmp')
+            temporary.write_text(json.dumps(output))
+            temporary.replace(checkpoint)
     for event in events[:MAX_EVENTS]:
+        if time.monotonic() >= deadline:
+            break
         observations = event.get('visual_samples') or []
         if not observations:
             continue
         start, end = event['proof']['proof_start_ms'], event['proof']['proof_end_ms']
+        result = {'version': 1, 'source_video_sha256': event['source_video_sha256'],
+                  'event_id': event['event_id'], 'method': 'TAP_OPTICAL_GROUND_PROXY', 'segments': [],
+                  'observed_samples': observed_motion(video, observations)}
+        output[event['event_id']] = result
+        save()  # keep completed sparse graphics if the optional contour work times out
+        try:
+            contours = contour_segments(video, anchors, observations, start, end, deadline=deadline)
+        except (ImportError, OSError, ValueError, cv2.error):
+            contours = []
+        if contours:
+            result.update(method=METHOD, segments=contours)
+            save()
+            continue
         seeds = [a for a in anchors if finite(a.get('t')) and start-1500 <= a['t']*1000 <= end+1500]
         # At most two short windows per event, nearest to actual visual evidence.
         seeds.sort(key=lambda a: min(abs(a['t']*1000-s['media_ms']) for s in observations))
         segments = []
         for seed_index, seed in enumerate(seeds[:2]):
+            if time.monotonic() >= deadline:
+                break
             track = track_player(video, [seed], span=1.5)
             for group in bind_segments(track['points'], observations, start, end):
                 motion = compute_motion_samples(video, {'points': group['points']})
@@ -185,9 +212,8 @@ def compute(video, anchors, events):
                 group.pop('points')
                 group['id'] = f'{seed_index}:{len(segments)}'
                 segments.append(group)
-        output[event['event_id']] = {'version': 1, 'source_video_sha256': event['source_video_sha256'],
-            'event_id': event['event_id'], 'method': 'TAP_OPTICAL_GROUND_PROXY', 'segments': segments,
-            'observed_samples': observed_motion(video, observations)}
+        result['segments'] = segments
+        save()
     return output
 
 
@@ -202,10 +228,21 @@ def bounded_tracks(video, anchors, events):
             subprocess.run([sys.executable, str(Path(__file__).resolve()), str(request), str(result)],
                            timeout=TIMEOUT_S, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             return json.loads(result.read_text()), 'COMPLETED'
+        except subprocess.TimeoutExpired:
+            try:
+                completed = json.loads(result.read_text())
+                if isinstance(completed, dict) and completed:
+                    return completed, 'PARTIAL_TIMEOUT'
+            except (OSError, ValueError):
+                pass
+            return {}, 'TRACKING_UNAVAILABLE'
         except (subprocess.SubprocessError, OSError, ValueError):
             return {}, 'TRACKING_UNAVAILABLE'
 
 
 if __name__ == '__main__':
     request = json.loads(Path(sys.argv[1]).read_text())
-    Path(sys.argv[2]).write_text(json.dumps(compute(**request)))
+    result = Path(sys.argv[2])
+    compute(**request, checkpoint=result)
+    if not result.exists():
+        result.write_text('{}')

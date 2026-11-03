@@ -126,3 +126,21 @@ test('endpoint arrows need the cited earlier sample from this event',()=>{
   const room=roomFor({...comment,match_room:{...raw,samples}},10);
   expect(graphicsAt(room,10250).groundTrail).toBeNull();
 });
+
+const contourTracking = {
+  ...tracked, method: 'TAP_BIDIRECTIONAL_INSTANCE_CONTOUR',
+  segments: [{reference_frame:'s1', ground_method:'LOWER_VISIBLE_CONTOUR', seed_ms:[10000,10200], overlap_frames:6,
+    samples:[10000,10033,10067,10100].map(media_ms=>({media_ms,ground:[.4,.8],player_width:.06,confidence:.8}))}]
+};
+const contourRoom = t => roomFor({...comment,match_room:{...raw,tracking:t}},10);
+test('measured contours require two anchors and same-source support',()=>{
+  expect(graphicsAt(contourRoom(contourTracking),10050).contourTrack).toBe(true);
+  for (const changes of [{seed_ms:[10000,10000]},{overlap_frames:4},{reference_frame:'unknown'},{ground_method:'BOX_OFFSET'}]) {
+    expect(contourRoom({...contourTracking,segments:[{...contourTracking.segments[0],...changes}]}).tracks).toEqual([]);
+  }
+});
+test('contour samples cannot bridge a long gap or create ball arrows',()=>{
+  const rows=contourTracking.segments[0].samples;
+  expect(graphicsAt(contourRoom(contourTracking),10050).ballTrail).toBeNull();
+  expect(contourRoom({...contourTracking,segments:[{...contourTracking.segments[0],samples:[...rows.slice(0,2),{...rows[2],media_ms:10200}]}]}).tracks).toEqual([]);
+});
