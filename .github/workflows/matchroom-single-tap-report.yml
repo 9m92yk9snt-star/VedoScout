@@ -5,6 +5,7 @@ on:
     paths: ['.github/workflows/matchroom-single-tap-report.yml']
 permissions:
   contents: read
+  actions: read
 jobs:
   single_tap_report:
     if: >-
@@ -13,7 +14,7 @@ jobs:
       github.event.pull_request.draft == true &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.event.pull_request.head.ref == 'codex/matchroom-graphics' &&
-      github.event.before == 'f63fec19cff81485d610db6f93dd2ecc78457f4b' &&
+      github.event.before == '9000fae8675a71791253face64dbc1ee2ab33cd2' &&
       github.run_attempt == 1
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -33,10 +34,17 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y -qq ffmpeg
           python -m pip install 'numpy<3' 'opencv-python-headless<5' 'Pillow>=10,<15' 'onnxruntime>=1.20,<2' 'python-dotenv>=1,<2'
-      - name: Run one cold report through the actual server orchestration
+      - name: Restore this failed attempt's exact-request checkpoint
+        uses: actions/download-artifact@v4
+        with:
+          name: matchroom-single-tap-report-41699254289
+          run-id: 41699254289
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/previous-single-tap
+      - name: Resume the same report through actual server retry validation
         env:
           EMERGENT_LLM_KEY: ${{ secrets.EMERGENT_LLM_KEY }}
-        run: python -u backend/scripts/run_matchroom_single_tap_trial.py --work "$RUNNER_TEMP/single-tap-input" --output "$RUNNER_TEMP/single-tap-report"
+        run: python -u backend/scripts/run_matchroom_single_tap_trial.py --work "$RUNNER_TEMP/single-tap-input" --output "$RUNNER_TEMP/single-tap-report" --retry-document "$RUNNER_TEMP/previous-single-tap/single-tap-report/report-document.json"
       - name: Preserve report, source-bound graphics and model receipts
         if: always()
         uses: actions/upload-artifact@v4

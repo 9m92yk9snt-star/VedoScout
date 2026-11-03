@@ -70,11 +70,25 @@ def server_harness(video, doc, directory, *, runtime=sequence_report_runtime):
     return namespace, store, trace, notifications
 
 
-async def trial(video, anchors, output, *, player_details=None, source_receipts=None):
+async def trial(video, anchors, output, *, player_details=None, source_receipts=None, retry_document=None):
     output.mkdir(parents=True, exist_ok=False)
     os.environ["FULL_REPORT_ENGINE"] = "sequence_v1"
     doc = {"id": "sequence-full-report-trial", "raw_marker_anchors": anchors["raw_marker_anchors"],
            "anchors": [], "player_details": player_details or {}, "is_paid": False}
+    if retry_document:
+        import hashlib
+        if source_receipts:
+            raise ValueError("RETRY_AND_REPLAY_ARE_EXCLUSIVE")
+        prior = json.loads(retry_document.read_text())
+        selection_sha = hashlib.sha256(json.dumps({"raw_marker_anchors": anchors["raw_marker_anchors"]}, sort_keys=True).encode()).hexdigest()
+        with Path(video).open("rb") as stream:
+            source_sha = hashlib.file_digest(stream, "sha256").hexdigest()
+        if (prior.get("id") != doc["id"] or prior.get("full_report_status") != "failed"
+                or prior.get("raw_marker_anchors") != doc["raw_marker_anchors"]
+                or not sequence_report_runtime.retained_retry(prior, source_sha, selection_sha)):
+            raise ValueError("EXACT_RETRY_INPUTS_CHANGED")
+        doc.update(analysis_engine="SEQUENCE_V1", full_report_status="failed",
+                   sequence_retry=deepcopy(prior["sequence_retry"]))
     if source_receipts:
         import hashlib
         retained = json.loads(source_receipts.read_text())
@@ -101,7 +115,8 @@ async def trial(video, anchors, output, *, player_details=None, source_receipts=
     full = store.doc.get("full_report") or {}
     summary = {"status": store.doc.get("full_report_status"), "total_wall_seconds": wall,
                "source_discovery_replayed": bool(source_receipts),
-               "fresh_end_to_end_timing": not bool(source_receipts),
+               "fresh_end_to_end_timing": not bool(source_receipts or retry_document),
+               "exact_request_retry": bool(retry_document),
                "timings": store.doc.get("sequence_timings"), "states": store.states,
                "source_video_sha256": (store.doc.get("canonical_events") or {}).get("source_video_sha256"),
                "verified_stats": full.get("verified_stats"), "match_stats": full.get("match_stats"),
@@ -130,3 +145,4 @@ if __name__ == "__main__":
     details = {k: v for k, v in {"age": args.age, "position": args.position}.items() if v is not None}
     asyncio.run(trial(args.video, json.loads(args.anchors.read_text()), args.output, player_details=details,
                       source_receipts=args.source_receipts))
+
