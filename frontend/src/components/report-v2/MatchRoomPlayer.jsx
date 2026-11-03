@@ -162,7 +162,8 @@ export function MatchRoomPlayer({
         </defs>
         <g mask={depth ? `url(#people-${id})` : undefined}>
           {mark.ground && <ellipse cx={mark.ground[0] * 1000} cy={Math.min(1, mark.ground[1]) * 1000} rx={mark.player_width * 650} ry={mark.player_width * 120 * ratio} fill={`url(#ground-${id})`} />}
-          {depth && mark.ballTrail && <line key={depth.frame_id} className="mr-pass-draw" pathLength="1" x1={mark.ballTrail[0][0] * 1000} y1={mark.ballTrail[0][1] * 1000} x2={mark.ballTrail[1][0] * 1000} y2={mark.ballTrail[1][1] * 1000} stroke={`url(#pass-${id})`} strokeWidth="2" strokeLinecap="round" markerEnd={`url(#arrow-${id})`} />}
+          {depth && mark.ballTrail && <line key={depth.frame_id} className="mr-pass-draw" pathLength="1" x1={mark.ballTrail[0][0] * 1000} y1={mark.ballTrail[0][1] * 1000} x2={mark.ballTrail[1][0] * 1000} y2={mark.ballTrail[1][1] * 1000} stroke={`url(#pass-${id})`} strokeWidth="2" strokeLinecap="round" />}
+          {depth && mark.ballTrail && <line key={`head-${depth.frame_id}`} className="mr-pass-head" x1={mark.ballTrail[0][0] * 1000} y1={mark.ballTrail[0][1] * 1000} x2={mark.ballTrail[1][0] * 1000} y2={mark.ballTrail[1][1] * 1000} stroke="none" strokeWidth="2" markerEnd={`url(#arrow-${id})`} />}
         </g>
       </svg>}
       {stop && !done && <div className="mr-caption"><span className="mr-kicker">{skill?.label || stop.label} · {stop.phase === 'result' ? 'THE RESULT' : 'YOUR QUALITY'}</span><strong>{(stop.caption || observation).length > 170 ? (stop.caption || observation).slice(0, 167) + '…' : stop.caption || observation}</strong></div>}
