@@ -296,29 +296,37 @@ def compute(video, anchors, events, checkpoint=None):
         if contours:
             result.update(method=diagnostic.get('method', METHOD), segments=contours)
             save()
-            continue
-        seeds = [a for a in anchors if finite(a.get('t')) and start-1500 <= a['t']*1000 <= end+1500]
-        # At most two short windows per event, nearest to actual visual evidence.
-        seeds.sort(key=lambda a: min(abs(a['t']*1000-s['media_ms']) for s in observations))
-        segments = []
-        for seed_index, seed in enumerate(seeds[:2]):
-            if time.monotonic() >= deadline:
-                break
-            track = track_player(video, [seed], span=1.5)
-            for group in bind_segments(track['points'], observations, start, end):
-                motion = compute_motion_samples(video, {'points': group['points']})
-                add_motion(group, motion)
-                group.pop('points')
-                group['id'] = f'{seed_index}:{len(segments)}'
-                segments.append(group)
-        result['segments'] = segments
+        else:
+            seeds = [a for a in anchors if finite(a.get('t')) and start-1500 <= a['t']*1000 <= end+1500]
+            # At most two short windows per event, nearest to actual visual evidence.
+            seeds.sort(key=lambda a: min(abs(a['t']*1000-s['media_ms']) for s in observations))
+            segments = []
+            for seed_index, seed in enumerate(seeds[:2]):
+                if time.monotonic() >= deadline:
+                    break
+                track = track_player(video, [seed], span=1.5)
+                for group in bind_segments(track['points'], observations, start, end):
+                    motion = compute_motion_samples(video, {'points': group['points']})
+                    add_motion(group, motion)
+                    group.pop('points')
+                    group['id'] = f'{seed_index}:{len(segments)}'
+                    segments.append(group)
+            result['segments'] = segments
+            save()
+        # Preserve the completed player track before optional moving arrows.
+        from match_room_ball_playback import build_ball_playback
+        try:
+            result['ball_playback'], result['ball_playback_diagnostics'] = build_ball_playback(
+                video, event, result['observed_samples'], deadline)
+        except (ImportError, OSError, ValueError, cv2.error):
+            result['ball_playback_diagnostics'] = {'status': 'UNAVAILABLE'}
         save()
     return output
 
 
 def _bounded_event(video, anchors, events):
     """One owned child, hard wall-clock bound; failure keeps sparse graphics."""
-    if not anchors or not any(e.get('visual_samples') for e in events):
+    if not any(e.get('visual_samples') for e in events):
         return {}, 'NO_TRACK_INPUT'
     with tempfile.TemporaryDirectory(prefix='matchroom-track-') as work:
         request, result = Path(work)/'input.json', Path(work)/'output.json'
@@ -345,7 +353,7 @@ def bounded_tracks(video, anchors, events):
     At most MAX_EVENTS sequential children, each hard-limited to TIMEOUT_S.
     A difficult earlier clip cannot consume a later clip's inference budget.
     """
-    if not anchors or not any(e.get('visual_samples') for e in events):
+    if not any(e.get('visual_samples') for e in events):
         return {}, 'NO_TRACK_INPUT'
     unique,seen = [],set()
     for index,event in enumerate(events):

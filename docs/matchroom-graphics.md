@@ -372,3 +372,45 @@ worker payload and wrong-player results are in `matchroom-duel-validation.json`.
 explicit source-checked local video, anchors and events. The observations in this
 review came from the existing review fixture; it does not establish new automatic
 provider extraction, unrelated-match accuracy or live-site behavior.
+
+## Moving ball arrows (supersedes paused-only arrow limitation)
+
+`match_room_ball_playback.py` now supplies an atomic source-frame sequence after
+saving the completed player track. Each accepted direction keeps its original
+ball release/reception references, transforms both endpoints into every decoded
+camera view, and measures fresh visible-person polygons on every frame. A cut,
+missing camera transform, missing mask, source gap or exhausted deadline rejects
+the complete sequence. Sparse paused arrows remain the fallback. The existing
+25s per-event hard limit, eight-event cap and player identity rules are unchanged.
+Ball-only events do not require an unrelated player anchor to start the worker.
+
+The production player consumes `requestVideoFrameCallback.mediaTime`, including
+the source offset of the selected clip. A synchronous React commit avoids the
+one-frame-old mask exposed by real browser playback testing. Timeupdate events
+do not overwrite the presented frame. Seeking clears that frame until decode;
+opacity is a deterministic function of source time, including a short fade within
+the proof after reception. There is no wall-clock CSS animation. Green stance
+rendering remains separate from moving ball masks. Offscreen endpoints retain
+their camera-projected coordinates; the visible line is clipped to the picture
+edge with a direction arrowhead. This does not place the receiver at the edge.
+
+The asset encoder aligns clip zero to an actual decoded source frame and uses
+FFmpeg passthrough frame timing. New clips declare `SOURCE_PTS_ALIGNED`.
+Unaligned older clips cannot use moving masks; their paused fallback is retained.
+A generated VFR fixture verifies preserved missing frames and source timestamps.
+
+The Orman700 review fixture yields 27 complete arrow frames (9.267–10.133s) in
+8.072s through the actual owned worker. Its encoded H.264 clip maps to those
+source PTS within 0.334ms. The production React component passes real local
+Chromium playback, seeking/replay and 0.5x checks using a VP9 copy of the same
+pictures (this local browser lacks H.264 decoding). Before the synchronous
+commit, this check exposed a consistent one-frame lag; after it, every sampled
+moving frame agrees within 2ms. Source fixture, timing and browser measurements
+are in `matchroom-ball-playback-validation.json`.
+
+This is runtime integration, not a fresh provider extraction or deployment.
+The reviewed ball locations are not fabricated receipts or written to the report.
+This pass's existing anchors do not yield an accepted production player segment;
+the ball validation does not claim to establish one. The independent approved
+fall presentation remains research-only. Existing reports need regenerated
+assets. No extra paid call, model asset or runtime dependency was added.

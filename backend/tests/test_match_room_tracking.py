@@ -208,3 +208,15 @@ def test_distinct_clips_have_separate_budgets_and_duplicate_cards_share_results(
     a={'event_id':'a','visual_samples':[{}]};b={'event_id':'b','visual_samples':[{}]}
     result,status=tracking.bounded_tracks('video',[{'t':1}],[a,a,b,a,b])
     assert calls==['a','b'] and set(result)=={'a','b'} and status=='COMPLETED'
+
+
+def test_ball_only_events_do_not_require_unrelated_player_anchors(monkeypatch):
+    event = {'event_id':'ball', 'visual_samples':[{'media_ms':1000,'ball':[.4,.7]}]}
+    calls = []
+    def run(video, anchors, events):
+        calls.append((anchors, events))
+        return {'ball': {'ball_playback': []}}, 'COMPLETED'
+    monkeypatch.setattr(tracking, '_bounded_event', run)
+    result, status = tracking.bounded_tracks('video', [], [event])
+    assert status == 'COMPLETED' and result == {'ball': {'ball_playback': []}}
+    assert calls == [([], [event])]

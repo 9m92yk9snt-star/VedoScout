@@ -395,15 +395,21 @@ def render_assets(video, full, bundle, directory, anchors=None):
                 raise RuntimeError("SEQUENCE_FRAME_WRITE_FAILED")
             start = max(0, event["proof"]["proof_start_ms"] - 750) / 1000.
             end = (event["proof"]["proof_end_ms"] + 750) / 1000.
+            # Bind clip zero to a decoded source picture, preserving VFR frame PTS.
+            clip_ok, _, clip_origin = video_timebase.read_frame_at(cap, start)
+            if not clip_ok or not start-.002 <= clip_origin <= end:
+                raise ValueError("SEQUENCE_CLIP_ORIGIN_UNAVAILABLE")
+            start = clip_origin
             clip = directory / (row["evidence_id"] + ".mp4")
             subprocess.run([FFMPEG_BIN, "-v", "error", "-y", "-ss", str(start), "-i", str(video),
                             "-t", str(end-start), "-an", "-vf", "scale=720:1280:force_original_aspect_ratio=decrease",
                             "-c:v", "libx264", "-preset", "ultrafast", "-crf", "24", "-threads", "1",
-                            "-movflags", "+faststart", str(clip)], check=True, timeout=45,
+                            "-vsync", "0", "-movflags", "+faststart", str(clip)], check=True, timeout=45,
                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             row.update(frame_time_ms=round(actual_s*1000), frame_time_authority="ACTUAL_MEDIA_PTS",
                        identity_verified=True, identity_verification_status="SEQUENCE_SOURCE_CONTINUITY",
-                       telestrated=False, tele_clip_start=start, tele_clip_end=end)
+                       telestrated=False, tele_clip_start=start, tele_clip_end=end,
+                       tele_clip_timebase="SOURCE_PTS_ALIGNED")
             from match_room import presentation
             row["match_room"] = presentation(event, event.get("visual_samples"))
             row["match_room"]["tracking_status"] = tracking_status

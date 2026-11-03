@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState, useId } from 'react';
+import { flushSync } from 'react-dom';
 import { Play, Pause, X, RotateCcw } from 'lucide-react';
-import { roomFor, graphicsAt, depthAt } from './matchRoomModel';
+import { roomFor, graphicsAt, depthAt, ballAt, clipArrowToFrame } from './matchRoomModel';
 import './matchroom.css';
 const clock = ms => `${String(Math.floor(ms / 60000)).padStart(2, '0')}:${String(Math.floor(ms / 1000) % 60).padStart(2, '0')}`;
 export function MatchRoomPlayer({
@@ -20,6 +21,7 @@ export function MatchRoomPlayer({
     [playing, setPlaying] = useState(false),
     [slow, setSlow] = useState(false),
     [at, setAt] = useState(0),
+    [frameAt, setFrameAt] = useState(null),
     [stop, setStop] = useState(null),
     [done, setDone] = useState(false),
     [ratio, setRatio] = useState(16 / 9);
@@ -36,9 +38,14 @@ export function MatchRoomPlayer({
   const room = useMemo(() => roomFor(raw, fallback), [raw, fallback]);
   const from = Math.max(room.start, clip ? offset * 1000 : 0),
     until = clip && Number.isFinite(raw?.tele_clip_end) ? Math.min(room.end + 750, raw.tele_clip_end * 1000) : room.end + 750;
-  const mark = graphicsAt(room, at),
+  const mark = graphicsAt(room, frameAt ?? at),
     id = useId().replace(/:/g, '');
-  const depth = depthAt(mark, at, !playing);
+  const depth = depthAt(mark, frameAt ?? at, !playing);
+  const movingArrow = (!clip || raw?.tele_clip_timebase === 'SOURCE_PTS_ALIGNED') ? ballAt(room, frameAt) : null;
+  const arrowSource = movingArrow || (depth && mark?.ballTrail ? {...mark, foreground: depth, opacity: 1} : null);
+  const visibleTrail = arrowSource && clipArrowToFrame(arrowSource.ballTrail);
+  const arrow = visibleTrail ? {...arrowSource, ballTrail: visibleTrail} : null;
+  const yScale = 1000 / ratio;
   const observation = (skill?.lines || []).filter(x => typeof x === 'string').join(' ') || raw?.comment || 'Review the documented action in your match.';
   useEffect(() => {
     const el = stage.current;
@@ -84,7 +91,10 @@ export function MatchRoomPlayer({
       }
       last.current = ms;
     };
-    const tick = () => {
+    const tick = (_, metadata) => {
+      // Commit the fresh foreground before this video frame paints. Deferring
+      // the React update leaves the previous person's silhouette on screen.
+      flushSync(() => setFrameAt((metadata.mediaTime + (clip ? offset : 0)) * 1000));
       update();
       frame = v.requestVideoFrameCallback(tick);
     };
@@ -102,10 +112,13 @@ export function MatchRoomPlayer({
       setDone(false);
       setAt(ms);
     };
+    const seeking = () => setFrameAt(null);
+    v.addEventListener('seeking', seeking);
     v.addEventListener('timeupdate', update);
     v.addEventListener('seeked', seek);
     return () => {
       if (frame != null) v.cancelVideoFrameCallback?.(frame);
+      v.removeEventListener('seeking', seeking);
       v.removeEventListener('timeupdate', update);
       v.removeEventListener('seeked', seek);
       v.pause();
@@ -153,21 +166,23 @@ export function MatchRoomPlayer({
           last.current = null;
         } else setError(true);
       }} data-testid="match-room-video" />
-      {mark && <svg className="mr-graphics" style={bounds} viewBox="0 0 1000 1000" preserveAspectRatio="none" aria-label={mark.contourTrack ? "Measured player contour" : mark.groundProxy ? "Optical player track" : "Observed positions at this source frame"}>
+      {(mark || arrow) && <svg className="mr-graphics" style={bounds} viewBox={`0 0 1000 ${yScale}`} preserveAspectRatio="none" aria-label={mark?.contourTrack ? "Measured player contour" : mark?.groundProxy ? "Optical player track" : "Observed positions at this source frame"}>
         <defs>
           <radialGradient id={`ground-${id}`}><stop offset="0" stopColor="#79f58a" stopOpacity=".72" /><stop offset="1" stopColor="#9fe870" stopOpacity="0" /></radialGradient>
-          <linearGradient id={`pass-${id}`} x1={mark.ballTrail?.[0][0] * 1000} y1={mark.ballTrail?.[0][1] * 1000} x2={mark.ballTrail?.[1][0] * 1000} y2={mark.ballTrail?.[1][1] * 1000} gradientUnits="userSpaceOnUse"><stop offset="0" stopColor="#ecea94" stopOpacity=".25" /><stop offset="1" stopColor="#f0ed9c" stopOpacity=".95" /></linearGradient>
+          {arrow && <linearGradient id={`pass-${id}`} x1={arrow?.ballTrail?.[0][0] * 1000} y1={arrow?.ballTrail?.[0][1] * yScale} x2={arrow?.ballTrail?.[1][0] * 1000} y2={arrow?.ballTrail?.[1][1] * yScale} gradientUnits="userSpaceOnUse"><stop offset="0" stopColor="#ecea94" stopOpacity=".25" /><stop offset="1" stopColor="#f0ed9c" stopOpacity=".95" /></linearGradient>}
           <marker id={`arrow-${id}`} markerWidth="5" markerHeight="5" refX="5" refY="2.5" orient="auto" viewBox="0 0 5 5"><path d="M0 0L5 2.5L0 5Z" fill="#f0ed9c" /></marker>
-          {depth && <mask id={`people-${id}`} maskUnits="userSpaceOnUse" x="0" y="0" width="1000" height="1000"><rect width="1000" height="1000" fill="white" />{depth.polygons.map((polygon, i) => <polygon key={i} points={polygon.map(p => `${p[0]*1000},${p[1]*1000}`).join(' ')} fill="black" stroke="black" strokeWidth="1" />)}</mask>}
+          {depth && <mask id={`people-${id}`} maskUnits="userSpaceOnUse" x="0" y="0" width="1000" height={yScale}><rect width="1000" height={yScale} fill="white" />{depth.polygons.map((polygon, i) => <polygon key={i} points={polygon.map(p => `${p[0]*1000},${p[1]*yScale}`).join(' ')} fill="black" stroke="black" strokeWidth="1" />)}</mask>}
+          {arrow && <mask id={`ball-people-${id}`} maskUnits="userSpaceOnUse" x="0" y="0" width="1000" height={yScale}><rect width="1000" height={yScale} fill="white" />{arrow.foreground.polygons.map((polygon, i) => <polygon key={i} points={polygon.map(p => `${p[0]*1000},${p[1]*yScale}`).join(' ')} fill="black" stroke="black" strokeWidth="1" />)}</mask>}
         </defs>
         <g mask={depth ? `url(#people-${id})` : undefined}>
-          {mark.ground && <g>
-            <ellipse cx={mark.ground[0] * 1000} cy={Math.min(1, mark.ground[1]) * 1000} rx={mark.player_width * 850} ry={mark.player_width * 170 * ratio} fill={`url(#ground-${id})`} />
-            <ellipse cx={mark.ground[0] * 1000} cy={Math.min(1, mark.ground[1]) * 1000} rx={mark.player_width * 700} ry={mark.player_width * 135 * ratio} fill="#62ed7b" fillOpacity=".18" stroke="#91ffa3" strokeOpacity=".92" strokeWidth="2" vectorEffect="non-scaling-stroke" />
+          {mark?.ground && <g>
+            <ellipse cx={mark.ground[0] * 1000} cy={Math.min(1, mark.ground[1]) * yScale} rx={mark.player_width * 850} ry={mark.player_width * 170} fill={`url(#ground-${id})`} />
+            <ellipse cx={mark.ground[0] * 1000} cy={Math.min(1, mark.ground[1]) * yScale} rx={mark.player_width * 700} ry={mark.player_width * 135} fill="#62ed7b" fillOpacity=".18" stroke="#91ffa3" strokeOpacity=".92" strokeWidth="2" vectorEffect="non-scaling-stroke" />
           </g>}
-          {depth && mark.ballTrail && <line key={depth.frame_id} className="mr-pass-draw" pathLength="1" x1={mark.ballTrail[0][0] * 1000} y1={mark.ballTrail[0][1] * 1000} x2={mark.ballTrail[1][0] * 1000} y2={mark.ballTrail[1][1] * 1000} stroke={`url(#pass-${id})`} strokeWidth="2" strokeLinecap="round" />}
-          {depth && mark.ballTrail && <line key={`head-${depth.frame_id}`} className="mr-pass-head" x1={mark.ballTrail[0][0] * 1000} y1={mark.ballTrail[0][1] * 1000} x2={mark.ballTrail[1][0] * 1000} y2={mark.ballTrail[1][1] * 1000} stroke="none" strokeWidth="2" markerEnd={`url(#arrow-${id})`} />}
         </g>
+        {arrow && <g data-testid="match-room-ball-arrow" data-source-ms={arrow.media_ms} mask={`url(#ball-people-${id})`} opacity={arrow.opacity}>
+          <line x1={arrow.ballTrail[0][0] * 1000} y1={arrow.ballTrail[0][1] * yScale} x2={arrow.ballTrail[1][0] * 1000} y2={arrow.ballTrail[1][1] * yScale} stroke={`url(#pass-${id})`} strokeWidth="2" strokeLinecap="round" vectorEffect="non-scaling-stroke" markerEnd={`url(#arrow-${id})`} />
+        </g>}
       </svg>}
       {stop && !done && <div className="mr-caption"><span className="mr-kicker">{skill?.label || stop.label} · {stop.phase === 'result' ? 'THE RESULT' : 'YOUR QUALITY'}</span><strong>{(stop.caption || observation).length > 170 ? (stop.caption || observation).slice(0, 167) + '…' : stop.caption || observation}</strong></div>}
     </div>

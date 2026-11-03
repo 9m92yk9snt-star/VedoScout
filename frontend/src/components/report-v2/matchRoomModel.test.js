@@ -1,4 +1,4 @@
-import { roomFor, graphicsAt, depthAt } from './matchRoomModel';
+import { roomFor, graphicsAt, depthAt, ballAt, clipArrowToFrame } from './matchRoomModel';
 
 test('stationary observations do not manufacture a direction', () => {
   const samples=raw.samples.map(s=>({...s,ground:[.4,.8],ball:[.5,.8]}));
@@ -235,4 +235,54 @@ test('reacquired tracks need both source-bound identity references',()=>{
  const make=s=>roomFor({...comment,match_room:{...raw,tracking:{version:1,event_id:'e1',source_video_sha256:'source',method:'TAP_REACQUIRED_INSTANCE_CONTOUR',segments:[s]}}},10);
  expect(graphicsAt(make(segment),10100).ground).toEqual([.4,.8]);
  for(const refs of [undefined,['s1'],['s1','s1'],['s1','missing'],['s2','s1']])expect(make({...segment,identity_reference_frames:refs}).tracks).toEqual([]);
+});
+
+const playbackRows = [10000,10050,10100,10150,10200,10250,10300,10350].map(media_ms => ({
+  media_ms, frame_id:`f:${media_ms}`, ballTrail:[[.5,.8],[.6,.7]],
+  foreground:{method:'SOURCE_PERSON_MASK',frame_id:`f:${media_ms}`,media_ms,polygons:[[[.2,.3],[.4,.3],[.3,.7]]]}
+}));
+const playbackSegment = {method:'SOURCE_FRAME_BALL_DIRECTION',start_ms:10000,arrival_ms:10250,end_ms:10350,reference_frames:['s1','s2'],samples:playbackRows};
+const movingRoom = (segment=playbackSegment,changes={}) => roomFor({...comment,match_room:{...raw,samples:ballSamples,tracking:{...tracked,ball_playback:[segment],...changes}}},10);
+test('moving ball requires an exact presented source frame and reproduces seeking',()=>{
+  const room=movingRoom();
+  expect(ballAt(room,10100).ballTrail).toEqual([[.5,.8],[.6,.7]]);
+  expect(ballAt(room,10125)).toBeNull();
+  expect(ballAt(room,9990)).toBeNull();
+  expect(ballAt(room,null)).toBeNull();
+  const original=ballAt(room,10100);
+  ballAt(room,10300); ballAt(room,10000);
+  expect(ballAt(room,10100)).toEqual(original);
+  expect(ballAt(room,10000).opacity).toBe(0);
+  expect(ballAt(room,10250).opacity).toBe(1);
+  expect(ballAt(room,10350).opacity).toBe(0);
+});
+test('moving arrows reject mismatched source, endpoint, time and any missing mask',()=>{
+  expect(movingRoom(playbackSegment,{source_video_sha256:'other'}).movingBall).toEqual([]);
+  for(const change of [
+    {reference_frames:['missing','s2']}, {start_ms:9990}, {arrival_ms:10200}, {end_ms:11000},
+    {samples:playbackRows.map((s,i)=>i===2?{...s,foreground:null}:s)},
+    {samples:playbackRows.map((s,i)=>i===2?{...s,foreground:playbackRows[1].foreground}:s)},
+    {samples:playbackRows.filter((s,i)=>i!==2)},
+    {samples:playbackRows.map((s,i)=>i===0?{...s,ballTrail:[[.8,.8],[.6,.7]]}:s)},
+    {samples:playbackRows.map((s,i)=>i===5?{...s,ballTrail:[[.5,.8],[.9,.7]]}:s)}
+  ]) expect(movingRoom({...playbackSegment,...change}).movingBall).toEqual([]);
+});
+test('offscreen projected endpoints clip naturally without moving the true endpoint',()=>{
+  const segment={...playbackSegment,samples:playbackRows.map((s,i)=>i===1?{...s,ballTrail:[[.4,.8],[-.2,.7]]}:s)};
+  expect(ballAt(movingRoom(segment),10050).ballTrail[1][0]).toBe(-.2);
+});
+test('overlapping moving arrows are not chosen by list order',()=>{
+  const room=movingRoom();room.movingBall.push({...room.movingBall[0]});
+  expect(ballAt(room,10100)).toBeNull();
+});
+
+test('edge arrow keeps the direction of an offscreen destination',()=>{
+ const input=[[.4,.7],[-.2,.6]];
+ const [tail,tip]=clipArrowToFrame(input);
+ expect(tail).toEqual(input[0]);
+ expect(Math.abs(tip[0]-.015)).toBeLessThan(1e-10);
+ expect(tip[1]).toBeLessThan(tail[1]);
+ expect(input[1]).toEqual([-.2,.6]);
+ expect(clipArrowToFrame([[-.2,.4],[-.1,.5]])).toBeNull();
+ expect(clipArrowToFrame([[.1,.5],[.8,.5]])).toEqual([[.1,.5],[.8,.5]]);
 });

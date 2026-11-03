@@ -143,7 +143,7 @@ jobs:
       - name: Verify Match Room source binding and sequence regressions
         env:
           PYTHONPATH: backend
-        run: python -m pytest -q backend/tests/test_match_room.py backend/tests/test_match_room_tracking.py backend/tests/test_match_room_contours.py backend/tests/test_sequence_report.py backend/tests/test_sequence_pilot.py backend/tests/test_sequence_only.py
+        run: python -m pytest -q backend/tests/test_match_room.py backend/tests/test_match_room_tracking.py backend/tests/test_match_room_ball_playback.py backend/tests/test_match_room_contours.py backend/tests/test_sequence_report.py backend/tests/test_sequence_pilot.py backend/tests/test_sequence_only.py
 
   backend_regression:
     runs-on: ubuntu-latest
@@ -288,7 +288,7 @@ jobs:
         working-directory: frontend
         env:
           CI: 'true'
-        run: yarn test --watchAll=false --runInBand --testPathPattern='(MarkerStudio|ScoutMode|sceneDetect|MarkedCropCanvas|AnalysisWaiting|BackgroundAnalysisTracker|ProfileAnalysisStatus|publication|MatchRoomContext|matchRoomModel)\.test\.'
+        run: yarn test --watchAll=false --runInBand --testPathPattern='(MarkerStudio|ScoutMode|sceneDetect|MarkedCropCanvas|AnalysisWaiting|BackgroundAnalysisTracker|ProfileAnalysisStatus|publication|MatchRoomContext|MatchRoomPlayer|matchRoomModel)\.test\.'
       - name: Build frontend
         working-directory: frontend
         env:

@@ -55,7 +55,26 @@ export function roomFor(comment, fallbackSeconds) {
       if (rows.length !== segment.samples.length || rows.length < 3 || rows.some((s, i) => i > 0 && (s.media_ms <= rows[i-1].media_ms || s.media_ms - rows[i-1].media_ms > (contour ? (segment.presentation_gap_ms === 200 ? 200 : 75) : 120)))) return [];
       return [rows.map((s, i) => ({...s, player_width: rows.slice(Math.max(0, i-2), i+3).map(r => r.player_width).sort((a,b) => a-b)[Math.floor(rows.slice(Math.max(0, i-2), i+3).length/2)], groundProxy: !contour, contourTrack: contour, ballTrail: null, groundTrail: i > 0 && s.motion_from_ms === rows[i-1].media_ms && Array.isArray(s.groundTrail) && s.groundTrail.length === 2 && s.groundTrail.every(point) && s.groundTrail[1][0] === s.ground[0] && s.groundTrail[1][1] === s.ground[1] ? s.groundTrail : null}))];
     }) : [];
+  // Only complete, event-bound sequences with a fresh mask on every source frame.
+  const movingBall = bound && tracking?.version === 1 && tracking.event_id === raw.event_id && tracking.source_video_sha256 === raw.source_video_sha256 && Array.isArray(tracking.ball_playback)
+    ? tracking.ball_playback.slice(0, 4).flatMap(segment => {
+      if (!segment || !Array.isArray(segment.reference_frames) || segment.reference_frames.length !== 2) return [];
+      const [first, last] = segment.reference_frames;
+      const release = samples.find(s => s.frame_id === first && s.media_ms === segment.start_ms && s.ball);
+      const arrival = samples.find(s => s.frame_id === last && s.media_ms === segment.arrival_ms && s.ballTrail);
+      const rawArrival = raw.samples.find(s => s.frame_id === last && s.media_ms === segment.arrival_ms);
+      const rows = segment.samples;
+      const arrowPoint = p => Array.isArray(p) && p.length === 2 && p.every(x => finite(x) && x >= -1 && x <= 2);
+      if (segment.method !== 'SOURCE_FRAME_BALL_DIRECTION' || !release || !arrival || rawArrival?.ball_motion_start_ms !== segment.start_ms || !finite(segment.end_ms) || segment.end_ms < segment.arrival_ms || segment.end_ms > Math.min(end, segment.arrival_ms+250) || !Array.isArray(rows) || rows.length < 2 || rows.length > 150) return [];
+      if (rows.some(s => !s || typeof s !== 'object') || Math.abs(rows[0].media_ms-segment.start_ms) > 2 || rows[rows.length-1].media_ms !== segment.end_ms || !rows.some(s => Math.abs(s.media_ms-segment.arrival_ms) <= 2)) return [];
+      if (rows.some((s, i) => !finite(s.media_ms) || s.media_ms < start || s.media_ms > end || typeof s.frame_id !== 'string' || !foregroundFor(s) || !Array.isArray(s.ballTrail) || s.ballTrail.length !== 2 || !s.ballTrail.every(arrowPoint) || (i > 0 && (s.media_ms <= rows[i-1].media_ms || s.media_ms-rows[i-1].media_ms > 75)))) return [];
+      if (Math.hypot(...rows[0].ballTrail[0].map((v, i) => v-release.ball[i])) > .002) return [];
+      const endpoint = rows.find(s => Math.abs(s.media_ms-segment.arrival_ms) <= 2);
+      if (Math.hypot(...endpoint.ballTrail[1].map((v, i) => v-arrival.ball[i])) > .002) return [];
+      return [{...segment, samples: rows}];
+    }) : [];
   return {
+    movingBall,
     tracks,
     start,
     end,
@@ -107,3 +126,35 @@ export function graphicsAt(room, mediaMs) {
   };
 }
 
+
+// Call with presented frame PTS, never an advancing wall clock. Seeking, pausing
+// and changing playback speed reproduce the same geometry and opacity.
+export function ballAt(room, mediaMs) {
+  if (!finite(mediaMs)) return null;
+  const candidates = (room.movingBall || []).filter(s => mediaMs >= s.start_ms-2 && mediaMs <= s.end_ms+2);
+  if (candidates.length !== 1) return null;
+  const segment = candidates[0];
+  const sample = segment.samples.find(s => Math.abs(s.media_ms-mediaMs) <= 2);
+  if (!sample) return null;
+  const smooth = t => { const x = Math.max(0, Math.min(1, t)); return x*x*(3-2*x); };
+  const fade = segment.end_ms > segment.arrival_ms ? 1-smooth((mediaMs-segment.arrival_ms)/(segment.end_ms-segment.arrival_ms)) : 1;
+  return {...sample, opacity: smooth((mediaMs-segment.start_ms)/120)*fade};
+}
+
+// Clip a direction line to the visible picture, preserving its orientation.
+// An edge arrow points towards an offscreen endpoint; it does not relocate it.
+export function clipArrowToFrame(trail) {
+  const [a, b] = trail;
+  const d = b.map((v, i) => v-a[i]);
+  let lo = 0, hi = 1;
+  for (let axis = 0; axis < 2; axis++) {
+    if (Math.abs(d[axis]) < 1e-10) {
+      if (a[axis] < .015 || a[axis] > .985) return null;
+    } else {
+      const u = (.015-a[axis])/d[axis], v = (.985-a[axis])/d[axis];
+      lo = Math.max(lo, Math.min(u, v));
+      hi = Math.min(hi, Math.max(u, v));
+    }
+  }
+  return lo < hi ? [lo, hi].map(t => a.map((v, i) => v+t*d[i])) : null;
+}
