@@ -238,3 +238,28 @@ It validates rendering on that fixture, not automatic extraction on future
 uploads. Automatic release/reception extraction and the unresolved duel still
 require further source-video validation. Local tests: 32 backend functions and
 17 frontend model tests pass, plus compilation and diff checks.
+
+### Paused-frame foreground and pass sequence
+
+Optional local person segmentation now supplies normalized foreground polygons
+on measured ball-arrow endpoint frames. Geometry is bound to the existing source,
+event, sample frame ID and actual PTS. The player validates geometry and only
+uses it while paused within 2ms of that frame. The arrow is omitted if no such
+mask is available, rather than painting across people. No single-frame mask is
+propagated during playback. Inference stays within the existing 25s child budget;
+completed sparse output is checkpointed before optional segmentation.
+
+Completed passes pause at the measured release, play forward on Continue, then
+pause at visible reception and reveal a restrained warm-yellow direction arrow.
+The reception-view arrow is never projected back onto the release frame. This
+is endpoint direction, not measured pitch homography, 3D or a ball trajectory.
+The player keeps only a soft green stance ellipse; conflicting tracks now take
+precedence over sparse motion marks and hide the stance instead of selecting a
+person by confidence. Missing tracked positions are not interpolated.
+
+Local validation: 33 backend functions, 20 frontend model tests. The existing
+manual Orman700 review fixture produced nine foreground polygons at 10.000s;
+visual inspection confirms occlusion behind white 13 and the coach. This is one
+frame, not validation of automatic pass extraction, all-person segmentation or
+the unresolved 24.63s duel. Existing reports require regenerated graphics to
+receive foreground data. No new paid model request, dependency or model asset.

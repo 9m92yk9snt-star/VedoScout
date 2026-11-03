@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState, useId } from 'react';
 import { Play, Pause, X, RotateCcw } from 'lucide-react';
-import { roomFor, graphicsAt } from './matchRoomModel';
+import { roomFor, graphicsAt, depthAt } from './matchRoomModel';
 import './matchroom.css';
 const clock = ms => `${String(Math.floor(ms / 60000)).padStart(2, '0')}:${String(Math.floor(ms / 1000) % 60).padStart(2, '0')}`;
 export function MatchRoomPlayer({
@@ -38,6 +38,7 @@ export function MatchRoomPlayer({
     until = clip && Number.isFinite(raw?.tele_clip_end) ? Math.min(room.end + 750, raw.tele_clip_end * 1000) : room.end + 750;
   const mark = graphicsAt(room, at),
     id = useId().replace(/:/g, '');
+  const depth = depthAt(mark, at, !playing);
   const observation = (skill?.lines || []).filter(x => typeof x === 'string').join(' ') || raw?.comment || 'Review the documented action in your match.';
   useEffect(() => {
     const el = stage.current;
@@ -153,9 +154,16 @@ export function MatchRoomPlayer({
         } else setError(true);
       }} data-testid="match-room-video" />
       {mark && <svg className="mr-graphics" style={bounds} viewBox="0 0 1000 1000" preserveAspectRatio="none" aria-label={mark.contourTrack ? "Measured player contour" : mark.groundProxy ? "Optical player track" : "Observed positions at this source frame"}>
-        <defs><radialGradient id={`ground-${id}`}><stop offset="0" stopColor="#d9fc77" stopOpacity=".5" /><stop offset="1" stopColor="#d9fc77" stopOpacity="0" /></radialGradient><marker id={`arrow-${id}`} markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto" viewBox="0 0 6 6"><path d="M0 0L6 3L0 6Z" fill="#d9fc77" /></marker></defs>
-        {mark.ground && <ellipse cx={mark.ground[0] * 1000} cy={Math.min(1, mark.ground[1]) * 1000} rx={mark.player_width * 700} ry={mark.player_width * 150 * ratio} fill={`url(#ground-${id})`} />}
-        {mark.ballTrail && <line x1={mark.ballTrail[0][0] * 1000} y1={mark.ballTrail[0][1] * 1000} x2={mark.ballTrail[1][0] * 1000} y2={mark.ballTrail[1][1] * 1000} stroke="#d9fc77" strokeWidth="2" markerEnd={`url(#arrow-${id})`} />}
+        <defs>
+          <radialGradient id={`ground-${id}`}><stop offset="0" stopColor="#9fe870" stopOpacity=".48" /><stop offset="1" stopColor="#9fe870" stopOpacity="0" /></radialGradient>
+          <linearGradient id={`pass-${id}`} x1={mark.ballTrail?.[0][0] * 1000} y1={mark.ballTrail?.[0][1] * 1000} x2={mark.ballTrail?.[1][0] * 1000} y2={mark.ballTrail?.[1][1] * 1000} gradientUnits="userSpaceOnUse"><stop offset="0" stopColor="#ecea94" stopOpacity=".25" /><stop offset="1" stopColor="#f0ed9c" stopOpacity=".95" /></linearGradient>
+          <marker id={`arrow-${id}`} markerWidth="5" markerHeight="5" refX="5" refY="2.5" orient="auto" viewBox="0 0 5 5"><path d="M0 0L5 2.5L0 5Z" fill="#f0ed9c" /></marker>
+          {depth && <mask id={`people-${id}`} maskUnits="userSpaceOnUse" x="0" y="0" width="1000" height="1000"><rect width="1000" height="1000" fill="white" />{depth.polygons.map((polygon, i) => <polygon key={i} points={polygon.map(p => `${p[0]*1000},${p[1]*1000}`).join(' ')} fill="black" stroke="black" strokeWidth="1" />)}</mask>}
+        </defs>
+        <g mask={depth ? `url(#people-${id})` : undefined}>
+          {mark.ground && <ellipse cx={mark.ground[0] * 1000} cy={Math.min(1, mark.ground[1]) * 1000} rx={mark.player_width * 650} ry={mark.player_width * 120 * ratio} fill={`url(#ground-${id})`} />}
+          {depth && mark.ballTrail && <line key={depth.frame_id} className="mr-pass-draw" pathLength="1" x1={mark.ballTrail[0][0] * 1000} y1={mark.ballTrail[0][1] * 1000} x2={mark.ballTrail[1][0] * 1000} y2={mark.ballTrail[1][1] * 1000} stroke={`url(#pass-${id})`} strokeWidth="2" strokeLinecap="round" markerEnd={`url(#arrow-${id})`} />}
+        </g>
       </svg>}
       {stop && !done && <div className="mr-caption"><span className="mr-kicker">{skill?.label || stop.label} · {stop.phase === 'result' ? 'THE RESULT' : 'YOUR QUALITY'}</span><strong>{(stop.caption || observation).length > 170 ? (stop.caption || observation).slice(0, 167) + '…' : stop.caption || observation}</strong></div>}
     </div>

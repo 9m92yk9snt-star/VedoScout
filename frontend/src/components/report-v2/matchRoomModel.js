@@ -6,6 +6,13 @@ function supportedPass(raw, sample) {
   const releases = raw.samples.filter(p => p.ball_phase === 'RELEASE' && point(p.ball) && typeof p.frame_id === 'string' && finite(p.media_ms) && p.media_ms >= raw.start_ms && Math.abs(p.media_ms-raw.contact_ms) <= 80);
   return releases.length === 1 && releases[0].media_ms === sample.ball_motion_start_ms;
 }
+function foregroundFor(s) {
+  const f = s.foreground;
+  return f?.method === 'SOURCE_PERSON_MASK' && f.frame_id === s.frame_id && finite(f.media_ms) && Math.abs(f.media_ms-s.media_ms) <= 2 && Array.isArray(f.polygons) && f.polygons.length > 0 && f.polygons.length <= 48 && f.polygons.every(p => Array.isArray(p) && p.length >= 3 && p.length <= 512 && p.every(point)) ? f : null;
+}
+export function depthAt(mark, mediaMs, paused) {
+  return paused && mark?.foreground && Math.abs(mark.foreground.media_ms-mediaMs) <= 2 ? mark.foreground : null;
+}
 export function roomFor(comment, fallbackSeconds) {
   const raw = comment?.match_room;
   const bound = raw?.version === 1 && raw.event_id === comment?.event_id && !!raw.source_video_sha256 && raw.source_video_sha256 === comment?.source_video_sha256 && raw.coordinate_space === 'FULL_FRAME_NORMALIZED' && finite(raw.start_ms) && finite(raw.end_ms) && raw.end_ms >= raw.start_ms;
@@ -27,6 +34,7 @@ export function roomFor(comment, fallbackSeconds) {
   const samples = bound && Array.isArray(raw.samples) ? raw.samples.filter(s => finite(s.media_ms) && s.media_ms >= start && s.media_ms <= end && typeof s.frame_id === 'string').slice(0, 160).map(s => ({
     media_ms: s.media_ms,
     frame_id: s.frame_id,
+    foreground: foregroundFor(s),
     ground: point(s.ground) && finite(s.player_width) && s.player_width >= .005 && s.player_width <= .4 ? s.ground : null,
     player_width: s.player_width,
     ball: point(s.ball) ? s.ball : null,
@@ -60,10 +68,9 @@ export function graphicsAt(room, mediaMs) {
   const moves = (a,b) => a && b && Math.hypot(b[0]-a[0],b[1]-a[1]) > .008;
   const staticPair = sample && previous && sample.camera_static_from_previous && sample.media_ms > previous.media_ms && sample.media_ms-previous.media_ms <= 300;
   const ballTrail = sample?.ballTrail || (staticPair && moves(previous.ball,sample.ball) ? [previous.ball,sample.ball] : null);
-  const withBall = mark => mark ? {...mark, ballTrail} : ballTrail ? {...sample, ground:null, groundTrail:null, ballTrail} : null;
+  const withBall = mark => mark ? {...mark, ballTrail, foreground: sample?.foreground} : ballTrail ? {...sample, ground:null, groundTrail:null, ballTrail} : null;
   // A source-observed endpoint takes precedence over an optical box proxy.
   const observed = nearest(room.samples.filter(s => s.groundTrail && Math.abs(s.media_ms-mediaMs) <= 60));
-  if (observed) return withBall({...observed, endpointMotion: true});
   const candidates = (room.tracks || []).filter(rows => mediaMs >= rows[0].media_ms && mediaMs <= rows[rows.length-1].media_ms).map(rows => rows.reduce((a, b) => Math.abs(a.media_ms-mediaMs) <= Math.abs(b.media_ms-mediaMs) ? a : b)).filter(s => Math.abs(s.media_ms-mediaMs) <= (s.contourTrack ? 40 : 60));
   if (candidates.length) {
     const chosen = candidates.sort((a,b) => b.confidence-a.confidence)[0];
@@ -71,6 +78,7 @@ export function graphicsAt(room, mediaMs) {
     if (candidates.every(s => Math.hypot(s.ground[0]-chosen.ground[0], s.ground[1]-chosen.ground[1]) <= Math.min(s.player_width, chosen.player_width)*.5)) return withBall(chosen);
     return withBall(null);
   }
+  if (observed) return withBall({...observed, endpointMotion: true});
   // Brief exact-frame marks; never interpolate across occlusion, camera motion or sparse samples.
   if (!sample) return null;
   const groundTrail = staticPair && moves(previous.ground,sample.ground) ? [previous.ground, sample.ground] : null;

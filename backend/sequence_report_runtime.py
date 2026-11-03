@@ -416,7 +416,18 @@ def render_assets(video, full, bundle, directory, anchors=None):
                 if ball_arrows:
                     focus = ball_arrows[-1]
                     stops = row["match_room"]["stops"]
-                    if not any(abs(s["media_ms"]-focus["media_ms"]) <= 60 for s in stops):
+                    if focus.get("ball_motion_method") == "BACKGROUND_AFFINE_PASS_ENDPOINTS":
+                        # Bind both pauses to measured endpoint frames. Never draw the
+                        # reception-view arrow over the earlier release camera view.
+                        for ms, label, phase in [(focus["ball_motion_start_ms"], "Pass release", "action"),
+                                                 (focus["media_ms"], "Reception", "result")]:
+                            nearby = next((s for s in stops if abs(s["media_ms"]-ms) <= 80), None)
+                            if nearby:
+                                nearby.update(media_ms=ms, label=label, phase=phase)
+                            else:
+                                stops.append({"media_ms": ms, "label": label, "phase": phase})
+                        stops.sort(key=lambda s: s["media_ms"])
+                    elif not any(abs(s["media_ms"]-focus["media_ms"]) <= 60 for s in stops):
                         stops.append({"media_ms": focus["media_ms"], "label": "Pass direction" if focus.get("ball_motion_method") == "BACKGROUND_AFFINE_PASS_ENDPOINTS" else "Ball movement", "phase": "action"})
                         stops.sort(key=lambda s: s["media_ms"])
 

@@ -1,4 +1,4 @@
-import { roomFor, graphicsAt } from './matchRoomModel';
+import { roomFor, graphicsAt, depthAt } from './matchRoomModel';
 
 test('stationary observations do not manufacture a direction', () => {
   const samples=raw.samples.map(s=>({...s,ground:[.4,.8],ball:[.5,.8]}));
@@ -180,4 +180,30 @@ test('long pass direction requires the recorded release and receiving actor',()=
   for(const change of [{action_type:'DRIBBLE'},{action_outcome:'INCOMPLETE'},{receiver_visual_id:'other'},{contact_ms:10500},{samples:[{...samples[0],ball_phase:null},samples[1]]}]) {
     expect(graphicsAt(room({...contract,...change}),10800).ballTrail).toBeNull();
   }
+});
+
+
+test('depth cutouts are restricted to the paused measured frame', () => {
+  const foreground = {media_ms: 1000, polygons: [[[0,0],[1,0],[1,1]]]};
+  expect(depthAt({foreground}, 1000, true)).toEqual(foreground);
+  expect(depthAt({foreground}, 1000, false)).toBeNull();
+  expect(depthAt({foreground}, 1033, true)).toBeNull();
+});
+
+test('foreground rejects a different frame and invalid polygon geometry', () => {
+  const sample = raw.samples[0];
+  const good = {method: 'SOURCE_PERSON_MASK', frame_id: sample.frame_id, media_ms: sample.media_ms, polygons: [[[0,0],[1,0],[1,1]]]};
+  const make = foreground => roomFor({...comment,match_room:{...raw,samples:[{...sample,foreground}]}},10).samples[0];
+  expect(make(good).foreground).toEqual(good);
+  expect(make({...good,frame_id:'another-frame'}).foreground).toBeNull();
+  expect(make({...good,polygons:[[[0,0],[2,0],[1,1]]]}).foreground).toBeNull();
+});
+
+test('sparse motion evidence cannot override disagreeing player tracks', () => {
+  const a = {media_ms:1000,ground:[.2,.8],player_width:.05,confidence:.9};
+  const b = {...a,ground:[.7,.8]};
+  const sample = {...a,groundTrail:[[.1,.8],[.2,.8]],ballTrail:[[.2,.7],[.5,.7]]};
+  const mark = graphicsAt({samples:[sample],tracks:[[a],[b]]},1000);
+  expect(mark.ground).toBeNull();
+  expect(mark.ballTrail).toEqual(sample.ballTrail);
 });

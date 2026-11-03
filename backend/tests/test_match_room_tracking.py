@@ -185,3 +185,15 @@ def test_pass_direction_requires_release_receiver_and_camera_proof(monkeypatch):
     for change in [{'canonical_action_type':'DRIBBLE'},{'canonical_outcome':'INCOMPLETE'},{'contact_ms':1300},{'causal_chain':{'receiver_visual_id':'other'}}]:
         assert tracking.pass_motion('video',{**event,**change},obs) == obs
     assert tracking.pass_motion('video',event,[obs[0],{**obs[1],'media_ms':3300}])[1]['ball_motion_method']=='BACKGROUND_AFFINE_BALL_ENDPOINTS'
+
+
+def test_foreground_includes_people_not_ball_and_preserves_offset():
+    import numpy as np
+    from match_room_tracking import foreground_polygons
+    mask = np.zeros((60, 80), dtype=np.uint8)
+    mask[10:50, 20:40] = 1
+    rows = [{'class_id': 0, 'mask': mask}, {'class_id': 32, 'mask': np.ones_like(mask)}]
+    polygons = foreground_polygons(rows, 80, 100, 20)
+    assert len(polygons) == 1
+    assert all(0 <= x <= 1 and .2 <= y <= .8 for x, y in polygons[0])
+    assert foreground_polygons(rows[1:], 80, 100, 20) is None

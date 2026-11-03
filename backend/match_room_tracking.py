@@ -205,6 +205,56 @@ def pass_motion(video, event, observations):
             if s is b else s for s in observations]
 
 
+def foreground_polygons(instances, width, height, y_offset=0):
+    """Conservative visible-person cutouts; no identity or hidden-body inference."""
+    import cv2
+    import numpy as np
+    polygons = []
+    for item in instances:
+        if item.get('class_id') != 0:
+            continue
+        mask = cv2.dilate(item['mask'].astype('uint8'), np.ones((5, 5), np.uint8))
+        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        for contour in contours:
+            if cv2.contourArea(contour) < 4:
+                continue
+            contour = cv2.approxPolyDP(contour, .5, True).reshape(-1, 2)
+            if not 3 <= len(contour) <= 512 or len(polygons) >= 48:
+                return None  # never silently omit a person because of payload limits
+            polygons.append([[round(float(x)/width, 6), round(float(y+y_offset)/height, 6)] for x, y in contour])
+    return polygons or None
+
+
+def add_foreground(video, observations, deadline):
+    """Measure occluders on arrow endpoint frames only, within the existing budget."""
+    import cv2
+    from native_player_segmentation import _instances
+    from video_timebase import read_frame_at
+    cap = cv2.VideoCapture(str(video))
+    try:
+        for sample in observations:
+            if time.monotonic() >= deadline - 1:
+                break
+            if not sample.get('ballTrail'):
+                continue
+            ok, frame, pts = read_frame_at(cap, sample['media_ms']/1000)
+            if not ok or abs(pts*1000-sample['media_ms']) > 2:
+                continue
+            height, width = frame.shape[:2]
+            ys = [p[1] for p in sample['ballTrail']]
+            if point(sample.get('ground')):
+                ys.append(sample['ground'][1])
+            top = max(0, int((min(ys)-.3)*height))
+            bottom = min(height, int((max(ys)+.06)*height)+1)
+            instances, _ = _instances(frame[top:bottom])
+            polygons = foreground_polygons(instances, width, height, top)
+            if polygons:
+                sample['foreground'] = {'method': 'SOURCE_PERSON_MASK', 'frame_id': sample['frame_id'],
+                                        'media_ms': round(pts*1000), 'polygons': polygons}
+    finally:
+        cap.release()
+
+
 def compute(video, anchors, events, checkpoint=None):
     import cv2
     from player_tracking import track_player
@@ -230,6 +280,11 @@ def compute(video, anchors, events, checkpoint=None):
                   'observed_samples': pass_motion(video, event, observed_motion(video, observations))}
         output[event['event_id']] = result
         save()  # keep completed sparse graphics if the optional contour work times out
+        try:
+            add_foreground(video, result['observed_samples'], deadline)
+        except (ImportError, OSError, ValueError, cv2.error):
+            pass  # graphics remain optional; no unmasked replacement is invented
+        save()
         diagnostic = {}
         try:
             contours = contour_segments(video, anchors, observations, start, end, deadline=deadline,
