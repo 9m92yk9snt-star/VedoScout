@@ -58,6 +58,82 @@
           "sha256": "a2545dff7699cffc819abc6e08f6dbddcc1561739e1e33e1fa3593e4c815e81f"
         }
       ]
+    },
+    "yolov8m-seg.onnx": {
+      "bytes": 109312538,
+      "sha256": "20877569fcfc4744855b1d6d05b0cd7031987ae31894af5c7e1e74328d18e653",
+      "parts": [
+        {
+          "file": "yolov8m-seg.onnx.part001",
+          "bytes": 8388608,
+          "sha256": "e6303a999ee8e4ca685713fa4ca7b9394ac378612c88af087f4e9178a59e9aa0"
+        },
+        {
+          "file": "yolov8m-seg.onnx.part002",
+          "bytes": 8388608,
+          "sha256": "90f48c0733dce5f00e89f681e10ecd5eda739dc91fc1c1427a73dd23d29fda88"
+        },
+        {
+          "file": "yolov8m-seg.onnx.part003",
+          "bytes": 8388608,
+          "sha256": "b8d3c2b76c1d14bc156a6974ecd21b46b3a83c979e38a6ef12fbbef40deb7930"
+        },
+        {
+          "file": "yolov8m-seg.onnx.part004",
+          "bytes": 8388608,
+          "sha256": "45b186ca02482535c1efe0071eca5afbb35264fe8ba9784594b66aa8de647363"
+        },
+        {
+          "file": "yolov8m-seg.onnx.part005",
+          "bytes": 8388608,
+          "sha256": "ddcbba7b2be00b4f2d8407dbf718791e7e67f1fcaf4e91cc2100fd916617ee9f"
+        },
+        {
+          "file": "yolov8m-seg.onnx.part006",
+          "bytes": 8388608,
+          "sha256": "0d93ffbf3e3e445116c609c37ed03fcd8b2a7cbcb5848176a6fc6552283dba62"
+        },
+        {
+          "file": "yolov8m-seg.onnx.part007",
+          "bytes": 8388608,
+          "sha256": "7af4f5a0d6ff62a7bd2d376d6d9361498dd63fe4e49e8b3820c7b2a1d7032331"
+        },
+        {
+          "file": "yolov8m-seg.onnx.part008",
+          "bytes": 8388608,
+          "sha256": "34cdd794833b385c72c8b9dab8c39b01a80fc59e484802dbef2b1d4b81fc3d50"
+        },
+        {
+          "file": "yolov8m-seg.onnx.part009",
+          "bytes": 8388608,
+          "sha256": "05d9d8ccdc3682ad2c935d54081d61c055658c76497a76da1df9afae5a1ee2d9"
+        },
+        {
+          "file": "yolov8m-seg.onnx.part010",
+          "bytes": 8388608,
+          "sha256": "9179e2fe5cde8e3e5d1ed9c2b76b63093f392db591154c492d2acc3f5225c0a8"
+        },
+        {
+          "file": "yolov8m-seg.onnx.part011",
+          "bytes": 8388608,
+          "sha256": "dd9ff050d9cccfc62478d21a9a3998b2696be190943a9247339fec3a1e3c1f0e"
+        },
+        {
+          "file": "yolov8m-seg.onnx.part012",
+          "bytes": 8388608,
+          "sha256": "e8e7cb032f54404ecf4396b45dfee78add21f51842ca5d27fbf4583d5f7f1b5e"
+        },
+        {
+          "file": "yolov8m-seg.onnx.part013",
+          "bytes": 8388608,
+          "sha256": "6acb119ca3384fe25ed8bd4bf147aef905314914876687a9f954067365dfe2d5"
+        },
+        {
+          "file": "yolov8m-seg.onnx.part014",
+          "bytes": 260634,
+          "sha256": "5493fbdf3c336e3d4f0dcf5c41aa9c4bed4677eace0edfe5066cd21a780e1a7c"
+        }
+      ]
     }
   }
 }
