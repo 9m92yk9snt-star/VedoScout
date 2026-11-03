@@ -1,6 +1,6 @@
 """Bounded presentation-only reuse of tap tracking and camera compensation.
 
-Never changes events, grades or identity authority. No provider/model calls.
+Never changes events, grades or identity authority. No LLM/provider requests.
 A measured box is a ground proxy, not a measured foot landmark.
 """
 import json
@@ -96,19 +96,19 @@ def add_motion(segment, motion):
             samples[b]['motion_from_ms'] = a
 
 
-def endpoint_arrow(previous, current, matrix, width, height):
+def endpoint_arrow(previous, current, matrix, width, height, *, field='ground', max_gap=1000):
     """Observed endpoint displacement in the current camera view; not a path."""
     import numpy as np
-    if not point(previous.get('ground')) or not point(current.get('ground')):
+    if not point(previous.get(field)) or not point(current.get(field)):
         return None
-    if not 0 < current['media_ms'] - previous['media_ms'] <= 1000:
+    if not 0 < current['media_ms'] - previous['media_ms'] <= max_gap:
         return None
     m = np.asarray(matrix, dtype=float)
     if m.shape != (3, 3) or not np.isfinite(m).all() or width <= 0 or height <= 0:
         return None
-    p = m @ np.array([previous['ground'][0]*width, previous['ground'][1]*height, 1.])
+    p = m @ np.array([previous[field][0]*width, previous[field][1]*height, 1.])
     tail = [float(p[0]/width), float(p[1]/height)]
-    tip = current['ground']
+    tip = current[field]
     if not point(tail) or not .008 <= math.dist(tail, tip) <= .3:
         return None
     return [tail, tip]
@@ -119,7 +119,8 @@ def observed_motion(video, observations):
 
     Every intervening decoded frame must support the camera transform. Exclude
     a full-height band containing the actor endpoints; no player trajectory is
-    assumed when selecting background pixels. Never connect ball observations.
+    assumed when selecting background pixels. Active-ball endpoints have their
+    own <=300ms gate and displacement; player motion never supplies ball motion.
     """
     import cv2
     import numpy as np
@@ -130,9 +131,10 @@ def observed_motion(video, observations):
     cap = cv2.VideoCapture(str(video))
     try:
         for previous, current in zip(samples, samples[1:]):
-            if not (point(previous.get('ground')) and point(current.get('ground'))):
-                continue
-            if not 0 < current['media_ms']-previous['media_ms'] <= 1000:
+            gap = current['media_ms']-previous['media_ms']
+            ground = 0 < gap <= 1000 and all(point(s.get('ground')) for s in (previous, current))
+            ball = 0 < gap <= 300 and all(point(s.get('ball')) for s in (previous, current))
+            if not (ground or ball):
                 continue
             start, end = previous['media_ms']/1000, current['media_ms']/1000
             frames = _read_window(cap, start-.02, end+.025, 1/30, seed_time=start)
@@ -141,8 +143,9 @@ def observed_motion(video, observations):
             cuts = _cut_flags(frames)
             h, w = frames[0][1].shape
             margin = max(previous.get('player_width', .1), current.get('player_width', .1))
-            left = max(0., min(previous['ground'][0], current['ground'][0])-margin)
-            right = min(1., max(previous['ground'][0], current['ground'][0])+margin)
+            endpoints = [s[key][0] for s in (previous, current) for key in ('ground', 'ball') if point(s.get(key))]
+            left = max(0., min(endpoints)-margin)
+            right = min(1., max(endpoints)+margin)
             exclude = [(left*w, 0, (right-left)*w, h)]
             cumulative = np.eye(3)
             valid = True
@@ -156,10 +159,15 @@ def observed_motion(video, observations):
                     break
                 cumulative = np.vstack([matrix, [0, 0, 1]]) @ cumulative
             if valid:
-                arrow = endpoint_arrow(previous, current, cumulative, w, h)
+                arrow = endpoint_arrow(previous, current, cumulative, w, h) if ground else None
                 if arrow:
                     current.update(groundTrail=arrow, motion_start_ms=previous['media_ms'],
                                    motion_method='BACKGROUND_AFFINE_ENDPOINTS')
+                ball_arrow = endpoint_arrow(previous, current, cumulative, w, h,
+                                            field='ball', max_gap=300) if ball else None
+                if ball_arrow:
+                    current.update(ballTrail=ball_arrow, ball_motion_start_ms=previous['media_ms'],
+                                   ball_motion_method='BACKGROUND_AFFINE_BALL_ENDPOINTS')
     finally:
         cap.release()
     return samples
@@ -190,10 +198,14 @@ def compute(video, anchors, events, checkpoint=None):
                   'observed_samples': observed_motion(video, observations)}
         output[event['event_id']] = result
         save()  # keep completed sparse graphics if the optional contour work times out
+        diagnostic = {}
         try:
-            contours = contour_segments(video, anchors, observations, start, end, deadline=deadline)
+            contours = contour_segments(video, anchors, observations, start, end, deadline=deadline,
+                                        diagnostics=diagnostic)
         except (ImportError, OSError, ValueError, cv2.error):
             contours = []
+            diagnostic['status'] = 'CONTOUR_UNAVAILABLE'
+        result['contour_diagnostics'] = diagnostic
         if contours:
             result.update(method=METHOD, segments=contours)
             save()

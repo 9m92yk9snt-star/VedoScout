@@ -111,6 +111,43 @@ def mask_iou(a, b):
     return np.count_nonzero((a > 0) & (b > 0))/max(1, np.count_nonzero((a > 0) | (b > 0)))
 
 
+def seed_candidates(rows, target, shape):
+    height, width = shape
+    return [i for i, row in enumerate(rows)
+            if owns(measured_mask(row), [target['x']*width, target['y']*height])]
+
+
+def select_seed_view(frames, seeds, segmenter, *, deadline=None):
+    """Choose one fixed view using both original taps, before dense inference.
+
+    A full-width view can make the selected person too small for the local
+    model. Retry the union of the original boxes with one body-width of context.
+    Both taps must resolve uniquely in that same view. Never move the crop to
+    chase a lost player, select the nearest person, or relax association gates.
+    """
+    height, width = frames[0]['gray'].shape
+    boxes = [s['box'] for s in seeds]
+    mx, my = max(b['w'] for b in boxes), max(b['h'] for b in boxes)*.7
+    top = max(0, int((min(b['y'] for b in boxes)-my)*height))
+    bottom = min(height, math.ceil((max(b['y']+b['h'] for b in boxes)+my)*height))
+    wide = (0, top, width, bottom)
+    focused = (max(0, int((min(b['x'] for b in boxes)-mx)*width)), top,
+               min(width, math.ceil((max(b['x']+b['w'] for b in boxes)+mx)*width)), bottom)
+    attempts = []
+    for roi in dict.fromkeys((wide, focused)):
+        rows = []
+        for frame in frames:
+            if deadline is not None and time.monotonic() >= deadline:
+                return None, {}, attempts
+            rows.append(detect_frame(frame, roi, segmenter))
+        counts = [len(seed_candidates(d, s['target_point'], f['gray'].shape))
+                  for f, s, d in zip(frames, seeds, rows)]
+        attempts.append({'roi': list(roi), 'owners': counts})
+        if counts == [1, 1]:
+            return roi, {f['media_ms']: d for f, d in zip(frames, rows)}, attempts
+    return None, {}, attempts
+
+
 def transport(previous, current, instance, candidates):
     """Warp for association only; every displayed contour is freshly detected."""
     height, width = previous.shape
@@ -129,9 +166,7 @@ def transport(previous, current, instance, candidates):
 
 
 def follow(frames, detections, seed_index, target):
-    height, width = frames[seed_index]['gray'].shape
-    candidates = [i for i, row in enumerate(detections[seed_index])
-                  if owns(measured_mask(row), [target['x']*width, target['y']*height])]
+    candidates = seed_candidates(detections[seed_index], target, frames[seed_index]['gray'].shape)
     if len(candidates) != 1:
         return {}
     source = candidates[0]
@@ -227,8 +262,10 @@ def agree_segments(frames, detections, paths, observations, seeds):
     return accepted
 
 
-def contour_segments(video, anchors, observations, start, end, *, deadline=None):
+def contour_segments(video, anchors, observations, start, end, *, deadline=None, diagnostics=None):
     """Fail closed if two nearby human taps or a pinned local asset are absent."""
+    diagnostic = diagnostics if diagnostics is not None else {}
+    diagnostic['status'] = 'UNSUPPORTED_INPUT'
     seeds = [a for a in anchors if isinstance(a.get('t'), (int, float))
              and start <= a['t']*1000 <= end and valid_box(a.get('box'))
              and valid_point(a.get('target_point')) and not a.get('player_behind')]
@@ -245,18 +282,32 @@ def contour_segments(video, anchors, observations, start, end, *, deadline=None)
         return []
     from native_player_segmentation import PersonSegmenter
     segmenter = PersonSegmenter()
+    selected_frames = []
+    for seed in (a, b):
+        at = round(seed['t']*1000)
+        candidates = list(read_clip(video, at-25, at+25))
+        if not candidates:
+            diagnostic['status'] = 'SOURCE_FRAME_UNAVAILABLE'
+            return []
+        frame = min(candidates, key=lambda f: abs(f['media_ms']-at))
+        if abs(frame['media_ms']-at) > 25:
+            diagnostic['status'] = 'SOURCE_FRAME_UNAVAILABLE'
+            return []
+        selected_frames.append(frame)
+    roi, seed_rows, attempts = select_seed_view(selected_frames, (a, b), segmenter, deadline=deadline)
+    diagnostic.update(seed_views=attempts, seed_ms=[f['media_ms'] for f in selected_frames])
+    if roi is None:
+        diagnostic['status'] = 'TIME_BUDGET' if deadline is not None and time.monotonic() >= deadline else 'UNRESOLVED_SELECTION'
+        return []
     frames, detections = [], []
     stream = read_clip(video, lo, hi)
     try:
         for frame in stream:
             if deadline is not None and time.monotonic() >= deadline:
+                diagnostic['status'] = 'TIME_BUDGET'
                 return []
-            height, width = frame['gray'].shape
-            boxes = [s['box'] for s in (a,b)]
-            margin = max(box['h'] for box in boxes)*.7
-            roi = (0, max(0, int((min(box['y'] for box in boxes)-margin)*height)), width,
-                   min(height, math.ceil((max(box['y']+box['h'] for box in boxes)+margin)*height)))
-            detections.append(detect_frame(frame, roi, segmenter))
+            cached = seed_rows.get(frame['media_ms'])
+            detections.append(cached if cached is not None else detect_frame(frame, roi, segmenter))
             frame.pop('image')
             frames.append(frame)
     finally:
@@ -267,5 +318,9 @@ def contour_segments(video, anchors, observations, start, end, *, deadline=None)
     if any(abs(frames[i]['media_ms']-s['t']*1000) > 25 for i,s in zip(indices, (a,b))):
         return []
     paths = [follow(frames, detections, i, seed['target_point']) for i,seed in zip(indices, (a,b))]
-    return agree_segments(frames, detections, paths, observations,
-                          [frames[i]['media_ms'] for i in indices])
+    diagnostic.update(path_frames=[len(p) for p in paths],
+                      shared_frames=len(set(paths[0]) & set(paths[1])))
+    segments = agree_segments(frames, detections, paths, observations,
+                              [frames[i]['media_ms'] for i in indices])
+    diagnostic['status'] = 'SUPPORTED_CONTOURS' if segments else 'UNSUPPORTED_CONTINUITY'
+    return segments

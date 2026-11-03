@@ -25,6 +25,7 @@ export function roomFor(comment, fallbackSeconds) {
     ground: point(s.ground) && finite(s.player_width) && s.player_width >= .005 && s.player_width <= .4 ? s.ground : null,
     player_width: s.player_width,
     ball: point(s.ball) ? s.ball : null,
+    ballTrail: s.ball_motion_method === 'BACKGROUND_AFFINE_BALL_ENDPOINTS' && finite(s.ball_motion_start_ms) && s.media_ms > s.ball_motion_start_ms && s.media_ms-s.ball_motion_start_ms <= 300 && raw.samples.some(p => p.media_ms === s.ball_motion_start_ms && p.media_ms >= start && typeof p.frame_id === 'string' && point(p.ball)) && !raw.samples.some(p => finite(p.media_ms) && p.media_ms > s.ball_motion_start_ms && p.media_ms < s.media_ms) && Array.isArray(s.ballTrail) && s.ballTrail.length === 2 && s.ballTrail.every(point) && point(s.ball) && s.ballTrail[1][0] === s.ball[0] && s.ballTrail[1][1] === s.ball[1] ? s.ballTrail : null,
     groundTrail: s.motion_method === 'BACKGROUND_AFFINE_ENDPOINTS' && finite(s.motion_start_ms) && s.media_ms > s.motion_start_ms && s.media_ms-s.motion_start_ms <= 1000 && raw.samples.some(p => p.media_ms === s.motion_start_ms && point(p.ground)) && Array.isArray(s.groundTrail) && s.groundTrail.length === 2 && s.groundTrail.every(point) && point(s.ground) && s.groundTrail[1][0] === s.ground[0] && s.groundTrail[1][1] === s.ground[1] ? s.groundTrail : null,
     motion_start_ms: s.motion_start_ms,
     camera_static_from_previous: s.camera_static_from_previous === true
@@ -48,24 +49,26 @@ export function roomFor(comment, fallbackSeconds) {
   };
 }
 export function graphicsAt(room, mediaMs) {
+  const nearest = rows => rows.reduce((best, s) => Math.abs(s.media_ms-mediaMs) < Math.abs((best?.media_ms ?? Infinity)-mediaMs) ? s : best, null);
+  const sample = nearest(room.samples.filter(s => Math.abs(s.media_ms-mediaMs) <= 60));
+  const previous = sample ? room.samples[room.samples.indexOf(sample)-1] : null;
+  const moves = (a,b) => a && b && Math.hypot(b[0]-a[0],b[1]-a[1]) > .008;
+  const staticPair = sample && previous && sample.camera_static_from_previous && sample.media_ms > previous.media_ms && sample.media_ms-previous.media_ms <= 300;
+  const ballTrail = sample?.ballTrail || (staticPair && moves(previous.ball,sample.ball) ? [previous.ball,sample.ball] : null);
+  const withBall = mark => mark ? {...mark, ballTrail} : ballTrail ? {...sample, ground:null, groundTrail:null, ballTrail} : null;
   // A source-observed endpoint takes precedence over an optical box proxy.
-  const observed = room.samples.find(s => s.groundTrail && Math.abs(s.media_ms-mediaMs) <= 60);
-  if (observed) return {...observed, ballTrail: null, endpointMotion: true};
+  const observed = nearest(room.samples.filter(s => s.groundTrail && Math.abs(s.media_ms-mediaMs) <= 60));
+  if (observed) return withBall({...observed, endpointMotion: true});
   const candidates = (room.tracks || []).filter(rows => mediaMs >= rows[0].media_ms && mediaMs <= rows[rows.length-1].media_ms).map(rows => rows.reduce((a, b) => Math.abs(a.media_ms-mediaMs) <= Math.abs(b.media_ms-mediaMs) ? a : b)).filter(s => Math.abs(s.media_ms-mediaMs) <= (s.contourTrack ? 40 : 60));
   if (candidates.length) {
     const chosen = candidates.sort((a,b) => b.confidence-a.confidence)[0];
     // Competing tap windows must agree; do not choose a nearby teammate by confidence.
-    if (candidates.every(s => Math.hypot(s.ground[0]-chosen.ground[0], s.ground[1]-chosen.ground[1]) <= Math.min(s.player_width, chosen.player_width)*.5)) return chosen;
-    return null;
+    if (candidates.every(s => Math.hypot(s.ground[0]-chosen.ground[0], s.ground[1]-chosen.ground[1]) <= Math.min(s.player_width, chosen.player_width)*.5)) return withBall(chosen);
+    return withBall(null);
   }
   // Brief exact-frame marks; never interpolate across occlusion, camera motion or sparse samples.
-  const sample = room.samples.reduce((best, s) => Math.abs(s.media_ms - mediaMs) < Math.abs((best?.media_ms ?? Infinity) - mediaMs) ? s : best, null);
-  if (!sample || Math.abs(sample.media_ms - mediaMs) > 60) return null;
-  const i = room.samples.indexOf(sample),
-    previous = room.samples[i - 1];
-  const moves = (a,b) => a && b && Math.hypot(b[0]-a[0],b[1]-a[1]) > .008;
-  const ballTrail = moves(previous?.ball,sample.ball) && sample.camera_static_from_previous && sample.media_ms - previous.media_ms <= 300 && sample.media_ms > previous.media_ms ? [previous.ball, sample.ball] : null;
-  const groundTrail = moves(previous?.ground,sample.ground) && sample.camera_static_from_previous && sample.media_ms - previous.media_ms <= 300 && sample.media_ms > previous.media_ms ? [previous.ground, sample.ground] : null;
+  if (!sample) return null;
+  const groundTrail = staticPair && moves(previous.ground,sample.ground) ? [previous.ground, sample.ground] : null;
   return {
     ...sample,
     ballTrail,

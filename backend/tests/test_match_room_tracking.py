@@ -88,7 +88,8 @@ def test_asset_renderer_attaches_event_bound_tracks_without_changing_samples():
            'proof':{'proof_start_ms':1000,'proof_end_ms':1200,'frame_ms':1000,'frame_id':'f'}}
     full={'video_comments':[{'event_id':'e','sequence_event_native':True,'source_video_sha256':'source',
            'evidence_time_ms':1000,'source_frame_id':'f','evidence_id':'proof'}]}
-    enhanced=[{**observations()[0], 'motion_method':'BACKGROUND_AFFINE_ENDPOINTS', 'motion_start_ms':1000, 'groundTrail':[[.4,.59],[.45,.59]]}]
+    enhanced=[{**observations()[0], 'motion_method':'BACKGROUND_AFFINE_ENDPOINTS', 'motion_start_ms':1000, 'groundTrail':[[.4,.59],[.45,.59]]},
+              {'frame_id':'ball-source','media_ms':1200,'ball':[.6,.7],'ball_motion_method':'BACKGROUND_AFFINE_BALL_ENDPOINTS','ball_motion_start_ms':1080,'ballTrail':[[.5,.7],[.6,.7]]}]
     tracks={'e':{'version':1,'event_id':'e','source_video_sha256':'source','segments':[], 'observed_samples':enhanced}}
     with tempfile.TemporaryDirectory() as directory, patch.dict(sys.modules,{'cv2':fake_cv,'video_timebase':fake_time,'media_binaries':types.SimpleNamespace(FFMPEG_BIN='ffmpeg')}), patch.object(tracking,'bounded_tracks',return_value=(tracks,'COMPLETED')) as build, patch.object(subprocess,'run'):
         namespace['render_assets']('video',full,{'source_video_sha256':'source','events':[event]},directory,[{'t':1}])
@@ -97,7 +98,8 @@ def test_asset_renderer_attaches_event_bound_tracks_without_changing_samples():
         assert room['tracking']==tracks['e']
         assert room['samples']==enhanced
         assert event['visual_samples']==observations()
-        assert [s['media_ms'] for s in room['stops']]==[1000,1080]
+        assert [s['media_ms'] for s in room['stops']]==[1000,1080,1200]
+        assert room['stops'][-1]['label']=='Ball movement'
 
 
 def test_endpoint_arrow_removes_camera_pan_and_keeps_player_direction():
@@ -132,3 +134,36 @@ def test_intermediate_camera_failure_does_not_make_endpoint_arrow():
         result=tracking.observed_motion('video',obs)
     assert all('groundTrail' not in row for row in result)
     assert all('groundTrail' not in row for row in obs)
+
+
+def test_ball_endpoints_use_their_own_positions_and_shorter_interval():
+    a={'media_ms':1000,'ground':[.4,.8],'ball':[.6,.7]}
+    b={'media_ms':1200,'ground':[.55,.8],'ball':[.65,.7]}
+    camera=[[1,0,100],[0,1,0],[0,0,1]]
+    assert tracking.endpoint_arrow(a,b,camera,1000,1000)[1][0] > .5
+    tail,tip=tracking.endpoint_arrow(a,b,camera,1000,1000,field='ball',max_gap=300)
+    assert tail == [.7,.7] and tip[0] < tail[0]
+    b['ball']=[.7,.7]
+    assert tracking.endpoint_arrow(a,b,camera,1000,1000,field='ball',max_gap=300) is None
+    b.update(media_ms=1400,ball=[.65,.7])
+    assert tracking.endpoint_arrow(a,b,camera,1000,1000,field='ball',max_gap=300) is None
+    b.update(media_ms=1200); b.pop('ball')
+    assert tracking.endpoint_arrow(a,b,camera,1000,1000,field='ball',max_gap=300) is None
+
+
+def test_ball_only_observations_work_without_player_geometry_and_fail_on_camera_loss():
+    import numpy as np
+    from unittest.mock import patch
+    import player_tracking, motion_compensation, cv2
+    frames=[(t,np.zeros((100,100),dtype=np.uint8),None,None) for t in (1.,1.033,1.067,1.1)]
+    obs=[{'media_ms':1000,'ball':[.6,.7]}, {'media_ms':1100,'ball':[.5,.7]}]
+    cap=type('Cap',(),{'release':lambda self:None})()
+    camera=np.array([[1.,0,0],[0,1.,0]])
+    with patch.object(cv2,'VideoCapture',return_value=cap), patch.object(player_tracking,'_read_window',return_value=frames), patch.object(player_tracking,'_cut_flags',return_value=[False]*4), patch.object(motion_compensation,'estimate_camera',return_value=(camera,20)) as estimate:
+        result=tracking.observed_motion('video',obs)
+        assert result[1]['ballTrail']==[[.6,.7],[.5,.7]]
+        assert result[1]['ball_motion_start_ms']==1000
+        assert 'groundTrail' not in result[1]
+        estimate.side_effect=[(camera,20),(None,'features')]
+        assert all('ballTrail' not in row for row in tracking.observed_motion('video',obs))
+    assert all('ballTrail' not in row for row in obs)

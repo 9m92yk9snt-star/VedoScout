@@ -144,3 +144,30 @@ test('contour samples cannot bridge a long gap or create ball arrows',()=>{
   expect(graphicsAt(contourRoom(contourTracking),10050).ballTrail).toBeNull();
   expect(contourRoom({...contourTracking,segments:[{...contourTracking.segments[0],samples:[...rows.slice(0,2),{...rows[2],media_ms:10200}]}]}).tracks).toEqual([]);
 });
+
+const ballSamples = raw.samples.map((s,i)=>({...s,camera_static_from_previous:false,...(i?{
+  ball_motion_method:'BACKGROUND_AFFINE_BALL_ENDPOINTS',ball_motion_start_ms:10000,
+  ballTrail:[[.65,.7],s.ball]
+}:{})}));
+const ballRoom = (samples=ballSamples, tracking=undefined) => roomFor({...comment,match_room:{...raw,samples,tracking}},10);
+test('camera corrected ball arrow is independent of the player arrow and track',()=>{
+  const samples=ballSamples.map((s,i)=>i?{...s,motion_method:'BACKGROUND_AFFINE_ENDPOINTS',motion_start_ms:10000,groundTrail:[[.4,.8],s.ground]}:s);
+  const mark=graphicsAt(ballRoom(samples),10250);
+  expect(mark.groundTrail).toEqual([[.4,.8],[.45,.8]]);
+  expect(mark.ballTrail).toEqual([[.65,.7],[.6,.7]]);
+  const t={...tracked,segments:[{reference_frame:'s2',samples:[10120,10200,10280].map(media_ms=>({media_ms,ground:[.4,.8],player_width:.06,confidence:.8}))}]};
+  expect(graphicsAt(ballRoom(ballSamples,t),10250).groundProxy).toBe(true);
+  expect(graphicsAt(ballRoom(ballSamples,t),10250).ballTrail).toEqual([[.65,.7],[.6,.7]]);
+  t.segments.push({...t.segments[0],samples:t.segments[0].samples.map(s=>({...s,ground:[.7,.8]}))});
+  expect(graphicsAt(ballRoom(ballSamples,t),10250).ground).toBeNull();
+  expect(graphicsAt(ballRoom(ballSamples,t),10250).ballTrail).toEqual([[.65,.7],[.6,.7]]);
+});
+test('ball endpoint arrows cannot borrow player geometry, skip observations or outlive their source frame',()=>{
+  for (const changes of [{ball_motion_start_ms:9900},{ball_motion_method:'BACKGROUND_AFFINE_ENDPOINTS'},{ballTrail:[[.65,.7],[.2,.3]]}]) {
+    expect(graphicsAt(ballRoom([ballSamples[0],{...ballSamples[1],...changes}]),10250).ballTrail).toBeNull();
+  }
+  expect(graphicsAt(ballRoom([{...ballSamples[0],ball:null},ballSamples[1]]),10250).ballTrail).toBeNull();
+  expect(graphicsAt(ballRoom([ballSamples[0],{frame_id:'missing-ball',media_ms:10120},ballSamples[1]]),10250).ballTrail).toBeNull();
+  expect(graphicsAt(ballRoom(),10320)).toBeNull();
+  expect(graphicsAt(ballRoom([{...ballSamples[0],media_ms:9800},{...ballSamples[1],ball_motion_start_ms:9800}]),10250).ballTrail).toBeNull();
+});

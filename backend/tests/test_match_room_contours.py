@@ -87,3 +87,31 @@ def test_one_tap_or_no_observations_cannot_start_local_model(monkeypatch):
     anchor={'t':1.2,'box':{'x':.3,'y':.3,'w':.2,'h':.4},'target_point':{'x':.4,'y':.4}}
     assert contours.contour_segments('missing',[anchor],[],1000,2000)==[]
     assert contours.contour_segments('missing',[anchor],[{'ground':[.4,.7]}],1000,2000)==[]
+
+
+def test_focused_view_requires_unique_ownership_at_both_original_taps(monkeypatch):
+    frames, detections, _, _, _ = fixture()
+    seeds = [{'target_point': {'x': .375, 'y': .5},
+              'box': {'x': .3, 'y': .2, 'w': .2, 'h': .7}}]*2
+    selected = [frames[0], frames[12]]
+    calls = []
+    def detect(frame, roi, model):
+        calls.append((frame['media_ms'], roi))
+        return [] if roi[0] == 0 else detections[0]
+    monkeypatch.setattr(contours, 'detect_frame', detect)
+    roi, cache, attempts = contours.select_seed_view(selected, seeds, object())
+    assert [a['owners'] for a in attempts] == [[0, 0], [1, 1]]
+    assert roi[0] > 0 and set(cache) == {1000, 1396}
+    assert calls[2][1] == calls[3][1] == roi
+
+
+def test_focused_view_does_not_choose_nearest_or_competing_person(monkeypatch):
+    frames, detections, _, _, _ = fixture()
+    seeds = [{'target_point': {'x': .375, 'y': .5},
+              'box': {'x': .3, 'y': .2, 'w': .2, 'h': .7}}]*2
+    monkeypatch.setattr(contours, 'detect_frame', lambda *args: detections[0]*2)
+    roi, cache, attempts = contours.select_seed_view([frames[0], frames[12]], seeds, object())
+    assert roi is None and cache == {}
+    assert all(a['owners'] == [2, 2] for a in attempts)
+    monkeypatch.setattr(contours, 'detect_frame', lambda *args: (_ for _ in ()).throw(AssertionError('deadline ignored')))
+    assert contours.select_seed_view([frames[0], frames[12]], seeds, object(), deadline=0) == (None, {}, [])

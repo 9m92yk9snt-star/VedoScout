@@ -22,8 +22,9 @@ to the original resets that offset. SVG geometry is fitted to the contained
 video rectangle including letterboxing and responsive resizing. Position marks
 are shown only within 60ms of an observed source frame: no continuous tracking
 or invented animation. Ball-direction arrows join two visible active-ball
-samples only within 300ms and with an explicit static-camera observation. Camera
-pans, zooms, cuts and unseen paths do not receive extrapolated arrows.
+samples only within 300ms, with either an explicit static-camera observation or
+a supported background-affine transform at every intervening source frame.
+These are endpoint displacements, not reconstructed paths or predicted targets.
 
 Old reports without visual samples get the same player and a stop at their
 existing evidence timestamp. Historical coordinates cannot be recovered from
@@ -146,3 +147,55 @@ in direct harnesses (pytest is unavailable in the local runtime). CI includes
 the new contour suite for full pytest execution. Regression checks cover
 conflicting paths, missing contours, source-observation disagreement, visible
 boot changes, packed masks, cuts, absent inputs and timeout checkpoint recovery.
+
+
+## Seed-view recovery and independent ball arrows (2026-11-03, draft)
+
+Before dense inference, both original source taps are checked in the same fixed
+view. If full-width inference misses or ambiguously owns either tap, the worker
+tries the union of the original boxes, padded by one maximum body width. Both
+taps must be uniquely owned in that view. This does not chase a missing player
+or change the optical-flow, competing-instance or two-path agreement gates.
+Exact-PTS seed detections are reused in the dense pass. Diagnostic statuses and
+ownership/path counts are retained in evidence exports.
+
+The 24.633s attack tap has zero owners in the wide view and one in the focused
+view; the second tap has one in both. The resulting first path covers only
+24.633–24.967s (11 frames), and the second 26.300–26.900s (19 frames), with zero
+shared frames. No contour segment is accepted. Visual inspection shows the
+model mixing the selected player's body with a defender during overlap; some
+other frames miss the white player completely. The original confirmed mask also
+contains mixed-player pixels. Resolving point ownership alone is therefore NOT
+a solution to this duel. Tight-crop and existing MobileSAM diagnostic probes
+also failed to isolate the player consistently; neither is used to relax gates.
+No new model asset, dependency or paid model request is introduced.
+
+Ball displacement now has its own source coordinates, maximum 300ms interval,
+method and earlier-frame reference. The same measured camera transform may be
+used, but player displacement is never copied to the ball. The actor and ball
+endpoint bands are excluded from background estimation. A failed intermediate
+camera transform, cut, missing ball endpoint or intervening observation without
+a ball prevents an arrow. The frontend checks same-event/source binding and
+keeps a valid ball arrow independently of player contours or competing player
+tracks. The last supported ball endpoint may add one Ball movement pause.
+
+Real-source rerun: Orman600 remains 66/67 contour frames (15.83s); Orman700
+remains 67/67 (16.10s). The attack remains unsupported for continuous contours
+(15.23s), with the existing five-frame optical fallback only. These are total
+graphics-worker times, not full report processing times.
+
+All nine source ball observations were visually checked against the actual
+ball. Only the Orman700 8.200–8.400s interval meets the short-gap requirement.
+Its six intermediate background transforms all succeed; an aligned-frame
+comparison shows the pitch markings coincide and the ball moves slightly up
+and right in the current view. The large raw leftward screen shift is primarily
+camera motion. One independent ball endpoint arrow is produced at 8.400s;
+Orman600 and the separate attack receive none. This verifies one short interval,
+not general ball tracking or hidden trajectories.
+
+Local validation: 30 backend functions and 16 frontend model tests pass in
+direct harnesses, plus Python compilation and diff checks. New checks cover
+fixed-view ownership, ambiguous taps, deadlines, independent ball/player
+direction, camera loss, missing ball observations, source binding, conflicting
+player tracks and the additional ball pause. PR remains draft; continuous duel
+coverage and live authenticated playback are unresolved.
