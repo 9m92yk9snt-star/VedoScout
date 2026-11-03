@@ -1,0 +1,936 @@
+{
+  "purpose": "Review-only continuous presentation through a source occlusion and fall; not production tracking.",
+  "source_sha256": "db97b9dc0e2cda68f6c4619405270006e7ab31eeb44e73bd7ed432b1a8d0de38",
+  "preview_source_ms": [
+    16100,
+    17700
+  ],
+  "bridge_source_ms": [
+    16367,
+    17100
+  ],
+  "bridge_inputs": {
+    "media_ms": [
+      16367,
+      16400,
+      16433,
+      16467,
+      16500,
+      16533,
+      16567,
+      16600,
+      16633,
+      16667,
+      16700,
+      16733,
+      16767,
+      16800,
+      16833,
+      16867,
+      16900,
+      16933,
+      16967,
+      17000,
+      17033,
+      17067,
+      17100
+    ],
+    "camera_from_reference": [
+      [
+        [
+          1.1694196009387958,
+          -0.007291049230761793,
+          372.7270326854219
+        ],
+        [
+          0.007291049230761786,
+          1.1694196009387965,
+          -76.82274460760279
+        ],
+        [
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      [
+        [
+          1.1750306654398177,
+          -0.007296182349901758,
+          377.9613661320568
+        ],
+        [
+          0.007296182349901751,
+          1.1750306654398184,
+          -76.70194192299516
+        ],
+        [
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      [
+        [
+          1.1810615873474615,
+          -0.007566258097182616,
+          385.76279498759646
+        ],
+        [
+          0.007566258097182609,
+          1.1810615873474621,
+          -75.70434424640047
+        ],
+        [
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      [
+        [
+          1.1864079375237122,
+          -0.007612644098597497,
+          390.6002112260278
+        ],
+        [
+          0.00761264409859749,
+          1.1864079375237129,
+          -75.97789858725864
+        ],
+        [
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      [
+        [
+          1.1913642075529467,
+          -0.007647403046916056,
+          395.1950600815251
+        ],
+        [
+          0.007647403046916048,
+          1.1913642075529474,
+          -76.13661298469108
+        ],
+        [
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      [
+        [
+          1.1965790626197856,
+          -0.007780292841229488,
+          399.7833121160918
+        ],
+        [
+          0.007780292841229481,
+          1.1965790626197863,
+          -76.8540034216359
+        ],
+        [
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      [
+        [
+          1.2011683095884353,
+          -0.0075861575160061515,
+          403.7607145875759
+        ],
+        [
+          0.0075861575160061446,
+          1.201168309588436,
+          -77.14239326880039
+        ],
+        [
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      [
+        [
+          1.2063141607337542,
+          -0.007624682401377561,
+          409.5852427214195
+        ],
+        [
+          0.007624682401377554,
+          1.2063141607337549,
+          -77.50120303376588
+        ],
+        [
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      [
+        [
+          1.2111043831178971,
+          -0.007699588852949656,
+          413.591331970611
+        ],
+        [
+          0.007699588852949649,
+          1.2111043831178978,
+          -78.82757820903817
+        ],
+        [
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      [
+        [
+          1.215859346413402,
+          -0.007616685354236857,
+          417.04104400486085
+        ],
+        [
+          0.0076166853542368506,
+          1.2158593464134029,
+          -79.98647842986391
+        ],
+        [
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      [
+        [
+          1.2207763743828055,
+          -0.00757448797197521,
+          420.61928970491965
+        ],
+        [
+          0.007574487971975204,
+          1.2207763743828064,
+          -81.41296348148879
+        ],
+        [
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      [
+        [
+          1.225231998724709,
+          -0.007526144206094944,
+          423.8837435177306
+        ],
+        [
+          0.007526144206094939,
+          1.2252319987247098,
+          -82.59774449400253
+        ],
+        [
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      [
+        [
+          1.2301866121683458,
+          -0.007751758561141181,
+          429.09360325971323
+        ],
+        [
+          0.007751758561141176,
+          1.2301866121683467,
+          -84.57528433455754
+        ],
+        [
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      [
+        [
+          1.2344835040676987,
+          -0.008025232558976022,
+          432.38951615588985
+        ],
+        [
+          0.008025232558976015,
+          1.2344835040676994,
+          -86.46775893846218
+        ],
+        [
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      [
+        [
+          1.2389420430331186,
+          -0.008341802518497312,
+          435.7424813433916
+        ],
+        [
+          0.008341802518497305,
+          1.2389420430331195,
+          -88.52158833424535
+        ],
+        [
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      [
+        [
+          1.2433249295693987,
+          -0.008209712314897966,
+          438.6224479404847
+        ],
+        [
+          0.00820971231489796,
+          1.2433249295693996,
+          -91.08249663701855
+        ],
+        [
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      [
+        [
+          1.2473846618112527,
+          -0.008321147983765273,
+          441.20392710601965
+        ],
+        [
+          0.008321147983765266,
+          1.2473846618112536,
+          -93.04399067099887
+        ],
+        [
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      [
+        [
+          1.2520574212026534,
+          -0.009063738198738699,
+          445.9765853368959
+        ],
+        [
+          0.00906373819873869,
+          1.2520574212026543,
+          -96.29198497466824
+        ],
+        [
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      [
+        [
+          1.2563471982737158,
+          -0.009387528208767702,
+          448.7868941099031
+        ],
+        [
+          0.009387528208767693,
+          1.2563471982737167,
+          -98.94889488869029
+        ],
+        [
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      [
+        [
+          1.2606230319155427,
+          -0.009882343055751985,
+          451.72646034899253
+        ],
+        [
+          0.009882343055751976,
+          1.2606230319155436,
+          -101.77038815893118
+        ],
+        [
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      [
+        [
+          1.264708953457037,
+          -0.010090180794264771,
+          454.39192230115873
+        ],
+        [
+          0.01009018079426476,
+          1.264708953457038,
+          -104.81961040467307
+        ],
+        [
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      [
+        [
+          1.2689185643344767,
+          -0.010573487001829682,
+          457.2167749909401
+        ],
+        [
+          0.010573487001829671,
+          1.2689185643344776,
+          -108.16075442395318
+        ],
+        [
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      [
+        [
+          1.272670042723663,
+          -0.010916575180602054,
+          460.75109904863547
+        ],
+        [
+          0.010916575180602043,
+          1.272670042723664,
+          -111.91617256461979
+        ],
+        [
+          0.0,
+          0.0,
+          1.0
+        ]
+      ]
+    ],
+    "stable_start": [
+      -56.86105852452287,
+      699.3903147687882
+    ],
+    "stable_end": [
+      -191.38297294576978,
+      700.6607582174825
+    ],
+    "incoming_per_ms": [
+      -0.27738847258371996,
+      -0.03675930439274439
+    ],
+    "outgoing_per_ms": [
+      -0.017109903100971248,
+      0.0033245663131317507
+    ]
+  },
+  "bridge_result": {
+    "kind": "REVIEW_ONLY_CAMERA_SPACE_DISPLAY",
+    "samples": [
+      {
+        "media_ms": 16367,
+        "display_position_px": [
+          301.1333071002196,
+          740.6434214127573
+        ],
+        "display_estimated": false,
+        "source_ground_observation": false
+      },
+      {
+        "media_ms": 16400,
+        "display_position_px": [
+          295.3318801129032,
+          744.6249971367712
+        ],
+        "display_estimated": true,
+        "source_ground_observation": false
+      },
+      {
+        "media_ms": 16433,
+        "display_position_px": [
+          291.8875655965975,
+          749.7642685204182
+        ],
+        "display_estimated": true,
+        "source_ground_observation": false
+      },
+      {
+        "media_ms": 16467,
+        "display_position_px": [
+          285.4110742776384,
+          753.1735712840085
+        ],
+        "display_estimated": true,
+        "source_ground_observation": false
+      },
+      {
+        "media_ms": 16500,
+        "display_position_px": [
+          279.14276443348916,
+          756.4345353083681
+        ],
+        "display_estimated": true,
+        "source_ground_observation": false
+      },
+      {
+        "media_ms": 16533,
+        "display_position_px": [
+          272.90238169021865,
+          759.3150961040802
+        ],
+        "display_estimated": true,
+        "source_ground_observation": false
+      },
+      {
+        "media_ms": 16567,
+        "display_position_px": [
+          266.2114656629931,
+          762.2282596017474
+        ],
+        "display_estimated": true,
+        "source_ground_observation": false
+      },
+      {
+        "media_ms": 16600,
+        "display_position_px": [
+          261.65849370579645,
+          765.4454557063839
+        ],
+        "display_estimated": true,
+        "source_ground_observation": false
+      },
+      {
+        "media_ms": 16633,
+        "display_position_px": [
+          255.54871894546574,
+          767.4497767313624
+        ],
+        "display_estimated": true,
+        "source_ground_observation": false
+      },
+      {
+        "media_ms": 16667,
+        "display_position_px": [
+          249.01296233412222,
+          769.6258068522974
+        ],
+        "display_estimated": true,
+        "source_ground_observation": false
+      },
+      {
+        "media_ms": 16700,
+        "display_position_px": [
+          243.16545126719214,
+          771.6524388912254
+        ],
+        "display_estimated": true,
+        "source_ground_observation": false
+      },
+      {
+        "media_ms": 16733,
+        "display_position_px": [
+          237.4435160387256,
+          773.6087531820328
+        ],
+        "display_estimated": true,
+        "source_ground_observation": false
+      },
+      {
+        "media_ms": 16767,
+        "display_position_px": [
+          233.57903223975114,
+          775.0902237003812
+        ],
+        "display_estimated": true,
+        "source_ground_observation": false
+      },
+      {
+        "media_ms": 16800,
+        "display_position_px": [
+          228.5699354325143,
+          776.1951632165067
+        ],
+        "display_estimated": true,
+        "source_ground_observation": false
+      },
+      {
+        "media_ms": 16833,
+        "display_position_px": [
+          224.06063898010376,
+          777.2516649729889
+        ],
+        "display_estimated": true,
+        "source_ground_observation": false
+      },
+      {
+        "media_ms": 16867,
+        "display_position_px": [
+          219.76227636260606,
+          777.8338183750518
+        ],
+        "display_estimated": true,
+        "source_ground_observation": false
+      },
+      {
+        "media_ms": 16900,
+        "display_position_px": [
+          215.83737516599032,
+          778.7568605560155
+        ],
+        "display_estimated": true,
+        "source_ground_observation": false
+      },
+      {
+        "media_ms": 16933,
+        "display_position_px": [
+          214.18174144249662,
+          778.7189218696689
+        ],
+        "display_estimated": true,
+        "source_ground_observation": false
+      },
+      {
+        "media_ms": 16967,
+        "display_position_px": [
+          211.4745465393656,
+          779.0893989202759
+        ],
+        "display_estimated": true,
+        "source_ground_observation": false
+      },
+      {
+        "media_ms": 17000,
+        "display_position_px": [
+          209.6399413664939,
+          779.2613388679864
+        ],
+        "display_estimated": true,
+        "source_ground_observation": false
+      },
+      {
+        "media_ms": 17033,
+        "display_position_px": [
+          208.5297825312496,
+          779.1367768748779
+        ],
+        "display_estimated": true,
+        "source_ground_observation": false
+      },
+      {
+        "media_ms": 17067,
+        "display_position_px": [
+          208.12087123939875,
+          778.7703068305633
+        ],
+        "display_estimated": true,
+        "source_ground_observation": false
+      },
+      {
+        "media_ms": 17100,
+        "display_position_px": [
+          209.5349068499822,
+          777.7045379183687
+        ],
+        "display_estimated": false,
+        "source_ground_observation": false
+      }
+    ],
+    "report_identity_approved": false
+  },
+  "camera_intervals": 73,
+  "minimum_camera_inliers": 199,
+  "presentation": {
+    "visible_fragment_smoothing": "Three-sample median in stabilized camera coordinates, capped at 4 source pixels.",
+    "bridge": "733ms camera-space monotone cubic; uses visible-fragment tangents and reviewed endpoint positions.",
+    "prone_endpoint": "Measured lower visible body silhouette used as a presentation contact proxy, not a foot measurement.",
+    "depth": "Fresh full-frame source person silhouettes for each of 49 preview frames; no propagated masks.",
+    "missing_foreground_frames_freshly_inferred": 20,
+    "constant_ring_opacity": true,
+    "visible_source_frames": 49,
+    "minimum_ring_visible_fraction": 0.47057124972343445,
+    "visibility_metrics": [
+      {
+        "ms": 16100,
+        "ring_visible_fraction": 0.7867055535316467,
+        "estimated": false
+      },
+      {
+        "ms": 16133,
+        "ring_visible_fraction": 0.8445228934288025,
+        "estimated": false
+      },
+      {
+        "ms": 16167,
+        "ring_visible_fraction": 0.9035823345184326,
+        "estimated": false
+      },
+      {
+        "ms": 16200,
+        "ring_visible_fraction": 0.8970757126808167,
+        "estimated": false
+      },
+      {
+        "ms": 16233,
+        "ring_visible_fraction": 0.8986830711364746,
+        "estimated": false
+      },
+      {
+        "ms": 16267,
+        "ring_visible_fraction": 0.9413209557533264,
+        "estimated": false
+      },
+      {
+        "ms": 16300,
+        "ring_visible_fraction": 0.951271116733551,
+        "estimated": false
+      },
+      {
+        "ms": 16333,
+        "ring_visible_fraction": 0.8806657791137695,
+        "estimated": false
+      },
+      {
+        "ms": 16367,
+        "ring_visible_fraction": 0.7340291142463684,
+        "estimated": false
+      },
+      {
+        "ms": 16400,
+        "ring_visible_fraction": 0.7578622698783875,
+        "estimated": true
+      },
+      {
+        "ms": 16433,
+        "ring_visible_fraction": 0.8199360966682434,
+        "estimated": true
+      },
+      {
+        "ms": 16467,
+        "ring_visible_fraction": 0.6750651001930237,
+        "estimated": true
+      },
+      {
+        "ms": 16500,
+        "ring_visible_fraction": 0.8532570600509644,
+        "estimated": true
+      },
+      {
+        "ms": 16533,
+        "ring_visible_fraction": 0.8877834677696228,
+        "estimated": true
+      },
+      {
+        "ms": 16567,
+        "ring_visible_fraction": 0.9012001156806946,
+        "estimated": true
+      },
+      {
+        "ms": 16600,
+        "ring_visible_fraction": 0.8429615497589111,
+        "estimated": true
+      },
+      {
+        "ms": 16633,
+        "ring_visible_fraction": 0.669070839881897,
+        "estimated": true
+      },
+      {
+        "ms": 16667,
+        "ring_visible_fraction": 0.5195826888084412,
+        "estimated": true
+      },
+      {
+        "ms": 16700,
+        "ring_visible_fraction": 0.47057124972343445,
+        "estimated": true
+      },
+      {
+        "ms": 16733,
+        "ring_visible_fraction": 0.6170028448104858,
+        "estimated": true
+      },
+      {
+        "ms": 16767,
+        "ring_visible_fraction": 0.7362444400787354,
+        "estimated": true
+      },
+      {
+        "ms": 16800,
+        "ring_visible_fraction": 0.8343134522438049,
+        "estimated": true
+      },
+      {
+        "ms": 16833,
+        "ring_visible_fraction": 0.7947525382041931,
+        "estimated": true
+      },
+      {
+        "ms": 16867,
+        "ring_visible_fraction": 0.7518954873085022,
+        "estimated": true
+      },
+      {
+        "ms": 16900,
+        "ring_visible_fraction": 0.704617440700531,
+        "estimated": true
+      },
+      {
+        "ms": 16933,
+        "ring_visible_fraction": 0.6425057053565979,
+        "estimated": true
+      },
+      {
+        "ms": 16967,
+        "ring_visible_fraction": 0.6340113282203674,
+        "estimated": true
+      },
+      {
+        "ms": 17000,
+        "ring_visible_fraction": 0.5092093348503113,
+        "estimated": true
+      },
+      {
+        "ms": 17033,
+        "ring_visible_fraction": 0.7025493383407593,
+        "estimated": true
+      },
+      {
+        "ms": 17067,
+        "ring_visible_fraction": 0.7232158780097961,
+        "estimated": true
+      },
+      {
+        "ms": 17100,
+        "ring_visible_fraction": 0.4991563856601715,
+        "estimated": false
+      },
+      {
+        "ms": 17133,
+        "ring_visible_fraction": 0.4851473867893219,
+        "estimated": false
+      },
+      {
+        "ms": 17167,
+        "ring_visible_fraction": 0.48630592226982117,
+        "estimated": false
+      },
+      {
+        "ms": 17200,
+        "ring_visible_fraction": 0.49787378311157227,
+        "estimated": false
+      },
+      {
+        "ms": 17233,
+        "ring_visible_fraction": 0.5035370588302612,
+        "estimated": false
+      },
+      {
+        "ms": 17267,
+        "ring_visible_fraction": 0.5283363461494446,
+        "estimated": false
+      },
+      {
+        "ms": 17300,
+        "ring_visible_fraction": 0.5430741310119629,
+        "estimated": false
+      },
+      {
+        "ms": 17333,
+        "ring_visible_fraction": 0.5140765905380249,
+        "estimated": false
+      },
+      {
+        "ms": 17367,
+        "ring_visible_fraction": 0.5201592445373535,
+        "estimated": false
+      },
+      {
+        "ms": 17400,
+        "ring_visible_fraction": 0.7456891536712646,
+        "estimated": false
+      },
+      {
+        "ms": 17433,
+        "ring_visible_fraction": 0.5181224346160889,
+        "estimated": false
+      },
+      {
+        "ms": 17467,
+        "ring_visible_fraction": 0.5307965874671936,
+        "estimated": false
+      },
+      {
+        "ms": 17500,
+        "ring_visible_fraction": 0.7448543310165405,
+        "estimated": false
+      },
+      {
+        "ms": 17533,
+        "ring_visible_fraction": 0.5157948732376099,
+        "estimated": false
+      },
+      {
+        "ms": 17567,
+        "ring_visible_fraction": 0.578923225402832,
+        "estimated": false
+      },
+      {
+        "ms": 17600,
+        "ring_visible_fraction": 0.5990443229675293,
+        "estimated": false
+      },
+      {
+        "ms": 17633,
+        "ring_visible_fraction": 0.6055265665054321,
+        "estimated": false
+      },
+      {
+        "ms": 17667,
+        "ring_visible_fraction": 0.6172493100166321,
+        "estimated": false
+      },
+      {
+        "ms": 17700,
+        "ring_visible_fraction": 0.5839372873306274,
+        "estimated": false
+      }
+    ]
+  },
+  "preview": {
+    "filename": "MatchRoom_fald_visuel_proeve.mp4",
+    "sha256": "95c2dffc2c2391a03afed0826ddcb1314e2eb2a5289e5f5deceba25a57dbb928",
+    "codec": "H.264 yuv420p faststart",
+    "frames": 147,
+    "fps": 30,
+    "duration_seconds": 4.9,
+    "playback": "One source-speed pass then one half-speed pass, labelled."
+  },
+  "limitations": [
+    "The endpoints/fragments were selected in offline source review, not produced by a new end-to-end report worker.",
+    "The hidden path is a visual estimate; no exact concealed foot location is established.",
+    "The standing-to-prone presentation changes the shadow to the visible body-contact proxy; it does not add source foot observations.",
+    "No production frontend/backend changes; its 200ms supported-contour display limit remains unchanged.",
+    "No independent match validation, live playback test, merge or deployment."
+  ]
+}
