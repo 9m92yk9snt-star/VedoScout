@@ -11,5 +11,16 @@
   "report_modified": false,
   "artifact_sha256": "7008ee82efbcd47b469b950d26ef22f4f5c980057c5e0a50e26670f4235f052c",
   "limitation": "Focused request omitted source context between original tap at 3.083 seconds and timeline at 30.015 seconds. All 42 player identities were explicitly uncertain. Do not use its ball positions to imply a verified selected-player kick.",
-  "next_probe": "Include chronological source-only identity context; retain explicit uncertainty across cuts and competing players."
+  "next_probe": "Earlier existing report duel 966c91c7243829d6fab0 with the same original tap; goal identity remains unverified.",
+  "context_probe": {
+    "run_id": 41723802064,
+    "head_sha": "0f4547d1ddea9f8295e3b4a6528eec825a1e3c8e",
+    "artifact_sha256": "feaa0a2f114000adf7555494d16fa955158471683781fcc29198c389d9b314d3",
+    "identity_context_frames": 54,
+    "timeline_frames": 42,
+    "confirmed_player_positions": 0,
+    "confirmed_ball_positions": 22,
+    "status": "IDENTITY_UNRESOLVED_AFTER_CONTEXT_CUT",
+    "report_modified": false
+  }
 }

@@ -45,16 +45,18 @@ def validate(raw, frames):
 
 
 def main():
-    ap=argparse.ArgumentParser();ap.add_argument('--report',type=Path,required=True);ap.add_argument('--work',type=Path,required=True);ap.add_argument('--run-model',action='store_true');args=ap.parse_args()
+    ap=argparse.ArgumentParser();ap.add_argument('--report',type=Path,required=True);ap.add_argument('--work',type=Path,required=True);ap.add_argument('--run-model',action='store_true');ap.add_argument('--event-id');ap.add_argument('--sample-ms',type=int,default=83);args=ap.parse_args()
+    if not 33 <= args.sample_ms <= 125:raise ValueError('BOUNDED_SAMPLE_INTERVAL_REQUIRED')
     doc=pilot.read_json(args.report)
     if doc.get('full_report_status')!='ready':raise ValueError('READY_REPORT_REQUIRED')
     video,selection=prepare(Path(__file__).resolve().parents[2]/'testdata/sequence-pilot-orman400',args.work)
     bundle=doc['canonical_events']; source=pilot.digest(video)
     if source!=bundle['source_video_sha256'] or selection['raw_marker_anchors']!=doc['raw_marker_anchors']:raise ValueError('SOURCE_SELECTION_MISMATCH')
-    row=doc['full_report']['video_comments'][0]
+    rows=doc['full_report']['video_comments']
+    row=next(r for r in rows if r['event_id']==args.event_id) if args.event_id else rows[0]
     event=next(e for e in bundle['events'] if e['event_id']==row['event_id'])
     lo=max(0,event['proof']['proof_start_ms']-750);hi=event['proof']['proof_end_ms']+750
-    if hi-lo>5000:raise ValueError('FOCUSED_WINDOW_REQUIRED')
+    if hi-lo>7000:raise ValueError('FOCUSED_WINDOW_REQUIRED')
     cap=cv2.VideoCapture(str(video));items=[{'type':'text','text':PROMPT}];frames=[]
     def image(ms,name, max_edge=1920, quality=75):
         ok,pixels,actual=read_frame_at(cap,ms/1000)
@@ -72,7 +74,7 @@ def main():
     for i,ms in enumerate(range(first_tap,lo,500)):
         f=image(ms,'context-'+str(i),max_edge=960,quality=75);context.append(f)
         items += [{'type':'text','text':'IDENTITY CONTEXT (not an output row) '+json.dumps({'frame':f['frame_id'],'media_ms':f['media_ms']})},{'type':'image','path':f['path'],'sha256':f['sha256']}]
-    times=sorted(set(list(range(lo,hi+1,83))+list(event['proof']['cited_frames'].values())+[hi]));seen=set()
+    times=sorted(set(list(range(lo,hi+1,args.sample_ms))+list(event['proof']['cited_frames'].values())+[hi]));seen=set()
     for i,ms in enumerate(times):
         f=image(ms,'timeline-'+str(i))
         if f['frame_id'] in seen:continue

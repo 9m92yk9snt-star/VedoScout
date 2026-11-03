@@ -14,7 +14,7 @@ jobs:
       github.event.pull_request.draft == true &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.event.pull_request.head.ref == 'codex/matchroom-graphics' &&
-      github.event.before == 'e6b90c8d546d8b2f16362130929823c4e19b550d' &&
+      github.event.before == '0f4547d1ddea9f8295e3b4a6528eec825a1e3c8e' &&
       github.run_attempt == 1
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -26,6 +26,11 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /backend/
+            !/backend/models/
+            /testdata/sequence-pilot-orman400/
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -43,10 +48,10 @@ jobs:
           run-id: 41715224954
           github-token: ${{ github.token }}
           path: ${{ runner.temp }}/previous-single-tap
-      - name: Observe positions in the first finalized report clip
+      - name: Observe the earlier report duel before the distant camera cut
         env:
           EMERGENT_LLM_KEY: ${{ secrets.EMERGENT_LLM_KEY }}
-        run: python -u backend/scripts/probe_report_positions.py --report "$RUNNER_TEMP/previous-single-tap/single-tap-report/report-document.json" --work "$RUNNER_TEMP/single-tap-input" --run-model
+        run: python -u backend/scripts/probe_report_positions.py --report "$RUNNER_TEMP/previous-single-tap/single-tap-report/report-document.json" --work "$RUNNER_TEMP/single-tap-input" --event-id 966c91c7243829d6fab0 --sample-ms 125 --run-model
       - name: Preserve report, source-bound graphics and model receipts
         if: always()
         uses: actions/upload-artifact@v4
