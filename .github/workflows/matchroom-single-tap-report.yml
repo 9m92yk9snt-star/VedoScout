@@ -14,7 +14,7 @@ jobs:
       github.event.pull_request.draft == true &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.event.pull_request.head.ref == 'codex/matchroom-graphics' &&
-      github.event.before == '23ff5ae9d066f6061f1e5047112c794ec67979d3' &&
+      github.event.before == '1e41aa3a3f201c284bcbf4c3834dd7d7a9ae401e' &&
       github.run_attempt == 1
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -31,19 +31,19 @@ jobs:
           python-version: '3.12'
       - name: Prepare video and existing model dependencies
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq ffmpeg
+          sudo apt-get -o Acquire::Retries=1 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 update -qq
+          sudo apt-get -o Acquire::Retries=1 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 install -y -qq ffmpeg
           python -m pip install 'numpy<3' 'opencv-python-headless<5' 'Pillow>=10,<15' 'onnxruntime>=1.20,<2' 'python-dotenv>=1,<2' 'pytest>=8,<10'
       - name: Verify bounded source requests before model calls
         run: python -m pytest backend/tests/test_sequence_request_windows.py backend/tests/test_sequence_pilot.py -q
       - name: Restore the unchanged-request checkpoint
         uses: actions/download-artifact@v4
         with:
-          name: matchroom-single-tap-report-41709092613
-          run-id: 41709092613
+          name: matchroom-single-tap-report-41711757873
+          run-id: 41711757873
           github-token: ${{ github.token }}
           path: ${{ runner.temp }}/previous-single-tap
-      - name: Recover the missing exact request and finish the report
+      - name: Complete the two remaining contact requests and finish the report
         env:
           EMERGENT_LLM_KEY: ${{ secrets.EMERGENT_LLM_KEY }}
         run: python -u backend/scripts/run_matchroom_single_tap_trial.py --work "$RUNNER_TEMP/single-tap-input" --output "$RUNNER_TEMP/single-tap-report" --retry-document "$RUNNER_TEMP/previous-single-tap/single-tap-report/report-document.json" --recover-missing
