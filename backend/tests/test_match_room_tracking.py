@@ -98,7 +98,7 @@ def test_asset_renderer_attaches_event_bound_tracks_without_changing_samples():
         assert room['tracking']==tracks['e']
         assert room['samples']==enhanced
         assert event['visual_samples']==observations()
-        assert [s['media_ms'] for s in room['stops']]==[1000,1080,1200]
+        assert [s['media_ms'] for s in room['stops']]==[1000,1200]
         assert room['stops'][-1]['label']=='Ball movement'
 
 

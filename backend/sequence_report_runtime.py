@@ -412,13 +412,6 @@ def render_assets(video, full, bundle, directory, anchors=None):
             observed = tracked.get("observed_samples")
             if isinstance(observed, list):
                 row["match_room"]["samples"] = observed
-                arrows = [s for s in observed if s.get("motion_method") == "BACKGROUND_AFFINE_ENDPOINTS"]
-                if arrows and event.get("canonical_action_type") in {"DRIBBLE", "CARRY"}:
-                    focus = arrows[-1]
-                    stops = row["match_room"]["stops"]
-                    if not any(abs(s["media_ms"]-focus["media_ms"]) <= 60 for s in stops):
-                        stops.append({"media_ms": focus["media_ms"], "label": "Movement", "phase": "action"})
-                        stops.sort(key=lambda s: s["media_ms"])
                 ball_arrows = [s for s in observed if s.get("ball_motion_method") == "BACKGROUND_AFFINE_BALL_ENDPOINTS"]
                 if ball_arrows:
                     focus = ball_arrows[-1]

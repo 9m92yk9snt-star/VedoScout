@@ -199,3 +199,14 @@ fixed-view ownership, ambiguous taps, deadlines, independent ball/player
 direction, camera loss, missing ball observations, source binding, conflicting
 player tracks and the additional ball pause. PR remains draft; continuous duel
 coverage and live authenticated playback are unresolved.
+
+
+## Display direction clarification
+
+The player is represented only by the green stance glow. Player-displacement
+arrows are no longer rendered, and asset generation no longer adds a pause
+solely for a player-displacement arrow. Existing analysis/contact/outcome stops
+remain. Arrows are reserved for observed ball movement and supported passes.
+The validated 200ms ball displacement is not evidence of an entire pass to a
+receiver: longer pass arrows still require source-bound release/arrival evidence.
+Earlier preview videos showing a dashed player arrow predate this correction.
