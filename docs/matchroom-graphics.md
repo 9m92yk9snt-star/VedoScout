@@ -363,3 +363,12 @@ The pinned 109,312,538-byte public model is bundled in fourteen checksum-verifie
 parts. Model reconstruction remains local and atomic; serving performs no model
 download. The one-shot bundling workflow only copies the previously tested model
 artifact into this draft branch and verifies its exact SHA before committing it.
+
+The two-clip replay (turn, duplicate turn card, duel) completed in 34.371s and
+returned both tracks; the duplicate card did not cause another run. The original
+turn retained its normal contour method. Details, original source checksum,
+worker payload and wrong-player results are in `matchroom-duel-validation.json`.
+`scripts/matchroom_tracking_probe.py` replays the actual bounded worker with
+explicit source-checked local video, anchors and events. The observations in this
+review came from the existing review fixture; it does not establish new automatic
+provider extraction, unrelated-match accuracy or live-site behavior.

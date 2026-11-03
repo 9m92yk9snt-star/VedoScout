@@ -1,0 +1,519 @@
+{
+  "scope": "Real-source local graphics worker and frontend adapter; not a live-site upload",
+  "source_sha256": "db97b9dc0e2cda68f6c4619405270006e7ab31eeb44e73bd7ed432b1a8d0de38",
+  "model_sha256": "20877569fcfc4744855b1d6d05b0cd7031987ae31894af5c7e1e74328d18e653",
+  "single_worker_seconds": 19.55442637098895,
+  "two_distinct_clips_plus_duplicate_card_seconds": 34.371404297009576,
+  "negative_controls": [
+    {
+      "first": 4,
+      "last": 2,
+      "accepted": true,
+      "paths": [
+        30,
+        23
+      ],
+      "shared": 16
+    },
+    {
+      "first": 0,
+      "last": 2,
+      "accepted": false,
+      "paths": [
+        1,
+        1
+      ],
+      "shared": 0
+    },
+    {
+      "first": 1,
+      "last": 2,
+      "accepted": false,
+      "paths": [
+        1,
+        1
+      ],
+      "shared": 0
+    },
+    {
+      "first": 2,
+      "last": 2,
+      "accepted": false,
+      "paths": [
+        1,
+        1
+      ],
+      "shared": 0
+    },
+    {
+      "first": 3,
+      "last": 2,
+      "accepted": false,
+      "paths": [
+        1,
+        1
+      ],
+      "shared": 0
+    },
+    {
+      "first": 5,
+      "last": 2,
+      "accepted": false,
+      "paths": [
+        3,
+        22
+      ],
+      "shared": 0
+    },
+    {
+      "first": 4,
+      "last": 0,
+      "accepted": false,
+      "paths": [
+        1,
+        1
+      ],
+      "shared": 0
+    },
+    {
+      "first": 4,
+      "last": 1,
+      "accepted": false,
+      "paths": [
+        1,
+        1
+      ],
+      "shared": 0
+    },
+    {
+      "first": 4,
+      "last": 3,
+      "accepted": false,
+      "paths": [
+        6,
+        2
+      ],
+      "shared": 0
+    },
+    {
+      "first": 4,
+      "last": 4,
+      "accepted": false,
+      "paths": [
+        2,
+        1
+      ],
+      "shared": 0
+    },
+    {
+      "first": 4,
+      "last": 5,
+      "accepted": false,
+      "paths": [
+        1,
+        1
+      ],
+      "shared": 0
+    },
+    {
+      "first": 4,
+      "last": 6,
+      "accepted": false,
+      "paths": [
+        1,
+        1
+      ],
+      "shared": 0
+    }
+  ],
+  "continuous_frontend_checks": 387,
+  "duel_tracking": {
+    "version": 1,
+    "source_video_sha256": "db97b9dc0e2cda68f6c4619405270006e7ab31eeb44e73bd7ed432b1a8d0de38",
+    "event_id": "duel-integration",
+    "method": "TAP_REACQUIRED_INSTANCE_CONTOUR",
+    "segments": [
+      {
+        "id": "reacquired:0",
+        "reference_frame": "human-mask-24.63",
+        "identity_reference_frames": [
+          "human-mask-24.63",
+          "human-mask-26.57"
+        ],
+        "seed_ms": [
+          24633,
+          26567
+        ],
+        "overlap_frames": 16,
+        "ground_method": "LOWER_VISIBLE_CONTOUR",
+        "presentation_gap_ms": 200,
+        "samples": [
+          {
+            "media_ms": 24633,
+            "ground": [
+              0.6180555555555556,
+              0.56328125
+            ],
+            "player_width": 0.07555555555555557,
+            "confidence": 0.6762085556983948
+          },
+          {
+            "media_ms": 24700,
+            "ground": [
+              0.6277777777777778,
+              0.5625
+            ],
+            "player_width": 0.0788888888888889,
+            "confidence": 0.8225414156913757
+          },
+          {
+            "media_ms": 24900,
+            "ground": [
+              0.5986111111111111,
+              0.5796875
+            ],
+            "player_width": 0.08333333333333333,
+            "confidence": 0.7249786853790283
+          },
+          {
+            "media_ms": 24967,
+            "ground": [
+              0.5729166666666666,
+              0.559375
+            ],
+            "player_width": 0.06888888888888889,
+            "confidence": 0.6612898111343384
+          },
+          {
+            "media_ms": 25000,
+            "ground": [
+              0.5652777777777778,
+              0.56875
+            ],
+            "player_width": 0.08,
+            "confidence": 0.664874792098999
+          },
+          {
+            "media_ms": 25200,
+            "ground": [
+              0.5486111111111112,
+              0.56875
+            ],
+            "player_width": 0.0788888888888889,
+            "confidence": 0.6547351479530334
+          },
+          {
+            "media_ms": 25267,
+            "ground": [
+              0.50625,
+              0.56484375
+            ],
+            "player_width": 0.0788888888888889,
+            "confidence": 0.6064474582672119
+          },
+          {
+            "media_ms": 25367,
+            "ground": [
+              0.4736111111111111,
+              0.56015625
+            ],
+            "player_width": 0.08222222222222222,
+            "confidence": 0.7284507155418396
+          },
+          {
+            "media_ms": 25400,
+            "ground": [
+              0.5069444444444444,
+              0.55703125
+            ],
+            "player_width": 0.08222222222222222,
+            "confidence": 0.8122273087501526
+          },
+          {
+            "media_ms": 25433,
+            "ground": [
+              0.5041666666666667,
+              0.55625
+            ],
+            "player_width": 0.0838888888888889,
+            "confidence": 0.879421591758728
+          },
+          {
+            "media_ms": 25467,
+            "ground": [
+              0.5,
+              0.55390625
+            ],
+            "player_width": 0.08555555555555555,
+            "confidence": 0.8710394501686096
+          },
+          {
+            "media_ms": 25500,
+            "ground": [
+              0.4979166666666667,
+              0.553125
+            ],
+            "player_width": 0.08722222222222223,
+            "confidence": 0.8869321942329407
+          },
+          {
+            "media_ms": 25533,
+            "ground": [
+              0.49583333333333335,
+              0.55078125
+            ],
+            "player_width": 0.08722222222222223,
+            "confidence": 0.8576288223266602
+          },
+          {
+            "media_ms": 25567,
+            "ground": [
+              0.4486111111111111,
+              0.5484375
+            ],
+            "player_width": 0.08833333333333333,
+            "confidence": 0.8382559418678284
+          },
+          {
+            "media_ms": 25600,
+            "ground": [
+              0.48819444444444443,
+              0.5453125
+            ],
+            "player_width": 0.08722222222222223,
+            "confidence": 0.858928918838501
+          },
+          {
+            "media_ms": 25633,
+            "ground": [
+              0.475,
+              0.5390625
+            ],
+            "player_width": 0.085,
+            "confidence": 0.8277392983436584
+          },
+          {
+            "media_ms": 25667,
+            "ground": [
+              0.4111111111111111,
+              0.53515625
+            ],
+            "player_width": 0.08,
+            "confidence": 0.814969003200531
+          },
+          {
+            "media_ms": 25733,
+            "ground": [
+              0.3729166666666667,
+              0.525
+            ],
+            "player_width": 0.08055555555555556,
+            "confidence": 0.6867873668670654
+          },
+          {
+            "media_ms": 25867,
+            "ground": [
+              0.37430555555555556,
+              0.53046875
+            ],
+            "player_width": 0.08555555555555555,
+            "confidence": 0.8692536354064941
+          },
+          {
+            "media_ms": 25933,
+            "ground": [
+              0.40347222222222223,
+              0.5296875
+            ],
+            "player_width": 0.08222222222222222,
+            "confidence": 0.869268536567688
+          },
+          {
+            "media_ms": 25967,
+            "ground": [
+              0.45555555555555555,
+              0.528125
+            ],
+            "player_width": 0.08,
+            "confidence": 0.7411008477210999
+          },
+          {
+            "media_ms": 26000,
+            "ground": [
+              0.45694444444444443,
+              0.5265625
+            ],
+            "player_width": 0.07944444444444444,
+            "confidence": 0.8481766581535339
+          },
+          {
+            "media_ms": 26033,
+            "ground": [
+              0.4534722222222222,
+              0.525
+            ],
+            "player_width": 0.08444444444444445,
+            "confidence": 0.7436878085136414
+          },
+          {
+            "media_ms": 26100,
+            "ground": [
+              0.43819444444444444,
+              0.52265625
+            ],
+            "player_width": 0.08555555555555555,
+            "confidence": 0.7114821076393127
+          },
+          {
+            "media_ms": 26167,
+            "ground": [
+              0.42916666666666664,
+              0.52265625
+            ],
+            "player_width": 0.08166666666666668,
+            "confidence": 0.7472932934761047
+          },
+          {
+            "media_ms": 26200,
+            "ground": [
+              0.42083333333333334,
+              0.52109375
+            ],
+            "player_width": 0.08222222222222222,
+            "confidence": 0.6616193056106567
+          },
+          {
+            "media_ms": 26300,
+            "ground": [
+              0.43125,
+              0.51953125
+            ],
+            "player_width": 0.08222222222222222,
+            "confidence": 0.5866105556488037
+          },
+          {
+            "media_ms": 26367,
+            "ground": [
+              0.4270833333333333,
+              0.51796875
+            ],
+            "player_width": 0.08333333333333333,
+            "confidence": 0.8553770184516907
+          },
+          {
+            "media_ms": 26433,
+            "ground": [
+              0.4284722222222222,
+              0.5171875
+            ],
+            "player_width": 0.08333333333333333,
+            "confidence": 0.908137321472168
+          },
+          {
+            "media_ms": 26500,
+            "ground": [
+              0.42430555555555555,
+              0.51484375
+            ],
+            "player_width": 0.08444444444444445,
+            "confidence": 0.9038565754890442
+          },
+          {
+            "media_ms": 26567,
+            "ground": [
+              0.41597222222222224,
+              0.514453125
+            ],
+            "player_width": 0.08333333333333333,
+            "confidence": 0.8851777911186218
+          }
+        ]
+      }
+    ],
+    "observed_samples": [
+      {
+        "media_ms": 24630,
+        "frame_id": "human-mask-24.63",
+        "ground": [
+          0.6214941697761194,
+          0.5633370180348258
+        ],
+        "player_width": 0.1389
+      },
+      {
+        "media_ms": 26570,
+        "frame_id": "human-mask-26.57",
+        "ground": [
+          0.4027718424479167,
+          0.5161096598307291
+        ],
+        "player_width": 0.0833
+      }
+    ],
+    "contour_diagnostics": {
+      "status": "SUPPORTED_REACQUIRED_CONTOURS",
+      "seed_views": [
+        {
+          "roi": [
+            0,
+            384,
+            720,
+            846
+          ],
+          "owners": [
+            0,
+            1
+          ]
+        },
+        {
+          "roi": [
+            170,
+            384,
+            565,
+            846
+          ],
+          "owners": [
+            1,
+            1
+          ]
+        }
+      ],
+      "seed_ms": [
+        24633,
+        26567
+      ],
+      "reacquisition_views": [
+        {
+          "roi": [
+            0,
+            384,
+            720,
+            846
+          ],
+          "owners": [
+            1,
+            1
+          ]
+        }
+      ],
+      "reacquisition_paths": [
+        30,
+        23
+      ],
+      "shared_frames": 16,
+      "small_frames": 44,
+      "large_frames": 7,
+      "method": "TAP_REACQUIRED_INSTANCE_CONTOUR"
+    }
+  },
+  "two_clip_methods": {
+    "turn": "TAP_BIDIRECTIONAL_INSTANCE_CONTOUR",
+    "holdout": "TAP_REACQUIRED_INSTANCE_CONTOUR"
+  },
+  "limits": [
+    "Same-source controls do not establish general accuracy.",
+    "Original anchors and review source observations were reused; this is not a new model-provider report run.",
+    "Independent unrelated-match and live-site validation remain pending.",
+    "Worst-case graphics bound is eight distinct clips at 25 seconds each."
+  ]
+}
