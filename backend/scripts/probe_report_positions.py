@@ -12,6 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import cv2
 import sequence_pilot as pilot
 import sequence_pilot_transport as transport
+from match_room_position_evidence import selection_digest, bound_samples
 from video_timebase import read_frame_at
 from scripts.run_matchroom_single_tap_trial import prepare
 
@@ -82,7 +83,7 @@ def main():
         items += [{'type':'text','text':'TIMELINE '+json.dumps({'frame':f['frame_id'],'media_ms':f['media_ms']})},{'type':'image','path':f['path'],'sha256':f['sha256']}]
     cap.release()
     _,_,request=transport.build_request('emergent','gpt-6-astra',items,reasoning_effort='medium',image_detail='high',max_output_tokens=12000)
-    output={'source_video_sha256':source,'event_id':event['event_id'],'human_tap_count':1,'frames':frames,'identity_context':context,'request':request,'prompt':PROMPT,'reviewed_positions_supplied':False,'report_modified':False,'status':'PREFLIGHT_ONLY'}
+    output={'source_video_sha256':source,'original_selection_values_sha256':selection_digest(selection),'event_id':event['event_id'],'human_tap_count':1,'frames':frames,'identity_context':context,'request':request,'prompt':PROMPT,'reviewed_positions_supplied':False,'report_modified':False,'status':'PREFLIGHT_ONLY'}
     pilot.write_json(args.work/'positions-result.json',output)
     print(json.dumps({'frames':len(frames),'payload_bytes':request['payload_bytes'],'event_id':event['event_id']}),flush=True)
     if args.run_model:
@@ -90,7 +91,9 @@ def main():
         output['receipt']=receipt;output['status']='MODEL_REQUEST_FAILED'
         pilot.write_json(args.work/'positions-result.json',output)
         if receipt.get('status')!='COMPLETED':raise RuntimeError('POSITION_REQUEST_FAILED')
-        output['observations']=validate(receipt['raw_response'],frames);output['status']='OBSERVATIONS_RETURNED_NOT_VISUALLY_VERIFIED'
+        output['observations']=validate(receipt['raw_response'],frames)
+        output['bound_samples']=bound_samples(event,selection,output,validate)
+        output['status']='OBSERVATIONS_RETURNED_NOT_VISUALLY_VERIFIED'
         pilot.write_json(args.work/'positions-result.json',output)
         print(json.dumps({'status':output['status'],'ground_samples':sum(r.get('ground') is not None for r in output['observations']),'ball_samples':sum(r.get('ball') is not None for r in output['observations'])}))
 
