@@ -334,3 +334,32 @@ limit. Measured endpoints and stored coordinates remain unchanged; no ball data 
 interpolated. Competing tracks still suppress a conflicting marker. This transfers
 the continuous movement behavior, not the offline duel model or its missing-identity
 bridges. Full automatic duel integration remains pending.
+
+### Adaptive reacquisition integration
+
+The difficult duel now has a runtime path: a failed normal wide-view tap triggers
+the checksum-pinned larger segmenter, adaptive sparse inference and bounded
+feature/motion association. Both original taps must resolve and agree with their
+source observations. Two independently seeded paths must agree on shared source
+frames; a path must reach both exact selections. The frontend requires both
+identity-reference frame IDs, matched to the original tap times. Middle stance
+samples remain fresh lower contours. Only the display bridges short gaps.
+
+A fresh owned-worker run on the original Orman600 duel completed in 19.554s and
+returned one 31-sample segment from 24.633–26.567s. The actual returned payload
+passed the frontend adapter and supplied continuous marks at 387 checked display
+instants. The integrated associator accepted the correct pair and rejected all
+11 wrong-player controls on stored source detections. This is still one duel,
+not independent match validation or a live-site playback test.
+
+Distinct clips now receive separate sequential children, each hard-limited to
+25s. Repeated report cards for the same event share one result. At most eight
+unique clips run, so worst-case graphics time is 200s; earlier clips no longer
+consume every later clip's budget. This is a deliberate increase from the old
+25s aggregate limit. No paid provider request is added. Total upload latency and
+behavior on unrelated matches still require live validation.
+
+The pinned 109,312,538-byte public model is bundled in fourteen checksum-verified
+parts. Model reconstruction remains local and atomic; serving performs no model
+download. The one-shot bundling workflow only copies the previously tested model
+artifact into this draft branch and verifies its exact SHA before committing it.

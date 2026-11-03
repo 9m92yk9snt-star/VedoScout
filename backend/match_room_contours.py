@@ -300,6 +300,19 @@ def contour_segments(video, anchors, observations, start, end, *, deadline=None,
         selected_frames.append(frame)
     roi, seed_rows, attempts = select_seed_view(selected_frames, (a, b), segmenter, deadline=deadline)
     diagnostic.update(seed_views=attempts, seed_ms=[f['media_ms'] for f in selected_frames])
+    # Spend the stronger model budget only when the normal wide-view tap failed.
+    if attempts and attempts[0]['owners'] != [1, 1]:
+        try:
+            from match_room_reacquisition import reacquire, METHOD as REACQUIRED_METHOD
+            recovered = reacquire(video, (a,b), observations, segmenter, roi or tuple(attempts[-1]['roi']), deadline, diagnostic)
+            if recovered:
+                diagnostic.update(status='SUPPORTED_REACQUIRED_CONTOURS', method=REACQUIRED_METHOD)
+                return recovered
+        except TimeoutError:
+            diagnostic['status'] = 'TIME_BUDGET'
+            return []
+        except (OSError, ValueError):
+            diagnostic['reacquisition_status'] = 'ASSET_OR_INPUT_UNAVAILABLE'
     if roi is None:
         diagnostic['status'] = 'TIME_BUDGET' if deadline is not None and time.monotonic() >= deadline else 'UNRESOLVED_SELECTION'
         return []

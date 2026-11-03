@@ -44,11 +44,13 @@ export function roomFor(comment, fallbackSeconds) {
     camera_static_from_previous: s.camera_static_from_previous === true
   })).sort((a, b) => a.media_ms - b.media_ms) : [];
   const tracking = raw?.tracking;
-  const tracks = bound && tracking?.version === 1 && tracking.event_id === raw.event_id && tracking.source_video_sha256 === raw.source_video_sha256 && ["TAP_OPTICAL_GROUND_PROXY", "TAP_BIDIRECTIONAL_INSTANCE_CONTOUR"].includes(tracking.method) && Array.isArray(tracking.segments)
+  const tracks = bound && tracking?.version === 1 && tracking.event_id === raw.event_id && tracking.source_video_sha256 === raw.source_video_sha256 && ["TAP_OPTICAL_GROUND_PROXY", "TAP_BIDIRECTIONAL_INSTANCE_CONTOUR", "TAP_REACQUIRED_INSTANCE_CONTOUR"].includes(tracking.method) && Array.isArray(tracking.segments)
     ? tracking.segments.slice(0, 32).flatMap(segment => {
       if (!Array.isArray(segment.samples) || typeof segment.reference_frame !== "string") return [];
-      const contour = tracking.method === "TAP_BIDIRECTIONAL_INSTANCE_CONTOUR";
+      const contour = tracking.method !== "TAP_OPTICAL_GROUND_PROXY";
+      const reacquired = tracking.method === "TAP_REACQUIRED_INSTANCE_CONTOUR";
       if (contour && (segment.ground_method !== "LOWER_VISIBLE_CONTOUR" || !samples.some(s => s.frame_id === segment.reference_frame) || !Array.isArray(segment.seed_ms) || segment.seed_ms.length !== 2 || !segment.seed_ms.every(t => finite(t) && t >= start && t <= end) || segment.seed_ms[1]-segment.seed_ms[0] < 150 || segment.seed_ms[1]-segment.seed_ms[0] > 2500 || !finite(segment.overlap_frames) || segment.overlap_frames < 5)) return [];
+      if (reacquired && (!Array.isArray(segment.identity_reference_frames) || segment.identity_reference_frames.length !== 2 || new Set(segment.identity_reference_frames).size !== 2 || !segment.identity_reference_frames.every((id,i) => samples.some(s => s.frame_id === id && s.ground && Math.abs(s.media_ms-segment.seed_ms[i]) <= 40)))) return [];
       const rows = segment.samples.slice(0, 100).filter(s => finite(s.media_ms) && s.media_ms >= start && s.media_ms <= end && point(s.ground) && finite(s.player_width) && s.player_width >= .005 && s.player_width <= .4 && finite(s.confidence) && s.confidence >= .55);
       if (rows.length !== segment.samples.length || rows.length < 3 || rows.some((s, i) => i > 0 && (s.media_ms <= rows[i-1].media_ms || s.media_ms - rows[i-1].media_ms > (contour ? (segment.presentation_gap_ms === 200 ? 200 : 75) : 120)))) return [];
       return [rows.map((s, i) => ({...s, player_width: rows.slice(Math.max(0, i-2), i+3).map(r => r.player_width).sort((a,b) => a-b)[Math.floor(rows.slice(Math.max(0, i-2), i+3).length/2)], groundProxy: !contour, contourTrack: contour, ballTrail: null, groundTrail: i > 0 && s.motion_from_ms === rows[i-1].media_ms && Array.isArray(s.groundTrail) && s.groundTrail.length === 2 && s.groundTrail.every(point) && s.groundTrail[1][0] === s.ground[0] && s.groundTrail[1][1] === s.ground[1] ? s.groundTrail : null}))];

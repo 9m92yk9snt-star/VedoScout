@@ -11,7 +11,7 @@ from pathlib import Path
 import tempfile
 
 MAX_PART_BYTES = 8 * 1024 * 1024
-MAX_MODEL_BYTES = 64 * 1024 * 1024
+MAX_MODEL_BYTES = 128 * 1024 * 1024
 
 
 def ensure_model_asset(path, expected_sha256):
@@ -26,7 +26,7 @@ def ensure_model_asset(path, expected_sha256):
         record = manifest["assets"][path.name]
         if (manifest.get("version") != 1 or record["sha256"] != expected_sha256
                 or not 0 < record["bytes"] <= MAX_MODEL_BYTES
-                or not 1 <= len(record["parts"]) <= 8):
+                or not 1 <= len(record["parts"]) <= 16):
             raise ValueError("Invalid player model bundle")
     except (OSError, KeyError, TypeError, json.JSONDecodeError) as exc:
         raise ValueError("Player model bundle unavailable") from exc
@@ -64,3 +64,4 @@ def ensure_model_asset(path, expected_sha256):
         if temporary is not None:
             temporary.unlink(missing_ok=True)
     return path
+

@@ -229,3 +229,10 @@ test('extended display gaps require explicit identity-continuity permission',()=
  expect(graphicsAt(room,10100).ground).toEqual([.4,.8]);
  expect(make({...segment,presentation_gap_ms:200,samples:segment.samples.map((s,i)=>i===2?{...s,media_ms:10234}:s)}).tracks).toEqual([]);
 });
+
+test('reacquired tracks need both source-bound identity references',()=>{
+ const segment={reference_frame:'s1',identity_reference_frames:['s1','s2'],ground_method:'LOWER_VISIBLE_CONTOUR',seed_ms:[10000,10250],overlap_frames:5,presentation_gap_ms:200,samples:[10000,10125,10250].map(media_ms=>({media_ms,ground:[.4,.8],player_width:.06,confidence:.9}))};
+ const make=s=>roomFor({...comment,match_room:{...raw,tracking:{version:1,event_id:'e1',source_video_sha256:'source',method:'TAP_REACQUIRED_INSTANCE_CONTOUR',segments:[s]}}},10);
+ expect(graphicsAt(make(segment),10100).ground).toEqual([.4,.8]);
+ for(const refs of [undefined,['s1'],['s1','s1'],['s1','missing'],['s2','s1']])expect(make({...segment,identity_reference_frames:refs}).tracks).toEqual([]);
+});

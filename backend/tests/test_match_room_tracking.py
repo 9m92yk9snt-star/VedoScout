@@ -197,3 +197,14 @@ def test_foreground_includes_people_not_ball_and_preserves_offset():
     assert len(polygons) == 1
     assert all(0 <= x <= 1 and .2 <= y <= .8 for x, y in polygons[0])
     assert foreground_polygons(rows[1:], 80, 100, 20) is None
+
+
+def test_distinct_clips_have_separate_budgets_and_duplicate_cards_share_results(monkeypatch):
+    calls=[]
+    def run(video,anchors,events):
+        calls.append(events[0]['event_id'])
+        return {events[0]['event_id']:{'segments':[]}},'COMPLETED'
+    monkeypatch.setattr(tracking,'_bounded_event',run)
+    a={'event_id':'a','visual_samples':[{}]};b={'event_id':'b','visual_samples':[{}]}
+    result,status=tracking.bounded_tracks('video',[{'t':1}],[a,a,b,a,b])
+    assert calls==['a','b'] and set(result)=={'a','b'} and status=='COMPLETED'

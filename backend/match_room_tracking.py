@@ -294,7 +294,7 @@ def compute(video, anchors, events, checkpoint=None):
             diagnostic['status'] = 'CONTOUR_UNAVAILABLE'
         result['contour_diagnostics'] = diagnostic
         if contours:
-            result.update(method=METHOD, segments=contours)
+            result.update(method=diagnostic.get('method', METHOD), segments=contours)
             save()
             continue
         seeds = [a for a in anchors if finite(a.get('t')) and start-1500 <= a['t']*1000 <= end+1500]
@@ -316,7 +316,7 @@ def compute(video, anchors, events, checkpoint=None):
     return output
 
 
-def bounded_tracks(video, anchors, events):
+def _bounded_event(video, anchors, events):
     """One owned child, hard wall-clock bound; failure keeps sparse graphics."""
     if not anchors or not any(e.get('visual_samples') for e in events):
         return {}, 'NO_TRACK_INPUT'
@@ -337,6 +337,35 @@ def bounded_tracks(video, anchors, events):
             return {}, 'TRACKING_UNAVAILABLE'
         except (subprocess.SubprocessError, OSError, ValueError):
             return {}, 'TRACKING_UNAVAILABLE'
+
+
+def bounded_tracks(video, anchors, events):
+    """One bounded child per distinct clip; repeated report cards share results.
+
+    At most MAX_EVENTS sequential children, each hard-limited to TIMEOUT_S.
+    A difficult earlier clip cannot consume a later clip's inference budget.
+    """
+    if not anchors or not any(e.get('visual_samples') for e in events):
+        return {}, 'NO_TRACK_INPUT'
+    unique,seen = [],set()
+    for index,event in enumerate(events):
+        key = event.get('event_id') or f'input:{index}'
+        if key in seen or not event.get('visual_samples'):
+            continue
+        seen.add(key)
+        unique.append(event)
+        if len(unique) >= MAX_EVENTS:
+            break
+    output,statuses = {},[]
+    for event in unique:
+        result,status = _bounded_event(video,anchors,[event])
+        output.update(result)
+        statuses.append(status)
+    if all(s == 'COMPLETED' for s in statuses):
+        return output,'COMPLETED'
+    if len(statuses) == 1:
+        return output,statuses[0]
+    return output,'PARTIAL_TIMEOUT' if 'PARTIAL_TIMEOUT' in statuses else 'TRACKING_PARTIAL'
 
 
 if __name__ == '__main__':

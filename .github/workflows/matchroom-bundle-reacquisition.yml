@@ -1,0 +1,57 @@
+name: Bundle pinned Match Room reacquisition model
+on:
+  pull_request:
+    types: [synchronize]
+    paths: ['.github/workflows/matchroom-bundle-reacquisition.yml']
+permissions:
+  contents: write
+  actions: read
+jobs:
+  bundle:
+    if: >-
+      github.repository == '9m92yk9snt-star/VedoScout' &&
+      github.event.pull_request.number == 55 &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.head.ref == 'codex/matchroom-graphics' &&
+      github.event.before == '84f54827fba68e2c054fdb22bb81e9b2b512a059' &&
+      github.run_attempt == 1
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: matchroom-larger-segmenter
+          run-id: 41649936327
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/pinned-model
+      - name: Verify and split the previously tested public model
+        env:
+          MODEL_DIR: ${{ runner.temp }}/pinned-model
+        run: |
+          python - <<'PY'
+          import os,pathlib,hashlib,json
+          name='yolov8m-seg.onnx'
+          data=(pathlib.Path(os.environ['MODEL_DIR'])/name).read_bytes()
+          digest='20877569fcfc4744855b1d6d05b0cd7031987ae31894af5c7e1e74328d18e653'
+          assert len(data)==109312538 and hashlib.sha256(data).hexdigest()==digest
+          folder=pathlib.Path('backend/models/segmentation-assets')
+          manifest=json.loads((folder/'manifest.json').read_text())
+          assert manifest['version']==1 and name not in manifest['assets']
+          parts=[]
+          for i,offset in enumerate(range(0,len(data),8*1024*1024),1):
+              part=data[offset:offset+8*1024*1024];filename=f'{name}.part{i:03d}'
+              (folder/filename).write_bytes(part)
+              parts.append({'file':filename,'bytes':len(part),'sha256':hashlib.sha256(part).hexdigest()})
+          manifest['assets'][name]={'bytes':len(data),'sha256':digest,'parts':parts}
+          (folder/'manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')
+          PY
+      - name: Commit verified assets to the existing draft branch
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add backend/models/segmentation-assets/manifest.json backend/models/segmentation-assets/yolov8m-seg.onnx.part*
+          git commit -m 'Bundle checksum-pinned Match Room reacquisition model'
+          git push origin HEAD:codex/matchroom-graphics
