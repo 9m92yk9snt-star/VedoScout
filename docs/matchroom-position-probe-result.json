@@ -30,7 +30,7 @@
     "reason": "no_visible_person",
     "visual_review": "The saved positive point lies beside the white player at the decoded source frame and nearby frames. No correction was invented."
   },
-  "next_trial": "One bounded exact-checkpoint resume after waiting, to distinguish a transient 429 from persistent model-access failure; no completed requests repeated.",
+  "next_trial": "Blocked on provider model access. No further model calls scheduled. When access works, resume only the three missing requests from run 41727716774 with original tap index 4 and unchanged source/prompt/code request hashes; then complete reviews/writer/assets and visually verify graphics.",
   "early_duel_probe": {
     "run_id": 41724654161,
     "status": "NOT_STARTED",
@@ -55,5 +55,23 @@
     "writer_calls": 0,
     "proof_clips": 0,
     "ui_flow_exercised": false
+  },
+  "visible_selection_resume": {
+    "run_id": 41727716774,
+    "head_sha": "2660c0aa91855010eede3041a98a1c00f472df27",
+    "artifact_sha256": "381acbcd3b1e1b2de15ec7ea140e513ff03c61ee19ae580969f55fc7685d960f",
+    "status": "FAILED_PROVIDER_429_AGAIN",
+    "validated_reused_receipts": 7,
+    "new_completed_receipts": 0,
+    "missing_packet_ids": [
+      "sequence_006",
+      "sequence_008",
+      "sequence_010"
+    ],
+    "limit_kind": "UNSPECIFIED",
+    "transport_rate_limit_retry_count": 1,
+    "ready_report": false,
+    "graphics_verified": false,
+    "retained_retry_validated_locally": true
   }
 }
