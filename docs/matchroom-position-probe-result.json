@@ -30,15 +30,30 @@
     "reason": "no_visible_person",
     "visual_review": "The saved positive point lies beside the white player at the decoded source frame and nearby frames. No correction was invented."
   },
-  "next_trial": {
-    "selection": "Exactly original anchor index 4 at 21.48 seconds, with its existing original mask; other nine anchors excluded",
-    "selection_validation": "Existing local person suggestion resolves the point; direct source review agrees the point lies on the white player",
-    "fresh_report_required": true,
-    "reuse_old_model_receipts": false
-  },
+  "next_trial": "One bounded exact-checkpoint resume after waiting, to distinguish a transient 429 from persistent model-access failure; no completed requests repeated.",
   "early_duel_probe": {
     "run_id": 41724654161,
     "status": "NOT_STARTED",
     "reason": "Sparse checkout omitted docs/examples fixtures, failing 18 setup tests. Full checkout restored; no model call occurred."
+  },
+  "visible_selection_fresh_report": {
+    "run_id": 41725039296,
+    "head_sha": "666cea71db92dacab61c9da55719bccac3505020",
+    "artifact_sha256": "aa993e8e706619a2ddd34f7003b6a7d533d27f70d346d4845d890ab0064231da",
+    "status": "FAILED_PROVIDER_429",
+    "duration_seconds": 747.015,
+    "initial_completed": 7,
+    "initial_total": 10,
+    "missing_packet_ids": [
+      "sequence_006",
+      "sequence_008",
+      "sequence_010"
+    ],
+    "limit_kind": "UNSPECIFIED",
+    "report_ready": false,
+    "retained_retry_validated_locally": true,
+    "writer_calls": 0,
+    "proof_clips": 0,
+    "ui_flow_exercised": false
   }
 }
