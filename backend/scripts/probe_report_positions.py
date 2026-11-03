@@ -15,7 +15,7 @@ import sequence_pilot_transport as transport
 from video_timebase import read_frame_at
 from scripts.run_matchroom_single_tap_trial import prepare
 
-PROMPT = '''Locate the SAME physical player selected by the original human point in the reference image. Reference images identify a person, not an action. Examine the full timeline independently; never transfer identity to a nearby teammate, recipient or scorer. A jersey number alone, proximity to the ball or the expected role is insufficient when conflicting people are visible.
+PROMPT = '''Locate the SAME physical player selected by the original human point in the reference image. Reference images identify a person, not an action. Use the chronological identity-context images to test continuity from the original tap to the output timeline. These context images contain no extra selections. If a cut, disappearance or competing appearance prevents re-identification, keep identity uncertain; never assume the next highlighted player is the target. Output rows only for TIMELINE images. Examine the full timeline independently; never transfer identity to a nearby teammate, recipient or scorer. A jersey number alone, proximity to the ball or the expected role is insufficient when conflicting people are visible.
 Return JSON {"frames":[...]} with exactly one row for EVERY supplied timeline frame, in order. Each row: {"frame":"source frame ID","target_status":"CONFIRMED|UNCERTAIN|ABSENT","identity_evidence":"visible reason for this decision","feet_visible":true|false,"ground":[x,y] or null,"box":[x,y,w,h] or null,"active_ball_status":"CONFIRMED|UNCERTAIN|ABSENT","ball":[x,y] or null}.
 Coordinates are normalized in the full uncropped source image. Ground is the observed contact with the pitch under the selected player's feet, never an estimated hidden point or the midpoint of a falling body. Box encloses the selected visible person only. When feet are hidden ground must be null. Confirm identity after occlusion only from visible continuity/appearance excluding competing players. If uncertain, target_status=UNCERTAIN and ground/box=null. Do not interpolate or invent positions through a duel, fall, cut or occlusion. Confirm the active ball only when distinguishable from spare balls and other objects; otherwise ball=null. Do not predict where a kick will go. Report all missing observations explicitly. No result, scores, prior positions or expected motion are provided.'''
 
@@ -56,15 +56,22 @@ def main():
     lo=max(0,event['proof']['proof_start_ms']-750);hi=event['proof']['proof_end_ms']+750
     if hi-lo>5000:raise ValueError('FOCUSED_WINDOW_REQUIRED')
     cap=cv2.VideoCapture(str(video));items=[{'type':'text','text':PROMPT}];frames=[]
-    def image(ms,name):
+    def image(ms,name, max_edge=1920, quality=75):
         ok,pixels,actual=read_frame_at(cap,ms/1000)
         if not ok:raise ValueError('SOURCE_FRAME_UNAVAILABLE')
-        scale=min(1,1920/max(pixels.shape[:2]))
+        scale=min(1,max_edge/max(pixels.shape[:2]))
         if scale<1:pixels=cv2.resize(pixels,(round(pixels.shape[1]*scale),round(pixels.shape[0]*scale)),interpolation=cv2.INTER_AREA)
-        path=args.work/(name+'.jpg');cv2.imwrite(str(path),pixels,[cv2.IMWRITE_JPEG_QUALITY,85])
+        path=args.work/(name+'.jpg');cv2.imwrite(str(path),pixels,[cv2.IMWRITE_JPEG_QUALITY,quality])
         return {'frame_id':'s'+str(round(actual*1000)).zfill(9),'media_ms':round(actual*1000),'path':str(path),'sha256':pilot.digest(path)}
     for tap in pilot.original_taps(selection):
-        f=image(tap['requested_ms'],tap['reference_id']);items += [{'type':'text','text':'ORIGINAL HUMAN IDENTITY REFERENCE '+json.dumps({'frame':f['frame_id'],'point':tap['target_point'],'box':tap['box']})},{'type':'image','path':f['path'],'sha256':f['sha256']}]
+        f=image(tap['requested_ms'],tap['reference_id'],quality=85);items += [{'type':'text','text':'ORIGINAL HUMAN IDENTITY REFERENCE '+json.dumps({'frame':f['frame_id'],'point':tap['target_point'],'box':tap['box']})},{'type':'image','path':f['path'],'sha256':f['sha256']}]
+    # Source-only continuity context; never treat a model box as a human tap.
+    context=[]
+    first_tap=min(t['requested_ms'] for t in pilot.original_taps(selection))
+    if lo-first_tap>35000:raise ValueError('BOUNDED_IDENTITY_CONTEXT_REQUIRED')
+    for i,ms in enumerate(range(first_tap,lo,500)):
+        f=image(ms,'context-'+str(i),max_edge=960,quality=75);context.append(f)
+        items += [{'type':'text','text':'IDENTITY CONTEXT (not an output row) '+json.dumps({'frame':f['frame_id'],'media_ms':f['media_ms']})},{'type':'image','path':f['path'],'sha256':f['sha256']}]
     times=sorted(set(list(range(lo,hi+1,83))+list(event['proof']['cited_frames'].values())+[hi]));seen=set()
     for i,ms in enumerate(times):
         f=image(ms,'timeline-'+str(i))
@@ -73,7 +80,7 @@ def main():
         items += [{'type':'text','text':'TIMELINE '+json.dumps({'frame':f['frame_id'],'media_ms':f['media_ms']})},{'type':'image','path':f['path'],'sha256':f['sha256']}]
     cap.release()
     _,_,request=transport.build_request('emergent','gpt-6-astra',items,reasoning_effort='medium',image_detail='high',max_output_tokens=12000)
-    output={'source_video_sha256':source,'event_id':event['event_id'],'human_tap_count':1,'frames':frames,'request':request,'prompt':PROMPT,'reviewed_positions_supplied':False,'report_modified':False,'status':'PREFLIGHT_ONLY'}
+    output={'source_video_sha256':source,'event_id':event['event_id'],'human_tap_count':1,'frames':frames,'identity_context':context,'request':request,'prompt':PROMPT,'reviewed_positions_supplied':False,'report_modified':False,'status':'PREFLIGHT_ONLY'}
     pilot.write_json(args.work/'positions-result.json',output)
     print(json.dumps({'frames':len(frames),'payload_bytes':request['payload_bytes'],'event_id':event['event_id']}),flush=True)
     if args.run_model:

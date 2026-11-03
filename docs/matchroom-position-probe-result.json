@@ -1,0 +1,15 @@
+{
+  "run_id": 41723094476,
+  "head_sha": "e6b90c8d546d8b2f16362130929823c4e19b550d",
+  "source_video_sha256": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+  "event_id": "af1adf2eedeff72ce905",
+  "human_tap_count": 1,
+  "timeline_frames": 42,
+  "confirmed_player_positions": 0,
+  "confirmed_ball_positions": 22,
+  "status": "IDENTITY_UNRESOLVED",
+  "report_modified": false,
+  "artifact_sha256": "7008ee82efbcd47b469b950d26ef22f4f5c980057c5e0a50e26670f4235f052c",
+  "limitation": "Focused request omitted source context between original tap at 3.083 seconds and timeline at 30.015 seconds. All 42 player identities were explicitly uncertain. Do not use its ball positions to imply a verified selected-player kick.",
+  "next_probe": "Include chronological source-only identity context; retain explicit uncertainty across cuts and competing players."
+}

@@ -14,7 +14,7 @@ jobs:
       github.event.pull_request.draft == true &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.event.pull_request.head.ref == 'codex/matchroom-graphics' &&
-      github.event.before == '74f3fb0632e750390c9d9d113bb1f0b7c0bdb27e' &&
+      github.event.before == 'e6b90c8d546d8b2f16362130929823c4e19b550d' &&
       github.run_attempt == 1
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -35,7 +35,7 @@ jobs:
           sudo apt-get -o Acquire::Retries=1 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 install -y -qq ffmpeg
           python -m pip install 'numpy<3' 'opencv-python-headless<5' 'Pillow>=10,<15' 'onnxruntime>=1.20,<2' 'python-dotenv>=1,<2' 'pytest>=8,<10'
       - name: Verify bounded source requests before model calls
-        run: python -m pytest backend/tests/test_sequence_request_windows.py backend/tests/test_sequence_pilot.py -q
+        run: python -m pytest backend/tests/test_position_probe.py backend/tests/test_sequence_request_windows.py backend/tests/test_sequence_pilot.py -q
       - name: Restore the unchanged-request checkpoint
         uses: actions/download-artifact@v4
         with:
