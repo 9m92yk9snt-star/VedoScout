@@ -263,3 +263,15 @@ visual inspection confirms occlusion behind white 13 and the coach. This is one
 frame, not validation of automatic pass extraction, all-person segmentation or
 the unresolved 24.63s duel. Existing reports require regenerated graphics to
 receive foreground data. No new paid model request, dependency or model asset.
+
+
+### Visible stance marker
+The stance marker now has a brighter green fill and a thin constant-screen-width
+rim. Dense accepted tracks render it during playback as well as at pauses.
+The five-sample local median of measured body widths stabilizes marker size;
+positions are not smoothed or extrapolated, and identity/gap rejection remains.
+A separate review preview measures all 38 source frames from 9.000–10.233s in
+Orman700, associating fresh person masks backward/forward from the reviewed
+10.000s player. It uses current-frame person occlusion, release/reception pauses
+and an uncropped horizontal field view. This manually seeded visual fixture is
+not automatic report tracking, and does not fix the separate 24.63s duel.
