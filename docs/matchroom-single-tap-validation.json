@@ -1,0 +1,98 @@
+{
+  "status": "BLOCKED_NO_FINISHED_REPORT",
+  "scope": "Fresh independent original video through actual server report orchestration, using exactly one original user selection. Not an authenticated UI test.",
+  "source": {
+    "fixture": "testdata/sequence-pilot-orman400",
+    "duration_seconds_approx": 76.76,
+    "sha256": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+    "bytes": 31896745,
+    "human_taps": 1,
+    "tap_time_seconds": 3.07,
+    "independence": "Visually different match: grass pitch versus earlier snow-bordered artificial pitch."
+  },
+  "first_attempt": {
+    "run_id": 41699254289,
+    "commit": "9000fae8675a71791253face64dbc1ee2ab33cd2",
+    "status": "FAILED",
+    "elapsed_seconds": 900.27,
+    "initial_jobs": 10,
+    "completed_receipts": 7,
+    "error_codes": [
+      "MODEL_WALL_DEADLINE_EXCEEDED",
+      "RUN_TIME_BUDGET_EXHAUSTED"
+    ],
+    "report_error": "SEQUENCE_PROCESS_FAILED",
+    "report_ready": false,
+    "clips": 0,
+    "writer_calls": 0,
+    "artifact_id": 13262619625
+  },
+  "retry": {
+    "run_id": 41702644655,
+    "commit": "d51ff61492c9f99e9d0eec332e6472e6d6c06098",
+    "status": "FAILED",
+    "method": "Existing production exact-request checkpoint validation. Same video, original tap and source-analysis code. No expected action results supplied.",
+    "elapsed_seconds": 436.816,
+    "completed_receipts": 9,
+    "validated_reused_receipts": 7,
+    "newly_completed_receipts": 2,
+    "failed_packet_id": "sequence_008",
+    "error_codes": [
+      "MODEL_WALL_DEADLINE_EXCEEDED"
+    ],
+    "report_error": "SEQUENCE_PROCESS_FAILED",
+    "report_ready": false,
+    "clips": 0,
+    "writer_calls": 0,
+    "artifact_id": 13264742281
+  },
+  "observed_blockers": [
+    {
+      "kind": "UI",
+      "evidence": "scoutTapPolicy.cjs MIN_TAPS=3. ScoutMode prevents submission below this minimum.",
+      "one_tap_ui_verified": false
+    },
+    {
+      "kind": "RUNTIME",
+      "evidence": "First fresh attempt reached its 900-second source-analysis budget before all ten initial requests completed."
+    },
+    {
+      "kind": "GRAPHICS_COVERAGE",
+      "evidence": "Seven completed raw responses contain four target visual samples, all on one action. These are raw provider outputs, not finalized report evidence."
+    },
+    {
+      "kind": "LOCAL_ANCHOR_SCOPE",
+      "evidence": "Dense contours require two local selections; the one-tap fallback requires a tap within 750ms before a short proof. The optical fallback searches selections within 1500ms of the proof."
+    }
+  ],
+  "visual_review": {
+    "raw_sample_times_ms": [
+      41765,
+      43015,
+      43265,
+      44515
+    ],
+    "ground_positions_checked_against_exact_source_frames": true,
+    "same_player_after_duel_in_finished_report": false,
+    "ball_arrow_after_kick_in_finished_report": false,
+    "uncertain_arrow_suppression_in_finished_report": false
+  },
+  "production_database_used": false,
+  "notifications_sent": 0,
+  "merged": false,
+  "deployed": false,
+  "keep_draft": true,
+  "total_analysis_attempt_seconds": 1337.086,
+  "final_raw_visual_sample_count": 4,
+  "completed_response_hashes_verified": 9,
+  "next_blocker": "sequence_008 exceeded its model-call deadline in both attempts; no complete discovery result or report was produced.",
+  "validation": {
+    "existing_offline_report_contract_run": 41702644646,
+    "existing_offline_report_contract": "PASSED",
+    "local_exact_retry_positive_and_changed_source_selection_negative_checks": "PASSED",
+    "local_failed_attempt_summary_receipt_count_check": "PASSED",
+    "browser_verification": "NOT_REACHED",
+    "production_verification_run": 41702644381,
+    "production_verification": "6 JOBS PASSED"
+  }
+}

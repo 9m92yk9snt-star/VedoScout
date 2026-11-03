@@ -50,6 +50,8 @@ def inspect_report(output, selection):
     path = output / 'report-document.json'
     doc = json.loads(path.read_text()) if path.exists() else {}
     audit = doc.get('sequence_audit') or {}
+    retry = doc.get('sequence_retry') or {}
+    receipts = audit.get('receipts') or retry.get('receipts') or []
     full = doc.get('full_report') or {}
     rows = []
     for row in full.get('video_comments') or []:
@@ -68,9 +70,11 @@ def inspect_report(output, selection):
         'ui_minimum_taps': int(match.group(1)) if match else None,
         'one_tap_upload_ui_pass': False, 'report_status': doc.get('full_report_status'),
         'report_error': doc.get('full_report_error'),
-        'source_video_sha256': audit.get('source_video_sha256'),
+        'source_video_sha256': audit.get('source_video_sha256') or retry.get('source_video_sha256'),
         'source_checkpoint_reused': audit.get('source_checkpoint_reused'),
-        'fresh_source_receipts': sum(r.get('origin') == 'LIVE_MODEL_REQUEST' for r in audit.get('receipts') or []),
+        'completed_source_receipts': sum(r.get('origin') == 'LIVE_MODEL_REQUEST' and r.get('status') == 'COMPLETED' for r in receipts),
+        'validated_reused_receipts': sum(r.get('retry_payload_verified') is True for r in receipts),
+        'source_progress': doc.get('sequence_progress'), 'failures': doc.get('sequence_failures'),
         'source_references': audit.get('references'), 'evidence': rows,
         'visual_correctness_verified': False, 'production_database_used': False,
         'notifications_sent': 0, 'deployment_performed': False}
