@@ -88,6 +88,7 @@ def main():
     parser.add_argument('--work', type=Path, required=True)
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--retry-document', type=Path)
+    parser.add_argument('--recover-missing', action='store_true')
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[2]
     video, selection = prepare(root / 'testdata/sequence-pilot-orman400', args.work)
@@ -96,6 +97,11 @@ def main():
     if not os.environ.get('EMERGENT_LLM_KEY'):
         raise RuntimeError('MODEL_KEY_NOT_CONFIGURED')
     try:
+        if args.recover_missing:
+            if not args.retry_document:
+                raise ValueError('RETRY_DOCUMENT_REQUIRED')
+            from scripts.recover_matchroom_request import recover
+            args.retry_document = recover(video, selection, args.retry_document, args.work)
         asyncio.run(trial(video, selection, args.output, retry_document=args.retry_document))
     finally:
         inspect_report(args.output, selection)

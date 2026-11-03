@@ -14,7 +14,7 @@ jobs:
       github.event.pull_request.draft == true &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.event.pull_request.head.ref == 'codex/matchroom-graphics' &&
-      github.event.before == '9000fae8675a71791253face64dbc1ee2ab33cd2' &&
+      github.event.before == '43bf0306b3f457105013e193db50a806310fe439' &&
       github.run_attempt == 1
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -37,14 +37,14 @@ jobs:
       - name: Restore this failed attempt's exact-request checkpoint
         uses: actions/download-artifact@v4
         with:
-          name: matchroom-single-tap-report-41699254289
-          run-id: 41699254289
+          name: matchroom-single-tap-report-41702644655
+          run-id: 41702644655
           github-token: ${{ github.token }}
           path: ${{ runner.temp }}/previous-single-tap
       - name: Resume the same report through actual server retry validation
         env:
           EMERGENT_LLM_KEY: ${{ secrets.EMERGENT_LLM_KEY }}
-        run: python -u backend/scripts/run_matchroom_single_tap_trial.py --work "$RUNNER_TEMP/single-tap-input" --output "$RUNNER_TEMP/single-tap-report" --retry-document "$RUNNER_TEMP/previous-single-tap/single-tap-report/report-document.json"
+        run: python -u backend/scripts/run_matchroom_single_tap_trial.py --work "$RUNNER_TEMP/single-tap-input" --output "$RUNNER_TEMP/single-tap-report" --retry-document "$RUNNER_TEMP/previous-single-tap/single-tap-report/report-document.json" --recover-missing
       - name: Preserve report, source-bound graphics and model receipts
         if: always()
         uses: actions/upload-artifact@v4
@@ -53,5 +53,6 @@ jobs:
           path: |
             ${{ runner.temp }}/single-tap-report/
             ${{ runner.temp }}/single-tap-input/single-tap.json
+            ${{ runner.temp }}/single-tap-input/recovery-*.json
           retention-days: 7
           if-no-files-found: warn
