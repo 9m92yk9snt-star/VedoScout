@@ -415,6 +415,11 @@ def packet_items(manifest, packet):
             "dive or an unseen path alone cannot. Report the observed result even if unsuccessful."})
     if packet.get("goal_attribution_review"):
         items.append({"type": "text", "text": GOAL_INSTRUCTION})
+    if packet.get("detail_frame_ids") is not None:
+        items.append({"type": "text", "text": "This is one overlapping detail window of the same play. "
+            "The full overview interval is retained. Native detail is supplied only for "
+            + json.dumps(packet["detail_frame_ids"]) + ". Missing native detail outside that window is not absence of action. "
+            "Keep identity, contact and outcome uncertain unless the supplied pixels establish them."})
     for frame_id in packet["frame_ids"]:
         f = frames[frame_id]
         label = f"Source frame {frame_id}, media_ms={f['media_ms']}"
@@ -422,7 +427,7 @@ def packet_items(manifest, packet):
             label += ", native source pixel crop=" + json.dumps(f["source_crop_box"])
         items.extend([{"type": "text", "text": label},
                       {"type": "image", "path": f["path"], "sha256": f["sha256"]}])
-        if f.get("zoom_view"):
+        if f.get("zoom_view") and (packet.get("detail_frame_ids") is None or frame_id in packet["detail_frame_ids"]):
             z = f["zoom_view"]
             items.extend([{"type": "text", "text": f"Same source instant {frame_id}, native pixel detail crop=" + json.dumps(z["source_crop_box"])},
                           {"type": "image", "path": z["path"], "sha256": z["sha256"]}])

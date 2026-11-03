@@ -41,6 +41,44 @@ def original_spatial_items(manifest, packet, output):
     return spatial_reference_items(manifest,{**packet,"core_start_ms":lo,"core_end_ms":hi},local,output)
 
 
+def bounded_detail_packets(packet, manifest, overview_ids, fits):
+    """Retain every source instant and original pixel crop across overlapping calls.
+
+    Every child carries the complete overview and original references. Only native
+    detail is partitioned, with 250 ms overlap. Never change the byte cap, pixels,
+    timestamps or identity requirements. At most four calls replace one review.
+    """
+    if fits(packet):
+        return [packet]
+    if packet.get("phase") != "FOLLOWUP":
+        raise ValueError("REQUEST_IMAGE_BUDGET_EXCEEDED")
+    frames = {f["frame_id"]: f for f in manifest["frames"]}
+    overview = set(overview_ids).intersection(packet["frame_ids"])
+    details = [i for i in packet["frame_ids"] if i not in overview or frames[i].get("zoom_view")]
+    pending, finished = [details], []
+    while pending:
+        ids = pending.pop(0)
+        selected = set(ids)
+        child = {**packet, "packet_id": packet["packet_id"] + f"_part_{len(finished)+1:03}",
+                 "detail_frame_ids": ids,
+                 "frame_ids": [i for i in packet["frame_ids"] if i in overview or i in selected],
+                 "detail_parent_packet_id": packet["packet_id"]}
+        if fits(child):
+            finished.append(child)
+            continue
+        if len(ids) < 2 or len(finished) + len(pending) + 2 > 4:
+            raise ValueError("REQUEST_IMAGE_BUDGET_EXCEEDED")
+        middle = frames[ids[len(ids)//2]]["media_ms"]
+        left = [i for i in ids if frames[i]["media_ms"] <= middle + 125]
+        right = [i for i in ids if frames[i]["media_ms"] >= middle - 125]
+        if len(left) == len(ids) or len(right) == len(ids):
+            raise ValueError("REQUEST_IMAGE_BUDGET_EXCEEDED")
+        pending[0:0] = [left, right]
+    assert set().union(*(set(p["frame_ids"]) for p in finished)) == set(packet["frame_ids"])
+    assert set().union(*(set(p["detail_frame_ids"]) for p in finished)) == set(details)
+    return finished
+
+
 def run(manifest_path, output_dir, *, provider="gemini", model="gemini-2.5-pro", budget_s=300., max_initial=4,
         max_followups=2, per_call_s=90., reasoning_effort=None, identity_profile=False, image_detail=None,
         identity_profile_receipt=None, contact_reviews=False, resume_initial_receipts=None, fresh_originals=False,
@@ -99,6 +137,39 @@ def run(manifest_path, output_dir, *, provider="gemini", model="gemini-2.5-pro",
 
     def execute(packets, current_manifest, *, call_seconds=None):
         jobs, reused = [], []
+        def fits(packet):
+            if fresh_originals:
+                packet["contact_sequence_evidence"] = True
+            parts = pilot.packet_items(current_manifest, packet)
+            if fresh_originals:
+                parts.insert(1, {"type":"text", "text":FRESH_IDENTITY_INSTRUCTION})
+                spatial, _ = original_spatial_items(current_manifest, packet, out/"spatial"/packet["packet_id"])
+                prefix = len(pilot.packet_items(current_manifest, {**packet, "frame_ids":[]})) + 1
+                parts[prefix:prefix] = spatial
+            try:
+                transport.build_request(provider, model, parts, reasoning_effort=reasoning_effort, image_detail=image_detail)
+                return True
+            except ValueError as exc:
+                if str(exc) != "REQUEST_IMAGE_BUDGET_EXCEEDED":
+                    raise
+                return False
+        expanded = []
+        for packet in packets:
+            if packet.get("phase") != "FOLLOWUP":
+                expanded.append(packet)
+                continue
+            try:
+                expanded.extend(bounded_detail_packets(packet, current_manifest,
+                    [f["frame_id"] for f in manifest["frames"]], fits))
+            except ValueError as exc:
+                if str(exc) != "REQUEST_IMAGE_BUDGET_EXCEEDED":
+                    raise
+                # Retain the normal NOT_SENT receipt without blocking other jobs.
+                expanded.append(packet)
+        packets[:] = expanded
+        summary.setdefault("detail_window_plan", []).extend({k: packet[k] for k in
+            ("packet_id", "detail_parent_packet_id", "frame_ids", "detail_frame_ids", "start_ms", "end_ms")}
+            for packet in packets if packet.get("detail_parent_packet_id"))
         for packet in packets:
             if fresh_originals:
                 packet["contact_sequence_evidence"] = True
@@ -260,6 +331,7 @@ def run(manifest_path, output_dir, *, provider="gemini", model="gemini-2.5-pro",
         followups = [] if access_failed or not initial_complete else planner(manifest, merged, limit=max_followups,
             **({"terminal_only":True, "complete_terminal_context":automatic_outcomes}
                if fresh_originals and contact_reviews else {}))
+        planned_followup_count = len(followups)
         if followups and time.monotonic() + 5 < deadline:
             preparer = pilot.prepare_contact_reviews if contact_reviews else pilot.prepare_followups
             owner_manifest, followups = preparer(manifest, followups, out,
@@ -282,7 +354,7 @@ def run(manifest_path, output_dir, *, provider="gemini", model="gemini-2.5-pro",
         outcome_followups = []
         if automatic_outcomes and initial_complete and not any(r.get("error") in transport.STOP_ERRORS for r in receipts):
             outcome_followups = pilot.plan_outcome_reviews(manifest, merged, manifest["packets"]+followups,
-                                                           limit=max(0,max_followups-len(followups)))
+                                                           limit=max(0,max_followups-planned_followup_count))
             summary["outcome_review_plan"] = deepcopy(outcome_followups)
             if outcome_followups and time.monotonic()+5 < deadline:
                 owner_manifest,outcome_followups = pilot.prepare_contact_reviews(manifest,outcome_followups,out/"outcome-round",
