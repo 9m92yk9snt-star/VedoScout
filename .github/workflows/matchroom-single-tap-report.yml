@@ -14,7 +14,7 @@ jobs:
       github.event.pull_request.draft == true &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.event.pull_request.head.ref == 'codex/matchroom-graphics' &&
-      github.event.before == 'cd5ea01fd166878295bd7be98750a43e3eaca8c2' &&
+      github.event.before == '23ff5ae9d066f6061f1e5047112c794ec67979d3' &&
       github.run_attempt == 1
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -36,10 +36,17 @@ jobs:
           python -m pip install 'numpy<3' 'opencv-python-headless<5' 'Pillow>=10,<15' 'onnxruntime>=1.20,<2' 'python-dotenv>=1,<2' 'pytest>=8,<10'
       - name: Verify bounded source requests before model calls
         run: python -m pytest backend/tests/test_sequence_request_windows.py backend/tests/test_sequence_pilot.py -q
-      - name: Run a fresh report with bounded detail windows
+      - name: Restore the unchanged-request checkpoint
+        uses: actions/download-artifact@v4
+        with:
+          name: matchroom-single-tap-report-41709092613
+          run-id: 41709092613
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/previous-single-tap
+      - name: Recover the missing exact request and finish the report
         env:
           EMERGENT_LLM_KEY: ${{ secrets.EMERGENT_LLM_KEY }}
-        run: python -u backend/scripts/run_matchroom_single_tap_trial.py --work "$RUNNER_TEMP/single-tap-input" --output "$RUNNER_TEMP/single-tap-report"
+        run: python -u backend/scripts/run_matchroom_single_tap_trial.py --work "$RUNNER_TEMP/single-tap-input" --output "$RUNNER_TEMP/single-tap-report" --retry-document "$RUNNER_TEMP/previous-single-tap/single-tap-report/report-document.json" --recover-missing
       - name: Preserve report, source-bound graphics and model receipts
         if: always()
         uses: actions/upload-artifact@v4
