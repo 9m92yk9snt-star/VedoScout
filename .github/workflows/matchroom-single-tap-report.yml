@@ -1,0 +1,49 @@
+name: Match Room fresh independent single-tap report
+on:
+  pull_request:
+    types: [synchronize]
+    paths: ['.github/workflows/matchroom-single-tap-report.yml']
+permissions:
+  contents: read
+jobs:
+  single_tap_report:
+    if: >-
+      github.repository == '9m92yk9snt-star/VedoScout' &&
+      github.event.pull_request.number == 55 &&
+      github.event.pull_request.draft == true &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.head.ref == 'codex/matchroom-graphics' &&
+      github.event.before == 'f63fec19cff81485d610db6f93dd2ecc78457f4b' &&
+      github.run_attempt == 1
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      PYTHONPATH: backend
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Prepare video and existing model dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg
+          python -m pip install 'numpy<3' 'opencv-python-headless<5' 'Pillow>=10,<15' 'onnxruntime>=1.20,<2' 'python-dotenv>=1,<2'
+      - name: Run one cold report through the actual server orchestration
+        env:
+          EMERGENT_LLM_KEY: ${{ secrets.EMERGENT_LLM_KEY }}
+        run: python -u backend/scripts/run_matchroom_single_tap_trial.py --work "$RUNNER_TEMP/single-tap-input" --output "$RUNNER_TEMP/single-tap-report"
+      - name: Preserve report, source-bound graphics and model receipts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: matchroom-single-tap-report-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/single-tap-report/
+            ${{ runner.temp }}/single-tap-input/single-tap.json
+          retention-days: 7
+          if-no-files-found: warn
