@@ -19,6 +19,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ('video', 'anchors', 'output'):
         parser.add_argument('--'+name, required=True)
+    parser.add_argument('--require-stance', action='store_true', help='Also require the complete nearby-tap player contour')
     args = parser.parse_args()
     fixture = json.loads((ROOT/'docs/matchroom-ball-playback-validation.json').read_text())
     if hashlib.sha256(Path(args.video).read_bytes()).hexdigest() != fixture['source_sha256']:
@@ -34,6 +35,11 @@ def main():
     arrows = tracks.get(event['event_id'], {}).get('ball_playback', [])
     if status != 'COMPLETED' or len(arrows) != 1 or len(arrows[0]['samples']) != 27:
         raise AssertionError('Complete moving pass sequence unavailable; inspect saved diagnostics')
+    if args.require_stance:
+        player = tracks.get(event['event_id'], {})
+        if (player.get('method') != 'TAP_OBSERVATION_BOUND_CONTOUR' or len(player['segments']) != 1
+                or len(player['segments'][0]['samples']) != 35):
+            raise AssertionError('Complete combined player/ball sequence unavailable')
     print(f"PASS: 27 source frames in {output['elapsed_seconds']:.3f}s")
 
 

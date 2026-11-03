@@ -410,7 +410,53 @@ are in `matchroom-ball-playback-validation.json`.
 
 This is runtime integration, not a fresh provider extraction or deployment.
 The reviewed ball locations are not fabricated receipts or written to the report.
-This pass's existing anchors do not yield an accepted production player segment;
-the ball validation does not claim to establish one. The independent approved
+At the arrow-only validation commit a9c3a680, this pass's existing anchors did
+not yield an accepted production player segment. The combined path below
+supersedes that limitation; the earlier arrow-only measurements remain historical. The independent approved
 fall presentation remains research-only. Existing reports need regenerated
 assets. No extra paid call, model asset or runtime dependency was added.
+
+
+## Combined player and ball playback
+
+The pass has no original taps inside its 9.000–10.133s proof, but its actual
+8.83s selection can establish a complete path into it. The new
+`TAP_OBSERVATION_BOUND_CONTOUR` fallback is eligible only after ordinary contours
+return `UNSUPPORTED_INPUT`. It uses one original tap at most 750ms before the
+proof and at least two source ground observations at least 200ms apart. These
+observations are never represented as extra human taps. Each must uniquely
+resolve to a detected person and independently track back to that original tap;
+all shared instances must agree. The whole proof must have measured feet.
+A failed identity or continuity decision from the existing two-tap methods is
+never retried through this fallback. Duel and fall identity gates are unchanged.
+
+The proof is at most two seconds, tap-to-end at most 2.5 seconds, and every decoded
+source frame gets a fresh person mask. The frontend independently checks the
+single pre-proof tap, both observation references, complete bounds, measured
+samples and masks. It selects the exact presented frame within 2ms, including
+fractional decoder timestamps against rounded payload milliseconds. This avoids
+using the previous person's mask at a timestamp such as 9466.667ms. Dense tracks
+do not use the optional 200ms interpolation allowance. Old unaligned clips cannot
+show these dense masks or arrows; assets must be regenerated.
+
+A capped three-frame lateral median removes isolated kicking-boot centre spikes
+in this dense display. Raw grounds and ground height stay unchanged. The ellipse
+uses its own fresh person mask; the ball arrow uses its independent mask and
+camera-corrected endpoints. The selected passer retains the green marker after
+the ball reaches another player.
+
+The actual owned worker completed in 17.466s within the unchanged 25s limit,
+returning 35 player frames and 27 arrow frames. All 18 wrong-selection,
+wrong-observation, competing-instance and missing-measurement controls rejected
+on the same stored source detections. The real React player passed normal and
+half-speed Chromium playback and seek/replay checks; all 35 source captures
+retained a visible green marker. Local suites pass 50 backend and 34 frontend
+tests. Numeric results, source checksum and limits are recorded in
+`matchroom-combined-validation.json`. Reproduce using the existing ball playback
+probe with `--require-stance`.
+
+This combined preview uses the existing reviewed source observations. It does
+not establish fresh-provider extraction, unrelated-match accuracy, native H.264
+browser playback or a deployed report. The browser used a VP9 copy preserving
+the source pictures; the shareable preview is H.264. Fall presentation research
+remains separate. No additional model asset, dependency or paid request is added.

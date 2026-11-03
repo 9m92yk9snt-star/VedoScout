@@ -286,3 +286,37 @@ test('edge arrow keeps the direction of an offscreen destination',()=>{
  expect(clipArrowToFrame([[-.2,.4],[-.1,.5]])).toBeNull();
  expect(clipArrowToFrame([[.1,.5],[.8,.5]])).toEqual([[.1,.5],[.8,.5]]);
 });
+
+const anchorRows = [10000,10050,10100,10150,10200,10250].map(media_ms=>({media_ms,frame_id:`g${media_ms}`,ground:[.4,.8],player_width:.06,confidence:.9,
+ foreground:{method:'SOURCE_PERSON_MASK',media_ms,frame_id:`g${media_ms}`,polygons:[[[.2,.4],[.3,.4],[.3,.8]]]}}));
+const anchorSegment = {reference_frame:'s1',observation_reference_frames:['s1','s2'],ground_method:'LOWER_VISIBLE_CONTOUR',source_frame_coverage:'COMPLETE',seed_ms:[9900],overlap_frames:8,samples:anchorRows};
+const anchorRoom = (segment=anchorSegment,patch={}) => roomFor({...comment,match_room:{...raw,start_ms:10000,end_ms:10250,tracking:{...tracked,method:'TAP_OBSERVATION_BOUND_CONTOUR',segments:[segment]},...patch}},10);
+test('a nearby real tap needs two source observations and complete fresh foregrounds',()=>{
+ const room=anchorRoom();expect(room.tracks.length).toBe(1);
+ const mark=graphicsAt(room,10049.667);
+ expect(mark.sourceFrameContour).toBe(true);
+ expect(mark.foreground.media_ms).toBe(10050);
+ expect(graphicsAt(room,10125)).toBeNull();
+ expect(graphicsAt(room,9999.667).foreground.media_ms).toBe(10000);
+ expect(graphicsAt(room,10250.667).foreground.media_ms).toBe(10250);
+});
+test('context tracks reject stale selections, missing references, partial coverage and stale masks',()=>{
+ for(const patch of [{seed_ms:[9200]},{seed_ms:[9900,9950]},{seed_ms:[10000]},
+  {observation_reference_frames:['s1']},{observation_reference_frames:['s1','missing']},
+  {source_frame_coverage:undefined},{samples:anchorRows.slice(0,-1)},
+  {presentation_gap_ms:200,samples:anchorRows.filter((s,i)=>i!==2)},
+  {samples:anchorRows.map((s,i)=>i===2?{...s,foreground:anchorRows[1].foreground}:s)}]) {
+  expect(anchorRoom({...anchorSegment,...patch}).tracks).toEqual([]);
+ }
+ expect(anchorRoom(anchorSegment,{samples:[raw.samples[0],{...raw.samples[1],ground:null}]}).tracks).toEqual([]);
+});
+test('stance display damps isolated boot-switch spikes without changing source height or measurements',()=>{
+ const rows=anchorRows.map((s,i)=>({...s,ground:[i===2?.37:.4,.8]}));
+ const room=anchorRoom({...anchorSegment,samples:rows});
+ const mark=graphicsAt(room,10100);
+ expect(Math.abs(mark.ground[0]-.385)).toBeLessThan(1e-10);
+ expect(mark.ground[1]).toBe(.8);
+ expect(room.tracks[0][2].ground).toEqual([.37,.8]);
+ expect(rows[2].ground).toEqual([.37,.8]);
+ expect(mark.foreground.media_ms).toBe(10100);
+});

@@ -47,3 +47,22 @@ test('legacy clips without a source-aligned timebase cannot reuse moving masks',
   act(()=>callback(0,{mediaTime:.567}));
   expect(ui.queryByTestId('match-room-ball-arrow')).toBeNull();
 });
+
+test('combined graphics use the same current person masks at fractional source timestamps',()=>{
+ const stanceRows=[1000,1033,1067,1100,1133,1167,1200,1233,1267,1300].map(media_ms=>({media_ms,frame_id:`g${media_ms}`,ground:[.4,.8],player_width:.06,confidence:.9,
+  foreground:{method:'SOURCE_PERSON_MASK',media_ms,frame_id:`g${media_ms}`,polygons:[[[.2,.4],[.3,.4],[.3,.8]]]}}));
+ const raw=proof.comment.match_room;
+ const combined={...proof,comment:{...proof.comment,match_room:{...raw,start_ms:1000,end_ms:1300,samples:raw.samples.map((s,i)=>({...s,ground:[.4,.8],player_width:.06})).concat([{frame_id:'later',media_ms:1300,ground:[.4,.8],player_width:.06}]),
+  tracking:{...raw.tracking,method:'TAP_OBSERVATION_BOUND_CONTOUR',segments:[{reference_frame:'release',observation_reference_frames:['release','later'],seed_ms:[900],overlap_frames:10,ground_method:'LOWER_VISIBLE_CONTOUR',source_frame_coverage:'COMPLETE',samples:stanceRows}]}}}};
+ const ui=render(<MatchRoomPlayer proof={combined} videoUrl="/source.mp4" onClose={()=>{}}/>);
+ fireEvent.play(ui.getByTestId('match-room-video'));
+ act(()=>callback(0,{mediaTime:.566667}));
+ expect(ui.getByTestId('match-room-ball-arrow').getAttribute('data-source-ms')).toBe('1067');
+ const marker=ui.getByTestId('match-room-player-marker');
+ expect(marker.getAttribute('data-source-ms')).toBe('1067');
+ expect(marker.parentElement.getAttribute('mask')).toMatch(/^url\(#people-/);
+ const legacy={...combined,comment:{...combined.comment,tele_clip_timebase:undefined}};
+ ui.rerender(<MatchRoomPlayer proof={legacy} videoUrl="/source.mp4" onClose={()=>{}}/>);
+ expect(ui.queryByTestId('match-room-player-marker')).toBeNull();
+ expect(ui.queryByTestId('match-room-ball-arrow')).toBeNull();
+});

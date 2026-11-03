@@ -1,5 +1,5 @@
 {
-  "scope": "Real source, bounded graphics worker, encoded clip timebase and production React player in local Chromium. Review annotations, not automatic extraction or deployed playback.",
+  "scope": "Historical arrow-only validation at a9c3a680. Real source, bounded graphics worker, encoded clip timebase and production React player in local Chromium. Review annotations, not automatic extraction or deployed playback.",
   "source_sha256": "a659197551270a396fa5754239066c176fbacf2d5af400e63eea876ebfe06082",
   "review_fixture": {
     "note": "Ball centres and player ground points were reviewed on exact source images. Reception is first clearly visible controlled ball, not a claimed obscured first touch. No report or model receipt is modified.",
@@ -306,5 +306,6 @@
     "frames": 152,
     "duration_seconds": 5.066667,
     "note": "Focused crop of the production React/SVG arrow renderer; stance hidden only for this separate ball-arrow review. Two normal-speed runs and one half-speed run."
-  }
+  },
+  "superseded_by": "matchroom-combined-validation.json adds the nearby-original-tap player segment; arrow-only measurements below remain unchanged."
 }

@@ -292,6 +292,13 @@ def compute(video, anchors, events, checkpoint=None):
         except (ImportError, OSError, ValueError, cv2.error):
             contours = []
             diagnostic['status'] = 'CONTOUR_UNAVAILABLE'
+        if not contours and diagnostic.get('status') == 'UNSUPPORTED_INPUT':
+            from match_room_anchor_contours import anchor_observation_segments
+            try:
+                contours = anchor_observation_segments(video, anchors, observations, start, end,
+                                                        deadline=deadline, diagnostics=diagnostic)
+            except (ImportError, OSError, ValueError, cv2.error):
+                diagnostic['status'] = 'CONTOUR_UNAVAILABLE'
         result['contour_diagnostics'] = diagnostic
         if contours:
             result.update(method=diagnostic.get('method', METHOD), segments=contours)

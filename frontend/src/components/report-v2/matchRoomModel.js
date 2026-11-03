@@ -13,6 +13,15 @@ function foregroundFor(s) {
 export function depthAt(mark, mediaMs, paused) {
   return paused && mark?.foreground && Math.abs(mark.foreground.media_ms-mediaMs) <= 2 ? mark.foreground : null;
 }
+function stanceDisplayPoint(rows, i) {
+  const a = rows[i-1], s = rows[i], b = rows[i+1];
+  if (!a || !b || s.media_ms-a.media_ms > 75 || b.media_ms-s.media_ms > 75) return s.ground;
+  // A kicking boot briefly changes the silhouette's stance centre. Suppress
+  // isolated lateral spikes, without shifting its measured ground height.
+  const median = [a.ground[0], s.ground[0], b.ground[0]].sort((x,y) => x-y)[1];
+  const cap = Math.min(a.player_width, s.player_width, b.player_width)*.25;
+  return [s.ground[0]+Math.max(-cap, Math.min(cap, median-s.ground[0])), s.ground[1]];
+}
 export function roomFor(comment, fallbackSeconds) {
   const raw = comment?.match_room;
   const bound = raw?.version === 1 && raw.event_id === comment?.event_id && !!raw.source_video_sha256 && raw.source_video_sha256 === comment?.source_video_sha256 && raw.coordinate_space === 'FULL_FRAME_NORMALIZED' && finite(raw.start_ms) && finite(raw.end_ms) && raw.end_ms >= raw.start_ms;
@@ -44,16 +53,24 @@ export function roomFor(comment, fallbackSeconds) {
     camera_static_from_previous: s.camera_static_from_previous === true
   })).sort((a, b) => a.media_ms - b.media_ms) : [];
   const tracking = raw?.tracking;
-  const tracks = bound && tracking?.version === 1 && tracking.event_id === raw.event_id && tracking.source_video_sha256 === raw.source_video_sha256 && ["TAP_OPTICAL_GROUND_PROXY", "TAP_BIDIRECTIONAL_INSTANCE_CONTOUR", "TAP_REACQUIRED_INSTANCE_CONTOUR"].includes(tracking.method) && Array.isArray(tracking.segments)
+  const tracks = bound && tracking?.version === 1 && tracking.event_id === raw.event_id && tracking.source_video_sha256 === raw.source_video_sha256 && ["TAP_OPTICAL_GROUND_PROXY", "TAP_BIDIRECTIONAL_INSTANCE_CONTOUR", "TAP_REACQUIRED_INSTANCE_CONTOUR", "TAP_OBSERVATION_BOUND_CONTOUR"].includes(tracking.method) && Array.isArray(tracking.segments)
     ? tracking.segments.slice(0, 32).flatMap(segment => {
       if (!Array.isArray(segment.samples) || typeof segment.reference_frame !== "string") return [];
       const contour = tracking.method !== "TAP_OPTICAL_GROUND_PROXY";
       const reacquired = tracking.method === "TAP_REACQUIRED_INSTANCE_CONTOUR";
-      if (contour && (segment.ground_method !== "LOWER_VISIBLE_CONTOUR" || !samples.some(s => s.frame_id === segment.reference_frame) || !Array.isArray(segment.seed_ms) || segment.seed_ms.length !== 2 || !segment.seed_ms.every(t => finite(t) && t >= start && t <= end) || segment.seed_ms[1]-segment.seed_ms[0] < 150 || segment.seed_ms[1]-segment.seed_ms[0] > 2500 || !finite(segment.overlap_frames) || segment.overlap_frames < 5)) return [];
+      const sourceFrameContour = tracking.method === "TAP_OBSERVATION_BOUND_CONTOUR";
+      if (contour && (segment.ground_method !== "LOWER_VISIBLE_CONTOUR" || !samples.some(s => s.frame_id === segment.reference_frame) || !finite(segment.overlap_frames) || segment.overlap_frames < 5)) return [];
+      if (sourceFrameContour) {
+        const refs = segment.observation_reference_frames;
+        if (segment.source_frame_coverage !== 'COMPLETE' || !Array.isArray(segment.seed_ms) || segment.seed_ms.length !== 1 || !finite(segment.seed_ms[0]) || segment.seed_ms[0] < start-750 || segment.seed_ms[0] >= start || end-segment.seed_ms[0] > 2500 || end-start > 2000 || !Array.isArray(refs) || refs.length < 2 || refs.length > 12 || new Set(refs).size !== refs.length || !refs.includes(segment.reference_frame)) return [];
+        const supported = refs.map(id => samples.find(s => s.frame_id === id && s.ground));
+        if (supported.some(s => !s || !segment.samples.some(row => row && Math.abs(row.media_ms-s.media_ms) <= 2)) || Math.max(...supported.map(s => s.media_ms))-Math.min(...supported.map(s => s.media_ms)) < 200) return [];
+        if (segment.samples.length < 5 || segment.samples.some(s => !s || !foregroundFor(s)) || segment.samples[0].media_ms > start+35 || segment.samples[segment.samples.length-1].media_ms < end-35) return [];
+      } else if (contour && (!Array.isArray(segment.seed_ms) || segment.seed_ms.length !== 2 || !segment.seed_ms.every(t => finite(t) && t >= start && t <= end) || segment.seed_ms[1]-segment.seed_ms[0] < 150 || segment.seed_ms[1]-segment.seed_ms[0] > 2500)) return [];
       if (reacquired && (!Array.isArray(segment.identity_reference_frames) || segment.identity_reference_frames.length !== 2 || new Set(segment.identity_reference_frames).size !== 2 || !segment.identity_reference_frames.every((id,i) => samples.some(s => s.frame_id === id && s.ground && Math.abs(s.media_ms-segment.seed_ms[i]) <= 40)))) return [];
       const rows = segment.samples.slice(0, 100).filter(s => finite(s.media_ms) && s.media_ms >= start && s.media_ms <= end && point(s.ground) && finite(s.player_width) && s.player_width >= .005 && s.player_width <= .4 && finite(s.confidence) && s.confidence >= .55);
-      if (rows.length !== segment.samples.length || rows.length < 3 || rows.some((s, i) => i > 0 && (s.media_ms <= rows[i-1].media_ms || s.media_ms - rows[i-1].media_ms > (contour ? (segment.presentation_gap_ms === 200 ? 200 : 75) : 120)))) return [];
-      return [rows.map((s, i) => ({...s, player_width: rows.slice(Math.max(0, i-2), i+3).map(r => r.player_width).sort((a,b) => a-b)[Math.floor(rows.slice(Math.max(0, i-2), i+3).length/2)], groundProxy: !contour, contourTrack: contour, ballTrail: null, groundTrail: i > 0 && s.motion_from_ms === rows[i-1].media_ms && Array.isArray(s.groundTrail) && s.groundTrail.length === 2 && s.groundTrail.every(point) && s.groundTrail[1][0] === s.ground[0] && s.groundTrail[1][1] === s.ground[1] ? s.groundTrail : null}))];
+      if (rows.length !== segment.samples.length || rows.length < 3 || rows.some((s, i) => i > 0 && (s.media_ms <= rows[i-1].media_ms || s.media_ms - rows[i-1].media_ms > (contour ? (!sourceFrameContour && segment.presentation_gap_ms === 200 ? 200 : 75) : 120)))) return [];
+      return [rows.map((s, i) => ({...s, player_width: rows.slice(Math.max(0, i-2), i+3).map(r => r.player_width).sort((a,b) => a-b)[Math.floor(rows.slice(Math.max(0, i-2), i+3).length/2)], groundProxy: !contour, contourTrack: contour, sourceFrameContour, foreground: sourceFrameContour ? foregroundFor(s) : null, ballTrail: null, groundTrail: i > 0 && s.motion_from_ms === rows[i-1].media_ms && Array.isArray(s.groundTrail) && s.groundTrail.length === 2 && s.groundTrail.every(point) && s.groundTrail[1][0] === s.ground[0] && s.groundTrail[1][1] === s.ground[1] ? s.groundTrail : null}))];
     }) : [];
   // Only complete, event-bound sequences with a fresh mask on every source frame.
   const movingBall = bound && tracking?.version === 1 && tracking.event_id === raw.event_id && tracking.source_video_sha256 === raw.source_video_sha256 && Array.isArray(tracking.ball_playback)
@@ -84,6 +101,12 @@ export function roomFor(comment, fallbackSeconds) {
 }
 // Display coordinates only: retain measured samples and never join separate tracks.
 function stanceAt(rows, mediaMs) {
+  // Dense contours carry a mask for this exact source picture. Rounded JSON
+  // milliseconds must not make a fractional decoder PTS select the prior mask.
+  if (rows[0]?.sourceFrameContour) {
+    const i = rows.findIndex(s => Math.abs(s.media_ms-mediaMs) <= 2);
+    return i < 0 ? null : {...rows[i], ground: stanceDisplayPoint(rows, i), displayFiltered: true};
+  }
   if (!rows.length || mediaMs < rows[0].media_ms || mediaMs > rows[rows.length-1].media_ms) return null;
   const right = rows.findIndex(s => s.media_ms >= mediaMs);
   const b = rows[right];
@@ -105,7 +128,7 @@ export function graphicsAt(room, mediaMs) {
   const moves = (a,b) => a && b && Math.hypot(b[0]-a[0],b[1]-a[1]) > .008;
   const staticPair = sample && previous && sample.camera_static_from_previous && sample.media_ms > previous.media_ms && sample.media_ms-previous.media_ms <= 300;
   const ballTrail = sample?.ballTrail || (staticPair && moves(previous.ball,sample.ball) ? [previous.ball,sample.ball] : null);
-  const withBall = mark => mark ? {...mark, ballTrail, foreground: sample?.foreground} : ballTrail ? {...sample, ground:null, groundTrail:null, ballTrail} : null;
+  const withBall = mark => mark ? {...mark, ballTrail, foreground: mark.sourceFrameContour ? mark.foreground : sample?.foreground} : ballTrail ? {...sample, ground:null, groundTrail:null, ballTrail} : null;
   // A source-observed endpoint takes precedence over an optical box proxy.
   const observed = nearest(room.samples.filter(s => s.groundTrail && Math.abs(s.media_ms-mediaMs) <= 60));
   const candidates = (room.tracks || []).map(rows => stanceAt(rows, mediaMs)).filter(s => s && Math.abs(s.media_ms-mediaMs) <= (s.contourTrack ? 40 : 60));

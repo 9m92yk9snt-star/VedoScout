@@ -38,10 +38,12 @@ export function MatchRoomPlayer({
   const room = useMemo(() => roomFor(raw, fallback), [raw, fallback]);
   const from = Math.max(room.start, clip ? offset * 1000 : 0),
     until = clip && Number.isFinite(raw?.tele_clip_end) ? Math.min(room.end + 750, raw.tele_clip_end * 1000) : room.end + 750;
-  const mark = graphicsAt(room, frameAt ?? at),
-    id = useId().replace(/:/g, '');
-  const depth = depthAt(mark, frameAt ?? at, !playing);
-  const movingArrow = (!clip || raw?.tele_clip_timebase === 'SOURCE_PTS_ALIGNED') ? ballAt(room, frameAt) : null;
+  const sourceAligned = !clip || raw?.tele_clip_timebase === 'SOURCE_PTS_ALIGNED';
+  const candidate = graphicsAt(room, frameAt ?? at);
+  const mark = candidate?.sourceFrameContour && !sourceAligned ? null : candidate;
+  const id = useId().replace(/:/g, '');
+  const depth = depthAt(mark, frameAt ?? at, !playing || (frameAt != null && mark?.sourceFrameContour));
+  const movingArrow = sourceAligned ? ballAt(room, frameAt) : null;
   const arrowSource = movingArrow || (depth && mark?.ballTrail ? {...mark, foreground: depth, opacity: 1} : null);
   const visibleTrail = arrowSource && clipArrowToFrame(arrowSource.ballTrail);
   const arrow = visibleTrail ? {...arrowSource, ballTrail: visibleTrail} : null;
@@ -175,7 +177,7 @@ export function MatchRoomPlayer({
           {arrow && <mask id={`ball-people-${id}`} maskUnits="userSpaceOnUse" x="0" y="0" width="1000" height={yScale}><rect width="1000" height={yScale} fill="white" />{arrow.foreground.polygons.map((polygon, i) => <polygon key={i} points={polygon.map(p => `${p[0]*1000},${p[1]*yScale}`).join(' ')} fill="black" stroke="black" strokeWidth="1" />)}</mask>}
         </defs>
         <g mask={depth ? `url(#people-${id})` : undefined}>
-          {mark?.ground && <g>
+          {mark?.ground && <g data-testid="match-room-player-marker" data-source-ms={mark.foreground?.media_ms}>
             <ellipse cx={mark.ground[0] * 1000} cy={Math.min(1, mark.ground[1]) * yScale} rx={mark.player_width * 850} ry={mark.player_width * 170} fill={`url(#ground-${id})`} />
             <ellipse cx={mark.ground[0] * 1000} cy={Math.min(1, mark.ground[1]) * yScale} rx={mark.player_width * 700} ry={mark.player_width * 135} fill="#62ed7b" fillOpacity=".18" stroke="#91ffa3" strokeOpacity=".92" strokeWidth="2" vectorEffect="non-scaling-stroke" />
           </g>}

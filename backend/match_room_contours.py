@@ -19,7 +19,7 @@ MAX_FRAMES = 96
 MAX_GAP_MS = 75
 
 
-def read_clip(video, start, end):
+def read_clip(video, start, end, *, sample_step=1/35):
     """Decode once, retaining actual post-grab media times and no FPS fallback."""
     cap = cv2.VideoCapture(str(video))
     count = 0
@@ -28,7 +28,7 @@ def read_clip(video, start, end):
         previous = None
         while ok and stamp*1000 <= end+1 and count < MAX_FRAMES:
             if (not fallback and stamp*1000 >= start-1
-                    and video_timebase.should_sample(stamp, previous, 1/35)):
+                    and video_timebase.should_sample(stamp, previous, sample_step)):
                 valid, image = cap.retrieve()
                 if valid:
                     height, width = image.shape[:2]
@@ -169,7 +169,11 @@ def follow(frames, detections, seed_index, target):
     candidates = seed_candidates(detections[seed_index], target, frames[seed_index]['gray'].shape)
     if len(candidates) != 1:
         return {}
-    source = candidates[0]
+    return follow_instance(frames, detections, seed_index, candidates[0])
+
+
+def follow_instance(frames, detections, seed_index, source):
+    """Follow an explicitly resolved instance; caller owns its seed authority."""
     result = {seed_index: source}
     for direction in (-1, 1):
         chosen = source
