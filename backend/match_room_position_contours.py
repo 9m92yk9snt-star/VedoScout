@@ -47,6 +47,38 @@ def agreed_intervals(frames, detections, observations, *, deadline):
     return accepted
 
 
+def observation_windows(observations, start, end):
+    """Partition confirmed visible-ground runs; prioritize measured recovery.
+
+    Unknown/hidden feet are barriers. Windows share only one observation, so
+    no interval is processed twice. Recovery is checked independently at both
+    ends and gets budget before optional repetition of the pre-occlusion run.
+    """
+    groups, current, interrupted = [], [], False
+    for row in observations:
+        if not start <= row['media_ms'] <= end:
+            continue
+        valid = row.get('identity_status') == 'CONFIRMED' and row.get('ground') and row.get('player_box')
+        gap = current and row['media_ms']-current[-1]['media_ms'] > 250
+        if not valid or gap:
+            if current: groups.append((interrupted, current))
+            current = []
+            interrupted = True
+        if valid: current.append(row)
+    if current: groups.append((interrupted, current))
+    windows = []
+    for recovery, rows in groups:
+        at = 0
+        while at < len(rows)-1:
+            last = max(i for i in range(at, len(rows)) if rows[i]['media_ms']-rows[at]['media_ms'] <= 1500)
+            if last == at: break
+            windows.append((recovery, rows[at]['media_ms'], rows[last]['media_ms']))
+            at = last
+    # Most recent recovery first; uninterrupted evidence retains source order.
+    windows.sort(key=lambda w: (not w[0], -w[1] if w[0] else w[1]))
+    return [(a, b) for _, a, b in windows]
+
+
 def contour_segments(video, observations, start, end, *, deadline, diagnostics, on_segment=None):
     """Bounded short proof only. Partial valid intervals stay separate."""
     from native_player_segmentation import PersonSegmenter

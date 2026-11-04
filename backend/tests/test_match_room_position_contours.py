@@ -87,3 +87,11 @@ def test_completed_interval_is_checkpointed_before_later_decode_timeout(monkeypa
     assert len(saved) == len(result) == 1
     assert result[0]['samples'][-1]['media_ms'] == 200
     assert diagnostic['status'] == 'TIME_BUDGET'
+
+
+def test_recovery_window_gets_budget_first_without_duplicate_intervals():
+    def row(t, valid=True):
+        return {'media_ms':t, 'identity_status':'CONFIRMED' if valid else 'UNCERTAIN',
+                'ground':[.4,.6] if valid else None, 'player_box':[.3,.3,.2,.3] if valid else None}
+    obs=[row(t) for t in range(0,2001,125)]+[row(2125,False)]+[row(t) for t in (2250,2375,2500)]
+    assert localized.observation_windows(obs,0,2500)==[(2250,2500),(0,1500),(1500,2000)]

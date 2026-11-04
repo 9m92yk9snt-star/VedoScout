@@ -314,25 +314,20 @@ def compute(video, anchors, events, checkpoint=None):
             save()
         try:
             if explicit:
-                from match_room_position_contours import contour_segments as position_contours, METHOD as position_method
+                from match_room_position_contours import contour_segments as position_contours, METHOD as position_method, observation_windows
                 contours = []
                 lo = max(start, min(s['media_ms'] for s in observations))
                 hi = min(end, max(s['media_ms'] for s in observations))
                 def preserve(segment):
                     result['segments'].append(segment)
                     save()
-                while lo < hi and time.monotonic() < deadline-1:
-                    boundaries = [s['media_ms'] for s in observations if lo < s['media_ms'] <= min(hi, lo+1500)]
-                    if not boundaries:
+                for lo, stop in observation_windows(observations, lo, hi):
+                    if time.monotonic() >= deadline-1:
                         break
-                    stop = max(boundaries)
-                    part = {}
+                    part = {'start_ms': lo, 'end_ms': stop}
                     contours.extend(position_contours(video, observations, lo, stop,
                                                       deadline=deadline, diagnostics=part, on_segment=preserve))
                     diagnostic.setdefault('windows', []).append(part)
-                    if stop == hi:
-                        break
-                    lo = stop
                 diagnostic.update(method=position_method, status='SUPPORTED_SOURCE_OBSERVATIONS' if contours else 'NO_AGREED_INTERVAL')
             else:
                 contours = contour_segments(video, anchors, observations, start, end, deadline=deadline,
