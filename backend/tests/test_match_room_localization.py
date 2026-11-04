@@ -17,8 +17,15 @@ def test_prepare_preserves_all_ten_original_reference_points(tmp_path, monkeypat
         'cited_frames': {'s000003000': 3000}}}
     monkeypatch.setattr(loc.cv2, 'VideoCapture', lambda _: type('Cap', (), {'release': lambda self: None})())
     monkeypatch.setattr(loc, 'read_frame_at', lambda cap, t: (True, np.zeros((80, 60, 3), np.uint8), t))
+    batches = []
+    def grouped(cap, times):
+        batches.append(times)
+        return {ms: (ms, np.zeros((80, 60, 3), np.uint8)) for ms in times}
+    monkeypatch.setattr(loc, 'read_frames_at', grouped)
     before = deepcopy(selection)
     record, job = loc.prepare('source', selection, event, tmp_path)
+    assert batches and max(map(len, batches)) <= 8
+    assert [ms for batch in batches for ms in batch] == sorted({f['media_ms'] for f in record['frames']})
     assert len(record['references']) == 10 and selection == before
     assert [r['target_point'] for r in record['references']] == [a['target_point'] for a in anchors]
     assert record['window_ms'] == [2250, 4750]
@@ -87,3 +94,18 @@ def test_paid_response_is_persisted_before_batch_failure(monkeypatch):
         asyncio.run(loc.localize('source',doc,checkpoint=checkpoint,run_jobs=interrupted))
     assert saved[-1]['events']['event']['receipt']==record['receipt']
     assert saved[-1]['events']['event']['status']=='OBSERVATIONS_RETURNED'
+
+
+def test_missing_grouped_source_frame_stops_before_request(tmp_path, monkeypatch):
+    event = {'event_id': 'e', 'source_video_sha256': 'source', 'proof': {
+        'proof_start_ms': 2000, 'proof_end_ms': 6000, 'frame_ms': 3000,
+        'cited_frames': {'s000003000': 3000}}}
+    selection = {'raw_marker_anchors': [{'t': 1, 'target_point': {'x': .4, 'y': .5}, 'box': {'x': .3, 'y': .3, 'w': .2, 'h': .3}}]}
+    released = []
+    monkeypatch.setattr(loc.cv2, 'VideoCapture', lambda _: type('Cap', (), {'release': lambda self: released.append(True)})())
+    monkeypatch.setattr(loc, 'read_frame_at', lambda cap, t: (True, np.zeros((80, 60, 3), np.uint8), t))
+    monkeypatch.setattr(loc, 'read_frames_at', lambda cap, times: {})
+    monkeypatch.setattr(loc.transport, 'build_request', lambda *a, **k: pytest.fail('request with missing source frame'))
+    with pytest.raises(ValueError, match='SOURCE_FRAME_UNAVAILABLE'):
+        loc.prepare('source', selection, event, tmp_path)
+    assert released == [True]
