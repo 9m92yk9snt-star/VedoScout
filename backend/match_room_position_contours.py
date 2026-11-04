@@ -107,6 +107,7 @@ def contour_segments(video, observations, start, end, *, deadline, diagnostics):
             refs = list(dict.fromkeys(group['refs']))
             segments.append({'id': f'position-contour:{len(segments)}',
                              'reference_frame': refs[0], 'observation_reference_frames': refs,
+                             'overlap_frames': len(samples),
                              'ground_method': 'LOWER_VISIBLE_CONTOUR',
                              'source_frame_coverage': 'COMPLETE_SEGMENT', 'samples': samples})
     diagnostics.update(status='SUPPORTED_SOURCE_OBSERVATIONS' if segments else 'NO_AGREED_INTERVAL',

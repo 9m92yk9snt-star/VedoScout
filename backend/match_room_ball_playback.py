@@ -49,6 +49,10 @@ def build_ball_playback(video, event, observations, deadline):
                 break
             # A short source-bound fade after reception, only within the proof.
             until = min(end+250, event['proof']['proof_end_ms'])
+            if event.get('localization_method') == 'EXPLICIT_SOURCE_POSITIONS':
+                # Explicit unknown rows are hard stops; never fade past the
+                # last observed endpoint into unobserved or uncertain video.
+                until = end
             frames = _read_window(cap, start/1000-.001, until/1000+.001, 0, seed_time=start/1000)
             endpoint = next((i for i, f in enumerate(frames) if abs(f[0]*1000-end) <= 2), None)
             if (not 2 <= len(frames) <= MAX_FRAMES or endpoint is None

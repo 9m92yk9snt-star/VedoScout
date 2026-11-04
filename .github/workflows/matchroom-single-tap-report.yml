@@ -1,4 +1,4 @@
-name: Match Room fresh independent single-tap report
+name: Match Room retained all-tap graphics integration
 on:
   pull_request:
     types: [synchronize]
@@ -14,7 +14,7 @@ jobs:
       github.event.pull_request.draft == true &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.event.pull_request.head.ref == 'codex/matchroom-graphics' &&
-      github.event.before == 'ab5f4a0ffa5231e3f51e80d882e61a75ae98e632' &&
+      github.event.before == '5ad7fdeed2415d6f25db024127579dd3dcc06cd8' &&
       github.run_attempt == 1
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -35,18 +35,11 @@ jobs:
           sudo apt-get -o Acquire::Retries=1 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 install -y -qq ffmpeg
           python -m pip install 'numpy<3' 'opencv-python-headless<5' 'Pillow>=10,<15' 'onnxruntime>=1.20,<2' 'python-dotenv>=1,<2' 'pytest>=8,<10'
       - name: Verify bounded source requests before model calls
-        run: python -m pytest backend/tests/test_single_tap_source.py backend/tests/test_position_probe.py backend/tests/test_sequence_request_windows.py backend/tests/test_sequence_pilot.py -q
-      - name: Restore the exact visible-selection checkpoint
-        uses: actions/download-artifact@v4
-        with:
-          name: matchroom-single-tap-report-41765803280
-          run-id: 41765803280
-          github-token: ${{ github.token }}
-          path: ${{ runner.temp }}/previous-single-tap
-      - name: Measure source positions for the first finished-report shot
+        run: python -m pytest backend/tests/test_match_room_localization.py backend/tests/test_match_room_position_evidence.py backend/tests/test_match_room_position_contours.py backend/tests/test_single_tap_source.py backend/tests/test_position_probe.py backend/tests/test_sequence_request_windows.py backend/tests/test_sequence_pilot.py -q
+      - name: Measure and render one report clip with all original taps
         env:
           EMERGENT_LLM_KEY: ${{ secrets.EMERGENT_LLM_KEY }}
-        run: python -u backend/scripts/probe_report_positions.py --report "$RUNNER_TEMP/previous-single-tap/single-tap-report/report-document.json" --work "$RUNNER_TEMP/single-tap-input" --tap-index 4 --event-id d2681bfea7368ba44893 --run-model
+        run: python -u backend/scripts/run_matchroom_retained_trial.py --work "$RUNNER_TEMP/single-tap-input" --output "$RUNNER_TEMP/single-tap-report" --event-limit 1 --run-model
       - name: Preserve report, source-bound graphics and model receipts
         if: always()
         uses: actions/upload-artifact@v4
@@ -54,7 +47,7 @@ jobs:
           name: matchroom-single-tap-report-${{ github.run_id }}
           path: |
             ${{ runner.temp }}/single-tap-report/
-            ${{ runner.temp }}/single-tap-input/single-tap.json
+            ${{ runner.temp }}/single-tap-input/all-taps.json
             ${{ runner.temp }}/single-tap-input/positions-result.json
             ${{ runner.temp }}/single-tap-input/*.jpg
           retention-days: 7

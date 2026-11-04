@@ -53,14 +53,20 @@ export function roomFor(comment, fallbackSeconds) {
     camera_static_from_previous: s.camera_static_from_previous === true
   })).sort((a, b) => a.media_ms - b.media_ms) : [];
   const tracking = raw?.tracking;
-  const tracks = bound && tracking?.version === 1 && tracking.event_id === raw.event_id && tracking.source_video_sha256 === raw.source_video_sha256 && ["TAP_OPTICAL_GROUND_PROXY", "TAP_BIDIRECTIONAL_INSTANCE_CONTOUR", "TAP_REACQUIRED_INSTANCE_CONTOUR", "TAP_OBSERVATION_BOUND_CONTOUR"].includes(tracking.method) && Array.isArray(tracking.segments)
+  const tracks = bound && tracking?.version === 1 && tracking.event_id === raw.event_id && tracking.source_video_sha256 === raw.source_video_sha256 && ["TAP_OPTICAL_GROUND_PROXY", "TAP_BIDIRECTIONAL_INSTANCE_CONTOUR", "TAP_REACQUIRED_INSTANCE_CONTOUR", "TAP_OBSERVATION_BOUND_CONTOUR", "SOURCE_OBSERVATION_INSTANCE_CONTOUR"].includes(tracking.method) && Array.isArray(tracking.segments)
     ? tracking.segments.slice(0, 32).flatMap(segment => {
       if (!Array.isArray(segment.samples) || typeof segment.reference_frame !== "string") return [];
       const contour = tracking.method !== "TAP_OPTICAL_GROUND_PROXY";
       const reacquired = tracking.method === "TAP_REACQUIRED_INSTANCE_CONTOUR";
-      const sourceFrameContour = tracking.method === "TAP_OBSERVATION_BOUND_CONTOUR";
+      const localized = tracking.method === "SOURCE_OBSERVATION_INSTANCE_CONTOUR";
+      const sourceFrameContour = localized || tracking.method === "TAP_OBSERVATION_BOUND_CONTOUR";
       if (contour && (segment.ground_method !== "LOWER_VISIBLE_CONTOUR" || !samples.some(s => s.frame_id === segment.reference_frame) || !finite(segment.overlap_frames) || segment.overlap_frames < 5)) return [];
-      if (sourceFrameContour) {
+      if (localized) {
+        const refs = segment.observation_reference_frames;
+        if (segment.source_frame_coverage !== 'COMPLETE_SEGMENT' || !Array.isArray(refs) || refs.length < 2 || refs.length > 160 || new Set(refs).size !== refs.length || !refs.includes(segment.reference_frame) || segment.samples.length < 5 || segment.samples.some(s => !s || !foregroundFor(s))) return [];
+        const first = segment.samples[0].media_ms, last = segment.samples[segment.samples.length-1].media_ms;
+        if (!refs.every(id => raw.samples.some(s => s.frame_id === id && s.identity_status === 'CONFIRMED' && point(s.ground) && segment.samples.some(row => row.media_ms === s.media_ms))) || raw.samples.some(s => s.media_ms >= first && s.media_ms <= last && (s.identity_status !== 'CONFIRMED' || !point(s.ground)))) return [];
+      } else if (sourceFrameContour) {
         const refs = segment.observation_reference_frames;
         if (segment.source_frame_coverage !== 'COMPLETE' || !Array.isArray(segment.seed_ms) || segment.seed_ms.length !== 1 || !finite(segment.seed_ms[0]) || segment.seed_ms[0] < start-750 || segment.seed_ms[0] >= start || end-segment.seed_ms[0] > 2500 || end-start > 2000 || !Array.isArray(refs) || refs.length < 2 || refs.length > 12 || new Set(refs).size !== refs.length || !refs.includes(segment.reference_frame)) return [];
         const supported = refs.map(id => samples.find(s => s.frame_id === id && s.ground));

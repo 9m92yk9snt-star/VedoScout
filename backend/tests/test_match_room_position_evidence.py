@@ -69,3 +69,19 @@ def test_uncertain_ball_is_not_filled_from_adjacent_confirmed_balls():
     result['receipt'].update(raw_response=raw, response_sha256=hashlib.sha256(raw.encode()).hexdigest())
     samples = bound_samples(event, selection, result, validate)
     assert 'ground' in samples[2] and 'ball' not in samples[2]
+
+
+def test_ball_can_continue_after_identified_player_exits_but_not_across_uncertainty():
+    event, selection, result = fixture()
+    rows = json.loads(result['receipt']['raw_response'])
+    for r in rows['frames'][1:]:
+        r.update(target_status='ABSENT',ground=None,box=None,feet_visible=False)
+    def bind():
+        raw=json.dumps(rows)
+        result['receipt'].update(raw_response=raw,response_sha256=hashlib.sha256(raw.encode()).hexdigest())
+        return bound_samples(event,selection,result,validate)
+    assert all('ball' in r for r in bind())
+    rows['frames'][1]['target_status']='UNCERTAIN'
+    assert 'ball' not in bind()[2]
+    rows['frames'][0].update(target_status='ABSENT',ground=None,box=None,feet_visible=False)
+    assert all('ball' not in r for r in bind())

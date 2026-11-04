@@ -278,6 +278,14 @@ def compute(video, anchors, events, checkpoint=None):
         result = {'version': 1, 'source_video_sha256': event['source_video_sha256'],
                   'event_id': event['event_id'], 'method': 'TAP_OPTICAL_GROUND_PROXY', 'segments': [],
                   'observed_samples': pass_motion(video, event, observed_motion(video, observations))}
+        if event.get('localization_method') == 'EXPLICIT_SOURCE_POSITIONS' and event.get('canonical_action_type') in {'SHOT', 'PASS'}:
+            contact = event.get('contact_ms')
+            interval = event.get('contact_interval_ms')
+            after = interval[1] if isinstance(interval, list) and len(interval) == 2 else contact
+            for sample in result['observed_samples']:
+                if not finite(after) or sample.get('ball_motion_start_ms', -1) < after:
+                    for key in ('ballTrail', 'ball_motion_start_ms', 'ball_motion_method'):
+                        sample.pop(key, None)
         output[event['event_id']] = result
         save()  # keep completed sparse graphics if the optional contour work times out
         try:
@@ -286,13 +294,30 @@ def compute(video, anchors, events, checkpoint=None):
             pass  # graphics remain optional; no unmasked replacement is invented
         save()
         diagnostic = {}
+        explicit = event.get('localization_method') == 'EXPLICIT_SOURCE_POSITIONS'
         try:
-            contours = contour_segments(video, anchors, observations, start, end, deadline=deadline,
-                                        diagnostics=diagnostic)
+            if explicit:
+                from match_room_position_contours import contour_segments as position_contours, METHOD as position_method
+                contours = []
+                lo = max(start, min(s['media_ms'] for s in observations))
+                hi = min(end, max(s['media_ms'] for s in observations))
+                while lo < hi and time.monotonic() < deadline-1:
+                    stop = min(hi, lo+1500)
+                    part = {}
+                    contours.extend(position_contours(video, observations, lo, stop,
+                                                      deadline=deadline, diagnostics=part))
+                    diagnostic.setdefault('windows', []).append(part)
+                    if stop == hi:
+                        break
+                    lo = stop-250
+                diagnostic.update(method=position_method, status='SUPPORTED_SOURCE_OBSERVATIONS' if contours else 'NO_AGREED_INTERVAL')
+            else:
+                contours = contour_segments(video, anchors, observations, start, end, deadline=deadline,
+                                            diagnostics=diagnostic)
         except (ImportError, OSError, ValueError, cv2.error):
             contours = []
             diagnostic['status'] = 'CONTOUR_UNAVAILABLE'
-        if not contours and diagnostic.get('status') == 'UNSUPPORTED_INPUT':
+        if not explicit and not contours and diagnostic.get('status') == 'UNSUPPORTED_INPUT':
             from match_room_anchor_contours import anchor_observation_segments
             try:
                 contours = anchor_observation_segments(video, anchors, observations, start, end,
@@ -303,7 +328,7 @@ def compute(video, anchors, events, checkpoint=None):
         if contours:
             result.update(method=diagnostic.get('method', METHOD), segments=contours)
             save()
-        else:
+        elif not explicit:
             seeds = [a for a in anchors if finite(a.get('t')) and start-1500 <= a['t']*1000 <= end+1500]
             # At most two short windows per event, nearest to actual visual evidence.
             seeds.sort(key=lambda a: min(abs(a['t']*1000-s['media_ms']) for s in observations))

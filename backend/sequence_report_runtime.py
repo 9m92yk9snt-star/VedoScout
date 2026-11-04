@@ -444,7 +444,7 @@ def render_assets(video, full, bundle, directory, anchors=None):
     return assets
 
 
-async def persist_assets(collection, doc, video, directory, publish):
+async def persist_assets(collection, doc, video, directory, publish, *, localizer=None):
     started = time.monotonic()
     full = deepcopy(doc["full_report"])
     if not full.get("video_comments"):
@@ -452,7 +452,11 @@ async def persist_assets(collection, doc, video, directory, publish):
     taps = pilot.original_taps({"raw_marker_anchors": doc["raw_marker_anchors"]}) if doc.get("raw_marker_anchors") else []
     anchors = [{"t": t["requested_ms"]/1000, "box": t["box"], "target_point": t["target_point"],
                 **t["selection_hints"]} for t in taps]
-    assets = await asyncio.to_thread(render_assets, video, full, doc["canonical_events"], directory, anchors)
+    from match_room_localization import localize
+    async def save_localization(audit):
+        await collection.update_one({"id": doc["id"]}, {"$set": {"match_room_localization": audit}})
+    graphics_bundle = await (localizer or localize)(video, doc, checkpoint=save_localization)
+    assets = await asyncio.to_thread(render_assets, video, full, graphics_bundle, directory, anchors)
     for row, image, clip in assets:
         row["frame_url"] = await publish(image, "image/jpeg")
         row["tele_clip_url"] = await publish(clip, "video/mp4")
