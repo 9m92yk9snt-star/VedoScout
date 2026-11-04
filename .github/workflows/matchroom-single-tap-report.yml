@@ -14,7 +14,7 @@ jobs:
       github.event.pull_request.draft == true &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.event.pull_request.head.ref == 'codex/matchroom-graphics' &&
-      github.event.before == '05c697f91c9c0f53c18903d812bdd844f1e88b16' &&
+      github.event.before == '64177032667d3fd81f5345f83c42f0229bd3fcf9' &&
       github.run_attempt == 1
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -39,8 +39,8 @@ jobs:
       - name: Restore the exact visible-selection checkpoint
         uses: actions/download-artifact@v4
         with:
-          name: matchroom-single-tap-report-41725039296
-          run-id: 41725039296
+          name: matchroom-single-tap-report-41727716774
+          run-id: 41727716774
           github-token: ${{ github.token }}
           path: ${{ runner.temp }}/previous-single-tap
       - name: Resume missing source responses once after provider throttling
