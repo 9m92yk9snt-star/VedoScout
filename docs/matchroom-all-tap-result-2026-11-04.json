@@ -1,72 +1,255 @@
 {
-  "status": "PASSED_SCOPED_GRAPHICS_CHECK",
-  "code_head": "5d6e9709c9c2c8fc1a58a794368b955b375b08ac",
-  "run_id": 41778466214,
+  "status": "PASSED_RETAINED_MATCH_GRAPHICS_TRIAL",
+  "code_head": "1901438fbfcdcf5f1189a459508e01e15c65c12f",
+  "source_video_sha256": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+  "report_sha256": "11e81504b2aa93f0f686fd8aa2cd4c76b72802e14f1776ebfffdcdfe2a9e7aa3",
   "report_status": "ready",
-  "all_original_taps": 10,
-  "canonical_events": 17,
-  "report_clips": 8,
-  "ellipse_cards": 8,
-  "ellipse_segments": 14,
-  "arrow_cards": 8,
-  "moving_ball_segments": 21,
-  "reused_position_requests": 8,
-  "new_model_requests": 0,
-  "uncertainty_verification": {
-    "passed": true,
-    "hiddenPlayerObservations": 76,
-    "hiddenBallObservations": 65
+  "trial_environment": "local test environment with retained source video, paid receipts and pinned segmentation models",
+  "scope": {
+    "source_analysis_reused": true,
+    "report_prose_reused": true,
+    "normal_asset_pipeline": true,
+    "position_event_ids": [
+      "9e9a8a68c1772db2614f",
+      "dc2acb1e19ba55950e7f",
+      "a512ae64e102f24b3383",
+      "ec74209ace700fa49d2e",
+      "9a392fb19c052dfe6719",
+      "88aa8bbdedbec570d4de",
+      "1349b8676c1e07e88c00",
+      "a8b5662ae46646b8f0ae"
+    ],
+    "human_taps": 10,
+    "production_database_used": false,
+    "notifications_sent": 0
   },
-  "browser_errors": [],
-  "upload_marker_roundtrip": {
-    "passed": true,
+  "acceptance": {
+    "technical_checks_passed": true,
+    "continuous_recovery_frames": 61,
+    "continuous_whole_duel_frames": 249,
+    "continuous_kick_frames": 76,
+    "continuous_direction_frames": 19,
+    "visual_acceptance": "PASSED_SCOPED_SOURCE_AND_REACT_REVIEW",
     "original_taps": 10,
-    "frontend_serializer_used": true,
-    "server_detachment_used": true,
-    "authenticated_upload_ui_tested": false
+    "report_clips": 8,
+    "ellipse_cards": 8,
+    "arrow_cards": 8,
+    "ellipse_segments": 75,
+    "moving_ball_segments": 24,
+    "hiddenPlayerObservations": 59,
+    "hiddenBallObservations": 65,
+    "post_duel_recovery": true,
+    "post_kick_direction": true,
+    "new_model_requests": 0
+  },
+  "browser": {
+    "continuous_playback": [
+      {
+        "index": 5,
+        "verified_interval_ms": [
+          8750,
+          12883
+        ],
+        "unique_presented_frames": 241,
+        "all_presented_frames_have_ellipse": true
+      },
+      {
+        "index": 2,
+        "verified_interval_ms": [
+          30765,
+          32015
+        ],
+        "unique_presented_frames": 74,
+        "all_presented_frames_have_ellipse": true
+      }
+    ],
+    "captured_native_frames_with_ellipse": 325,
+    "captured_direction_frames_with_arrow": 19,
+    "all_eight_cards_checked": true,
+    "errors": []
+  },
+  "visual_review": {
+    "same_white_number_16_player_before_fall_and_after_recovery": true,
+    "ellipse_remains_with_selected_player_during_supported_overlap": true,
+    "post_kick_arrow_matches_observed_up_right_motion": true,
+    "intermediate_display_positions_are_estimates_not_new_source_measurements": true
+  },
+  "unchanged_original_taps": 10,
+  "unchanged_canonical_events": 17,
+  "reused_receipts": 8,
+  "new_paid_requests": 0,
+  "valid_decoded_report_clips": [
+    {
+      "index": 0,
+      "name": "evd_4d87702458e0.mp4",
+      "sha256": "6dbd29e91553a808c21a1c082d2af172b581239549dd2773ac22529e1bd3bf7c",
+      "width": 720,
+      "height": 1280,
+      "nb_read_frames": "165"
+    },
+    {
+      "index": 1,
+      "name": "evd_b8e044352b67.mp4",
+      "sha256": "c489833aed28e4cb0b58376a4818354ffe26c148b5a01dc2255a5e3aa6ffe0e5",
+      "width": 720,
+      "height": 1280,
+      "nb_read_frames": "212"
+    },
+    {
+      "index": 2,
+      "name": "evd_e69c8aeb8274.mp4",
+      "sha256": "7a80071b34b7764fe48e5bf29eb16688af43f7ffbb40004c2a6ad47f00c44344",
+      "width": 720,
+      "height": 1280,
+      "nb_read_frames": "165"
+    },
+    {
+      "index": 3,
+      "name": "evd_9db7a8f6bcbd.mp4",
+      "sha256": "438915d1cbd8fc0dc8158b8f93a2ba8cf75cbdd8686e896196322ec5fb1d6eee",
+      "width": 720,
+      "height": 1280,
+      "nb_read_frames": "255"
+    },
+    {
+      "index": 4,
+      "name": "evd_3570ae3d2b0f.mp4",
+      "sha256": "d112850ee75b9d6573ee7f69bff2072bf3ef41603526bda0fa505cc42b30a689",
+      "width": 720,
+      "height": 1280,
+      "nb_read_frames": "250"
+    },
+    {
+      "index": 5,
+      "name": "evd_b5f74c4eb087.mp4",
+      "sha256": "7ce0161cf9a57b288c2bfb31a6de0caddb3871b4f79a6afa26206e1a5efb018a",
+      "width": 720,
+      "height": 1280,
+      "nb_read_frames": "294"
+    },
+    {
+      "index": 6,
+      "name": "evd_7c6a6a341b24.mp4",
+      "sha256": "87df83bdc4b0c36e5e53f2ab38b791eaab341d7451d3653baa796053d66db97e",
+      "width": 720,
+      "height": 1280,
+      "nb_read_frames": "270"
+    },
+    {
+      "index": 7,
+      "name": "evd_d559f5fe3ce5.mp4",
+      "sha256": "129da242d0003745118d4ffae38a58e6841a6bde925ef34b69faa0f0b13e850c",
+      "width": 720,
+      "height": 1280,
+      "nb_read_frames": "218"
+    }
+  ],
+  "targeted_backend_tests_passed": 300,
+  "frontend_localization_contract_passed": true,
+  "approved_reference_curve_unchanged_frames": 23,
+  "ci": {
+    "run_url": "https://github.com/9m92yk9snt-star/VedoScout/actions/runs/41801089016",
+    "jobs_passed": [
+      "matchroom_contract",
+      "report_evidence_export",
+      "fix10_unit",
+      "backend_regression",
+      "frontend_build",
+      "player_selection"
+    ]
+  },
+  "preview": {
+    "filename": "MatchRoom_ny_proeve_duel_og_boldretning.mp4",
+    "sha256": "a77a7627582df84e827d76a4ca57637f127a94f72ac28de27f8a1fd8e86e481f",
+    "bytes": 10450032,
+    "duration_seconds": 16.233333,
+    "normal_then_half_speed": true,
+    "rendering": "Actual report React renderer; deterministic source-frame capture. Labels and replay speed added for presentation. No hand-positioned graphics.",
+    "library_file_id": "libfile_088b0bfe51488191b8229da0ce7c4e53"
   },
   "normal_authenticated_upload_ui_tested": false,
   "production_database_used": false,
   "notifications_sent": 0,
   "merge_or_deploy": false,
   "draft": true,
+  "supersedes": {
+    "code_head": "5d6e9709c9c2c8fc1a58a794368b955b375b08ac",
+    "reason": "Earlier short-fragment checks did not establish continuous visual acceptance."
+  },
   "cards": [
     {
       "event_id": "9e9a8a68c1772db2614f",
       "ellipse_intervals_ms": [
         [
-          56264,
-          56381
+          56064,
+          56264
+        ],
+        [
+          56381,
+          56514
         ],
         [
           56514,
           56648
+        ],
+        [
+          56514,
+          56764
+        ],
+        [
+          56264,
+          56398
         ]
       ],
-      "accepted_ellipse_segments": 2,
-      "accepted_ball_segments": 2
+      "ball_segments": 2
     },
     {
       "event_id": "dc2acb1e19ba55950e7f",
       "ellipse_intervals_ms": [
         [
-          23666,
-          23749
+          23499,
+          23632
+        ],
+        [
+          23499,
+          23666
+        ],
+        [
+          23632,
+          23766
         ]
       ],
-      "accepted_ellipse_segments": 1,
-      "accepted_ball_segments": 2
+      "ball_segments": 2
     },
     {
       "event_id": "a512ae64e102f24b3383",
       "ellipse_intervals_ms": [
         [
+          30765,
+          30899
+        ],
+        [
+          30899,
+          31015
+        ],
+        [
+          31015,
+          31649
+        ],
+        [
           31649,
           31765
+        ],
+        [
+          31765,
+          31982
+        ],
+        [
+          31765,
+          32015
         ]
       ],
-      "accepted_ellipse_segments": 1,
-      "accepted_ball_segments": 4
+      "ball_segments": 5
     },
     {
       "event_id": "ec74209ace700fa49d2e",
@@ -74,32 +257,150 @@
         [
           43882,
           44015
+        ],
+        [
+          44015,
+          44132
+        ],
+        [
+          44132,
+          44265
+        ],
+        [
+          44265,
+          44382
+        ],
+        [
+          44382,
+          44515
+        ],
+        [
+          44515,
+          44632
+        ],
+        [
+          44632,
+          44765
+        ],
+        [
+          44765,
+          44882
+        ],
+        [
+          44882,
+          45015
+        ],
+        [
+          44882,
+          45132
+        ],
+        [
+          45132,
+          45265
+        ],
+        [
+          45132,
+          45382
         ]
       ],
-      "accepted_ellipse_segments": 1,
-      "accepted_ball_segments": 3
+      "ball_segments": 4
     },
     {
       "event_id": "9a392fb19c052dfe6719",
       "ellipse_intervals_ms": [
         [
+          50615,
+          50748
+        ],
+        [
+          50748,
+          50865
+        ],
+        [
+          50865,
+          50998
+        ],
+        [
           50998,
           51115
+        ],
+        [
+          50998,
+          51131
+        ],
+        [
+          50998,
+          51248
         ]
       ],
-      "accepted_ellipse_segments": 1,
-      "accepted_ball_segments": 1
+      "ball_segments": 1
     },
     {
       "event_id": "88aa8bbdedbec570d4de",
       "ellipse_intervals_ms": [
         [
+          11750,
+          11883
+        ],
+        [
+          11883,
+          12133
+        ],
+        [
+          12133,
+          12383
+        ],
+        [
+          12383,
+          12500
+        ],
+        [
+          12500,
+          12633
+        ],
+        [
+          12500,
+          12749
+        ],
+        [
           12749,
           12883
         ],
         [
-          11750,
-          11883
+          10250,
+          10383
+        ],
+        [
+          10250,
+          10500
+        ],
+        [
+          10500,
+          10633
+        ],
+        [
+          10633,
+          11133
+        ],
+        [
+          11133,
+          11750
+        ],
+        [
+          8750,
+          8883
+        ],
+        [
+          8750,
+          9000
+        ],
+        [
+          9000,
+          9250
+        ],
+        [
+          9250,
+          9383
         ],
         [
           9383,
@@ -108,21 +409,51 @@
         [
           9500,
           9633
+        ],
+        [
+          9633,
+          9750
+        ],
+        [
+          9750,
+          9883
+        ],
+        [
+          9883,
+          10000
+        ],
+        [
+          10000,
+          10133
+        ],
+        [
+          10000,
+          10250
         ]
       ],
-      "accepted_ellipse_segments": 4,
-      "accepted_ball_segments": 3
+      "ball_segments": 3
     },
     {
       "event_id": "1349b8676c1e07e88c00",
       "ellipse_intervals_ms": [
         [
-          28399,
+          28016,
+          28149
+        ],
+        [
+          28149,
+          28266
+        ],
+        [
+          28266,
+          28382
+        ],
+        [
+          28382,
           28516
         ]
       ],
-      "accepted_ellipse_segments": 1,
-      "accepted_ball_segments": 3
+      "ball_segments": 4
     },
     {
       "event_id": "a8b5662ae46646b8f0ae",
@@ -132,840 +463,67 @@
           1767
         ],
         [
-          1767,
+          1633,
           1883
         ],
         [
           1883,
           2017
+        ],
+        [
+          1883,
+          2133
+        ],
+        [
+          2133,
+          2267
+        ],
+        [
+          2267,
+          2383
+        ],
+        [
+          2383,
+          2517
+        ],
+        [
+          2383,
+          2633
+        ],
+        [
+          2633,
+          2767
+        ],
+        [
+          2633,
+          2883
+        ],
+        [
+          2883,
+          3017
+        ],
+        [
+          2883,
+          3083
+        ],
+        [
+          3017,
+          3267
+        ],
+        [
+          3133,
+          3383
+        ],
+        [
+          3267,
+          3500
+        ],
+        [
+          3383,
+          3517
         ]
       ],
-      "accepted_ellipse_segments": 3,
-      "accepted_ball_segments": 3
+      "ball_segments": 3
     }
-  ],
-  "artifact_id": 13298760601,
-  "artifact_sha256": "de2283c13cd342e7870b86036ae4fd0af7d8ece1597e96d4ee9f2b6fa6b06b35",
-  "production_verification_run": 41778459424,
-  "production_verification_jobs_passed": 6,
-  "backend_controls_passed": 207,
-  "frontend_controls_passed": 9,
-  "duel_recovery_interval_ms": [
-    12749,
-    12883
-  ],
-  "observed_shot_direction": "up/right after contact at30915ms, visually checked at31115ms",
-  "limitations": [
-    "Short measured intervals, not continuous tracking.",
-    "Authenticated upload-to-report UI untested.",
-    "One retained match does not establish accuracy on all matches."
-  ],
-  "browser_continuous": {
-    "output": [
-      {
-        "index": 0,
-        "event_id": "9e9a8a68c1772db2614f",
-        "offset": 55.264455999999996,
-        "frames": [
-          {
-            "source_ms": 56231,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 56248,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 56264,
-            "ellipse_ms": 56264,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 56281,
-            "ellipse_ms": 56281,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 56248,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 56281,
-            "ellipse_ms": 56281,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 56298,
-            "ellipse_ms": 56298,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 56314,
-            "ellipse_ms": 56314,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 56331,
-            "ellipse_ms": 56331,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 56348,
-            "ellipse_ms": 56348,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 56364,
-            "ellipse_ms": 56364,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 56381,
-            "ellipse_ms": 56381,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 56398,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 56414,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 56431,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 56448,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 56464,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 56481,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 56498,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 56514,
-            "ellipse_ms": 56514,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 56531,
-            "ellipse_ms": 56531,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 56548,
-            "ellipse_ms": 56548,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 56564,
-            "ellipse_ms": 56564,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 56581,
-            "ellipse_ms": 56581,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 56598,
-            "ellipse_ms": 56598,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 56614,
-            "ellipse_ms": 56614,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 56631,
-            "ellipse_ms": 56631,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 56648,
-            "ellipse_ms": 56648,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 56664,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 56681,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 56698,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 56714,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 56731,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 56748,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 56764,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          }
-        ]
-      },
-      {
-        "index": 1,
-        "event_id": "dc2acb1e19ba55950e7f",
-        "offset": 22.74909,
-        "frames": [
-          {
-            "source_ms": 23632,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 23649,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 23666,
-            "ellipse_ms": 23666,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 23682,
-            "ellipse_ms": 23682,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 23699,
-            "ellipse_ms": 23699,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 23666,
-            "ellipse_ms": 23666,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 23682,
-            "ellipse_ms": 23682,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 23699,
-            "ellipse_ms": 23699,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 23716,
-            "ellipse_ms": 23716,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 23732,
-            "ellipse_ms": 23732,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 23749,
-            "ellipse_ms": 23749,
-            "arrow_ms": 23749
-          },
-          {
-            "source_ms": 23766,
-            "ellipse_ms": null,
-            "arrow_ms": 23766
-          },
-          {
-            "source_ms": 23782,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 23799,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 23816,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 23832,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 23849,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 23866,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          }
-        ]
-      },
-      {
-        "index": 5,
-        "event_id": "88aa8bbdedbec570d4de",
-        "offset": 7.99968,
-        "frames": [
-          {
-            "source_ms": 12166,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 12183,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 12200,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 12216,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 12250,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 12266,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 12283,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 12300,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 12316,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 12333,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 12350,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 12366,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 12383,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 12400,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 12416,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 12433,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 12450,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 12466,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 12483,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 12500,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 12516,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 12533,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 12549,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 12566,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 12583,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 12599,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 12616,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 12633,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 12649,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 12666,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 12683,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 12699,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 12716,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 12733,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 12749,
-            "ellipse_ms": 12749,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 12766,
-            "ellipse_ms": 12766,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 12783,
-            "ellipse_ms": 12783,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 12799,
-            "ellipse_ms": 12799,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 12816,
-            "ellipse_ms": 12816,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 12833,
-            "ellipse_ms": 12833,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 12849,
-            "ellipse_ms": 12849,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 12866,
-            "ellipse_ms": 12866,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 12883,
-            "ellipse_ms": 12883,
-            "arrow_ms": null
-          }
-        ]
-      },
-      {
-        "index": 2,
-        "event_id": "a512ae64e102f24b3383",
-        "offset": 30.015466,
-        "frames": [
-          {
-            "source_ms": 30932,
-            "ellipse_ms": null,
-            "arrow_ms": 30932
-          },
-          {
-            "source_ms": 30899,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 30949,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 30965,
-            "ellipse_ms": null,
-            "arrow_ms": 30965
-          },
-          {
-            "source_ms": 30982,
-            "ellipse_ms": null,
-            "arrow_ms": 30982
-          },
-          {
-            "source_ms": 30999,
-            "ellipse_ms": null,
-            "arrow_ms": 30999
-          },
-          {
-            "source_ms": 31015,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 31032,
-            "ellipse_ms": null,
-            "arrow_ms": 31032
-          },
-          {
-            "source_ms": 31049,
-            "ellipse_ms": null,
-            "arrow_ms": 31049
-          },
-          {
-            "source_ms": 31065,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 31082,
-            "ellipse_ms": null,
-            "arrow_ms": 31082
-          },
-          {
-            "source_ms": 31099,
-            "ellipse_ms": null,
-            "arrow_ms": 31099
-          },
-          {
-            "source_ms": 31115,
-            "ellipse_ms": null,
-            "arrow_ms": 31115
-          },
-          {
-            "source_ms": 31132,
-            "ellipse_ms": null,
-            "arrow_ms": 31132
-          },
-          {
-            "source_ms": 31149,
-            "ellipse_ms": null,
-            "arrow_ms": 31149
-          },
-          {
-            "source_ms": 31182,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 31199,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 31215,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 31232,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 31249,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 31265,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 31282,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 31249,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 31282,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 31299,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 31315,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 31332,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 31349,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 31365,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 31382,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 31399,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 31415,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 31432,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 31449,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 31465,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 31482,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 31499,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 31515,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 31532,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 31549,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 31565,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 31582,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 31599,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 31615,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 31632,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 31649,
-            "ellipse_ms": 31649,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 31665,
-            "ellipse_ms": 31665,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 31682,
-            "ellipse_ms": 31682,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 31699,
-            "ellipse_ms": 31699,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 31715,
-            "ellipse_ms": 31715,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 31732,
-            "ellipse_ms": 31732,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 31749,
-            "ellipse_ms": 31749,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 31765,
-            "ellipse_ms": 31765,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 31782,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 31799,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 31815,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 31832,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 31849,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          },
-          {
-            "source_ms": 31865,
-            "ellipse_ms": null,
-            "arrow_ms": null
-          }
-        ]
-      }
-    ],
-    "errors": []
-  }
+  ]
 }
