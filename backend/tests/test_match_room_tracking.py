@@ -294,3 +294,17 @@ def test_partial_ellipse_triggers_targeted_refinement_without_erasing_existing(m
     assert result['e']['ball_playback'] == original['ball_playback']
     assert '_display_refinement_windows' not in event
     assert status == 'COMPLETED'
+
+
+def test_source_graphics_have_a_bounded_budget_that_does_not_truncate_valid_tail(monkeypatch):
+    event = {'localization_method':'EXPLICIT_SOURCE_POSITIONS','visual_samples':[{}]}
+    timeouts = []
+    def expire(command, **kwargs):
+        timeouts.append(kwargs['timeout'])
+        raise subprocess.TimeoutExpired(command, kwargs['timeout'])
+    monkeypatch.setattr(subprocess, 'run', expire)
+    tracking._bounded_event('unused', [], [event])
+    tracking._bounded_event('unused', [], [event], refinement='medium')
+    assert timeouts == [35, 180]
+    assert tracking.TIMEOUT_S == 25
+    assert tracking.MAX_EVENTS*tracking.SOURCE_TIMEOUT_S+tracking.MAX_REFINEMENT_EVENTS*tracking.MEDIUM_TIMEOUT_S == 820

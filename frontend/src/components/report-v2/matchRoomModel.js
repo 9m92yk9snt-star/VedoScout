@@ -54,7 +54,7 @@ export function roomFor(comment, fallbackSeconds) {
   })).sort((a, b) => a.media_ms - b.media_ms) : [];
   const tracking = raw?.tracking;
   const tracks = bound && tracking?.version === 1 && tracking.event_id === raw.event_id && tracking.source_video_sha256 === raw.source_video_sha256 && ["TAP_OPTICAL_GROUND_PROXY", "TAP_BIDIRECTIONAL_INSTANCE_CONTOUR", "TAP_REACQUIRED_INSTANCE_CONTOUR", "TAP_OBSERVATION_BOUND_CONTOUR", "SOURCE_OBSERVATION_INSTANCE_CONTOUR"].includes(tracking.method) && Array.isArray(tracking.segments)
-    ? tracking.segments.slice(0, 32).flatMap(segment => {
+    ? tracking.segments.slice(0, 96).flatMap(segment => {
       if (!Array.isArray(segment.samples) || segment.samples.some(s => !s) || typeof segment.reference_frame !== "string") return [];
       const contour = tracking.method !== "TAP_OPTICAL_GROUND_PROXY";
       const reacquired = tracking.method === "TAP_REACQUIRED_INSTANCE_CONTOUR";

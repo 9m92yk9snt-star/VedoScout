@@ -14,8 +14,9 @@ from pathlib import Path
 MAX_GAP_MS = 120
 MAX_EVENTS = 8
 TIMEOUT_S = 25
+SOURCE_TIMEOUT_S = 35
 MAX_REFINEMENT_EVENTS = 3
-MEDIUM_TIMEOUT_S = 90
+MEDIUM_TIMEOUT_S = 180
 
 
 def finite(x):
@@ -263,7 +264,7 @@ def compute(video, anchors, events, checkpoint=None):
     from motion_compensation import compute_motion_samples
     from match_room_contours import contour_segments, METHOD
     cv2.setNumThreads(2)
-    deadline = time.monotonic() + TIMEOUT_S - 3
+    deadline = time.monotonic() + (SOURCE_TIMEOUT_S if any(e.get('localization_method') == 'EXPLICIT_SOURCE_POSITIONS' for e in events) else TIMEOUT_S) - 3
     output = {}
     def save():
         if checkpoint is not None:
@@ -436,7 +437,7 @@ def _bounded_event(video, anchors, events, *, refinement=False):
                                        'refinement': refinement}))
         try:
             subprocess.run([sys.executable, str(Path(__file__).resolve()), str(request), str(result)],
-                           timeout=MEDIUM_TIMEOUT_S if refinement == 'medium' else TIMEOUT_S,
+                           timeout=MEDIUM_TIMEOUT_S if refinement == 'medium' else TIMEOUT_S if refinement else SOURCE_TIMEOUT_S if any(e.get('localization_method') == 'EXPLICIT_SOURCE_POSITIONS' for e in events) else TIMEOUT_S,
                            check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             return json.loads(result.read_text()), 'COMPLETED'
         except subprocess.TimeoutExpired:
@@ -483,8 +484,8 @@ def bounded_tracks(video, anchors, events):
     """One bounded child per distinct clip; repeated report cards share results.
 
     At most MAX_EVENTS initial children plus MAX_REFINEMENT_EVENTS optional
-    retries. Initial/small passes allow 25s; medium refinements allow 90s
-    (at most 470s total). Every initial result is complete
+    retries. Source-position passes allow 35s; legacy/small passes allow 25s;
+    medium refinements allow 180s (at most 820s total). Every initial result is complete
     before retries begin; no retry can spend another clip's original budget.
     A difficult earlier clip cannot consume a later clip's inference budget.
     """

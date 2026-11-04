@@ -20,7 +20,7 @@ Adjacent direction segments sharing the same observed ball endpoint are one pres
 
 ## Execution and verification
 
-All original taps and retained paid receipts are reused. Initial tracking passes are bounded at 25 seconds. Up to three targeted medium-model refinements allow 90 seconds each, including when an earlier pass produced only fragmented coverage. Earlier completed paths and ball evidence are retained. The maximum tracking budget is 470 seconds per eight-card report; no additional LLM request is introduced.
+All original taps and retained paid receipts are reused. Source-position tracking passes are bounded at 35 seconds; legacy tap passes retain their 25-second limit. Up to three targeted medium-model refinements allow 180 seconds each, including when an earlier pass produced only fragmented coverage. Earlier completed paths and ball evidence are retained. The maximum tracking budget is 820 seconds per eight-card report; no additional LLM request is introduced.
 
 Report clips are written to temporary MP4s and decoded at both ends before publication. A failed clip cannot be published as ready.
 
