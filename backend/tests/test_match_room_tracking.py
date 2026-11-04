@@ -220,3 +220,41 @@ def test_ball_only_events_do_not_require_unrelated_player_anchors(monkeypatch):
     result, status = tracking.bounded_tracks('video', [], [event])
     assert status == 'COMPLETED' and result == {'ball': {'ball_playback': []}}
     assert calls == [([], [event])]
+
+
+def test_refinement_preserves_initial_paths_and_ball_evidence_with_separate_budget(monkeypatch):
+    from copy import deepcopy
+    method = 'SOURCE_OBSERVATION_INSTANCE_CONTOUR'
+    events = [{'event_id': e, 'source_video_sha256':'source', 'localization_method':'EXPLICIT_SOURCE_POSITIONS',
+               'visual_samples':[{}]} for e in ('covered','missing1','missing2','missing3')]
+    originals = {e['event_id']:{'event_id':e['event_id'], 'source_video_sha256':'source', 'method':method,
+                  'segments':[{'id':'original'}] if e['event_id']=='covered' else [],
+                  'ball_playback':[{'id':'ball-'+e['event_id']}], 'observed_samples':[{'identity_status':'UNCERTAIN'}]}
+                 for e in events}
+    calls = []
+    def run(video, anchors, batch, *, refinement=False):
+        eid = batch[0]['event_id']; calls.append((eid,refinement))
+        if not refinement: return {eid:deepcopy(originals[eid])}, 'COMPLETED'
+        return {eid:{'event_id':eid, 'source_video_sha256':'source', 'method':method,
+                     'segments':[{'id':'measured'}], 'ball_playback':[{'id':'must-not-replace'}]}}, 'COMPLETED'
+    monkeypatch.setattr(tracking, '_bounded_event', run)
+    result, status = tracking.bounded_tracks('video', [], events)
+    assert calls == [(e['event_id'],False) for e in events]+[('missing1',True),('missing2',True)]
+    assert result['covered'] == originals['covered']
+    assert result['missing3'] == originals['missing3']
+    for eid in ('missing1','missing2'):
+        assert result[eid]['segments'] == [{'id':'measured'}]
+        assert result[eid]['ball_playback'] == originals[eid]['ball_playback']
+        assert result[eid]['observed_samples'] == originals[eid]['observed_samples']
+    assert status == 'COMPLETED' and tracking.TIMEOUT_S == 25
+
+
+def test_failed_refinement_keeps_original_evidence(monkeypatch):
+    event = {'event_id':'e','source_video_sha256':'source','localization_method':'EXPLICIT_SOURCE_POSITIONS','visual_samples':[{}]}
+    original = {'event_id':'e','source_video_sha256':'source','method':'SOURCE_OBSERVATION_INSTANCE_CONTOUR',
+                'segments':[], 'ball_playback':[{'id':'measured-ball'}]}
+    def run(video, anchors, events, *, refinement=False):
+        return ({}, 'TRACKING_UNAVAILABLE') if refinement else ({'e':original.copy()}, 'COMPLETED')
+    monkeypatch.setattr(tracking, '_bounded_event', run)
+    result, status = tracking.bounded_tracks('video', [], [event])
+    assert result['e'] == original and status == 'TRACKING_PARTIAL'

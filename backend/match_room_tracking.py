@@ -14,6 +14,7 @@ from pathlib import Path
 MAX_GAP_MS = 120
 MAX_EVENTS = 8
 TIMEOUT_S = 25
+MAX_REFINEMENT_EVENTS = 2
 
 
 def finite(x):
@@ -376,13 +377,54 @@ def compute(video, anchors, events, checkpoint=None):
     return output
 
 
-def _bounded_event(video, anchors, events):
+def compute_refinement(video, anchors, events, checkpoint=None):
+    """A separate budget for missing ellipses; never recompute ball evidence."""
+    import cv2
+    from match_room import presentation_window
+    from match_room_position_contours import contour_segments, observation_windows, refinement_model, METHOD
+    cv2.setNumThreads(2)
+    deadline = time.monotonic() + TIMEOUT_S - 3
+    output = {}
+    def save():
+        if checkpoint is not None:
+            temporary = Path(str(checkpoint)+'.tmp')
+            temporary.write_text(json.dumps(output))
+            temporary.replace(checkpoint)
+    for event in events[:1]:
+        if event.get('localization_method') != 'EXPLICIT_SOURCE_POSITIONS':
+            continue
+        observations = event.get('visual_samples') or []
+        if not observations:
+            continue
+        start, end = presentation_window(event)
+        result = {'version': 1, 'event_id': event['event_id'],
+                  'source_video_sha256': event['source_video_sha256'],
+                  'method': METHOD, 'segments': [], 'refinement_diagnostics': {'windows': []}}
+        output[event['event_id']] = result
+        save()
+        model = refinement_model()
+        def preserve(segment):
+            result['segments'].append(segment)
+            save()
+        for lo, hi in observation_windows(observations, start, end):
+            if time.monotonic() >= deadline-1:
+                break
+            part = {'start_ms': lo, 'end_ms': hi}
+            contour_segments(video, observations, lo, hi, deadline=deadline,
+                             diagnostics=part, on_segment=preserve, segmenter=model)
+            result['refinement_diagnostics']['windows'].append(part)
+            save()
+    return output
+
+
+def _bounded_event(video, anchors, events, *, refinement=False):
     """One owned child, hard wall-clock bound; failure keeps sparse graphics."""
     if not any(e.get('visual_samples') for e in events):
         return {}, 'NO_TRACK_INPUT'
     with tempfile.TemporaryDirectory(prefix='matchroom-track-') as work:
         request, result = Path(work)/'input.json', Path(work)/'output.json'
-        request.write_text(json.dumps({'video': str(video), 'anchors': anchors, 'events': events[:MAX_EVENTS]}))
+        request.write_text(json.dumps({'video': str(video), 'anchors': anchors, 'events': events[:MAX_EVENTS],
+                                       'refinement': refinement}))
         try:
             subprocess.run([sys.executable, str(Path(__file__).resolve()), str(request), str(result)],
                            timeout=TIMEOUT_S, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -402,7 +444,9 @@ def _bounded_event(video, anchors, events):
 def bounded_tracks(video, anchors, events):
     """One bounded child per distinct clip; repeated report cards share results.
 
-    At most MAX_EVENTS sequential children, each hard-limited to TIMEOUT_S.
+    At most MAX_EVENTS initial children plus MAX_REFINEMENT_EVENTS optional
+    retries, each hard-limited to TIMEOUT_S. Every initial result is complete
+    before retries begin; no retry can spend another clip's original budget.
     A difficult earlier clip cannot consume a later clip's inference budget.
     """
     if not any(e.get('visual_samples') for e in events):
@@ -421,6 +465,25 @@ def bounded_tracks(video, anchors, events):
         result,status = _bounded_event(video,anchors,[event])
         output.update(result)
         statuses.append(status)
+    attempted = 0
+    for event in unique:
+        if not event.get('event_id'):
+            continue
+        previous = output.get(event['event_id']) or {}
+        if (attempted >= MAX_REFINEMENT_EVENTS or previous.get('segments')
+                or event.get('localization_method') != 'EXPLICIT_SOURCE_POSITIONS'
+                or previous.get('method') != 'SOURCE_OBSERVATION_INSTANCE_CONTOUR'
+                or previous.get('source_video_sha256') != event.get('source_video_sha256')):
+            continue
+        attempted += 1
+        retried, status = _bounded_event(video, anchors, [event], refinement=True)
+        result = retried.get(event['event_id']) or {}
+        if (result.get('event_id') == event['event_id'] and result.get('method') == previous.get('method')
+                and result.get('source_video_sha256') == event.get('source_video_sha256')):
+            # Preserve original observations, moving arrows and completed paths.
+            previous['refinement_diagnostics'] = result.get('refinement_diagnostics', {})
+            previous['segments'] = result.get('segments', [])
+        statuses.append(status)
     if all(s == 'COMPLETED' for s in statuses):
         return output,'COMPLETED'
     if len(statuses) == 1:
@@ -431,6 +494,7 @@ def bounded_tracks(video, anchors, events):
 if __name__ == '__main__':
     request = json.loads(Path(sys.argv[1]).read_text())
     result = Path(sys.argv[2])
-    compute(**request, checkpoint=result)
+    operation = compute_refinement if request.pop('refinement', False) else compute
+    operation(**request, checkpoint=result)
     if not result.exists():
         result.write_text('{}')

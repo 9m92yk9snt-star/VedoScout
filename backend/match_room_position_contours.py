@@ -10,6 +10,19 @@ from match_room_contours import agrees_with_observation, follow_instance
 METHOD = 'SOURCE_OBSERVATION_INSTANCE_CONTOUR'
 
 
+def refinement_model():
+    """Load the pinned, local medium segmenter only after a small-model miss."""
+    import cv2
+    from native_player_segmentation import PersonSegmenter
+    from match_room_reacquisition import MODEL_PATH, MODEL_SHA256
+    from player_segmentation_assets import ensure_model_asset
+    ensure_model_asset(MODEL_PATH, MODEL_SHA256)
+    model = PersonSegmenter.__new__(PersonSegmenter)
+    model.net = cv2.dnn.readNetFromONNX(str(MODEL_PATH))
+    model.sha256 = MODEL_SHA256
+    return model
+
+
 def agreed_intervals(frames, detections, observations, *, deadline):
     """Require both endpoint observations and both complete optical paths."""
     if not frames or len(frames) != len(detections):
@@ -79,7 +92,7 @@ def observation_windows(observations, start, end):
     return [(a, b) for _, a, b in windows]
 
 
-def contour_segments(video, observations, start, end, *, deadline, diagnostics, on_segment=None):
+def contour_segments(video, observations, start, end, *, deadline, diagnostics, on_segment=None, segmenter=None):
     """Bounded short proof only. Partial valid intervals stay separate."""
     from native_player_segmentation import PersonSegmenter
     from match_room_contours import read_clip, detect_frame, measured_mask
@@ -97,7 +110,7 @@ def contour_segments(video, observations, start, end, *, deadline, diagnostics, 
         return []
     start, end = min(a['media_ms'] for a, _ in pairs), max(b['media_ms'] for _, b in pairs)
     boxes = [s['player_box'] for pair in pairs for s in pair if s.get('player_box')]
-    model = PersonSegmenter()
+    model = segmenter if segmenter is not None else PersonSegmenter()
     frames, detections, segments = [], [], []
     pending = {b['media_ms']: (a, b) for a, b in pairs}
     stream = read_clip(video, start, end, sample_step=0)
@@ -111,7 +124,8 @@ def contour_segments(video, observations, start, end, *, deadline, diagnostics, 
             # Keep competitors in one fixed full-width detector view.
             top = max(0, int((min(b[1] for b in boxes)-.1)*h))
             bottom = min(h, int((max(b[1]+b[3] for b in boxes)+.1)*h)+1)
-            detections.append(detect_frame(frame, (0, top, w, bottom), model))
+            roi = (0, top, w, bottom)
+            detections.append(detect_frame(frame, roi, model))
             frame.pop('image')
             frames.append(frame)
             pair = pending.get(frame['media_ms'])
@@ -140,6 +154,7 @@ def contour_segments(video, observations, start, end, *, deadline, diagnostics, 
                     segment = {'id': f"position-contour:{samples[0]['media_ms']}:{samples[-1]['media_ms']}",
                                'reference_frame': refs[0], 'observation_reference_frames': refs,
                                'overlap_frames': len(samples),
+                               'segmenter_sha256': getattr(model, 'sha256', None),
                                'ground_method': 'LOWER_VISIBLE_CONTOUR',
                                'source_frame_coverage': 'COMPLETE_SEGMENT', 'samples': samples}
                     segments.append(segment)
