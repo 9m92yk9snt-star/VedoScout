@@ -8,6 +8,7 @@ import time
 METHOD = 'SOURCE_FRAME_BALL_DIRECTION'
 MAX_FRAMES = 150
 MAX_SEGMENTS = 16
+MAX_SOURCE_CACHE_BYTES = 64 * 1024 * 1024
 
 
 def build_ball_playback(video, event, observations, deadline):
@@ -17,6 +18,7 @@ def build_ball_playback(video, event, observations, deadline):
     from player_tracking import _read_window, _cut_flags
     from motion_compensation import estimate_camera
     from native_player_segmentation import _instances
+
     from video_timebase import seek_with_preroll, grab_frame_time_seconds
 
     segments, failures = [], []
@@ -54,7 +56,20 @@ def build_ball_playback(video, event, observations, deadline):
                 # Explicit unknown rows are hard stops; never fade past the
                 # last observed endpoint into unobserved or uncertain video.
                 until = end
-            frames = _read_window(cap, start/1000-.001, until/1000+.001, 0, seed_time=start/1000)
+            source_pixels = {}
+            cache_bytes, cache_overflow = 0, False
+            def retain_source(stamp, pixels):
+                nonlocal cache_bytes, cache_overflow
+                if cache_overflow:
+                    return
+                if len(source_pixels) >= MAX_FRAMES or cache_bytes + pixels.nbytes > MAX_SOURCE_CACHE_BYTES:
+                    source_pixels.clear()
+                    cache_overflow = True
+                    return
+                source_pixels[round(stamp*1000)] = pixels
+                cache_bytes += pixels.nbytes
+            frames = _read_window(cap, start/1000-.001, until/1000+.001, 0,
+                                  seed_time=start/1000, on_frame=retain_source)
             endpoint = next((i for i, f in enumerate(frames) if abs(f[0]*1000-end) <= 2), None)
             if (not 2 <= len(frames) <= MAX_FRAMES or endpoint is None
                     or abs(frames[0][0]*1000-start) > 2
@@ -81,17 +96,24 @@ def build_ball_playback(video, event, observations, deadline):
             initial = np.array([release['ball'][0]*w, release['ball'][1]*h, 1.])
             destination = inverse @ np.array([arrival['ball'][0]*w, arrival['ball'][1]*h, 1.])
             rows = []
-            ok, t, fallback = seek_with_preroll(cap, start/1000)
+            if cache_overflow:
+                ok, t, fallback = seek_with_preroll(cap, start/1000)
             for source, camera in zip(frames, cameras):
                 if time.monotonic() >= deadline-1:
                     break
-                while ok and t < source[0]-.001:
-                    ok, t, fallback = grab_frame_time_seconds(cap)
-                if not ok or fallback or abs(t-source[0]) > .002:
-                    break
-                ok_pixels, pixels = cap.retrieve()
-                if not ok_pixels:
-                    break
+                if cache_overflow:
+                    while ok and t < source[0]-.001:
+                        ok, t, fallback = grab_frame_time_seconds(cap)
+                    if not ok or fallback or abs(t-source[0]) > .002:
+                        break
+                    ok_pixels, pixels = cap.retrieve()
+                    if not ok_pixels:
+                        break
+                else:
+                    t = source[0]
+                    pixels = source_pixels.pop(round(t*1000), None)
+                    if pixels is None:
+                        break
                 trail = [(camera @ p)[:2] / [w, h] for p in (initial, destination)]
                 # Camera projection may legitimately put the recipient offscreen.
                 # SVG clipping handles it; unbounded/invalid transforms do not.
