@@ -16,7 +16,7 @@ MAX_EVENTS = 8
 TIMEOUT_S = 25
 SOURCE_TIMEOUT_S = 35
 MAX_REFINEMENT_EVENTS = 3
-MEDIUM_TIMEOUT_S = 180
+MEDIUM_TIMEOUT_S = 210
 
 
 def finite(x):
@@ -485,7 +485,7 @@ def bounded_tracks(video, anchors, events):
 
     At most MAX_EVENTS initial children plus MAX_REFINEMENT_EVENTS optional
     retries. Source-position passes allow 35s; legacy/small passes allow 25s;
-    medium refinements allow 180s (at most 820s total). Every initial result is complete
+    medium refinements allow 210s (at most 910s total). Every initial result is complete
     before retries begin; no retry can spend another clip's original budget.
     A difficult earlier clip cannot consume a later clip's inference budget.
     """

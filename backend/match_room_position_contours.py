@@ -272,6 +272,21 @@ def observation_windows(observations, start, end):
     return [(a, b) for _, a, b in windows]
 
 
+def bind_source_display_knots(frames, detections, interval, observations):
+    """Keep confirmed middle observations in every overlapping display curve.
+
+    Only missing pixel ground gets a source presentation knot. Measurements
+    and raw source observations are left unchanged.
+    """
+    by_time = {o['media_ms']: o for o in observations
+               if o.get('identity_status') == 'CONFIRMED' and o.get('ground')}
+    knots = interval.setdefault('source_endpoint_ground', {})
+    for i, j in zip(interval['indices'], interval['instances']):
+        observation = by_time.get(frames[i]['media_ms'])
+        if observation and (j is None or detections[i][j].get('ground') is None):
+            knots[i] = observation['ground']
+
+
 def contour_segments(video, observations, start, end, *, deadline, diagnostics, on_segment=None, segmenter=None):
     """Bounded short proof only. Partial valid intervals stay separate."""
     from native_player_segmentation import PersonSegmenter
@@ -342,6 +357,7 @@ def contour_segments(video, observations, start, end, *, deadline, diagnostics, 
                 if not supporting_observations(frames, detections, interval, support):
                     continue
                 interval['reference_frames'] = [o['frame_id'] for o in support if o.get('ground')]
+                bind_source_display_knots(frames, detections, interval, support)
                 from match_room_display_bridge import tracked_display_positions
                 display = tracked_display_positions(frames, detections, interval, deadline=deadline)
                 if display is None or not display_fits_source_bodies(frames, interval, display, support):

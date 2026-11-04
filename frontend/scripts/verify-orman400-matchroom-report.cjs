@@ -51,6 +51,8 @@ const {execFileSync} = require('node:child_process');
     .filter(ms => ms >= 11883 && ms <= 12883);
   assert.ok(recoveryFrames.length >= 25, 'Insufficient decoded recovery pictures');
   for (const ms of recoveryFrames) assert.ok(graphicsAt(duel, ms)?.ground, `Ellipse disappears during recovery at ${ms}`);
+  const wholeDuelFrames = decoded.frames.map(f => Math.round((Number(f.best_effort_timestamp_time)+duelRow.tele_clip_start)*1000)).filter(ms => ms >= 8750 && ms <= 12883);
+  for (const ms of wholeDuelFrames) assert.ok(graphicsAt(duel,ms)?.ground, `Ellipse disappears during whole duel at ${ms}`);
   const shot = rooms.get('a512ae64e102f24b3383');
   const shotRow = rows.find(r => r.event_id === 'a512ae64e102f24b3383');
   const shotClip = path.join(path.dirname(process.argv[2]), 'frames', path.basename(shotRow.tele_clip_url));
@@ -66,7 +68,7 @@ const {execFileSync} = require('node:child_process');
   assert.ok(arrow, 'Missing observed post-kick direction');
   const [a,b] = arrow.ballTrail;
   assert.ok(b[0]>a[0] && b[1]<a[1], 'This source shot travels up/right');
-  console.log(JSON.stringify({technical_checks_passed:true,continuous_recovery_frames:recoveryFrames.length,continuous_kick_frames:shotFrames.length,continuous_direction_frames:directionFrames.length,visual_acceptance:'REQUIRES_CONTINUOUS_PLAYBACK_REVIEW',original_taps:10,report_clips:8,ellipse_cards:8,arrow_cards:8,
+  console.log(JSON.stringify({technical_checks_passed:true,continuous_recovery_frames:recoveryFrames.length,continuous_whole_duel_frames:wholeDuelFrames.length,continuous_kick_frames:shotFrames.length,continuous_direction_frames:directionFrames.length,visual_acceptance:'REQUIRES_CONTINUOUS_PLAYBACK_REVIEW',original_taps:10,report_clips:8,ellipse_cards:8,arrow_cards:8,
     ellipse_segments:ellipses,moving_ball_segments:arrows,hiddenPlayerObservations:hiddenPlayer,
     hiddenBallObservations:hiddenBall,post_duel_recovery:true,post_kick_direction:true,new_model_requests:0}));
 })().catch(error=>{console.error(error.message);process.exitCode=1;});

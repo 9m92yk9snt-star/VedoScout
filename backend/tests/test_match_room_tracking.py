@@ -305,6 +305,6 @@ def test_source_graphics_have_a_bounded_budget_that_does_not_truncate_valid_tail
     monkeypatch.setattr(subprocess, 'run', expire)
     tracking._bounded_event('unused', [], [event])
     tracking._bounded_event('unused', [], [event], refinement='medium')
-    assert timeouts == [35, 180]
+    assert timeouts == [35, 210]
     assert tracking.TIMEOUT_S == 25
-    assert tracking.MAX_EVENTS*tracking.SOURCE_TIMEOUT_S+tracking.MAX_REFINEMENT_EVENTS*tracking.MEDIUM_TIMEOUT_S == 820
+    assert tracking.MAX_EVENTS*tracking.SOURCE_TIMEOUT_S+tracking.MAX_REFINEMENT_EVENTS*tracking.MEDIUM_TIMEOUT_S == 910

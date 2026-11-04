@@ -234,3 +234,19 @@ def test_automatic_flow_exports_endpoint_estimates_without_pixel_identity_claim(
     assert middle['source_ground_observation'] is False
     monkeypatch.setattr(motion_compensation, 'estimate_camera', lambda *a: (None,'failure'))
     assert localized.contour_segments('unused',obs,0,200,deadline=time.monotonic()+5,diagnostics={}) == []
+
+
+def test_middle_source_knot_is_shared_by_overlapping_curves_without_rewriting_measurements(monkeypatch):
+    frames, rows, obs, _ = fixture(monkeypatch)
+    rows[2][0]['ground'] = None
+    middle = {'frame_id':'f100','media_ms':100,'identity_status':'CONFIRMED','ground':[.43,.77]}
+    obs.insert(1,middle)
+    interval = {'indices':list(range(5)), 'instances':[0]*5}
+    localized.bind_source_display_knots(frames, rows, interval, obs)
+    assert interval['source_endpoint_ground'] == {2:[.43,.77]}
+    assert rows[2][0]['ground'] is None
+    assert rows[0][0]['ground'] == [.4,.79]
+    middle['identity_status'] = 'UNCERTAIN'
+    other = {'indices':list(range(5)), 'instances':[0]*5}
+    localized.bind_source_display_knots(frames, rows, other, obs)
+    assert other['source_endpoint_ground'] == {}

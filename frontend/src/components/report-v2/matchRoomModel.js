@@ -147,7 +147,8 @@ export function graphicsAt(room, mediaMs) {
     // A coarse presentation estimate fills a missing measurement; it must not
     // erase a fresh measured contour when both cover the same source picture.
     const measured = candidates.filter(s => s.display_estimated !== true);
-    const supported = measured.length ? measured : candidates;
+    const bound = candidates.filter(s => s.display_origin === 'BOUND_SOURCE_OBSERVATION');
+    const supported = measured.length ? measured : bound.length ? bound : candidates;
     const chosen = supported.sort((a,b) => b.confidence-a.confidence)[0];
     // Competing evidence at the same level must still agree.
     if (supported.every(s => Math.hypot(s.ground[0]-chosen.ground[0], s.ground[1]-chosen.ground[1]) <= Math.min(s.player_width, chosen.player_width)*.5)) return withBall(chosen);
