@@ -1,0 +1,63 @@
+name: Match Room retained all-tap graphics integration
+on:
+  pull_request:
+    types: [synchronize]
+    paths: ['.github/workflows/matchroom-single-tap-report.yml']
+permissions:
+  contents: read
+  actions: read
+jobs:
+  single_tap_report:
+    if: >-
+      github.repository == '9m92yk9snt-star/VedoScout' &&
+      github.event.pull_request.number == 55 &&
+      github.event.pull_request.draft == true &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.head.ref == 'codex/matchroom-graphics' &&
+      github.event.before == '2e19ccfe06e2243327cb44672fcb00a39ac62cdb' &&
+      github.run_attempt == 1
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      PYTHONPATH: backend
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Prepare video and existing model dependencies
+        run: |
+          sudo apt-get -o Acquire::Retries=1 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 update -qq
+          sudo apt-get -o Acquire::Retries=1 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 install -y -qq ffmpeg
+          python -m pip install 'numpy<3' 'opencv-python-headless<5' 'Pillow>=10,<15' 'onnxruntime>=1.20,<2' 'python-dotenv>=1,<2' 'pytest>=8,<10'
+      - name: Verify bounded source requests before model calls
+        run: python -m pytest backend/tests/test_match_room_localization.py backend/tests/test_match_room_position_evidence.py backend/tests/test_match_room_position_contours.py backend/tests/test_match_room_tracking.py backend/tests/test_match_room_contours.py backend/tests/test_single_tap_source.py backend/tests/test_position_probe.py backend/tests/test_sequence_request_windows.py backend/tests/test_sequence_pilot.py -q
+      - name: Verify frontend source-position acceptance
+        run: node frontend/scripts/test-matchroom-localization.cjs
+      - name: Restore all eight completed requests including duel recovery
+        uses: actions/download-artifact@v4
+        with:
+          name: matchroom-single-tap-report-41772727152
+          run-id: 41772727152
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/previous-all-taps
+      - name: Verify refined graphics using only retained position results
+        run: python -u backend/scripts/run_matchroom_retained_trial.py --work "$RUNNER_TEMP/single-tap-input" --output "$RUNNER_TEMP/single-tap-report" --event-limit 8 --run-model --max-new-requests 0 --resume-document "$RUNNER_TEMP/previous-all-taps/single-tap-report/report-document.json"
+      - name: Verify actual report coverage, recovery and uncertainty gates
+        run: node frontend/scripts/verify-orman400-matchroom-report.cjs "$RUNNER_TEMP/single-tap-report/report-document.json"
+      - name: Preserve report, source-bound graphics and model receipts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: matchroom-single-tap-report-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/single-tap-report/
+            ${{ runner.temp }}/single-tap-input/all-taps.json
+            ${{ runner.temp }}/single-tap-input/positions-result.json
+            ${{ runner.temp }}/single-tap-input/*.jpg
+          retention-days: 7
+          if-no-files-found: warn

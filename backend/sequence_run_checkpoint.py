@@ -8,7 +8,7 @@ def code_fingerprint():
     paths = [root / name for name in (
         "sequence_pilot.py", "sequence_pilot_transport.py", "player_selection.py",
         "sequence_run_checkpoint.py", "sequence_report_runtime.py", "sequence_report_adapter.py",
-        "sequence_foot_evidence.py", "sequence_action_evidence.py")]
+        "sequence_foot_evidence.py", "sequence_action_evidence.py", "match_room.py")]
     paths.append(root / "scripts/run_sequence_pilot.py")
     return {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in paths}
 

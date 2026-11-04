@@ -363,7 +363,24 @@ async def generate(video, doc, *, template, writer=write_facts, discovery=discov
                                      "before_assets_seconds": round(time.monotonic()-started, 3)}}
 
 
-def render_assets(video, full, bundle, directory):
+def validate_rendered_clip(path):
+    """Do not publish an unfinished MP4 even if the encoder reports success."""
+    import cv2
+    capture = cv2.VideoCapture(str(path))
+    try:
+        ok, frame = capture.read()
+        count = int(capture.get(cv2.CAP_PROP_FRAME_COUNT))
+        if not ok or frame is None or count < 2:
+            raise ValueError('SEQUENCE_CLIP_DECODE_FAILED')
+        capture.set(cv2.CAP_PROP_POS_FRAMES, count-1)
+        ok, frame = capture.read()
+        if not ok or frame is None:
+            raise ValueError('SEQUENCE_CLIP_DECODE_FAILED')
+    finally:
+        capture.release()
+
+
+def render_assets(video, full, bundle, directory, anchors=None):
     """Actual source PTS and unannotated clips. Zero re-identification calls."""
     import cv2
     import subprocess
@@ -374,6 +391,8 @@ def render_assets(video, full, bundle, directory):
     if pilot.digest(Path(video)) != bundle["source_video_sha256"]:
         raise ValueError("SEQUENCE_ASSET_SOURCE_CHANGED")
     events = {e["event_id"]: e for e in bundle["events"]}
+    from match_room_tracking import bounded_tracks
+    tracks, tracking_status = bounded_tracks(video, anchors or [], [events[r["event_id"]] for r in (full.get("video_comments") or []) if r.get("event_id") in events])
     cap = cv2.VideoCapture(str(video))
     assets = []
     try:
@@ -393,15 +412,54 @@ def render_assets(video, full, bundle, directory):
                 raise RuntimeError("SEQUENCE_FRAME_WRITE_FAILED")
             start = max(0, event["proof"]["proof_start_ms"] - 750) / 1000.
             end = (event["proof"]["proof_end_ms"] + 750) / 1000.
+            # Bind clip zero to a decoded source picture, preserving VFR frame PTS.
+            clip_ok, _, clip_origin = video_timebase.read_frame_at(cap, start)
+            if not clip_ok or not start-.002 <= clip_origin <= end:
+                raise ValueError("SEQUENCE_CLIP_ORIGIN_UNAVAILABLE")
+            start = clip_origin
             clip = directory / (row["evidence_id"] + ".mp4")
-            subprocess.run([FFMPEG_BIN, "-v", "error", "-y", "-ss", str(start), "-i", str(video),
-                            "-t", str(end-start), "-an", "-vf", "scale=720:1280:force_original_aspect_ratio=decrease",
-                            "-c:v", "libx264", "-preset", "ultrafast", "-crf", "24", "-threads", "1",
-                            "-movflags", "+faststart", str(clip)], check=True, timeout=45,
-                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            pending_clip = clip.with_suffix('.pending.mp4')
+            try:
+                subprocess.run([FFMPEG_BIN, "-v", "error", "-y", "-ss", str(start), "-i", str(video),
+                                "-t", str(end-start), "-an", "-vf", "scale=720:1280:force_original_aspect_ratio=decrease",
+                                "-c:v", "libx264", "-preset", "ultrafast", "-crf", "24", "-threads", "1",
+                                "-vsync", "0", "-movflags", "+faststart", str(pending_clip)], check=True, timeout=45,
+                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                validate_rendered_clip(pending_clip)
+                pending_clip.replace(clip)
+            finally:
+                pending_clip.unlink(missing_ok=True)
             row.update(frame_time_ms=round(actual_s*1000), frame_time_authority="ACTUAL_MEDIA_PTS",
                        identity_verified=True, identity_verification_status="SEQUENCE_SOURCE_CONTINUITY",
-                       telestrated=False, tele_clip_start=start, tele_clip_end=end)
+                       telestrated=False, tele_clip_start=start, tele_clip_end=end,
+                       tele_clip_timebase="SOURCE_PTS_ALIGNED")
+            from match_room import presentation
+            row["match_room"] = presentation(event, event.get("visual_samples"))
+            row["match_room"]["tracking_status"] = tracking_status if event['event_id'] in tracks else 'NO_TRACK_INPUT'
+            row["match_room"]["tracking"] = tracks.get(event["event_id"])
+            tracked = tracks.get(event["event_id"]) or {}
+            observed = tracked.get("observed_samples")
+            if isinstance(observed, list):
+                row["match_room"]["samples"] = observed
+                ball_arrows = [s for s in observed if s.get("ball_motion_method") in {"BACKGROUND_AFFINE_BALL_ENDPOINTS", "BACKGROUND_AFFINE_PASS_ENDPOINTS"}]
+                if ball_arrows:
+                    focus = ball_arrows[-1]
+                    stops = row["match_room"]["stops"]
+                    if focus.get("ball_motion_method") == "BACKGROUND_AFFINE_PASS_ENDPOINTS":
+                        # Bind both pauses to measured endpoint frames. Never draw the
+                        # reception-view arrow over the earlier release camera view.
+                        for ms, label, phase in [(focus["ball_motion_start_ms"], "Pass release", "action"),
+                                                 (focus["media_ms"], "Reception", "result")]:
+                            nearby = next((s for s in stops if abs(s["media_ms"]-ms) <= 80), None)
+                            if nearby:
+                                nearby.update(media_ms=ms, label=label, phase=phase)
+                            else:
+                                stops.append({"media_ms": ms, "label": label, "phase": phase})
+                        stops.sort(key=lambda s: s["media_ms"])
+                    elif not any(abs(s["media_ms"]-focus["media_ms"]) <= 60 for s in stops):
+                        stops.append({"media_ms": focus["media_ms"], "label": "Pass direction" if focus.get("ball_motion_method") == "BACKGROUND_AFFINE_PASS_ENDPOINTS" else "Ball movement", "phase": "action"})
+                        stops.sort(key=lambda s: s["media_ms"])
+
             attach_clip_authority(row, start, end, {row["event_id"]: event["canonical_ms"]})
             assets.append((row, image, clip))
     finally:
@@ -409,12 +467,19 @@ def render_assets(video, full, bundle, directory):
     return assets
 
 
-async def persist_assets(collection, doc, video, directory, publish):
+async def persist_assets(collection, doc, video, directory, publish, *, localizer=None):
     started = time.monotonic()
     full = deepcopy(doc["full_report"])
     if not full.get("video_comments"):
         raise ValueError("SEQUENCE_SOURCE_PROOFS_MISSING")
-    assets = await asyncio.to_thread(render_assets, video, full, doc["canonical_events"], directory)
+    taps = pilot.original_taps({"raw_marker_anchors": doc["raw_marker_anchors"]}) if doc.get("raw_marker_anchors") else []
+    anchors = [{"t": t["requested_ms"]/1000, "box": t["box"], "target_point": t["target_point"],
+                **t["selection_hints"]} for t in taps]
+    from match_room_localization import localize
+    async def save_localization(audit):
+        await collection.update_one({"id": doc["id"]}, {"$set": {"match_room_localization": audit}})
+    graphics_bundle = await (localizer or localize)(video, doc, checkpoint=save_localization)
+    assets = await asyncio.to_thread(render_assets, video, full, graphics_bundle, directory, anchors)
     for row, image, clip in assets:
         row["frame_url"] = await publish(image, "image/jpeg")
         row["tele_clip_url"] = await publish(clip, "video/mp4")
@@ -429,3 +494,4 @@ async def persist_assets(collection, doc, video, directory, publish):
         "full_report": full, "sequence_timings": timings, "identity_gate_done": True,
         "full_report_status": "finalizing"}})
     return {"checked": len(assets), "hard_rejected": 0, "authority": adapter.ENGINE}
+

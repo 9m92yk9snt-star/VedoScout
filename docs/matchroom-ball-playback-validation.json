@@ -1,0 +1,311 @@
+{
+  "scope": "Historical arrow-only validation at a9c3a680. Real source, bounded graphics worker, encoded clip timebase and production React player in local Chromium. Review annotations, not automatic extraction or deployed playback.",
+  "source_sha256": "a659197551270a396fa5754239066c176fbacf2d5af400e63eea876ebfe06082",
+  "review_fixture": {
+    "note": "Ball centres and player ground points were reviewed on exact source images. Reception is first clearly visible controlled ball, not a claimed obscured first touch. No report or model receipt is modified.",
+    "event": {
+      "actor_local_track_id": null,
+      "actor_visual_id": "sequence_001:1:p1",
+      "canonical_action_type": "PASS",
+      "canonical_event_type": "PASS",
+      "canonical_ms": 9267,
+      "canonical_outcome": "COMPLETED",
+      "causal_chain": {
+        "finisher_visual_id": null,
+        "goal_outcome_ms": 10133,
+        "receiver_visual_id": "p7",
+        "target_contact_ms": 9267
+      },
+      "causal_verified": false,
+      "contact_interval_ms": [
+        9267,
+        9267
+      ],
+      "contact_ms": 9267,
+      "details": [
+        "Ground pass forward-left reaches the blue-capped teammate. A possible opposing brush near p6 is not clear enough to assign a separate touch, but no controlled red possession or intervening deliberate pass is visible. The recipient continues carrying through the end of this uninterrupted segment; no shot or goal is shown."
+      ],
+      "end_ms": 10133,
+      "event_id": "1e3a49811c726ebd65b7",
+      "foot": "UNKNOWN",
+      "foot_verification": "ANATOMICAL_SIDE_NOT_VERIFIED",
+      "global_target_id": "GLOBAL_TARGET",
+      "identity_resolution": "ORIGINAL_SELECTION_SEQUENCE_CONTINUITY",
+      "movement_observations": [],
+      "proof": {
+        "cited_frames": {
+          "s000009133": 9133,
+          "s000009267": 9267,
+          "s000009400": 9400,
+          "s000009500": 9500,
+          "s000010000": 10000,
+          "s000010133": 10133
+        },
+        "frame_id": "s000009267",
+        "frame_ms": 9267,
+        "outcome_ms": 10133,
+        "proof_eligible": true,
+        "proof_end_ms": 10133,
+        "proof_start_ms": 9000,
+        "receipts": [
+          {
+            "origin": "LIVE_MODEL_REQUEST",
+            "packet_id": "sequence_001",
+            "payload_sha256": "1ef217d8c16eb0cfd79a8ee576b79915506fd8ab3fcd27355806a7b50eb9857e",
+            "response_sha256": "0893f760be7f9ac1b1e1741d06e25b6032083ffd62328ee05c31da764e01a714"
+          }
+        ],
+        "reference_ids": [
+          "r1",
+          "r4",
+          "r5"
+        ],
+        "source_video_sha256": "a659197551270a396fa5754239066c176fbacf2d5af400e63eea876ebfe06082"
+      },
+      "source_action_ids": [
+        "sequence_001:1:a7"
+      ],
+      "source_sequence_ids": [
+        "sequence_001"
+      ],
+      "source_video_sha256": "a659197551270a396fa5754239066c176fbacf2d5af400e63eea876ebfe06082",
+      "start_ms": 9000,
+      "visual_samples": [
+        {
+          "frame_id": "s000009267",
+          "media_ms": 9267,
+          "ball": [
+            0.4074074074074074,
+            0.584375
+          ],
+          "ball_phase": "RELEASE",
+          "ground": [
+            0.4703703703703704,
+            0.5958333333333333
+          ],
+          "player_width": 0.08333333333333333
+        },
+        {
+          "frame_id": "s000010000",
+          "media_ms": 10000,
+          "ball": [
+            0.06944444444444445,
+            0.5697916666666667
+          ],
+          "ball_phase": "RECEIVED",
+          "receiver": "p7",
+          "ground": [
+            0.7592592592592593,
+            0.6057291666666667
+          ],
+          "player_width": 0.07685185185185185
+        }
+      ]
+    }
+  },
+  "worker": {
+    "status": "COMPLETED",
+    "elapsed_seconds": 8.071695100999932,
+    "moving_segments": 1,
+    "frames": 27,
+    "start_ms": 9267,
+    "end_ms": 10133,
+    "foreground_counts": [
+      7,
+      7,
+      10,
+      10,
+      9,
+      7,
+      6,
+      6,
+      6,
+      6,
+      6,
+      7,
+      7,
+      9,
+      5,
+      6,
+      9,
+      12,
+      8,
+      7,
+      9,
+      9,
+      11,
+      8,
+      14,
+      6,
+      4
+    ],
+    "player_track_segments": 0
+  },
+  "encoded_clip": {
+    "origin_seconds": 8.266667,
+    "maximum_source_frame_error_ms": 0.3336666666655219,
+    "vfr_gap_regression": "PASS"
+  },
+  "browser": {
+    "codec": "VP9 transcode preserving source pictures; local Chromium build lacks H.264 decoding",
+    "normal_playback": [
+      {
+        "pts": 9433.667,
+        "arrow": 9433,
+        "opacity": 1,
+        "paused": false
+      },
+      {
+        "pts": 9466.667,
+        "arrow": 9467,
+        "opacity": 1,
+        "paused": false
+      },
+      {
+        "pts": 9499.667000000001,
+        "arrow": 9500,
+        "opacity": 1,
+        "paused": false
+      },
+      {
+        "pts": 9533.667,
+        "arrow": 9533,
+        "opacity": 1,
+        "paused": false
+      },
+      {
+        "pts": 9566.667000000001,
+        "arrow": 9567,
+        "opacity": 1,
+        "paused": false
+      },
+      {
+        "pts": 9599.667,
+        "arrow": 9600,
+        "opacity": 1,
+        "paused": false
+      },
+      {
+        "pts": 9633.667,
+        "arrow": 9633,
+        "opacity": 1,
+        "paused": false
+      },
+      {
+        "pts": 9666.667,
+        "arrow": 9667,
+        "opacity": 1,
+        "paused": false
+      },
+      {
+        "pts": 9699.667,
+        "arrow": 9700,
+        "opacity": 1,
+        "paused": false
+      },
+      {
+        "pts": 9733.667000000001,
+        "arrow": 9733,
+        "opacity": 1,
+        "paused": false
+      },
+      {
+        "pts": 9766.667,
+        "arrow": 9767,
+        "opacity": 1,
+        "paused": false
+      },
+      {
+        "pts": 9799.667,
+        "arrow": 9800,
+        "opacity": 1,
+        "paused": false
+      },
+      {
+        "pts": 9833.667,
+        "arrow": 9833,
+        "opacity": 1,
+        "paused": false
+      },
+      {
+        "pts": 9866.667,
+        "arrow": 9867,
+        "opacity": 1,
+        "paused": false
+      },
+      {
+        "pts": 9899.667000000001,
+        "arrow": 9900,
+        "opacity": 1,
+        "paused": false
+      },
+      {
+        "pts": 9933.667,
+        "arrow": 9933,
+        "opacity": 1,
+        "paused": false
+      },
+      {
+        "pts": 9966.667,
+        "arrow": 9967,
+        "opacity": 1,
+        "paused": false
+      },
+      {
+        "pts": 9999.667000000001,
+        "arrow": 10000,
+        "opacity": 1,
+        "paused": false
+      },
+      {
+        "pts": 10033.667,
+        "arrow": 10033,
+        "opacity": 0.8402080604840172,
+        "paused": false
+      },
+      {
+        "pts": 10066.667000000001,
+        "arrow": 10067,
+        "opacity": 0.4981165453127244,
+        "paused": false
+      },
+      {
+        "pts": 10099.667,
+        "arrow": 10100,
+        "opacity": 0.1569526513597026,
+        "paused": false
+      },
+      {
+        "pts": 10133.667,
+        "arrow": 10133,
+        "opacity": 0,
+        "paused": false
+      },
+      {
+        "pts": 10166.667,
+        "arrow": null,
+        "opacity": 0,
+        "paused": true
+      }
+    ],
+    "seek_replay_identical": true,
+    "half_speed": true,
+    "page_errors": []
+  },
+  "limits": [
+    "No new automatic provider extraction was performed.",
+    "Existing report clips must regenerate graphics and aligned encoding.",
+    "All-or-nothing fresh masks are local detections, not independent validation of every person.",
+    "The source pass has no accepted production player track with its existing anchors; this test validates its independent ball arrow.",
+    "Other clips can exhaust the unchanged 25-second worker budget; their saved player graphics survive.",
+    "Fall ellipse research is not integrated by this change. Nothing deployed."
+  ],
+  "preview": {
+    "file": "MatchRoom_boldpil_under_afspilning.mp4",
+    "sha256": "6efa558937a162bdd191e65dc6cb542f5f2a1b8438d824bf1b7418bca6764bf4",
+    "frames": 152,
+    "duration_seconds": 5.066667,
+    "note": "Focused crop of the production React/SVG arrow renderer; stance hidden only for this separate ball-arrow review. Two normal-speed runs and one half-speed run."
+  },
+  "superseded_by": "matchroom-combined-validation.json adds the nearby-original-tap player segment; arrow-only measurements below remain unchanged."
+}

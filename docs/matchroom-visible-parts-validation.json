@@ -1,0 +1,1077 @@
+{
+  "source_sha256": "db97b9dc0e2cda68f6c4619405270006e7ab31eeb44e73bd7ed432b1a8d0de38",
+  "runtime_code_head": "5e10e23dc2ed765a1a7a62fb3e2df4266488d1a3",
+  "opencv": "5.0.0",
+  "scope": "Offline experiments only. No runtime identity, foot measurement or display approval.",
+  "partial_feature_audit": [
+    {
+      "from_index": 31,
+      "from_detection": 1,
+      "to_index": 33,
+      "to_detection": 2,
+      "partial_feature_support": true,
+      "from_ms": 16300,
+      "to_ms": 16367,
+      "forward": {
+        "initial": 51,
+        "final": {
+          "index": 33,
+          "media_ms": 16367,
+          "surviving": 32,
+          "votes": [
+            [
+              27,
+              2
+            ],
+            [
+              0,
+              3
+            ],
+            [
+              0,
+              1
+            ],
+            [
+              0,
+              0
+            ]
+          ]
+        }
+      },
+      "reverse": {
+        "initial": 64,
+        "final": {
+          "index": 31,
+          "media_ms": 16300,
+          "surviving": 34,
+          "votes": [
+            [
+              26,
+              1
+            ],
+            [
+              0,
+              4
+            ],
+            [
+              0,
+              3
+            ],
+            [
+              0,
+              2
+            ],
+            [
+              0,
+              0
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "from_index": 33,
+      "from_detection": 2,
+      "to_index": 31,
+      "to_detection": 1,
+      "partial_feature_support": true,
+      "from_ms": 16367,
+      "to_ms": 16300,
+      "forward": {
+        "initial": 64,
+        "final": {
+          "index": 31,
+          "media_ms": 16300,
+          "surviving": 34,
+          "votes": [
+            [
+              26,
+              1
+            ],
+            [
+              0,
+              4
+            ],
+            [
+              0,
+              3
+            ],
+            [
+              0,
+              2
+            ],
+            [
+              0,
+              0
+            ]
+          ]
+        }
+      },
+      "reverse": {
+        "initial": 51,
+        "final": {
+          "index": 33,
+          "media_ms": 16367,
+          "surviving": 32,
+          "votes": [
+            [
+              27,
+              2
+            ],
+            [
+              0,
+              3
+            ],
+            [
+              0,
+              1
+            ],
+            [
+              0,
+              0
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "from_index": 35,
+      "from_detection": 3,
+      "to_index": 55,
+      "to_detection": 5,
+      "partial_feature_support": false,
+      "from_ms": 16433,
+      "to_ms": 17100,
+      "forward": {
+        "initial": 68,
+        "final": {
+          "index": 55,
+          "media_ms": 17100,
+          "surviving": 5,
+          "votes": [
+            [
+              2,
+              3
+            ],
+            [
+              0,
+              5
+            ],
+            [
+              0,
+              4
+            ],
+            [
+              0,
+              2
+            ],
+            [
+              0,
+              1
+            ],
+            [
+              0,
+              0
+            ]
+          ]
+        }
+      },
+      "reverse": {
+        "initial": 42,
+        "final": {
+          "index": 35,
+          "media_ms": 16433,
+          "surviving": 2,
+          "votes": [
+            [
+              1,
+              0
+            ],
+            [
+              0,
+              3
+            ],
+            [
+              0,
+              2
+            ],
+            [
+              0,
+              1
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "from_index": 31,
+      "from_detection": 1,
+      "to_index": 33,
+      "to_detection": 0,
+      "partial_feature_support": false,
+      "from_ms": 16300,
+      "to_ms": 16367,
+      "forward": {
+        "initial": 51,
+        "final": {
+          "index": 33,
+          "media_ms": 16367,
+          "surviving": 32,
+          "votes": [
+            [
+              27,
+              2
+            ],
+            [
+              0,
+              3
+            ],
+            [
+              0,
+              1
+            ],
+            [
+              0,
+              0
+            ]
+          ]
+        }
+      },
+      "reverse": {
+        "initial": 103,
+        "final": {
+          "index": 31,
+          "media_ms": 16300,
+          "surviving": 103,
+          "votes": [
+            [
+              102,
+              0
+            ],
+            [
+              0,
+              4
+            ],
+            [
+              0,
+              3
+            ],
+            [
+              0,
+              2
+            ],
+            [
+              0,
+              1
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "from_index": 31,
+      "from_detection": 1,
+      "to_index": 33,
+      "to_detection": 1,
+      "partial_feature_support": false,
+      "from_ms": 16300,
+      "to_ms": 16367,
+      "forward": {
+        "initial": 51,
+        "final": {
+          "index": 33,
+          "media_ms": 16367,
+          "surviving": 32,
+          "votes": [
+            [
+              27,
+              2
+            ],
+            [
+              0,
+              3
+            ],
+            [
+              0,
+              1
+            ],
+            [
+              0,
+              0
+            ]
+          ]
+        }
+      },
+      "reverse": {
+        "initial": 43,
+        "final": {
+          "index": 31,
+          "media_ms": 16300,
+          "surviving": 35,
+          "votes": [
+            [
+              30,
+              2
+            ],
+            [
+              1,
+              1
+            ],
+            [
+              0,
+              4
+            ],
+            [
+              0,
+              3
+            ],
+            [
+              0,
+              0
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "from_index": 31,
+      "from_detection": 1,
+      "to_index": 33,
+      "to_detection": 3,
+      "partial_feature_support": false,
+      "from_ms": 16300,
+      "to_ms": 16367,
+      "forward": {
+        "initial": 51,
+        "final": {
+          "index": 33,
+          "media_ms": 16367,
+          "surviving": 32,
+          "votes": [
+            [
+              27,
+              2
+            ],
+            [
+              0,
+              3
+            ],
+            [
+              0,
+              1
+            ],
+            [
+              0,
+              0
+            ]
+          ]
+        }
+      },
+      "reverse": {
+        "initial": 57,
+        "final": {
+          "index": 31,
+          "media_ms": 16300,
+          "surviving": 33,
+          "votes": [
+            [
+              30,
+              3
+            ],
+            [
+              2,
+              4
+            ],
+            [
+              0,
+              2
+            ],
+            [
+              0,
+              1
+            ],
+            [
+              0,
+              0
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "from_index": 35,
+      "from_detection": 3,
+      "to_index": 55,
+      "to_detection": 0,
+      "partial_feature_support": false,
+      "from_ms": 16433,
+      "to_ms": 17100,
+      "forward": {
+        "initial": 68,
+        "final": {
+          "index": 55,
+          "media_ms": 17100,
+          "surviving": 5,
+          "votes": [
+            [
+              2,
+              3
+            ],
+            [
+              0,
+              5
+            ],
+            [
+              0,
+              4
+            ],
+            [
+              0,
+              2
+            ],
+            [
+              0,
+              1
+            ],
+            [
+              0,
+              0
+            ]
+          ]
+        }
+      },
+      "reverse": {
+        "initial": 85,
+        "final": {
+          "index": 35,
+          "media_ms": 16433,
+          "surviving": 66,
+          "votes": [
+            [
+              57,
+              0
+            ],
+            [
+              0,
+              3
+            ],
+            [
+              0,
+              2
+            ],
+            [
+              0,
+              1
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "from_index": 35,
+      "from_detection": 3,
+      "to_index": 55,
+      "to_detection": 1,
+      "partial_feature_support": false,
+      "from_ms": 16433,
+      "to_ms": 17100,
+      "forward": {
+        "initial": 68,
+        "final": {
+          "index": 55,
+          "media_ms": 17100,
+          "surviving": 5,
+          "votes": [
+            [
+              2,
+              3
+            ],
+            [
+              0,
+              5
+            ],
+            [
+              0,
+              4
+            ],
+            [
+              0,
+              2
+            ],
+            [
+              0,
+              1
+            ],
+            [
+              0,
+              0
+            ]
+          ]
+        }
+      },
+      "reverse": {
+        "initial": 36,
+        "final": {
+          "index": 41,
+          "media_ms": 16633,
+          "surviving": 0,
+          "votes": [
+            [
+              0,
+              3
+            ],
+            [
+              0,
+              2
+            ],
+            [
+              0,
+              1
+            ],
+            [
+              0,
+              0
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "from_index": 35,
+      "from_detection": 3,
+      "to_index": 55,
+      "to_detection": 2,
+      "partial_feature_support": false,
+      "from_ms": 16433,
+      "to_ms": 17100,
+      "forward": {
+        "initial": 68,
+        "final": {
+          "index": 55,
+          "media_ms": 17100,
+          "surviving": 5,
+          "votes": [
+            [
+              2,
+              3
+            ],
+            [
+              0,
+              5
+            ],
+            [
+              0,
+              4
+            ],
+            [
+              0,
+              2
+            ],
+            [
+              0,
+              1
+            ],
+            [
+              0,
+              0
+            ]
+          ]
+        }
+      },
+      "reverse": {
+        "initial": 74,
+        "final": {
+          "index": 35,
+          "media_ms": 16433,
+          "surviving": 18,
+          "votes": [
+            [
+              13,
+              1
+            ],
+            [
+              0,
+              3
+            ],
+            [
+              0,
+              2
+            ],
+            [
+              0,
+              0
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "from_index": 35,
+      "from_detection": 3,
+      "to_index": 55,
+      "to_detection": 3,
+      "partial_feature_support": false,
+      "from_ms": 16433,
+      "to_ms": 17100,
+      "forward": {
+        "initial": 68,
+        "final": {
+          "index": 55,
+          "media_ms": 17100,
+          "surviving": 5,
+          "votes": [
+            [
+              2,
+              3
+            ],
+            [
+              0,
+              5
+            ],
+            [
+              0,
+              4
+            ],
+            [
+              0,
+              2
+            ],
+            [
+              0,
+              1
+            ],
+            [
+              0,
+              0
+            ]
+          ]
+        }
+      },
+      "reverse": {
+        "initial": 55,
+        "final": {
+          "index": 35,
+          "media_ms": 16433,
+          "surviving": 2,
+          "votes": [
+            [
+              1,
+              3
+            ],
+            [
+              0,
+              2
+            ],
+            [
+              0,
+              1
+            ],
+            [
+              0,
+              0
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "from_index": 35,
+      "from_detection": 3,
+      "to_index": 55,
+      "to_detection": 4,
+      "partial_feature_support": false,
+      "from_ms": 16433,
+      "to_ms": 17100,
+      "forward": {
+        "initial": 68,
+        "final": {
+          "index": 55,
+          "media_ms": 17100,
+          "surviving": 5,
+          "votes": [
+            [
+              2,
+              3
+            ],
+            [
+              0,
+              5
+            ],
+            [
+              0,
+              4
+            ],
+            [
+              0,
+              2
+            ],
+            [
+              0,
+              1
+            ],
+            [
+              0,
+              0
+            ]
+          ]
+        }
+      },
+      "reverse": {
+        "initial": 33,
+        "final": {
+          "index": 35,
+          "media_ms": 16433,
+          "surviving": 10,
+          "votes": [
+            [
+              1,
+              2
+            ],
+            [
+              1,
+              0
+            ],
+            [
+              0,
+              3
+            ],
+            [
+              0,
+              1
+            ]
+          ]
+        }
+      }
+    }
+  ],
+  "summary": {
+    "positive_short_controls_passed": 2,
+    "wrong_destination_controls_rejected": 8,
+    "correct_long_gap_rejected": true,
+    "feature_drift_visual_review": "Forward survivors move to goalkeeper; reverse survivors move to white teammate 4. White-only source features do not prevent drift.",
+    "local_crop_trial": {
+      "roi": [
+        91,
+        562,
+        431,
+        875
+      ],
+      "frames_reinferred": 19,
+      "seconds_excluding_model_load": 27.56049,
+      "path_lengths": [
+        11,
+        25
+      ],
+      "shared_frames": 0,
+      "passed": false
+    },
+    "sam_prompt_trial": {
+      "proposals_only": true,
+      "automatic_points_are_not_human_anchors": true,
+      "telemetry_disabled_before_model_sessions": true,
+      "seconds": 26.5351,
+      "forward_masks": 23,
+      "reverse_masks": 3,
+      "forward_endpoint_target_iou": 0.0,
+      "passed": false,
+      "visual_review": "Forward contour shifts to goalkeeper and field markings; reverse stops at 17.000s.",
+      "logs": [
+        [
+          {
+            "i": 34,
+            "ms": 16400,
+            "positive": [
+              291,
+              664
+            ],
+            "negatives": 0,
+            "mask_area": 2086
+          },
+          {
+            "i": 35,
+            "ms": 16433,
+            "positive": [
+              285,
+              719
+            ],
+            "negatives": 4,
+            "mask_area": 1629
+          },
+          {
+            "i": 36,
+            "ms": 16467,
+            "positive": [
+              287,
+              675
+            ],
+            "negatives": 4,
+            "mask_area": 1930
+          },
+          {
+            "i": 37,
+            "ms": 16500,
+            "positive": [
+              280,
+              746
+            ],
+            "negatives": 4,
+            "mask_area": 2337
+          },
+          {
+            "i": 38,
+            "ms": 16533,
+            "positive": [
+              278,
+              744
+            ],
+            "negatives": 4,
+            "mask_area": 1947
+          },
+          {
+            "i": 39,
+            "ms": 16567,
+            "positive": [
+              276,
+              747
+            ],
+            "negatives": 3,
+            "mask_area": 2298
+          },
+          {
+            "i": 40,
+            "ms": 16600,
+            "positive": [
+              284,
+              748
+            ],
+            "negatives": 4,
+            "mask_area": 3505
+          },
+          {
+            "i": 41,
+            "ms": 16633,
+            "positive": [
+              278,
+              749
+            ],
+            "negatives": 4,
+            "mask_area": 3751
+          },
+          {
+            "i": 42,
+            "ms": 16667,
+            "positive": [
+              277,
+              752
+            ],
+            "negatives": 4,
+            "mask_area": 1688
+          },
+          {
+            "i": 43,
+            "ms": 16700,
+            "positive": [
+              300,
+              754
+            ],
+            "negatives": 4,
+            "mask_area": 2191
+          },
+          {
+            "i": 44,
+            "ms": 16733,
+            "positive": [
+              310,
+              756
+            ],
+            "negatives": 4,
+            "mask_area": 2047
+          },
+          {
+            "i": 45,
+            "ms": 16767,
+            "positive": [
+              306,
+              756
+            ],
+            "negatives": 0,
+            "mask_area": 5320
+          },
+          {
+            "i": 46,
+            "ms": 16800,
+            "positive": [
+              319,
+              758
+            ],
+            "negatives": 4,
+            "mask_area": 1945
+          },
+          {
+            "i": 47,
+            "ms": 16833,
+            "positive": [
+              321,
+              758
+            ],
+            "negatives": 4,
+            "mask_area": 1790
+          },
+          {
+            "i": 48,
+            "ms": 16867,
+            "positive": [
+              291,
+              719
+            ],
+            "negatives": 4,
+            "mask_area": 6112
+          },
+          {
+            "i": 49,
+            "ms": 16900,
+            "positive": [
+              352,
+              718
+            ],
+            "negatives": 4,
+            "mask_area": 6051
+          },
+          {
+            "i": 50,
+            "ms": 16933,
+            "positive": [
+              360,
+              718
+            ],
+            "negatives": 4,
+            "mask_area": 5028
+          },
+          {
+            "i": 51,
+            "ms": 16967,
+            "positive": [
+              389,
+              717
+            ],
+            "negatives": 4,
+            "mask_area": 5352
+          },
+          {
+            "i": 52,
+            "ms": 17000,
+            "positive": [
+              391,
+              717
+            ],
+            "negatives": 5,
+            "mask_area": 3741
+          },
+          {
+            "i": 53,
+            "ms": 17033,
+            "positive": [
+              385,
+              717
+            ],
+            "negatives": 4,
+            "mask_area": 5618
+          },
+          {
+            "i": 54,
+            "ms": 17067,
+            "positive": [
+              303,
+              719
+            ],
+            "negatives": 4,
+            "mask_area": 5207
+          },
+          {
+            "i": 55,
+            "ms": 17100,
+            "positive": [
+              305,
+              717
+            ],
+            "negatives": 5,
+            "mask_area": 4893
+          }
+        ],
+        [
+          {
+            "i": 54,
+            "ms": 17067,
+            "positive": [
+              204,
+              746
+            ],
+            "negatives": 4,
+            "mask_area": 1344
+          },
+          {
+            "i": 53,
+            "ms": 17033,
+            "positive": [
+              207,
+              747
+            ],
+            "negatives": 4,
+            "mask_area": 1290
+          },
+          {
+            "i": 52,
+            "ms": 17000,
+            "positive": [
+              211,
+              747
+            ],
+            "negatives": 5,
+            "mask_area": 0
+          }
+        ]
+      ]
+    },
+    "descriptor_trial": {
+      "method": "SIFT at 3x interpolation, Lowe .7, mutual correspondences, partial-affine RANSAC 2 source pixels",
+      "note": "Upsampling adds no source detail.",
+      "source_fragments": 5,
+      "destination_times": 5,
+      "all_measured_destination_people_evaluated": true,
+      "mutual_candidate_results": [
+        {
+          "a": 25,
+          "j": 1,
+          "b": 61,
+          "k": 1,
+          "inliers": 2,
+          "unique": 2,
+          "area": 0.0,
+          "scale": 1.5509181650446948,
+          "source": [
+            [
+              281.1399841308594,
+              746.8085327148438
+            ],
+            [
+              301.33599853515625,
+              688.5429077148438
+            ]
+          ],
+          "destination": [
+            [
+              262.22174072265625,
+              803.6268920898438
+            ],
+            [
+              282.5367736816406,
+              710.1696166992188
+            ]
+          ]
+        }
+      ],
+      "passed": false
+    }
+  },
+  "decision": "Reject all tested bridges. Keep production behavior unchanged. Missing masks and smooth trajectories are not sufficient evidence of identity."
+}

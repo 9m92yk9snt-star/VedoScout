@@ -1,0 +1,40 @@
+name: Match Room two source graphics probe
+on:
+  pull_request:
+    types: [synchronize]
+    paths: ['.github/workflows/matchroom-two-source-probe.yml']
+permissions:
+  contents: read
+jobs:
+  probe:
+    if: >-
+      github.repository == '9m92yk9snt-star/VedoScout' &&
+      github.event.pull_request.number == 55 &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.head.ref == 'codex/matchroom-graphics' &&
+      github.event.before == '5082fb7b56f13ff9fa69f694f5bc749103e8e6e8' &&
+      github.run_attempt == 1
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install cryptography
+      - name: Decrypt source frames locally and make exactly two bounded model requests
+        env:
+          EMERGENT_LLM_KEY: ${{ secrets.EMERGENT_LLM_KEY }}
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: python backend/scripts/probe_matchroom_two_sources.py
+      - name: Preserve model receipts without source images
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: matchroom-two-source-results
+          path: ${{ runner.temp }}/matchroom-two-source-results.json
+          retention-days: 7
+          if-no-files-found: warn

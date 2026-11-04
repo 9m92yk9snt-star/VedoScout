@@ -12,6 +12,7 @@ from evidence_authority import attach_event_evidence_authority, apply_fail_close
 from verified_stats import apply_verified_stats_authority
 from sequence_foot_evidence import assess_foot, filter_foot_prose
 from sequence_action_evidence import supported_movements, MOVEMENT_TEXT
+from match_room import from_receipts
 
 ENGINE = "SEQUENCE_V1"
 
@@ -113,6 +114,7 @@ def canonical_bundle(result, manifest, receipts):
             "identity_resolution": "ORIGINAL_SELECTION_SEQUENCE_CONTINUITY",
             "details": movement_details + ([description] if description else []),
             "movement_observations": movements,
+            "visual_samples": from_receipts(raw, manifest, receipts),
             **foot,
             "source_video_sha256": source,
             "source_action_ids": deepcopy(raw.get("source_action_keys") or []),

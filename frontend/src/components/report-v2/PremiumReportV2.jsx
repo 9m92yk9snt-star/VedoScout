@@ -281,7 +281,7 @@ export default function PremiumReportV2({ report, assetBase, onDownloadPdf, down
     setProof(null);
     const vc = resolveProofClip(report.full_report?.video_comments,
       { ...(ref || {}), timestamp: ts }, isAuthorityReport(report.full_report));
-    setInlineProof({ skillKey, ts: ts || null,
+    setInlineProof({ skillKey, ts: ts || null, comment: vc || null, playerName: report.player_details?.player_name,
       clip: vc ? resolveUrl(vc.tele_clip_url, assetBase) : null,
       clipStart: vc && typeof vc.tele_clip_start === "number" ? vc.tele_clip_start : null,
       key: `${skillKey}:${Date.now()}` });

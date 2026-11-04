@@ -1,0 +1,39 @@
+name: Match Room model connection check
+on:
+  pull_request:
+    types: [synchronize]
+    paths: ['.github/workflows/matchroom-model-access.yml']
+permissions:
+  contents: read
+jobs:
+  model_connection:
+    if: >-
+      github.repository == '9m92yk9snt-star/VedoScout' &&
+      github.event.pull_request.number == 55 &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.head.ref == 'codex/matchroom-graphics' &&
+      github.event.before == '76c8860b817ba0bbeea78dc3faf313d4daea9c5a' &&
+      github.run_attempt == 1
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: One bounded authenticated request without video
+        env:
+          EMERGENT_LLM_KEY: ${{ secrets.EMERGENT_LLM_KEY }}
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: python backend/scripts/probe_sequence_model.py --output "$RUNNER_TEMP/matchroom-model-access.json"
+      - name: Preserve credential-free connection receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: matchroom-model-access
+          path: ${{ runner.temp }}/matchroom-model-access.json
+          retention-days: 7
+          if-no-files-found: warn

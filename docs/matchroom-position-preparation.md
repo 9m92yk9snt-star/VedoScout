@@ -1,0 +1,15 @@
+# Automatic Match Room graphics — verified 4 November 2026
+
+The new retained Orman400 report trial passes on code `1901438fbfcdcf5f1189a459508e01e15c65c12f`. It ran the normal asset pipeline in a local test environment with the source video and pinned analysis models. All ten original taps and all seventeen canonical events are unchanged. All eight paid position receipts, source analysis and report prose were reused; no fresh paid request was made.
+
+The report contains eight valid decoded clips, 75 accepted ellipse segments and 24 observed ball-direction segments. Every card was checked in the actual React report player. Presence on a card is only a preliminary check: continuity was additionally verified on all 249 native frames of the complete duel at 8.750–12.883s and all 76 native kick frames at 30.765–32.015s. All nineteen frames at 30.949–31.249s retain a nonzero observed ball arrow across segment junctions.
+
+Actual continuous playback and deterministic capture through the same React renderer confirm those sequences. The capture contains 325 source frames with the ellipse and nineteen checked direction frames with the arrow. Visual review confirms the selected white number 16 before the fall, through overlap, and after recovery. At 31.115s the arrow follows the ball up/right after the kick. There are no browser errors. All 59 uncertain-identity observations and 65 unsupported/uncertain-ball observations still suppress the corresponding graphics.
+
+The display reuses the approved camera-space curve; its 23 reference positions are unchanged. Missing feet can use camera-corrected presentation between independently confirmed source endpoints. Confirmed middle source positions bind overlapping curves as well. These are explicitly labelled display estimates, not new pixel measurements. Raw source observations are retained. Fresh foreground masks keep graphics behind players. See `matchroom-display-continuity.md` for evidence gates and bounded computation.
+
+Validation: 300 targeted backend tests, frontend localization/display contract checks and all six [Production verification jobs](https://github.com/9m92yk9snt-star/VedoScout/actions/runs/41801089016) pass on the implementation commit. Sequence full-report integration and the standalone sequence workflow also pass. The new real-video graphics trial was local; it is not a rerun of the earlier GitHub graphics artifact.
+
+The earlier `5d6e970` result checked short fragments and did not meet continuous visual acceptance. It is superseded by this result. `matchroom-all-tap-result-2026-11-04.json` records source/report/preview digests, exact intervals, checks and the preserved video identity.
+
+PR55 remains draft. No production database write, notification, merge or deployment occurred. The authenticated upload-to-report UI remains untested; this retained-video trial does not establish accuracy on every match. The delivered 16.23-second preview presents the actual report renderer at normal and half speed, with presentation labels and no hand-positioned graphics.

@@ -1,0 +1,42 @@
+name: Match Room encrypted transfer preparation
+on:
+  pull_request:
+    types: [synchronize]
+    paths: ['.github/workflows/matchroom-transfer.yml']
+permissions:
+  contents: read
+jobs:
+  prepare:
+    if: >-
+      github.repository == '9m92yk9snt-star/VedoScout' &&
+      github.event.pull_request.number == 55 &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.head.ref == 'codex/matchroom-graphics' &&
+      github.event.before == '738e14dda707546e37ae3248b7f91c32ef085e5e' &&
+      github.run_attempt == 1
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install cryptography
+      - name: Prepare public encryption key; private key stays wrapped by repository secret
+        env:
+          EMERGENT_LLM_KEY: ${{ secrets.EMERGENT_LLM_KEY }}
+        run: |
+          python - <<'PY'
+          import os,json,base64,hashlib
+          from cryptography.hazmat.primitives.asymmetric import rsa
+          from cryptography.hazmat.primitives import serialization
+          from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+          secret=os.environ["EMERGENT_LLM_KEY"]
+          assert secret
+          private=rsa.generate_private_key(public_exponent=65537,key_size=3072)
+          pem=private.private_bytes(serialization.Encoding.PEM,serialization.PrivateFormat.PKCS8,serialization.NoEncryption())
+          salt=os.urandom(16);nonce=os.urandom(12)
+          key=hashlib.scrypt(secret.encode(),salt=salt,n=16384,r=8,p=1,dklen=32)
+          record={"public":private.public_key().public_bytes(serialization.Encoding.PEM,serialization.PublicFormat.SubjectPublicKeyInfo).decode(),"salt":base64.b64encode(salt).decode(),"nonce":base64.b64encode(nonce).decode(),"wrapped":base64.b64encode(AESGCM(key).encrypt(nonce,pem,b"matchroom-55")).decode()}
+          print("MATCHROOM_TRANSFER="+json.dumps(record))
+          
+          PY

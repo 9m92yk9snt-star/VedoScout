@@ -1,0 +1,367 @@
+{
+  "scope": "Combined runtime player contour and ball-direction arrow on the existing reviewed Orman700 fixture. Local source and production React component; not a fresh provider extraction or deployment.",
+  "source_sha256": "a659197551270a396fa5754239066c176fbacf2d5af400e63eea876ebfe06082",
+  "review_fixture": "matchroom-ball-playback-validation.json#/review_fixture/event",
+  "identity": {
+    "method": "TAP_OBSERVATION_BOUND_CONTOUR",
+    "original_tap_seconds": 8.83,
+    "actual_source_seed_ms": 8833,
+    "original_tap_count": 1,
+    "source_observation_frames": [
+      "s000009267",
+      "s000010000"
+    ],
+    "source_observations_are_human_taps": false,
+    "required_direction_checks": "Original tap forward path; each uniquely matched source observation independently follows back to the same tap and agrees on all shared instances."
+  },
+  "worker": {
+    "status": "COMPLETED",
+    "elapsed_seconds": 17.465723691000676,
+    "hard_budget_seconds": 25,
+    "source_frames": 40,
+    "shared_agreement_frames": 40,
+    "player_segments": 1,
+    "player_frames": 35,
+    "player_start_ms": 9000,
+    "player_end_ms": 10133,
+    "arrow_segments": 1,
+    "arrow_frames": 27,
+    "arrow_start_ms": 9267,
+    "arrow_end_ms": 10133
+  },
+  "negative_controls": {
+    "positive": {
+      "frames": 35,
+      "references": [
+        "s000009267",
+        "s000010000"
+      ],
+      "overlap": 40
+    },
+    "controls": [
+      {
+        "kind": "wrong_original_tap",
+        "candidate": 1,
+        "rejected": true
+      },
+      {
+        "kind": "wrong_original_tap",
+        "candidate": 2,
+        "rejected": true
+      },
+      {
+        "kind": "wrong_original_tap",
+        "candidate": 3,
+        "rejected": true
+      },
+      {
+        "kind": "wrong_original_tap",
+        "candidate": 4,
+        "rejected": true
+      },
+      {
+        "kind": "wrong_source_observation",
+        "media_ms": 9267,
+        "candidate": 0,
+        "rejected": true
+      },
+      {
+        "kind": "wrong_source_observation",
+        "media_ms": 9267,
+        "candidate": 1,
+        "rejected": true
+      },
+      {
+        "kind": "wrong_source_observation",
+        "media_ms": 9267,
+        "candidate": 2,
+        "rejected": true
+      },
+      {
+        "kind": "wrong_source_observation",
+        "media_ms": 9267,
+        "candidate": 4,
+        "rejected": true
+      },
+      {
+        "kind": "wrong_source_observation",
+        "media_ms": 9267,
+        "candidate": 5,
+        "rejected": true
+      },
+      {
+        "kind": "target_removed",
+        "media_ms": 9267,
+        "rejected": true
+      },
+      {
+        "kind": "competing_instance",
+        "media_ms": 9267,
+        "rejected": true
+      },
+      {
+        "kind": "wrong_source_observation",
+        "media_ms": 10000,
+        "candidate": 0,
+        "rejected": true
+      },
+      {
+        "kind": "wrong_source_observation",
+        "media_ms": 10000,
+        "candidate": 1,
+        "rejected": true
+      },
+      {
+        "kind": "wrong_source_observation",
+        "media_ms": 10000,
+        "candidate": 3,
+        "rejected": true
+      },
+      {
+        "kind": "wrong_source_observation",
+        "media_ms": 10000,
+        "candidate": 5,
+        "rejected": true
+      },
+      {
+        "kind": "target_removed",
+        "media_ms": 10000,
+        "rejected": true
+      },
+      {
+        "kind": "competing_instance",
+        "media_ms": 10000,
+        "rejected": true
+      },
+      {
+        "kind": "missing_foot_measurement",
+        "rejected": true
+      }
+    ],
+    "scope": "18 perturbations using stored fresh detections of this same source/crop; not independent matches."
+  },
+  "browser": {
+    "codec": "VP9 copy preserving source pictures; local Chromium lacks H.264 decoding",
+    "normal_playback": [
+      {
+        "pts": 9433.667,
+        "arrow": 9433,
+        "opacity": 1,
+        "stance": "9433",
+        "stanceMask": "url(#people-_r_0_)",
+        "paused": false
+      },
+      {
+        "pts": 9466.667,
+        "arrow": 9467,
+        "opacity": 1,
+        "stance": "9467",
+        "stanceMask": "url(#people-_r_0_)",
+        "paused": false
+      },
+      {
+        "pts": 9499.667000000001,
+        "arrow": 9500,
+        "opacity": 1,
+        "stance": "9500",
+        "stanceMask": "url(#people-_r_0_)",
+        "paused": false
+      },
+      {
+        "pts": 9533.667,
+        "arrow": 9533,
+        "opacity": 1,
+        "stance": "9533",
+        "stanceMask": "url(#people-_r_0_)",
+        "paused": false
+      },
+      {
+        "pts": 9566.667000000001,
+        "arrow": 9567,
+        "opacity": 1,
+        "stance": "9567",
+        "stanceMask": "url(#people-_r_0_)",
+        "paused": false
+      },
+      {
+        "pts": 9599.667,
+        "arrow": 9600,
+        "opacity": 1,
+        "stance": "9600",
+        "stanceMask": "url(#people-_r_0_)",
+        "paused": false
+      },
+      {
+        "pts": 9633.667,
+        "arrow": 9633,
+        "opacity": 1,
+        "stance": "9633",
+        "stanceMask": "url(#people-_r_0_)",
+        "paused": false
+      },
+      {
+        "pts": 9666.667,
+        "arrow": 9667,
+        "opacity": 1,
+        "stance": "9667",
+        "stanceMask": "url(#people-_r_0_)",
+        "paused": false
+      },
+      {
+        "pts": 9699.667,
+        "arrow": 9700,
+        "opacity": 1,
+        "stance": "9700",
+        "stanceMask": "url(#people-_r_0_)",
+        "paused": false
+      },
+      {
+        "pts": 9733.667000000001,
+        "arrow": 9733,
+        "opacity": 1,
+        "stance": "9733",
+        "stanceMask": "url(#people-_r_0_)",
+        "paused": false
+      },
+      {
+        "pts": 9766.667,
+        "arrow": 9767,
+        "opacity": 1,
+        "stance": "9767",
+        "stanceMask": "url(#people-_r_0_)",
+        "paused": false
+      },
+      {
+        "pts": 9799.667,
+        "arrow": 9800,
+        "opacity": 1,
+        "stance": "9800",
+        "stanceMask": "url(#people-_r_0_)",
+        "paused": false
+      },
+      {
+        "pts": 9833.667,
+        "arrow": 9833,
+        "opacity": 1,
+        "stance": "9833",
+        "stanceMask": "url(#people-_r_0_)",
+        "paused": false
+      },
+      {
+        "pts": 9866.667,
+        "arrow": 9867,
+        "opacity": 1,
+        "stance": "9867",
+        "stanceMask": "url(#people-_r_0_)",
+        "paused": false
+      },
+      {
+        "pts": 9899.667000000001,
+        "arrow": 9900,
+        "opacity": 1,
+        "stance": "9900",
+        "stanceMask": "url(#people-_r_0_)",
+        "paused": false
+      },
+      {
+        "pts": 9933.667,
+        "arrow": 9933,
+        "opacity": 1,
+        "stance": "9933",
+        "stanceMask": "url(#people-_r_0_)",
+        "paused": false
+      },
+      {
+        "pts": 9966.667,
+        "arrow": 9967,
+        "opacity": 1,
+        "stance": "9967",
+        "stanceMask": "url(#people-_r_0_)",
+        "paused": false
+      },
+      {
+        "pts": 9999.667000000001,
+        "arrow": 10000,
+        "opacity": 1,
+        "stance": "10000",
+        "stanceMask": "url(#people-_r_0_)",
+        "paused": false
+      },
+      {
+        "pts": 10033.667,
+        "arrow": 10033,
+        "opacity": 0.8402080604840172,
+        "stance": "10033",
+        "stanceMask": "url(#people-_r_0_)",
+        "paused": false
+      },
+      {
+        "pts": 10066.667000000001,
+        "arrow": 10067,
+        "opacity": 0.4981165453127244,
+        "stance": "10067",
+        "stanceMask": "url(#people-_r_0_)",
+        "paused": false
+      },
+      {
+        "pts": 10099.667,
+        "arrow": 10100,
+        "opacity": 0.1569526513597026,
+        "stance": "10100",
+        "stanceMask": "url(#people-_r_0_)",
+        "paused": false
+      },
+      {
+        "pts": 10133.667,
+        "arrow": 10133,
+        "opacity": 0,
+        "stance": "10133",
+        "stanceMask": "url(#people-_r_0_)",
+        "paused": false
+      },
+      {
+        "pts": 10166.667,
+        "arrow": null,
+        "opacity": 0,
+        "paused": true
+      }
+    ],
+    "seek_replay_identical": true,
+    "half_speed": true,
+    "page_errors": [],
+    "exact_source_capture_frames": 35,
+    "maximum_allowed_mask_pts_difference_ms": 2,
+    "fractional_pts_regression": "9466.667ms selects 9467ms contour and mask, not the previous sample. Seek capture checks every source marker from 9000 to 10133ms."
+  },
+  "presentation": {
+    "filter": "Three-frame median of lateral centre, capped at one quarter of minimum adjacent measured player width; only for this dense contour method. Ground height and stored measurements unchanged.",
+    "visibility_check": {
+      "frames": 35,
+      "minimum_visible_green_pixels": 151,
+      "fully_hidden_frames": 0,
+      "scope": "Vivid green pixels in expected marker region of each actual React render; confirms visibility, not anatomical accuracy."
+    }
+  },
+  "validation": {
+    "backend_tests_passed": 50,
+    "frontend_tests_passed": 34
+  },
+  "reproduce": "python scripts/matchroom_ball_playback_probe.py --video ORIGINAL_SOURCE --anchors ORIGINAL_EXPORTED_ANCHORS --output combined-worker.json --require-stance",
+  "limits": [
+    "Only runs after UNSUPPORTED_INPUT; never bypasses a failed two-tap identity or continuity decision.",
+    "Each decoded proof frame requires measured ground and fresh person polygons; incomplete results are rejected as a whole.",
+    "Dense display does not inherit the older optional 200ms interpolation allowance.",
+    "Encoded clips must declare SOURCE_PTS_ALIGNED for dense contours and moving arrows. Existing reports need regenerated assets.",
+    "Source observations and ball endpoints remain the existing reviewed fixture, not a new automatic model response. No scores, actions, report receipts or source measurements are changed.",
+    "The 15.27\u201317.70s fall presentation remains separate offline research. Independent-match accuracy and authenticated live-site playback remain unverified."
+  ],
+  "preview": {
+    "file": "MatchRoom_ellipse_og_boldpil.mp4",
+    "sha256": "7deada81864f36e5ab326c416c4e9808dadfb363775114cf6e28e63fb3fa2485",
+    "frames": 140,
+    "duration_seconds": 4.666667,
+    "width": 720,
+    "height": 576,
+    "note": "Both ellipse and arrow from the actual React/SVG renderer, two normal-speed runs and one half-speed run."
+  }
+}

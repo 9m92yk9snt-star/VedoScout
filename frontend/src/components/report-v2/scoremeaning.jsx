@@ -35,7 +35,7 @@ function AngleChips({ s, onPlayAt, seekable = true, authority = false }) {
             className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[10.5px] font-extrabold tracking-[0.04em] uppercase transition-transform hover:scale-[1.03] active:scale-[0.97]"
             style={{ background: FOREST, color: LIME }}
           >
-            <Play className="w-3 h-3 fill-current" /> See why at {ev.timestamp}
+            <Play className="w-3 h-3 fill-current" /> Match Room · {ev.timestamp}
           </button>
         ) : (
           <span
@@ -162,7 +162,7 @@ export function SkillMeaningCard({ s, position, onPlayAt, seekable = true, defau
       ))}
       {s.comparison && <p className="mt-3 text-xs font-semibold" data-testid={`academy-skill-${s.key}`}>{s.comparison.bracket} · {s.comparison.label} skill reference</p>}
       <AngleChips s={s} onPlayAt={showProof} seekable={seekable} authority={authority} />
-      {seekable && <SkillMatchRoom skillKey={s.key} />}
+      {seekable && <SkillMatchRoom skillKey={s.key} skill={s} />}
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}

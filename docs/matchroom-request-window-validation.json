@@ -1,0 +1,24 @@
+{
+  "status": "LOCAL_PREFLIGHT_PASSED_MODEL_PENDING",
+  "source_video_sha256": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+  "tap_count": 1,
+  "source_run": 41706403699,
+  "limit_bytes": 19500000,
+  "source_images_removed": 0,
+  "pixels_reencoded": false,
+  "all_original_image_paths_and_hashes_preserved": true,
+  "full_overview_in_every_window": true,
+  "native_overlap_ms": 250,
+  "max_windows_per_review": 4,
+  "production_deadlines_changed": false,
+  "review_payload_bytes": {
+    "contact_review_001": [13288480, 13590175],
+    "contact_review_002": [17405250],
+    "contact_review_003": [17110512, 16643519],
+    "contact_review_004": [16488546, 16038971],
+    "contact_review_005": [13463987, 14107255],
+    "outcome_review_001": [13936274, 14237969]
+  },
+  "local_regression_tests_passed": 201,
+  "finished_report_graphics_verified": false
+}

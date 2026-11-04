@@ -1,0 +1,3916 @@
+{
+  "source_sha256": "db97b9dc0e2cda68f6c4619405270006e7ab31eeb44e73bd7ed432b1a8d0de38",
+  "model_source": "https://github.com/openvinotoolkit/open_model_zoo/blob/master/models/intel/person-reidentification-retail-0287/model.yml",
+  "model_source_sha384": "c650c97722d597efd65fe041d67e17658d776c45d56736b817264ec544d8a9b5a5e8cdc1a0920cc2aada61151c1a9191",
+  "prepared_model_sha256": "46f389ecfba35e3808dad985880e6393d700648cc8ccaa5101ab9659ec3b5554",
+  "normalization": "RGB (image-[123.675,116.28,103.53])/[58.395,57.12,57.375]. 12 source MVN nodes rewritten to match FP32 IR 1e-5 epsilon inside sqrt; weights unchanged.",
+  "runtime": "OpenCV 5.0.0; no OpenVINO runtime or ONNX Runtime used in successful model run.",
+  "model_limit": "Documented upright-pedestrian model; this fall is outside its stated pose coverage.",
+  "source_observations": "Existing measured masks and two tap-anchored fragments. No new provider observations. No inferred foot positions.",
+  "checks": [
+    {
+      "media_ms": 17100,
+      "measured_target_index": 5,
+      "selected_index": 5,
+      "target_absent_selected": null
+    },
+    {
+      "media_ms": 17167,
+      "measured_target_index": 4,
+      "selected_index": 4,
+      "target_absent_selected": null
+    },
+    {
+      "media_ms": 17233,
+      "measured_target_index": 4,
+      "selected_index": 4,
+      "target_absent_selected": null
+    },
+    {
+      "media_ms": 17300,
+      "measured_target_index": 3,
+      "selected_index": 3,
+      "target_absent_selected": null
+    },
+    {
+      "media_ms": 17367,
+      "measured_target_index": 4,
+      "selected_index": 4,
+      "target_absent_selected": null
+    },
+    {
+      "media_ms": 17433,
+      "measured_target_index": 4,
+      "selected_index": 4,
+      "target_absent_selected": null
+    },
+    {
+      "media_ms": 17533,
+      "measured_target_index": 6,
+      "selected_index": 6,
+      "target_absent_selected": null
+    },
+    {
+      "media_ms": 17567,
+      "measured_target_index": 6,
+      "selected_index": 6,
+      "target_absent_selected": null
+    },
+    {
+      "media_ms": 17633,
+      "measured_target_index": 6,
+      "selected_index": 6,
+      "target_absent_selected": null
+    },
+    {
+      "media_ms": 17700,
+      "measured_target_index": 6,
+      "selected_index": 6,
+      "target_absent_selected": null
+    }
+  ],
+  "positive_match_frames": 10,
+  "wrong_source_pairs_rejected": 40,
+  "wrong_destination_pairs_rejected": 53,
+  "target_absent_frames_rejected": 10,
+  "temporal_proposal": {
+    "track_id": "post-fall-original-anchor-track",
+    "from_ms": 17100,
+    "confirmed_ms": 17367,
+    "samples": 5,
+    "report_identity_approved": false
+  },
+  "research_gate": "Unique mutual best in both views; >=5 source-track-consistent matches spanning >=200ms, max100ms sample gap. Chosen on this clip, uncalibrated for other matches.",
+  "research_limit": "Candidate-ranking evidence on one known clip, not independent-match validation or a full original-tap-to-report worker run. No hidden-interval ground trajectory established.",
+  "unmasked_failure": "Without mask-view consensus, removing the target at17.633s yields one false reciprocal proposal.",
+  "report_identity_approved": false,
+  "runtime_changed": false,
+  "details": {
+    "banks": {
+      "0": [
+        [
+          25,
+          0
+        ],
+        [
+          27,
+          0
+        ],
+        [
+          29,
+          0
+        ],
+        [
+          31,
+          0
+        ],
+        [
+          33,
+          0
+        ]
+      ],
+      "1": [
+        [
+          25,
+          1
+        ],
+        [
+          27,
+          3
+        ],
+        [
+          29,
+          2
+        ],
+        [
+          31,
+          1
+        ],
+        [
+          33,
+          2
+        ]
+      ],
+      "2": [
+        [
+          25,
+          2
+        ],
+        [
+          27,
+          1
+        ],
+        [
+          29,
+          1
+        ],
+        [
+          31,
+          2
+        ],
+        [
+          33,
+          1
+        ]
+      ],
+      "3": [
+        [
+          25,
+          3
+        ],
+        [
+          27,
+          2
+        ],
+        [
+          29,
+          3
+        ],
+        [
+          31,
+          3
+        ],
+        [
+          33,
+          3
+        ]
+      ],
+      "4": [
+        [
+          31,
+          4
+        ]
+      ]
+    },
+    "results": [
+      {
+        "masked": false,
+        "ms": 17100,
+        "target": 5,
+        "forward": [
+          {
+            "reference_at_31": 0,
+            "ranking": [
+              {
+                "candidate": 0,
+                "cosine": 0.8314616084098816
+              },
+              {
+                "candidate": 5,
+                "cosine": 0.2569202482700348
+              },
+              {
+                "candidate": 3,
+                "cosine": 0.2321491539478302
+              },
+              {
+                "candidate": 2,
+                "cosine": 0.2091972529888153
+              },
+              {
+                "candidate": 1,
+                "cosine": 0.1960940659046173
+              },
+              {
+                "candidate": 4,
+                "cosine": 0.12797167897224426
+              }
+            ]
+          },
+          {
+            "reference_at_31": 1,
+            "ranking": [
+              {
+                "candidate": 5,
+                "cosine": 0.5089441537857056
+              },
+              {
+                "candidate": 0,
+                "cosine": 0.46842238306999207
+              },
+              {
+                "candidate": 4,
+                "cosine": 0.28615403175354004
+              },
+              {
+                "candidate": 3,
+                "cosine": 0.25599804520606995
+              },
+              {
+                "candidate": 1,
+                "cosine": 0.24418598413467407
+              },
+              {
+                "candidate": 2,
+                "cosine": 0.21139833331108093
+              }
+            ]
+          },
+          {
+            "reference_at_31": 2,
+            "ranking": [
+              {
+                "candidate": 4,
+                "cosine": 0.6158705353736877
+              },
+              {
+                "candidate": 1,
+                "cosine": 0.5692752003669739
+              },
+              {
+                "candidate": 2,
+                "cosine": 0.44707971811294556
+              },
+              {
+                "candidate": 3,
+                "cosine": 0.24241802096366882
+              },
+              {
+                "candidate": 0,
+                "cosine": 0.18824730813503265
+              },
+              {
+                "candidate": 5,
+                "cosine": 0.11232821643352509
+              }
+            ]
+          },
+          {
+            "reference_at_31": 3,
+            "ranking": [
+              {
+                "candidate": 2,
+                "cosine": 0.743188738822937
+              },
+              {
+                "candidate": 1,
+                "cosine": 0.4531906247138977
+              },
+              {
+                "candidate": 4,
+                "cosine": 0.38795846700668335
+              },
+              {
+                "candidate": 3,
+                "cosine": 0.2818032503128052
+              },
+              {
+                "candidate": 0,
+                "cosine": 0.24132415652275085
+              },
+              {
+                "candidate": 5,
+                "cosine": 0.22956666350364685
+              }
+            ]
+          },
+          {
+            "reference_at_31": 4,
+            "ranking": [
+              {
+                "candidate": 1,
+                "cosine": 0.36654847860336304
+              },
+              {
+                "candidate": 2,
+                "cosine": 0.36186856031417847
+              },
+              {
+                "candidate": 4,
+                "cosine": 0.30493658781051636
+              },
+              {
+                "candidate": 0,
+                "cosine": 0.22144056856632233
+              },
+              {
+                "candidate": 3,
+                "cosine": 0.21539941430091858
+              },
+              {
+                "candidate": 5,
+                "cosine": 0.20399925112724304
+              }
+            ]
+          }
+        ],
+        "reverse_target": [
+          {
+            "reference": 1,
+            "cosine": 0.5089441537857056
+          },
+          {
+            "reference": 0,
+            "cosine": 0.2569202482700348
+          },
+          {
+            "reference": 3,
+            "cosine": 0.22956666350364685
+          },
+          {
+            "reference": 4,
+            "cosine": 0.20399925112724304
+          },
+          {
+            "reference": 2,
+            "cosine": 0.11232821643352509
+          }
+        ]
+      },
+      {
+        "masked": false,
+        "ms": 17167,
+        "target": 4,
+        "forward": [
+          {
+            "reference_at_31": 0,
+            "ranking": [
+              {
+                "candidate": 1,
+                "cosine": 0.8154318332672119
+              },
+              {
+                "candidate": 2,
+                "cosine": 0.27647918462753296
+              },
+              {
+                "candidate": 0,
+                "cosine": 0.23389124870300293
+              },
+              {
+                "candidate": 4,
+                "cosine": 0.22197721898555756
+              },
+              {
+                "candidate": 3,
+                "cosine": 0.21526986360549927
+              },
+              {
+                "candidate": 5,
+                "cosine": 0.17701396346092224
+              },
+              {
+                "candidate": 6,
+                "cosine": 0.17320385575294495
+              }
+            ]
+          },
+          {
+            "reference_at_31": 1,
+            "ranking": [
+              {
+                "candidate": 4,
+                "cosine": 0.49421852827072144
+              },
+              {
+                "candidate": 1,
+                "cosine": 0.4637349545955658
+              },
+              {
+                "candidate": 5,
+                "cosine": 0.31038859486579895
+              },
+              {
+                "candidate": 2,
+                "cosine": 0.297605037689209
+              },
+              {
+                "candidate": 6,
+                "cosine": 0.28820016980171204
+              },
+              {
+                "candidate": 0,
+                "cosine": 0.23916636407375336
+              },
+              {
+                "candidate": 3,
+                "cosine": 0.21211707592010498
+              }
+            ]
+          },
+          {
+            "reference_at_31": 2,
+            "ranking": [
+              {
+                "candidate": 0,
+                "cosine": 0.5721534490585327
+              },
+              {
+                "candidate": 5,
+                "cosine": 0.5287271738052368
+              },
+              {
+                "candidate": 3,
+                "cosine": 0.47580820322036743
+              },
+              {
+                "candidate": 2,
+                "cosine": 0.311724990606308
+              },
+              {
+                "candidate": 6,
+                "cosine": 0.30524441599845886
+              },
+              {
+                "candidate": 1,
+                "cosine": 0.19750019907951355
+              },
+              {
+                "candidate": 4,
+                "cosine": 0.09352278709411621
+              }
+            ]
+          },
+          {
+            "reference_at_31": 3,
+            "ranking": [
+              {
+                "candidate": 3,
+                "cosine": 0.7132132053375244
+              },
+              {
+                "candidate": 0,
+                "cosine": 0.43637651205062866
+              },
+              {
+                "candidate": 6,
+                "cosine": 0.4152328372001648
+              },
+              {
+                "candidate": 5,
+                "cosine": 0.36928078532218933
+              },
+              {
+                "candidate": 2,
+                "cosine": 0.3147246837615967
+              },
+              {
+                "candidate": 1,
+                "cosine": 0.2550339102745056
+              },
+              {
+                "candidate": 4,
+                "cosine": 0.22761429846286774
+              }
+            ]
+          },
+          {
+            "reference_at_31": 4,
+            "ranking": [
+              {
+                "candidate": 6,
+                "cosine": 0.3733680248260498
+              },
+              {
+                "candidate": 3,
+                "cosine": 0.3698839843273163
+              },
+              {
+                "candidate": 0,
+                "cosine": 0.3391135334968567
+              },
+              {
+                "candidate": 2,
+                "cosine": 0.27306896448135376
+              },
+              {
+                "candidate": 5,
+                "cosine": 0.2614452540874481
+              },
+              {
+                "candidate": 1,
+                "cosine": 0.18116503953933716
+              },
+              {
+                "candidate": 4,
+                "cosine": 0.1784607470035553
+              }
+            ]
+          }
+        ],
+        "reverse_target": [
+          {
+            "reference": 1,
+            "cosine": 0.49421852827072144
+          },
+          {
+            "reference": 3,
+            "cosine": 0.22761429846286774
+          },
+          {
+            "reference": 0,
+            "cosine": 0.22197721898555756
+          },
+          {
+            "reference": 4,
+            "cosine": 0.1784607470035553
+          },
+          {
+            "reference": 2,
+            "cosine": 0.09352278709411621
+          }
+        ]
+      },
+      {
+        "masked": false,
+        "ms": 17233,
+        "target": 4,
+        "forward": [
+          {
+            "reference_at_31": 0,
+            "ranking": [
+              {
+                "candidate": 1,
+                "cosine": 0.8054222464561462
+              },
+              {
+                "candidate": 2,
+                "cosine": 0.3367862403392792
+              },
+              {
+                "candidate": 4,
+                "cosine": 0.24084949493408203
+              },
+              {
+                "candidate": 0,
+                "cosine": 0.2244366705417633
+              },
+              {
+                "candidate": 3,
+                "cosine": 0.22078095376491547
+              },
+              {
+                "candidate": 5,
+                "cosine": 0.19358903169631958
+              }
+            ]
+          },
+          {
+            "reference_at_31": 1,
+            "ranking": [
+              {
+                "candidate": 4,
+                "cosine": 0.5883021354675293
+              },
+              {
+                "candidate": 1,
+                "cosine": 0.49135279655456543
+              },
+              {
+                "candidate": 5,
+                "cosine": 0.3081848621368408
+              },
+              {
+                "candidate": 2,
+                "cosine": 0.28582924604415894
+              },
+              {
+                "candidate": 0,
+                "cosine": 0.26052752137184143
+              },
+              {
+                "candidate": 3,
+                "cosine": 0.25302767753601074
+              }
+            ]
+          },
+          {
+            "reference_at_31": 2,
+            "ranking": [
+              {
+                "candidate": 0,
+                "cosine": 0.5719178915023804
+              },
+              {
+                "candidate": 3,
+                "cosine": 0.49484145641326904
+              },
+              {
+                "candidate": 5,
+                "cosine": 0.33377373218536377
+              },
+              {
+                "candidate": 2,
+                "cosine": 0.23475997149944305
+              },
+              {
+                "candidate": 1,
+                "cosine": 0.23300695419311523
+              },
+              {
+                "candidate": 4,
+                "cosine": 0.08654917776584625
+              }
+            ]
+          },
+          {
+            "reference_at_31": 3,
+            "ranking": [
+              {
+                "candidate": 3,
+                "cosine": 0.7657620906829834
+              },
+              {
+                "candidate": 5,
+                "cosine": 0.5148724913597107
+              },
+              {
+                "candidate": 0,
+                "cosine": 0.44572824239730835
+              },
+              {
+                "candidate": 1,
+                "cosine": 0.3214412033557892
+              },
+              {
+                "candidate": 2,
+                "cosine": 0.27135807275772095
+              },
+              {
+                "candidate": 4,
+                "cosine": 0.20334525406360626
+              }
+            ]
+          },
+          {
+            "reference_at_31": 4,
+            "ranking": [
+              {
+                "candidate": 5,
+                "cosine": 0.43592703342437744
+              },
+              {
+                "candidate": 0,
+                "cosine": 0.40017473697662354
+              },
+              {
+                "candidate": 3,
+                "cosine": 0.39871224761009216
+              },
+              {
+                "candidate": 2,
+                "cosine": 0.2498985230922699
+              },
+              {
+                "candidate": 1,
+                "cosine": 0.20420792698860168
+              },
+              {
+                "candidate": 4,
+                "cosine": 0.16467657685279846
+              }
+            ]
+          }
+        ],
+        "reverse_target": [
+          {
+            "reference": 1,
+            "cosine": 0.5883021354675293
+          },
+          {
+            "reference": 0,
+            "cosine": 0.24084949493408203
+          },
+          {
+            "reference": 3,
+            "cosine": 0.20334525406360626
+          },
+          {
+            "reference": 4,
+            "cosine": 0.16467657685279846
+          },
+          {
+            "reference": 2,
+            "cosine": 0.08654917776584625
+          }
+        ]
+      },
+      {
+        "masked": false,
+        "ms": 17300,
+        "target": 3,
+        "forward": [
+          {
+            "reference_at_31": 0,
+            "ranking": [
+              {
+                "candidate": 1,
+                "cosine": 0.826297402381897
+              },
+              {
+                "candidate": 2,
+                "cosine": 0.3019678592681885
+              },
+              {
+                "candidate": 0,
+                "cosine": 0.2141713947057724
+              },
+              {
+                "candidate": 3,
+                "cosine": 0.1972074806690216
+              },
+              {
+                "candidate": 4,
+                "cosine": 0.16654884815216064
+              }
+            ]
+          },
+          {
+            "reference_at_31": 1,
+            "ranking": [
+              {
+                "candidate": 3,
+                "cosine": 0.5735015869140625
+              },
+              {
+                "candidate": 1,
+                "cosine": 0.5176963806152344
+              },
+              {
+                "candidate": 2,
+                "cosine": 0.2908591032028198
+              },
+              {
+                "candidate": 0,
+                "cosine": 0.24777674674987793
+              },
+              {
+                "candidate": 4,
+                "cosine": 0.22546681761741638
+              }
+            ]
+          },
+          {
+            "reference_at_31": 2,
+            "ranking": [
+              {
+                "candidate": 0,
+                "cosine": 0.5700088739395142
+              },
+              {
+                "candidate": 4,
+                "cosine": 0.4236776828765869
+              },
+              {
+                "candidate": 1,
+                "cosine": 0.23733773827552795
+              },
+              {
+                "candidate": 2,
+                "cosine": 0.23319771885871887
+              },
+              {
+                "candidate": 3,
+                "cosine": 0.13893088698387146
+              }
+            ]
+          },
+          {
+            "reference_at_31": 3,
+            "ranking": [
+              {
+                "candidate": 4,
+                "cosine": 0.6439232230186462
+              },
+              {
+                "candidate": 0,
+                "cosine": 0.42510831356048584
+              },
+              {
+                "candidate": 2,
+                "cosine": 0.2793760299682617
+              },
+              {
+                "candidate": 1,
+                "cosine": 0.22650785744190216
+              },
+              {
+                "candidate": 3,
+                "cosine": 0.14159917831420898
+              }
+            ]
+          },
+          {
+            "reference_at_31": 4,
+            "ranking": [
+              {
+                "candidate": 0,
+                "cosine": 0.36602526903152466
+              },
+              {
+                "candidate": 4,
+                "cosine": 0.34754806756973267
+              },
+              {
+                "candidate": 2,
+                "cosine": 0.21146801114082336
+              },
+              {
+                "candidate": 1,
+                "cosine": 0.20558422803878784
+              },
+              {
+                "candidate": 3,
+                "cosine": 0.14598827064037323
+              }
+            ]
+          }
+        ],
+        "reverse_target": [
+          {
+            "reference": 1,
+            "cosine": 0.5735015869140625
+          },
+          {
+            "reference": 0,
+            "cosine": 0.1972074806690216
+          },
+          {
+            "reference": 4,
+            "cosine": 0.14598827064037323
+          },
+          {
+            "reference": 3,
+            "cosine": 0.14159917831420898
+          },
+          {
+            "reference": 2,
+            "cosine": 0.13893088698387146
+          }
+        ]
+      },
+      {
+        "masked": false,
+        "ms": 17367,
+        "target": 4,
+        "forward": [
+          {
+            "reference_at_31": 0,
+            "ranking": [
+              {
+                "candidate": 0,
+                "cosine": 0.8150737285614014
+              },
+              {
+                "candidate": 1,
+                "cosine": 0.29240885376930237
+              },
+              {
+                "candidate": 3,
+                "cosine": 0.20733389258384705
+              },
+              {
+                "candidate": 4,
+                "cosine": 0.1890830099582672
+              },
+              {
+                "candidate": 2,
+                "cosine": 0.16930405795574188
+              }
+            ]
+          },
+          {
+            "reference_at_31": 1,
+            "ranking": [
+              {
+                "candidate": 4,
+                "cosine": 0.5821704864501953
+              },
+              {
+                "candidate": 0,
+                "cosine": 0.4748571813106537
+              },
+              {
+                "candidate": 1,
+                "cosine": 0.2568652927875519
+              },
+              {
+                "candidate": 2,
+                "cosine": 0.252847284078598
+              },
+              {
+                "candidate": 3,
+                "cosine": 0.185786634683609
+              }
+            ]
+          },
+          {
+            "reference_at_31": 2,
+            "ranking": [
+              {
+                "candidate": 2,
+                "cosine": 0.5944477915763855
+              },
+              {
+                "candidate": 3,
+                "cosine": 0.4529149830341339
+              },
+              {
+                "candidate": 1,
+                "cosine": 0.27841973304748535
+              },
+              {
+                "candidate": 0,
+                "cosine": 0.23101766407489777
+              },
+              {
+                "candidate": 4,
+                "cosine": 0.12138140201568604
+              }
+            ]
+          },
+          {
+            "reference_at_31": 3,
+            "ranking": [
+              {
+                "candidate": 3,
+                "cosine": 0.7163094282150269
+              },
+              {
+                "candidate": 2,
+                "cosine": 0.39570778608322144
+              },
+              {
+                "candidate": 0,
+                "cosine": 0.2939419746398926
+              },
+              {
+                "candidate": 1,
+                "cosine": 0.2360294610261917
+              },
+              {
+                "candidate": 4,
+                "cosine": 0.15564529597759247
+              }
+            ]
+          },
+          {
+            "reference_at_31": 4,
+            "ranking": [
+              {
+                "candidate": 3,
+                "cosine": 0.3814811706542969
+              },
+              {
+                "candidate": 2,
+                "cosine": 0.37149402499198914
+              },
+              {
+                "candidate": 0,
+                "cosine": 0.2281075268983841
+              },
+              {
+                "candidate": 1,
+                "cosine": 0.2117781937122345
+              },
+              {
+                "candidate": 4,
+                "cosine": 0.13112029433250427
+              }
+            ]
+          }
+        ],
+        "reverse_target": [
+          {
+            "reference": 1,
+            "cosine": 0.5821704864501953
+          },
+          {
+            "reference": 0,
+            "cosine": 0.1890830099582672
+          },
+          {
+            "reference": 3,
+            "cosine": 0.15564529597759247
+          },
+          {
+            "reference": 4,
+            "cosine": 0.13112029433250427
+          },
+          {
+            "reference": 2,
+            "cosine": 0.12138140201568604
+          }
+        ]
+      },
+      {
+        "masked": false,
+        "ms": 17433,
+        "target": 4,
+        "forward": [
+          {
+            "reference_at_31": 0,
+            "ranking": [
+              {
+                "candidate": 1,
+                "cosine": 0.818832278251648
+              },
+              {
+                "candidate": 3,
+                "cosine": 0.27105462551116943
+              },
+              {
+                "candidate": 0,
+                "cosine": 0.200563445687294
+              },
+              {
+                "candidate": 4,
+                "cosine": 0.17768990993499756
+              },
+              {
+                "candidate": 2,
+                "cosine": 0.16397221386432648
+              }
+            ]
+          },
+          {
+            "reference_at_31": 1,
+            "ranking": [
+              {
+                "candidate": 4,
+                "cosine": 0.5439982414245605
+              },
+              {
+                "candidate": 1,
+                "cosine": 0.48060178756713867
+              },
+              {
+                "candidate": 3,
+                "cosine": 0.3034585118293762
+              },
+              {
+                "candidate": 0,
+                "cosine": 0.21547003090381622
+              },
+              {
+                "candidate": 2,
+                "cosine": 0.21285851299762726
+              }
+            ]
+          },
+          {
+            "reference_at_31": 2,
+            "ranking": [
+              {
+                "candidate": 2,
+                "cosine": 0.6171218156814575
+              },
+              {
+                "candidate": 0,
+                "cosine": 0.46121180057525635
+              },
+              {
+                "candidate": 3,
+                "cosine": 0.30008792877197266
+              },
+              {
+                "candidate": 1,
+                "cosine": 0.25031304359436035
+              },
+              {
+                "candidate": 4,
+                "cosine": 0.11280004680156708
+              }
+            ]
+          },
+          {
+            "reference_at_31": 3,
+            "ranking": [
+              {
+                "candidate": 0,
+                "cosine": 0.7358078360557556
+              },
+              {
+                "candidate": 2,
+                "cosine": 0.5061959028244019
+              },
+              {
+                "candidate": 1,
+                "cosine": 0.3072413206100464
+              },
+              {
+                "candidate": 3,
+                "cosine": 0.2550596296787262
+              },
+              {
+                "candidate": 4,
+                "cosine": 0.1641446053981781
+              }
+            ]
+          },
+          {
+            "reference_at_31": 4,
+            "ranking": [
+              {
+                "candidate": 2,
+                "cosine": 0.42410019040107727
+              },
+              {
+                "candidate": 0,
+                "cosine": 0.38732656836509705
+              },
+              {
+                "candidate": 3,
+                "cosine": 0.22166672348976135
+              },
+              {
+                "candidate": 1,
+                "cosine": 0.20836134254932404
+              },
+              {
+                "candidate": 4,
+                "cosine": 0.13945941627025604
+              }
+            ]
+          }
+        ],
+        "reverse_target": [
+          {
+            "reference": 1,
+            "cosine": 0.5439982414245605
+          },
+          {
+            "reference": 0,
+            "cosine": 0.17768990993499756
+          },
+          {
+            "reference": 3,
+            "cosine": 0.1641446053981781
+          },
+          {
+            "reference": 4,
+            "cosine": 0.13945941627025604
+          },
+          {
+            "reference": 2,
+            "cosine": 0.11280004680156708
+          }
+        ]
+      },
+      {
+        "masked": false,
+        "ms": 17533,
+        "target": 6,
+        "forward": [
+          {
+            "reference_at_31": 0,
+            "ranking": [
+              {
+                "candidate": 0,
+                "cosine": 0.7905392050743103
+              },
+              {
+                "candidate": 4,
+                "cosine": 0.4443836808204651
+              },
+              {
+                "candidate": 3,
+                "cosine": 0.26023954153060913
+              },
+              {
+                "candidate": 6,
+                "cosine": 0.24531017243862152
+              },
+              {
+                "candidate": 1,
+                "cosine": 0.22097986936569214
+              },
+              {
+                "candidate": 2,
+                "cosine": 0.17541968822479248
+              },
+              {
+                "candidate": 5,
+                "cosine": 0.1649787873029709
+              }
+            ]
+          },
+          {
+            "reference_at_31": 1,
+            "ranking": [
+              {
+                "candidate": 6,
+                "cosine": 0.5873680710792542
+              },
+              {
+                "candidate": 0,
+                "cosine": 0.47687482833862305
+              },
+              {
+                "candidate": 4,
+                "cosine": 0.34026622772216797
+              },
+              {
+                "candidate": 3,
+                "cosine": 0.27405864000320435
+              },
+              {
+                "candidate": 1,
+                "cosine": 0.2198556363582611
+              },
+              {
+                "candidate": 2,
+                "cosine": 0.20381247997283936
+              },
+              {
+                "candidate": 5,
+                "cosine": 0.1479238122701645
+              }
+            ]
+          },
+          {
+            "reference_at_31": 2,
+            "ranking": [
+              {
+                "candidate": 2,
+                "cosine": 0.5510470867156982
+              },
+              {
+                "candidate": 1,
+                "cosine": 0.41305387020111084
+              },
+              {
+                "candidate": 4,
+                "cosine": 0.29903745651245117
+              },
+              {
+                "candidate": 5,
+                "cosine": 0.26754701137542725
+              },
+              {
+                "candidate": 3,
+                "cosine": 0.2470935434103012
+              },
+              {
+                "candidate": 0,
+                "cosine": 0.20206815004348755
+              },
+              {
+                "candidate": 6,
+                "cosine": 0.14690342545509338
+              }
+            ]
+          },
+          {
+            "reference_at_31": 3,
+            "ranking": [
+              {
+                "candidate": 1,
+                "cosine": 0.7442890405654907
+              },
+              {
+                "candidate": 2,
+                "cosine": 0.4770241975784302
+              },
+              {
+                "candidate": 5,
+                "cosine": 0.4656074047088623
+              },
+              {
+                "candidate": 3,
+                "cosine": 0.2933923006057739
+              },
+              {
+                "candidate": 0,
+                "cosine": 0.27201706171035767
+              },
+              {
+                "candidate": 4,
+                "cosine": 0.26330679655075073
+              },
+              {
+                "candidate": 6,
+                "cosine": 0.21916230022907257
+              }
+            ]
+          },
+          {
+            "reference_at_31": 4,
+            "ranking": [
+              {
+                "candidate": 5,
+                "cosine": 0.5260783433914185
+              },
+              {
+                "candidate": 1,
+                "cosine": 0.4079941213130951
+              },
+              {
+                "candidate": 2,
+                "cosine": 0.3421626091003418
+              },
+              {
+                "candidate": 3,
+                "cosine": 0.2237451821565628
+              },
+              {
+                "candidate": 4,
+                "cosine": 0.21260856091976166
+              },
+              {
+                "candidate": 0,
+                "cosine": 0.17527011036872864
+              },
+              {
+                "candidate": 6,
+                "cosine": 0.11493569612503052
+              }
+            ]
+          }
+        ],
+        "reverse_target": [
+          {
+            "reference": 1,
+            "cosine": 0.5873680710792542
+          },
+          {
+            "reference": 0,
+            "cosine": 0.24531017243862152
+          },
+          {
+            "reference": 3,
+            "cosine": 0.21916230022907257
+          },
+          {
+            "reference": 2,
+            "cosine": 0.14690342545509338
+          },
+          {
+            "reference": 4,
+            "cosine": 0.11493569612503052
+          }
+        ]
+      },
+      {
+        "masked": false,
+        "ms": 17567,
+        "target": 6,
+        "forward": [
+          {
+            "reference_at_31": 0,
+            "ranking": [
+              {
+                "candidate": 0,
+                "cosine": 0.7723493576049805
+              },
+              {
+                "candidate": 1,
+                "cosine": 0.46579480171203613
+              },
+              {
+                "candidate": 6,
+                "cosine": 0.28502821922302246
+              },
+              {
+                "candidate": 3,
+                "cosine": 0.2605557143688202
+              },
+              {
+                "candidate": 4,
+                "cosine": 0.2238055318593979
+              },
+              {
+                "candidate": 5,
+                "cosine": 0.21840772032737732
+              },
+              {
+                "candidate": 2,
+                "cosine": 0.16862289607524872
+              }
+            ]
+          },
+          {
+            "reference_at_31": 1,
+            "ranking": [
+              {
+                "candidate": 6,
+                "cosine": 0.6174980998039246
+              },
+              {
+                "candidate": 0,
+                "cosine": 0.4759027361869812
+              },
+              {
+                "candidate": 1,
+                "cosine": 0.3256378769874573
+              },
+              {
+                "candidate": 3,
+                "cosine": 0.2512983977794647
+              },
+              {
+                "candidate": 4,
+                "cosine": 0.22842063009738922
+              },
+              {
+                "candidate": 5,
+                "cosine": 0.1852707713842392
+              },
+              {
+                "candidate": 2,
+                "cosine": 0.1823357790708542
+              }
+            ]
+          },
+          {
+            "reference_at_31": 2,
+            "ranking": [
+              {
+                "candidate": 2,
+                "cosine": 0.5624725818634033
+              },
+              {
+                "candidate": 4,
+                "cosine": 0.4396745562553406
+              },
+              {
+                "candidate": 5,
+                "cosine": 0.27477800846099854
+              },
+              {
+                "candidate": 1,
+                "cosine": 0.24715092778205872
+              },
+              {
+                "candidate": 3,
+                "cosine": 0.22102363407611847
+              },
+              {
+                "candidate": 0,
+                "cosine": 0.2012551724910736
+              },
+              {
+                "candidate": 6,
+                "cosine": 0.130844846367836
+              }
+            ]
+          },
+          {
+            "reference_at_31": 3,
+            "ranking": [
+              {
+                "candidate": 4,
+                "cosine": 0.7492771148681641
+              },
+              {
+                "candidate": 2,
+                "cosine": 0.4596443176269531
+              },
+              {
+                "candidate": 5,
+                "cosine": 0.4393075704574585
+              },
+              {
+                "candidate": 0,
+                "cosine": 0.2924519181251526
+              },
+              {
+                "candidate": 1,
+                "cosine": 0.2878662347793579
+              },
+              {
+                "candidate": 3,
+                "cosine": 0.26916027069091797
+              },
+              {
+                "candidate": 6,
+                "cosine": 0.16009002923965454
+              }
+            ]
+          },
+          {
+            "reference_at_31": 4,
+            "ranking": [
+              {
+                "candidate": 5,
+                "cosine": 0.5331361889839172
+              },
+              {
+                "candidate": 4,
+                "cosine": 0.37756288051605225
+              },
+              {
+                "candidate": 2,
+                "cosine": 0.33476436138153076
+              },
+              {
+                "candidate": 3,
+                "cosine": 0.21089434623718262
+              },
+              {
+                "candidate": 1,
+                "cosine": 0.20405614376068115
+              },
+              {
+                "candidate": 0,
+                "cosine": 0.18442586064338684
+              },
+              {
+                "candidate": 6,
+                "cosine": 0.11543761938810349
+              }
+            ]
+          }
+        ],
+        "reverse_target": [
+          {
+            "reference": 1,
+            "cosine": 0.6174980998039246
+          },
+          {
+            "reference": 0,
+            "cosine": 0.28502821922302246
+          },
+          {
+            "reference": 3,
+            "cosine": 0.16009002923965454
+          },
+          {
+            "reference": 2,
+            "cosine": 0.130844846367836
+          },
+          {
+            "reference": 4,
+            "cosine": 0.11543761938810349
+          }
+        ]
+      },
+      {
+        "masked": false,
+        "ms": 17633,
+        "target": 6,
+        "forward": [
+          {
+            "reference_at_31": 0,
+            "ranking": [
+              {
+                "candidate": 2,
+                "cosine": 0.7963742017745972
+              },
+              {
+                "candidate": 0,
+                "cosine": 0.475810706615448
+              },
+              {
+                "candidate": 6,
+                "cosine": 0.3199141025543213
+              },
+              {
+                "candidate": 5,
+                "cosine": 0.23392029106616974
+              },
+              {
+                "candidate": 3,
+                "cosine": 0.22420747578144073
+              },
+              {
+                "candidate": 1,
+                "cosine": 0.15762226283550262
+              },
+              {
+                "candidate": 4,
+                "cosine": 0.14623083174228668
+              },
+              {
+                "candidate": 7,
+                "cosine": 0.11630607396364212
+              }
+            ]
+          },
+          {
+            "reference_at_31": 1,
+            "ranking": [
+              {
+                "candidate": 6,
+                "cosine": 0.5722794532775879
+              },
+              {
+                "candidate": 0,
+                "cosine": 0.4919307827949524
+              },
+              {
+                "candidate": 2,
+                "cosine": 0.41856369376182556
+              },
+              {
+                "candidate": 5,
+                "cosine": 0.23640236258506775
+              },
+              {
+                "candidate": 7,
+                "cosine": 0.2300216108560562
+              },
+              {
+                "candidate": 1,
+                "cosine": 0.22835299372673035
+              },
+              {
+                "candidate": 3,
+                "cosine": 0.20971156656742096
+              },
+              {
+                "candidate": 4,
+                "cosine": 0.13283950090408325
+              }
+            ]
+          },
+          {
+            "reference_at_31": 2,
+            "ranking": [
+              {
+                "candidate": 1,
+                "cosine": 0.5657597780227661
+              },
+              {
+                "candidate": 3,
+                "cosine": 0.4065622091293335
+              },
+              {
+                "candidate": 7,
+                "cosine": 0.4038386940956116
+              },
+              {
+                "candidate": 5,
+                "cosine": 0.3207786977291107
+              },
+              {
+                "candidate": 2,
+                "cosine": 0.25361526012420654
+              },
+              {
+                "candidate": 4,
+                "cosine": 0.24982373416423798
+              },
+              {
+                "candidate": 0,
+                "cosine": 0.21165746450424194
+              },
+              {
+                "candidate": 6,
+                "cosine": 0.10935615748167038
+              }
+            ]
+          },
+          {
+            "reference_at_31": 3,
+            "ranking": [
+              {
+                "candidate": 3,
+                "cosine": 0.7509291172027588
+              },
+              {
+                "candidate": 1,
+                "cosine": 0.5236729383468628
+              },
+              {
+                "candidate": 4,
+                "cosine": 0.39839968085289
+              },
+              {
+                "candidate": 5,
+                "cosine": 0.3874637484550476
+              },
+              {
+                "candidate": 7,
+                "cosine": 0.32254573702812195
+              },
+              {
+                "candidate": 0,
+                "cosine": 0.3154541850090027
+              },
+              {
+                "candidate": 2,
+                "cosine": 0.28285127878189087
+              },
+              {
+                "candidate": 6,
+                "cosine": 0.18145202100276947
+              }
+            ]
+          },
+          {
+            "reference_at_31": 4,
+            "ranking": [
+              {
+                "candidate": 7,
+                "cosine": 0.45927953720092773
+              },
+              {
+                "candidate": 4,
+                "cosine": 0.4331567883491516
+              },
+              {
+                "candidate": 1,
+                "cosine": 0.383876770734787
+              },
+              {
+                "candidate": 3,
+                "cosine": 0.3631904125213623
+              },
+              {
+                "candidate": 5,
+                "cosine": 0.2443913072347641
+              },
+              {
+                "candidate": 0,
+                "cosine": 0.1885160505771637
+              },
+              {
+                "candidate": 2,
+                "cosine": 0.17496654391288757
+              },
+              {
+                "candidate": 6,
+                "cosine": 0.13032907247543335
+              }
+            ]
+          }
+        ],
+        "reverse_target": [
+          {
+            "reference": 1,
+            "cosine": 0.5722794532775879
+          },
+          {
+            "reference": 0,
+            "cosine": 0.3199141025543213
+          },
+          {
+            "reference": 3,
+            "cosine": 0.18145202100276947
+          },
+          {
+            "reference": 4,
+            "cosine": 0.13032907247543335
+          },
+          {
+            "reference": 2,
+            "cosine": 0.10935615748167038
+          }
+        ]
+      },
+      {
+        "masked": false,
+        "ms": 17700,
+        "target": 6,
+        "forward": [
+          {
+            "reference_at_31": 0,
+            "ranking": [
+              {
+                "candidate": 2,
+                "cosine": 0.7353472709655762
+              },
+              {
+                "candidate": 1,
+                "cosine": 0.578889012336731
+              },
+              {
+                "candidate": 6,
+                "cosine": 0.3769429326057434
+              },
+              {
+                "candidate": 4,
+                "cosine": 0.23161278665065765
+              },
+              {
+                "candidate": 0,
+                "cosine": 0.16248244047164917
+              },
+              {
+                "candidate": 3,
+                "cosine": 0.15360435843467712
+              },
+              {
+                "candidate": 5,
+                "cosine": 0.14286081492900848
+              }
+            ]
+          },
+          {
+            "reference_at_31": 1,
+            "ranking": [
+              {
+                "candidate": 6,
+                "cosine": 0.5294417142868042
+              },
+              {
+                "candidate": 1,
+                "cosine": 0.508888840675354
+              },
+              {
+                "candidate": 2,
+                "cosine": 0.42569878697395325
+              },
+              {
+                "candidate": 4,
+                "cosine": 0.27104389667510986
+              },
+              {
+                "candidate": 5,
+                "cosine": 0.24150678515434265
+              },
+              {
+                "candidate": 0,
+                "cosine": 0.2218167781829834
+              },
+              {
+                "candidate": 3,
+                "cosine": 0.19987809658050537
+              }
+            ]
+          },
+          {
+            "reference_at_31": 2,
+            "ranking": [
+              {
+                "candidate": 0,
+                "cosine": 0.5601232051849365
+              },
+              {
+                "candidate": 5,
+                "cosine": 0.5340923070907593
+              },
+              {
+                "candidate": 4,
+                "cosine": 0.38789603114128113
+              },
+              {
+                "candidate": 2,
+                "cosine": 0.25691378116607666
+              },
+              {
+                "candidate": 1,
+                "cosine": 0.24040096998214722
+              },
+              {
+                "candidate": 3,
+                "cosine": 0.22837524116039276
+              },
+              {
+                "candidate": 6,
+                "cosine": 0.17344112694263458
+              }
+            ]
+          },
+          {
+            "reference_at_31": 3,
+            "ranking": [
+              {
+                "candidate": 4,
+                "cosine": 0.724355161190033
+              },
+              {
+                "candidate": 0,
+                "cosine": 0.46874451637268066
+              },
+              {
+                "candidate": 5,
+                "cosine": 0.4232759475708008
+              },
+              {
+                "candidate": 3,
+                "cosine": 0.3787957727909088
+              },
+              {
+                "candidate": 2,
+                "cosine": 0.31268078088760376
+              },
+              {
+                "candidate": 1,
+                "cosine": 0.2742333710193634
+              },
+              {
+                "candidate": 6,
+                "cosine": 0.196442112326622
+              }
+            ]
+          },
+          {
+            "reference_at_31": 4,
+            "ranking": [
+              {
+                "candidate": 3,
+                "cosine": 0.44103050231933594
+              },
+              {
+                "candidate": 4,
+                "cosine": 0.3845660090446472
+              },
+              {
+                "candidate": 5,
+                "cosine": 0.3809073269367218
+              },
+              {
+                "candidate": 0,
+                "cosine": 0.3542822599411011
+              },
+              {
+                "candidate": 2,
+                "cosine": 0.19671662151813507
+              },
+              {
+                "candidate": 1,
+                "cosine": 0.18580733239650726
+              },
+              {
+                "candidate": 6,
+                "cosine": 0.15253953635692596
+              }
+            ]
+          }
+        ],
+        "reverse_target": [
+          {
+            "reference": 1,
+            "cosine": 0.5294417142868042
+          },
+          {
+            "reference": 0,
+            "cosine": 0.3769429326057434
+          },
+          {
+            "reference": 3,
+            "cosine": 0.196442112326622
+          },
+          {
+            "reference": 2,
+            "cosine": 0.17344112694263458
+          },
+          {
+            "reference": 4,
+            "cosine": 0.15253953635692596
+          }
+        ]
+      },
+      {
+        "masked": true,
+        "ms": 17100,
+        "target": 5,
+        "forward": [
+          {
+            "reference_at_31": 0,
+            "ranking": [
+              {
+                "candidate": 0,
+                "cosine": 0.8414822220802307
+              },
+              {
+                "candidate": 5,
+                "cosine": 0.36001574993133545
+              },
+              {
+                "candidate": 2,
+                "cosine": 0.3559193015098572
+              },
+              {
+                "candidate": 1,
+                "cosine": 0.282831072807312
+              },
+              {
+                "candidate": 4,
+                "cosine": 0.28252625465393066
+              },
+              {
+                "candidate": 3,
+                "cosine": 0.27023524045944214
+              }
+            ]
+          },
+          {
+            "reference_at_31": 1,
+            "ranking": [
+              {
+                "candidate": 5,
+                "cosine": 0.537334680557251
+              },
+              {
+                "candidate": 0,
+                "cosine": 0.48559778928756714
+              },
+              {
+                "candidate": 1,
+                "cosine": 0.43640148639678955
+              },
+              {
+                "candidate": 2,
+                "cosine": 0.4033856987953186
+              },
+              {
+                "candidate": 3,
+                "cosine": 0.35526949167251587
+              },
+              {
+                "candidate": 4,
+                "cosine": 0.3301908075809479
+              }
+            ]
+          },
+          {
+            "reference_at_31": 2,
+            "ranking": [
+              {
+                "candidate": 4,
+                "cosine": 0.6295562982559204
+              },
+              {
+                "candidate": 1,
+                "cosine": 0.5415487885475159
+              },
+              {
+                "candidate": 2,
+                "cosine": 0.5139330625534058
+              },
+              {
+                "candidate": 3,
+                "cosine": 0.40447258949279785
+              },
+              {
+                "candidate": 0,
+                "cosine": 0.2988855838775635
+              },
+              {
+                "candidate": 5,
+                "cosine": 0.23340292274951935
+              }
+            ]
+          },
+          {
+            "reference_at_31": 3,
+            "ranking": [
+              {
+                "candidate": 2,
+                "cosine": 0.7197350859642029
+              },
+              {
+                "candidate": 1,
+                "cosine": 0.5230623483657837
+              },
+              {
+                "candidate": 4,
+                "cosine": 0.44631752371788025
+              },
+              {
+                "candidate": 3,
+                "cosine": 0.3186154365539551
+              },
+              {
+                "candidate": 5,
+                "cosine": 0.3034909963607788
+              },
+              {
+                "candidate": 0,
+                "cosine": 0.24141749739646912
+              }
+            ]
+          },
+          {
+            "reference_at_31": 4,
+            "ranking": [
+              {
+                "candidate": 2,
+                "cosine": 0.3563201129436493
+              },
+              {
+                "candidate": 4,
+                "cosine": 0.34105342626571655
+              },
+              {
+                "candidate": 1,
+                "cosine": 0.32792994379997253
+              },
+              {
+                "candidate": 0,
+                "cosine": 0.2232804149389267
+              },
+              {
+                "candidate": 3,
+                "cosine": 0.20765644311904907
+              },
+              {
+                "candidate": 5,
+                "cosine": 0.12243159115314484
+              }
+            ]
+          }
+        ],
+        "reverse_target": [
+          {
+            "reference": 1,
+            "cosine": 0.537334680557251
+          },
+          {
+            "reference": 0,
+            "cosine": 0.36001574993133545
+          },
+          {
+            "reference": 3,
+            "cosine": 0.3034909963607788
+          },
+          {
+            "reference": 2,
+            "cosine": 0.23340292274951935
+          },
+          {
+            "reference": 4,
+            "cosine": 0.12243159115314484
+          }
+        ]
+      },
+      {
+        "masked": true,
+        "ms": 17167,
+        "target": 4,
+        "forward": [
+          {
+            "reference_at_31": 0,
+            "ranking": [
+              {
+                "candidate": 1,
+                "cosine": 0.8274775743484497
+              },
+              {
+                "candidate": 3,
+                "cosine": 0.3847781717777252
+              },
+              {
+                "candidate": 4,
+                "cosine": 0.31065797805786133
+              },
+              {
+                "candidate": 6,
+                "cosine": 0.2723691761493683
+              },
+              {
+                "candidate": 2,
+                "cosine": 0.27093809843063354
+              },
+              {
+                "candidate": 0,
+                "cosine": 0.23473075032234192
+              },
+              {
+                "candidate": 5,
+                "cosine": 0.21319679915905
+              }
+            ]
+          },
+          {
+            "reference_at_31": 1,
+            "ranking": [
+              {
+                "candidate": 4,
+                "cosine": 0.5544718503952026
+              },
+              {
+                "candidate": 1,
+                "cosine": 0.5019553899765015
+              },
+              {
+                "candidate": 3,
+                "cosine": 0.42195725440979004
+              },
+              {
+                "candidate": 2,
+                "cosine": 0.3954668641090393
+              },
+              {
+                "candidate": 0,
+                "cosine": 0.35588711500167847
+              },
+              {
+                "candidate": 5,
+                "cosine": 0.279774010181427
+              },
+              {
+                "candidate": 6,
+                "cosine": 0.27721330523490906
+              }
+            ]
+          },
+          {
+            "reference_at_31": 2,
+            "ranking": [
+              {
+                "candidate": 0,
+                "cosine": 0.6041770577430725
+              },
+              {
+                "candidate": 3,
+                "cosine": 0.5400346517562866
+              },
+              {
+                "candidate": 5,
+                "cosine": 0.4932110011577606
+              },
+              {
+                "candidate": 2,
+                "cosine": 0.4291255474090576
+              },
+              {
+                "candidate": 6,
+                "cosine": 0.3803008198738098
+              },
+              {
+                "candidate": 1,
+                "cosine": 0.29015812277793884
+              },
+              {
+                "candidate": 4,
+                "cosine": 0.09528827667236328
+              }
+            ]
+          },
+          {
+            "reference_at_31": 3,
+            "ranking": [
+              {
+                "candidate": 3,
+                "cosine": 0.7081896662712097
+              },
+              {
+                "candidate": 6,
+                "cosine": 0.5050925016403198
+              },
+              {
+                "candidate": 0,
+                "cosine": 0.5005899667739868
+              },
+              {
+                "candidate": 5,
+                "cosine": 0.3989773988723755
+              },
+              {
+                "candidate": 2,
+                "cosine": 0.3356083929538727
+              },
+              {
+                "candidate": 1,
+                "cosine": 0.25655168294906616
+              },
+              {
+                "candidate": 4,
+                "cosine": 0.20808818936347961
+              }
+            ]
+          },
+          {
+            "reference_at_31": 4,
+            "ranking": [
+              {
+                "candidate": 6,
+                "cosine": 0.4319225549697876
+              },
+              {
+                "candidate": 3,
+                "cosine": 0.3712524175643921
+              },
+              {
+                "candidate": 0,
+                "cosine": 0.3250909447669983
+              },
+              {
+                "candidate": 5,
+                "cosine": 0.2702195644378662
+              },
+              {
+                "candidate": 1,
+                "cosine": 0.19183461368083954
+              },
+              {
+                "candidate": 2,
+                "cosine": 0.18987403810024261
+              },
+              {
+                "candidate": 4,
+                "cosine": 0.13854195177555084
+              }
+            ]
+          }
+        ],
+        "reverse_target": [
+          {
+            "reference": 1,
+            "cosine": 0.5544718503952026
+          },
+          {
+            "reference": 0,
+            "cosine": 0.31065797805786133
+          },
+          {
+            "reference": 3,
+            "cosine": 0.20808818936347961
+          },
+          {
+            "reference": 4,
+            "cosine": 0.13854195177555084
+          },
+          {
+            "reference": 2,
+            "cosine": 0.09528827667236328
+          }
+        ]
+      },
+      {
+        "masked": true,
+        "ms": 17233,
+        "target": 4,
+        "forward": [
+          {
+            "reference_at_31": 0,
+            "ranking": [
+              {
+                "candidate": 1,
+                "cosine": 0.8049857020378113
+              },
+              {
+                "candidate": 3,
+                "cosine": 0.34261593222618103
+              },
+              {
+                "candidate": 2,
+                "cosine": 0.3326047658920288
+              },
+              {
+                "candidate": 4,
+                "cosine": 0.25188153982162476
+              },
+              {
+                "candidate": 0,
+                "cosine": 0.22087422013282776
+              },
+              {
+                "candidate": 5,
+                "cosine": 0.20797497034072876
+              }
+            ]
+          },
+          {
+            "reference_at_31": 1,
+            "ranking": [
+              {
+                "candidate": 4,
+                "cosine": 0.6011408567428589
+              },
+              {
+                "candidate": 1,
+                "cosine": 0.4886804223060608
+              },
+              {
+                "candidate": 2,
+                "cosine": 0.4289090037345886
+              },
+              {
+                "candidate": 3,
+                "cosine": 0.3943042755126953
+              },
+              {
+                "candidate": 0,
+                "cosine": 0.28627267479896545
+              },
+              {
+                "candidate": 5,
+                "cosine": 0.258987694978714
+              }
+            ]
+          },
+          {
+            "reference_at_31": 2,
+            "ranking": [
+              {
+                "candidate": 0,
+                "cosine": 0.6123980283737183
+              },
+              {
+                "candidate": 3,
+                "cosine": 0.5126394629478455
+              },
+              {
+                "candidate": 2,
+                "cosine": 0.357490599155426
+              },
+              {
+                "candidate": 5,
+                "cosine": 0.34370243549346924
+              },
+              {
+                "candidate": 1,
+                "cosine": 0.26192304491996765
+              },
+              {
+                "candidate": 4,
+                "cosine": 0.0911882221698761
+              }
+            ]
+          },
+          {
+            "reference_at_31": 3,
+            "ranking": [
+              {
+                "candidate": 3,
+                "cosine": 0.721527099609375
+              },
+              {
+                "candidate": 5,
+                "cosine": 0.4697633981704712
+              },
+              {
+                "candidate": 0,
+                "cosine": 0.44203275442123413
+              },
+              {
+                "candidate": 2,
+                "cosine": 0.3236534595489502
+              },
+              {
+                "candidate": 1,
+                "cosine": 0.27170872688293457
+              },
+              {
+                "candidate": 4,
+                "cosine": 0.20084884762763977
+              }
+            ]
+          },
+          {
+            "reference_at_31": 4,
+            "ranking": [
+              {
+                "candidate": 0,
+                "cosine": 0.3628630042076111
+              },
+              {
+                "candidate": 5,
+                "cosine": 0.3487628102302551
+              },
+              {
+                "candidate": 3,
+                "cosine": 0.3472423255443573
+              },
+              {
+                "candidate": 2,
+                "cosine": 0.1890866905450821
+              },
+              {
+                "candidate": 1,
+                "cosine": 0.18341203033924103
+              },
+              {
+                "candidate": 4,
+                "cosine": 0.09260596334934235
+              }
+            ]
+          }
+        ],
+        "reverse_target": [
+          {
+            "reference": 1,
+            "cosine": 0.6011408567428589
+          },
+          {
+            "reference": 0,
+            "cosine": 0.25188153982162476
+          },
+          {
+            "reference": 3,
+            "cosine": 0.20084884762763977
+          },
+          {
+            "reference": 4,
+            "cosine": 0.09260596334934235
+          },
+          {
+            "reference": 2,
+            "cosine": 0.0911882221698761
+          }
+        ]
+      },
+      {
+        "masked": true,
+        "ms": 17300,
+        "target": 3,
+        "forward": [
+          {
+            "reference_at_31": 0,
+            "ranking": [
+              {
+                "candidate": 1,
+                "cosine": 0.8485785722732544
+              },
+              {
+                "candidate": 2,
+                "cosine": 0.3193818926811218
+              },
+              {
+                "candidate": 3,
+                "cosine": 0.29806897044181824
+              },
+              {
+                "candidate": 4,
+                "cosine": 0.23308342695236206
+              },
+              {
+                "candidate": 0,
+                "cosine": 0.22792088985443115
+              }
+            ]
+          },
+          {
+            "reference_at_31": 1,
+            "ranking": [
+              {
+                "candidate": 3,
+                "cosine": 0.594691276550293
+              },
+              {
+                "candidate": 1,
+                "cosine": 0.507625937461853
+              },
+              {
+                "candidate": 2,
+                "cosine": 0.38762885332107544
+              },
+              {
+                "candidate": 0,
+                "cosine": 0.3280390501022339
+              },
+              {
+                "candidate": 4,
+                "cosine": 0.2832503616809845
+              }
+            ]
+          },
+          {
+            "reference_at_31": 2,
+            "ranking": [
+              {
+                "candidate": 0,
+                "cosine": 0.5597308874130249
+              },
+              {
+                "candidate": 4,
+                "cosine": 0.4847940504550934
+              },
+              {
+                "candidate": 2,
+                "cosine": 0.3956952393054962
+              },
+              {
+                "candidate": 1,
+                "cosine": 0.2643686532974243
+              },
+              {
+                "candidate": 3,
+                "cosine": 0.14485903084278107
+              }
+            ]
+          },
+          {
+            "reference_at_31": 3,
+            "ranking": [
+              {
+                "candidate": 4,
+                "cosine": 0.6920275092124939
+              },
+              {
+                "candidate": 0,
+                "cosine": 0.4626311957836151
+              },
+              {
+                "candidate": 2,
+                "cosine": 0.3141241669654846
+              },
+              {
+                "candidate": 1,
+                "cosine": 0.2415769249200821
+              },
+              {
+                "candidate": 3,
+                "cosine": 0.1611512303352356
+              }
+            ]
+          },
+          {
+            "reference_at_31": 4,
+            "ranking": [
+              {
+                "candidate": 0,
+                "cosine": 0.35420382022857666
+              },
+              {
+                "candidate": 4,
+                "cosine": 0.30931103229522705
+              },
+              {
+                "candidate": 1,
+                "cosine": 0.18617761135101318
+              },
+              {
+                "candidate": 2,
+                "cosine": 0.1660851240158081
+              },
+              {
+                "candidate": 3,
+                "cosine": 0.06795299053192139
+              }
+            ]
+          }
+        ],
+        "reverse_target": [
+          {
+            "reference": 1,
+            "cosine": 0.594691276550293
+          },
+          {
+            "reference": 0,
+            "cosine": 0.29806897044181824
+          },
+          {
+            "reference": 3,
+            "cosine": 0.1611512303352356
+          },
+          {
+            "reference": 2,
+            "cosine": 0.14485903084278107
+          },
+          {
+            "reference": 4,
+            "cosine": 0.06795299053192139
+          }
+        ]
+      },
+      {
+        "masked": true,
+        "ms": 17367,
+        "target": 4,
+        "forward": [
+          {
+            "reference_at_31": 0,
+            "ranking": [
+              {
+                "candidate": 0,
+                "cosine": 0.8360882997512817
+              },
+              {
+                "candidate": 4,
+                "cosine": 0.32443439960479736
+              },
+              {
+                "candidate": 3,
+                "cosine": 0.3009154796600342
+              },
+              {
+                "candidate": 1,
+                "cosine": 0.25451231002807617
+              },
+              {
+                "candidate": 2,
+                "cosine": 0.23175381124019623
+              }
+            ]
+          },
+          {
+            "reference_at_31": 1,
+            "ranking": [
+              {
+                "candidate": 4,
+                "cosine": 0.6150948405265808
+              },
+              {
+                "candidate": 0,
+                "cosine": 0.4797478914260864
+              },
+              {
+                "candidate": 3,
+                "cosine": 0.35567712783813477
+              },
+              {
+                "candidate": 2,
+                "cosine": 0.32684898376464844
+              },
+              {
+                "candidate": 1,
+                "cosine": 0.3090444803237915
+              }
+            ]
+          },
+          {
+            "reference_at_31": 2,
+            "ranking": [
+              {
+                "candidate": 3,
+                "cosine": 0.5551284551620483
+              },
+              {
+                "candidate": 2,
+                "cosine": 0.5209293961524963
+              },
+              {
+                "candidate": 1,
+                "cosine": 0.3812214732170105
+              },
+              {
+                "candidate": 0,
+                "cosine": 0.2613363564014435
+              },
+              {
+                "candidate": 4,
+                "cosine": 0.17642465233802795
+              }
+            ]
+          },
+          {
+            "reference_at_31": 3,
+            "ranking": [
+              {
+                "candidate": 3,
+                "cosine": 0.7250433564186096
+              },
+              {
+                "candidate": 2,
+                "cosine": 0.44353991746902466
+              },
+              {
+                "candidate": 1,
+                "cosine": 0.3281537890434265
+              },
+              {
+                "candidate": 0,
+                "cosine": 0.27253496646881104
+              },
+              {
+                "candidate": 4,
+                "cosine": 0.24713341891765594
+              }
+            ]
+          },
+          {
+            "reference_at_31": 4,
+            "ranking": [
+              {
+                "candidate": 2,
+                "cosine": 0.343681275844574
+              },
+              {
+                "candidate": 3,
+                "cosine": 0.32136455178260803
+              },
+              {
+                "candidate": 0,
+                "cosine": 0.21648651361465454
+              },
+              {
+                "candidate": 1,
+                "cosine": 0.1645480990409851
+              },
+              {
+                "candidate": 4,
+                "cosine": 0.0695858895778656
+              }
+            ]
+          }
+        ],
+        "reverse_target": [
+          {
+            "reference": 1,
+            "cosine": 0.6150948405265808
+          },
+          {
+            "reference": 0,
+            "cosine": 0.32443439960479736
+          },
+          {
+            "reference": 3,
+            "cosine": 0.24713341891765594
+          },
+          {
+            "reference": 2,
+            "cosine": 0.17642465233802795
+          },
+          {
+            "reference": 4,
+            "cosine": 0.0695858895778656
+          }
+        ]
+      },
+      {
+        "masked": true,
+        "ms": 17433,
+        "target": 4,
+        "forward": [
+          {
+            "reference_at_31": 0,
+            "ranking": [
+              {
+                "candidate": 1,
+                "cosine": 0.8218361139297485
+              },
+              {
+                "candidate": 0,
+                "cosine": 0.2902621030807495
+              },
+              {
+                "candidate": 2,
+                "cosine": 0.27471157908439636
+              },
+              {
+                "candidate": 4,
+                "cosine": 0.2732962369918823
+              },
+              {
+                "candidate": 3,
+                "cosine": 0.24962422251701355
+              }
+            ]
+          },
+          {
+            "reference_at_31": 1,
+            "ranking": [
+              {
+                "candidate": 4,
+                "cosine": 0.5957939624786377
+              },
+              {
+                "candidate": 1,
+                "cosine": 0.4776291251182556
+              },
+              {
+                "candidate": 0,
+                "cosine": 0.3670938014984131
+              },
+              {
+                "candidate": 2,
+                "cosine": 0.3624764382839203
+              },
+              {
+                "candidate": 3,
+                "cosine": 0.3376465439796448
+              }
+            ]
+          },
+          {
+            "reference_at_31": 2,
+            "ranking": [
+              {
+                "candidate": 0,
+                "cosine": 0.5457383990287781
+              },
+              {
+                "candidate": 2,
+                "cosine": 0.48842722177505493
+              },
+              {
+                "candidate": 3,
+                "cosine": 0.391732782125473
+              },
+              {
+                "candidate": 1,
+                "cosine": 0.27559253573417664
+              },
+              {
+                "candidate": 4,
+                "cosine": 0.1294996738433838
+              }
+            ]
+          },
+          {
+            "reference_at_31": 3,
+            "ranking": [
+              {
+                "candidate": 0,
+                "cosine": 0.7402369976043701
+              },
+              {
+                "candidate": 2,
+                "cosine": 0.5279185175895691
+              },
+              {
+                "candidate": 3,
+                "cosine": 0.3940538167953491
+              },
+              {
+                "candidate": 1,
+                "cosine": 0.2659885287284851
+              },
+              {
+                "candidate": 4,
+                "cosine": 0.17173436284065247
+              }
+            ]
+          },
+          {
+            "reference_at_31": 4,
+            "ranking": [
+              {
+                "candidate": 0,
+                "cosine": 0.36707162857055664
+              },
+              {
+                "candidate": 2,
+                "cosine": 0.317069947719574
+              },
+              {
+                "candidate": 1,
+                "cosine": 0.19364267587661743
+              },
+              {
+                "candidate": 3,
+                "cosine": 0.17392991483211517
+              },
+              {
+                "candidate": 4,
+                "cosine": 0.01838267594575882
+              }
+            ]
+          }
+        ],
+        "reverse_target": [
+          {
+            "reference": 1,
+            "cosine": 0.5957939624786377
+          },
+          {
+            "reference": 0,
+            "cosine": 0.2732962369918823
+          },
+          {
+            "reference": 3,
+            "cosine": 0.17173436284065247
+          },
+          {
+            "reference": 2,
+            "cosine": 0.1294996738433838
+          },
+          {
+            "reference": 4,
+            "cosine": 0.01838267594575882
+          }
+        ]
+      },
+      {
+        "masked": true,
+        "ms": 17533,
+        "target": 6,
+        "forward": [
+          {
+            "reference_at_31": 0,
+            "ranking": [
+              {
+                "candidate": 0,
+                "cosine": 0.7921523451805115
+              },
+              {
+                "candidate": 4,
+                "cosine": 0.516124963760376
+              },
+              {
+                "candidate": 6,
+                "cosine": 0.32531678676605225
+              },
+              {
+                "candidate": 1,
+                "cosine": 0.29698505997657776
+              },
+              {
+                "candidate": 2,
+                "cosine": 0.2773504853248596
+              },
+              {
+                "candidate": 3,
+                "cosine": 0.2730635404586792
+              },
+              {
+                "candidate": 5,
+                "cosine": 0.2456725835800171
+              }
+            ]
+          },
+          {
+            "reference_at_31": 1,
+            "ranking": [
+              {
+                "candidate": 6,
+                "cosine": 0.6484276056289673
+              },
+              {
+                "candidate": 0,
+                "cosine": 0.49865785241127014
+              },
+              {
+                "candidate": 4,
+                "cosine": 0.45789650082588196
+              },
+              {
+                "candidate": 1,
+                "cosine": 0.372047483921051
+              },
+              {
+                "candidate": 3,
+                "cosine": 0.36156657338142395
+              },
+              {
+                "candidate": 2,
+                "cosine": 0.33854570984840393
+              },
+              {
+                "candidate": 5,
+                "cosine": 0.2535555064678192
+              }
+            ]
+          },
+          {
+            "reference_at_31": 2,
+            "ranking": [
+              {
+                "candidate": 2,
+                "cosine": 0.5602695345878601
+              },
+              {
+                "candidate": 1,
+                "cosine": 0.4595426917076111
+              },
+              {
+                "candidate": 4,
+                "cosine": 0.3782193660736084
+              },
+              {
+                "candidate": 3,
+                "cosine": 0.32608866691589355
+              },
+              {
+                "candidate": 0,
+                "cosine": 0.2580075263977051
+              },
+              {
+                "candidate": 5,
+                "cosine": 0.2309739738702774
+              },
+              {
+                "candidate": 6,
+                "cosine": 0.23061658442020416
+              }
+            ]
+          },
+          {
+            "reference_at_31": 3,
+            "ranking": [
+              {
+                "candidate": 1,
+                "cosine": 0.7630853652954102
+              },
+              {
+                "candidate": 2,
+                "cosine": 0.5301089286804199
+              },
+              {
+                "candidate": 5,
+                "cosine": 0.4174269735813141
+              },
+              {
+                "candidate": 3,
+                "cosine": 0.38270214200019836
+              },
+              {
+                "candidate": 4,
+                "cosine": 0.31796130537986755
+              },
+              {
+                "candidate": 0,
+                "cosine": 0.281991571187973
+              },
+              {
+                "candidate": 6,
+                "cosine": 0.20228184759616852
+              }
+            ]
+          },
+          {
+            "reference_at_31": 4,
+            "ranking": [
+              {
+                "candidate": 5,
+                "cosine": 0.46306517720222473
+              },
+              {
+                "candidate": 2,
+                "cosine": 0.36567583680152893
+              },
+              {
+                "candidate": 1,
+                "cosine": 0.3445693850517273
+              },
+              {
+                "candidate": 3,
+                "cosine": 0.1956031620502472
+              },
+              {
+                "candidate": 0,
+                "cosine": 0.181548073887825
+              },
+              {
+                "candidate": 4,
+                "cosine": 0.07682158052921295
+              },
+              {
+                "candidate": 6,
+                "cosine": 0.04838920012116432
+              }
+            ]
+          }
+        ],
+        "reverse_target": [
+          {
+            "reference": 1,
+            "cosine": 0.6484276056289673
+          },
+          {
+            "reference": 0,
+            "cosine": 0.32531678676605225
+          },
+          {
+            "reference": 2,
+            "cosine": 0.23061658442020416
+          },
+          {
+            "reference": 3,
+            "cosine": 0.20228184759616852
+          },
+          {
+            "reference": 4,
+            "cosine": 0.04838920012116432
+          }
+        ]
+      },
+      {
+        "masked": true,
+        "ms": 17567,
+        "target": 6,
+        "forward": [
+          {
+            "reference_at_31": 0,
+            "ranking": [
+              {
+                "candidate": 0,
+                "cosine": 0.7949591875076294
+              },
+              {
+                "candidate": 1,
+                "cosine": 0.5435642004013062
+              },
+              {
+                "candidate": 5,
+                "cosine": 0.32689160108566284
+              },
+              {
+                "candidate": 4,
+                "cosine": 0.30875879526138306
+              },
+              {
+                "candidate": 6,
+                "cosine": 0.2911927402019501
+              },
+              {
+                "candidate": 3,
+                "cosine": 0.24911954998970032
+              },
+              {
+                "candidate": 2,
+                "cosine": 0.24050375819206238
+              }
+            ]
+          },
+          {
+            "reference_at_31": 1,
+            "ranking": [
+              {
+                "candidate": 6,
+                "cosine": 0.5979526042938232
+              },
+              {
+                "candidate": 0,
+                "cosine": 0.5000461339950562
+              },
+              {
+                "candidate": 1,
+                "cosine": 0.4842582941055298
+              },
+              {
+                "candidate": 4,
+                "cosine": 0.38401612639427185
+              },
+              {
+                "candidate": 3,
+                "cosine": 0.3434683382511139
+              },
+              {
+                "candidate": 2,
+                "cosine": 0.28559720516204834
+              },
+              {
+                "candidate": 5,
+                "cosine": 0.2794852554798126
+              }
+            ]
+          },
+          {
+            "reference_at_31": 2,
+            "ranking": [
+              {
+                "candidate": 2,
+                "cosine": 0.5509162545204163
+              },
+              {
+                "candidate": 4,
+                "cosine": 0.5155540704727173
+              },
+              {
+                "candidate": 1,
+                "cosine": 0.3241695761680603
+              },
+              {
+                "candidate": 5,
+                "cosine": 0.3145468235015869
+              },
+              {
+                "candidate": 3,
+                "cosine": 0.30968400835990906
+              },
+              {
+                "candidate": 0,
+                "cosine": 0.2894245386123657
+              },
+              {
+                "candidate": 6,
+                "cosine": 0.18350821733474731
+              }
+            ]
+          },
+          {
+            "reference_at_31": 3,
+            "ranking": [
+              {
+                "candidate": 4,
+                "cosine": 0.7696570158004761
+              },
+              {
+                "candidate": 2,
+                "cosine": 0.5255140662193298
+              },
+              {
+                "candidate": 5,
+                "cosine": 0.45506787300109863
+              },
+              {
+                "candidate": 3,
+                "cosine": 0.41277652978897095
+              },
+              {
+                "candidate": 1,
+                "cosine": 0.35604846477508545
+              },
+              {
+                "candidate": 0,
+                "cosine": 0.2788732051849365
+              },
+              {
+                "candidate": 6,
+                "cosine": 0.1915663182735443
+              }
+            ]
+          },
+          {
+            "reference_at_31": 4,
+            "ranking": [
+              {
+                "candidate": 5,
+                "cosine": 0.5104455947875977
+              },
+              {
+                "candidate": 4,
+                "cosine": 0.3674546182155609
+              },
+              {
+                "candidate": 2,
+                "cosine": 0.3454262614250183
+              },
+              {
+                "candidate": 3,
+                "cosine": 0.21496587991714478
+              },
+              {
+                "candidate": 0,
+                "cosine": 0.18164941668510437
+              },
+              {
+                "candidate": 1,
+                "cosine": 0.13877451419830322
+              },
+              {
+                "candidate": 6,
+                "cosine": 0.07435465604066849
+              }
+            ]
+          }
+        ],
+        "reverse_target": [
+          {
+            "reference": 1,
+            "cosine": 0.5979526042938232
+          },
+          {
+            "reference": 0,
+            "cosine": 0.2911927402019501
+          },
+          {
+            "reference": 3,
+            "cosine": 0.1915663182735443
+          },
+          {
+            "reference": 2,
+            "cosine": 0.18350821733474731
+          },
+          {
+            "reference": 4,
+            "cosine": 0.07435465604066849
+          }
+        ]
+      },
+      {
+        "masked": true,
+        "ms": 17633,
+        "target": 6,
+        "forward": [
+          {
+            "reference_at_31": 0,
+            "ranking": [
+              {
+                "candidate": 2,
+                "cosine": 0.7844815850257874
+              },
+              {
+                "candidate": 0,
+                "cosine": 0.5485553741455078
+              },
+              {
+                "candidate": 6,
+                "cosine": 0.3309284448623657
+              },
+              {
+                "candidate": 3,
+                "cosine": 0.32262665033340454
+              },
+              {
+                "candidate": 7,
+                "cosine": 0.2492557018995285
+              },
+              {
+                "candidate": 1,
+                "cosine": 0.22492146492004395
+              },
+              {
+                "candidate": 4,
+                "cosine": 0.22430634498596191
+              },
+              {
+                "candidate": 5,
+                "cosine": 0.1819564551115036
+              }
+            ]
+          },
+          {
+            "reference_at_31": 1,
+            "ranking": [
+              {
+                "candidate": 6,
+                "cosine": 0.6104950904846191
+              },
+              {
+                "candidate": 0,
+                "cosine": 0.5046651363372803
+              },
+              {
+                "candidate": 2,
+                "cosine": 0.4772597551345825
+              },
+              {
+                "candidate": 3,
+                "cosine": 0.36138808727264404
+              },
+              {
+                "candidate": 7,
+                "cosine": 0.32803118228912354
+              },
+              {
+                "candidate": 5,
+                "cosine": 0.3068601191043854
+              },
+              {
+                "candidate": 1,
+                "cosine": 0.2965496778488159
+              },
+              {
+                "candidate": 4,
+                "cosine": 0.26381638646125793
+              }
+            ]
+          },
+          {
+            "reference_at_31": 2,
+            "ranking": [
+              {
+                "candidate": 1,
+                "cosine": 0.5707014203071594
+              },
+              {
+                "candidate": 7,
+                "cosine": 0.49502885341644287
+              },
+              {
+                "candidate": 3,
+                "cosine": 0.48279696702957153
+              },
+              {
+                "candidate": 5,
+                "cosine": 0.415121853351593
+              },
+              {
+                "candidate": 2,
+                "cosine": 0.27301013469696045
+              },
+              {
+                "candidate": 4,
+                "cosine": 0.2572193443775177
+              },
+              {
+                "candidate": 0,
+                "cosine": 0.22647486627101898
+              },
+              {
+                "candidate": 6,
+                "cosine": 0.11730825155973434
+              }
+            ]
+          },
+          {
+            "reference_at_31": 3,
+            "ranking": [
+              {
+                "candidate": 3,
+                "cosine": 0.7154085636138916
+              },
+              {
+                "candidate": 1,
+                "cosine": 0.5751138925552368
+              },
+              {
+                "candidate": 5,
+                "cosine": 0.454059362411499
+              },
+              {
+                "candidate": 4,
+                "cosine": 0.41228187084198
+              },
+              {
+                "candidate": 7,
+                "cosine": 0.35530272126197815
+              },
+              {
+                "candidate": 2,
+                "cosine": 0.3205570876598358
+              },
+              {
+                "candidate": 0,
+                "cosine": 0.2967575788497925
+              },
+              {
+                "candidate": 6,
+                "cosine": 0.17032872140407562
+              }
+            ]
+          },
+          {
+            "reference_at_31": 4,
+            "ranking": [
+              {
+                "candidate": 7,
+                "cosine": 0.4440482258796692
+              },
+              {
+                "candidate": 4,
+                "cosine": 0.39658552408218384
+              },
+              {
+                "candidate": 1,
+                "cosine": 0.37479349970817566
+              },
+              {
+                "candidate": 3,
+                "cosine": 0.34341752529144287
+              },
+              {
+                "candidate": 5,
+                "cosine": 0.1959487795829773
+              },
+              {
+                "candidate": 2,
+                "cosine": 0.1956651508808136
+              },
+              {
+                "candidate": 0,
+                "cosine": 0.16222701966762543
+              },
+              {
+                "candidate": 6,
+                "cosine": 0.06527087837457657
+              }
+            ]
+          }
+        ],
+        "reverse_target": [
+          {
+            "reference": 1,
+            "cosine": 0.6104950904846191
+          },
+          {
+            "reference": 0,
+            "cosine": 0.3309284448623657
+          },
+          {
+            "reference": 3,
+            "cosine": 0.17032872140407562
+          },
+          {
+            "reference": 2,
+            "cosine": 0.11730825155973434
+          },
+          {
+            "reference": 4,
+            "cosine": 0.06527087837457657
+          }
+        ]
+      },
+      {
+        "masked": true,
+        "ms": 17700,
+        "target": 6,
+        "forward": [
+          {
+            "reference_at_31": 0,
+            "ranking": [
+              {
+                "candidate": 2,
+                "cosine": 0.758699893951416
+              },
+              {
+                "candidate": 1,
+                "cosine": 0.6796029806137085
+              },
+              {
+                "candidate": 6,
+                "cosine": 0.37671881914138794
+              },
+              {
+                "candidate": 4,
+                "cosine": 0.29627320170402527
+              },
+              {
+                "candidate": 5,
+                "cosine": 0.2811179757118225
+              },
+              {
+                "candidate": 0,
+                "cosine": 0.2547069787979126
+              },
+              {
+                "candidate": 3,
+                "cosine": 0.18793317675590515
+              }
+            ]
+          },
+          {
+            "reference_at_31": 1,
+            "ranking": [
+              {
+                "candidate": 6,
+                "cosine": 0.6327533721923828
+              },
+              {
+                "candidate": 1,
+                "cosine": 0.5396225452423096
+              },
+              {
+                "candidate": 2,
+                "cosine": 0.5096275806427002
+              },
+              {
+                "candidate": 4,
+                "cosine": 0.37132441997528076
+              },
+              {
+                "candidate": 5,
+                "cosine": 0.330835223197937
+              },
+              {
+                "candidate": 0,
+                "cosine": 0.24887976050376892
+              },
+              {
+                "candidate": 3,
+                "cosine": 0.2357289046049118
+              }
+            ]
+          },
+          {
+            "reference_at_31": 2,
+            "ranking": [
+              {
+                "candidate": 0,
+                "cosine": 0.6051316261291504
+              },
+              {
+                "candidate": 5,
+                "cosine": 0.5786846280097961
+              },
+              {
+                "candidate": 4,
+                "cosine": 0.47593313455581665
+              },
+              {
+                "candidate": 3,
+                "cosine": 0.32238301634788513
+              },
+              {
+                "candidate": 2,
+                "cosine": 0.2861204147338867
+              },
+              {
+                "candidate": 1,
+                "cosine": 0.26957395672798157
+              },
+              {
+                "candidate": 6,
+                "cosine": 0.26877129077911377
+              }
+            ]
+          },
+          {
+            "reference_at_31": 3,
+            "ranking": [
+              {
+                "candidate": 4,
+                "cosine": 0.7072763442993164
+              },
+              {
+                "candidate": 0,
+                "cosine": 0.5299139618873596
+              },
+              {
+                "candidate": 5,
+                "cosine": 0.4544789493083954
+              },
+              {
+                "candidate": 3,
+                "cosine": 0.43167436122894287
+              },
+              {
+                "candidate": 1,
+                "cosine": 0.40029382705688477
+              },
+              {
+                "candidate": 2,
+                "cosine": 0.2698412239551544
+              },
+              {
+                "candidate": 6,
+                "cosine": 0.2582531273365021
+              }
+            ]
+          },
+          {
+            "reference_at_31": 4,
+            "ranking": [
+              {
+                "candidate": 5,
+                "cosine": 0.38245338201522827
+              },
+              {
+                "candidate": 4,
+                "cosine": 0.37915584444999695
+              },
+              {
+                "candidate": 3,
+                "cosine": 0.35043489933013916
+              },
+              {
+                "candidate": 0,
+                "cosine": 0.32522737979888916
+              },
+              {
+                "candidate": 2,
+                "cosine": 0.18447503447532654
+              },
+              {
+                "candidate": 1,
+                "cosine": 0.17826682329177856
+              },
+              {
+                "candidate": 6,
+                "cosine": 0.07841677963733673
+              }
+            ]
+          }
+        ],
+        "reverse_target": [
+          {
+            "reference": 1,
+            "cosine": 0.6327533721923828
+          },
+          {
+            "reference": 0,
+            "cosine": 0.37671881914138794
+          },
+          {
+            "reference": 2,
+            "cosine": 0.26877129077911377
+          },
+          {
+            "reference": 3,
+            "cosine": 0.2582531273365021
+          },
+          {
+            "reference": 4,
+            "cosine": 0.07841677963733673
+          }
+        ]
+      }
+    ]
+  },
+  "target_reference_index": 1,
+  "other_interval_check": {
+    "seed_ms": [
+      24633,
+      26567
+    ],
+    "owners": [
+      4,
+      2
+    ],
+    "consensus_choice": null,
+    "correct": false,
+    "raw_scores": [
+      [
+        0.49770891666412354,
+        0.32091647386550903,
+        0.16810950636863708,
+        0.1540006697177887,
+        0.4108951985836029,
+        0.36418280005455017,
+        0.13082337379455566
+      ],
+      [
+        0.2601778507232666,
+        0.24171960353851318,
+        0.2181503176689148,
+        0.21848085522651672,
+        0.23610424995422363,
+        0.17423610389232635,
+        0.5698474645614624
+      ],
+      [
+        0.3647194504737854,
+        0.29716795682907104,
+        0.1711328625679016,
+        0.230266273021698,
+        0.5360004901885986,
+        0.3219238221645355,
+        0.1968812644481659
+      ],
+      [
+        0.48770472407341003,
+        0.3543057441711426,
+        0.18817204236984253,
+        0.3094988763332367,
+        0.3995271325111389,
+        0.4267862141132355,
+        0.19216802716255188
+      ],
+      [
+        0.26112300157546997,
+        0.24727126955986023,
+        0.4354333281517029,
+        0.4297149181365967,
+        0.18520566821098328,
+        0.18062981963157654,
+        0.2693348228931427
+      ],
+      [
+        0.19288891553878784,
+        0.18445417284965515,
+        0.23834416270256042,
+        0.5792080163955688,
+        0.16397500038146973,
+        0.16490289568901062,
+        0.23379354178905487
+      ]
+    ],
+    "masked_scores": [
+      [
+        0.6088413000106812,
+        0.37573325634002686,
+        0.17702367901802063,
+        0.15086980164051056,
+        0.40570467710494995,
+        0.4433459937572479,
+        0.2251884937286377
+      ],
+      [
+        0.31554579734802246,
+        0.33239859342575073,
+        0.31091952323913574,
+        0.37496820092201233,
+        0.29795801639556885,
+        0.2829545736312866,
+        0.5616416931152344
+      ],
+      [
+        0.46846964955329895,
+        0.4079805016517639,
+        0.13654792308807373,
+        0.27998197078704834,
+        0.580437183380127,
+        0.40550291538238525,
+        0.2806495428085327
+      ],
+      [
+        0.3765943944454193,
+        0.4263988137245178,
+        0.19532066583633423,
+        0.22989410161972046,
+        0.4220435619354248,
+        0.39155298471450806,
+        0.31287503242492676
+      ],
+      [
+        0.29164910316467285,
+        0.29381564259529114,
+        0.42395076155662537,
+        0.4515441656112671,
+        0.24729794263839722,
+        0.2669437527656555,
+        0.32906675338745117
+      ],
+      [
+        0.1096256673336029,
+        0.2456299066543579,
+        0.3388270139694214,
+        0.6414508819580078,
+        0.19334964454174042,
+        0.2564345598220825,
+        0.2042551338672638
+      ]
+    ],
+    "scope": "Two endpoint frames, not full path or independent match",
+    "interpretation": "Single-frame references yield no consensus on the previous duel. This method cannot replace its existing supported contour path. This is a limited endpoint test, not a full comparison with the five-frame fall banks."
+  },
+  "replay": "python scripts/matchroom_reid_probe.py --validation docs/matchroom-reid-validation.json (cached scores only; no new model inference)"
+}
