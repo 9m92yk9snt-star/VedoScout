@@ -38,7 +38,7 @@ SOURCE_MODULES = (
     "report_publication.py", "player_report_copy.py", "pdf_v2.py", "score_meaning.py", "score_context.py", "snapshot_card.py", "progression.py",
     "scripts/review_report_publication.py",
     "sequence_report_adapter.py", "match_room.py", "match_room_tracking.py", "sequence_report_runtime.py", "sequence_pilot.py", "sequence_pilot_transport.py",
-    "match_room_localization.py", "match_room_position_evidence.py", "match_room_position_contours.py", "match_room_anchor_contours.py", "match_room_ball_playback.py", "match_room_contours.py", "match_room_reacquisition.py", "native_player_segmentation.py", "prompt_player_segmentation.py", "player_segmentation_assets.py",
+    "match_room_display_bridge.py", "match_room_localization.py", "match_room_position_evidence.py", "match_room_position_contours.py", "match_room_anchor_contours.py", "match_room_ball_playback.py", "match_room_contours.py", "match_room_reacquisition.py", "native_player_segmentation.py", "prompt_player_segmentation.py", "player_segmentation_assets.py",
     "sequence_run_checkpoint.py", "sequence_foot_evidence.py", "sequence_action_evidence.py",
     "scripts/run_sequence_pilot.py",
     "source_frame_cache.py", "analysis_jobs.py", "ordered_vision_reviews.py",
