@@ -47,7 +47,7 @@ def agreed_intervals(frames, detections, observations, *, deadline):
     return accepted
 
 
-def contour_segments(video, observations, start, end, *, deadline, diagnostics):
+def contour_segments(video, observations, start, end, *, deadline, diagnostics, on_segment=None):
     """Bounded short proof only. Partial valid intervals stay separate."""
     from native_player_segmentation import PersonSegmenter
     from match_room_contours import read_clip, detect_frame, measured_mask
@@ -66,58 +66,56 @@ def contour_segments(video, observations, start, end, *, deadline, diagnostics):
     start, end = min(a['media_ms'] for a, _ in pairs), max(b['media_ms'] for _, b in pairs)
     boxes = [s['player_box'] for pair in pairs for s in pair if s.get('player_box')]
     model = PersonSegmenter()
-    frames, detections = [], []
+    frames, detections, segments = [], [], []
+    pending = {b['media_ms']: (a, b) for a, b in pairs}
     stream = read_clip(video, start, end, sample_step=0)
+    timed_out = False
     try:
         for frame in stream:
             if time.monotonic() >= deadline-1:
-                diagnostics['status'] = 'TIME_BUDGET'
-                return []
+                timed_out = True
+                break
             h, w = frame['gray'].shape
-            # One fixed band from the observed boxes. Keep the full width so
-            # competing players remain in the same detector view.
+            # Keep competitors in one fixed full-width detector view.
             top = max(0, int((min(b[1] for b in boxes)-.1)*h))
             bottom = min(h, int((max(b[1]+b[3] for b in boxes)+.1)*h)+1)
             detections.append(detect_frame(frame, (0, top, w, bottom), model))
             frame.pop('image')
             frames.append(frame)
+            pair = pending.get(frame['media_ms'])
+            if pair is None:
+                continue
+            # Complete and preserve each independently checked interval before
+            # decoding more frames. A later timeout cannot erase earlier proof.
+            intervals = agreed_intervals(frames, detections, pair, deadline=deadline)
+            for interval in intervals:
+                samples = []
+                for i, j in zip(interval['indices'], interval['instances']):
+                    h, w = frames[i]['gray'].shape
+                    polygons = foreground_polygons([{'class_id': 0, 'mask': measured_mask(d)}
+                                                    for d in detections[i]], w, h)
+                    if not polygons:
+                        samples = []
+                        break
+                    row, ms = detections[i][j], frames[i]['media_ms']
+                    fid = f'position-contour:{ms}'
+                    samples.append({'media_ms': ms, 'frame_id': fid, 'ground': row['ground'],
+                                    'player_width': row['player_width'], 'confidence': row['confidence'],
+                                    'foreground': {'method': 'SOURCE_PERSON_MASK', 'frame_id': fid,
+                                                   'media_ms': ms, 'polygons': polygons}})
+                if samples:
+                    refs = interval['reference_frames']
+                    segment = {'id': f"position-contour:{samples[0]['media_ms']}:{samples[-1]['media_ms']}",
+                               'reference_frame': refs[0], 'observation_reference_frames': refs,
+                               'overlap_frames': len(samples),
+                               'ground_method': 'LOWER_VISIBLE_CONTOUR',
+                               'source_frame_coverage': 'COMPLETE_SEGMENT', 'samples': samples}
+                    segments.append(segment)
+                    if on_segment is not None:
+                        on_segment(segment)
     finally:
         stream.close()
-    intervals = agreed_intervals(frames, detections, observations, deadline=deadline-1)
-    groups = []
-    for interval in intervals:
-        pairs = list(zip(interval['indices'], interval['instances']))
-        if groups and groups[-1]['pairs'][-1] == pairs[0]:
-            groups[-1]['pairs'].extend(pairs[1:])
-            groups[-1]['refs'].extend(interval['reference_frames'])
-        else:
-            groups.append({'pairs': pairs, 'refs': interval['reference_frames'][:]})
-    segments = []
-    for group in groups:
-        samples = []
-        for i, j in group['pairs']:
-            if time.monotonic() >= deadline:
-                diagnostics['status'] = 'TIME_BUDGET'
-                return []
-            h, w = frames[i]['gray'].shape
-            polygons = foreground_polygons([{'class_id': 0, 'mask': measured_mask(d)}
-                                            for d in detections[i]], w, h)
-            if not polygons:
-                samples = []
-                break
-            row, ms = detections[i][j], frames[i]['media_ms']
-            fid = f'position-contour:{ms}'
-            samples.append({'media_ms': ms, 'frame_id': fid, 'ground': row['ground'],
-                            'player_width': row['player_width'], 'confidence': row['confidence'],
-                            'foreground': {'method': 'SOURCE_PERSON_MASK', 'frame_id': fid,
-                                           'media_ms': ms, 'polygons': polygons}})
-        if samples:
-            refs = list(dict.fromkeys(group['refs']))
-            segments.append({'id': f'position-contour:{len(segments)}',
-                             'reference_frame': refs[0], 'observation_reference_frames': refs,
-                             'overlap_frames': len(samples),
-                             'ground_method': 'LOWER_VISIBLE_CONTOUR',
-                             'source_frame_coverage': 'COMPLETE_SEGMENT', 'samples': samples})
-    diagnostics.update(status='SUPPORTED_SOURCE_OBSERVATIONS' if segments else 'NO_AGREED_INTERVAL',
-                       decoded_frames=len(frames), agreed_intervals=len(intervals))
+    diagnostics.update(status='TIME_BUDGET' if timed_out else
+                       'SUPPORTED_SOURCE_OBSERVATIONS' if segments else 'NO_AGREED_INTERVAL',
+                       decoded_frames=len(frames), agreed_intervals=len(segments))
     return segments

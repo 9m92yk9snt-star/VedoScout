@@ -72,9 +72,26 @@ def samples(rows, *, actor, frames, start, end, allowed=None):
     return sorted(result.values(), key=lambda r: r['media_ms'])
 
 
+def position_window(event):
+    """Presentation perception only; duel recovery may use encoded clip context."""
+    proof = event['proof']
+    start = max(proof['proof_start_ms'], proof['frame_ms']-750)
+    context = 750 if event.get('canonical_action_type') == 'DUEL' else 0
+    end = min(proof['proof_end_ms']+context, start+(5000 if context else 2500))
+    return start, end, context
+
+
+def presentation_window(event):
+    proof = event['proof']
+    context = 750 if (event.get('localization_method') == 'EXPLICIT_SOURCE_POSITIONS'
+                      and event.get('canonical_action_type') == 'DUEL'
+                      and event.get('graphics_context_ms') == 750) else 0
+    return proof['proof_start_ms'], proof['proof_end_ms']+context
+
+
 def presentation(event, samples_=None):
     proof = event['proof']
-    start, end = proof['proof_start_ms'], proof['proof_end_ms']
+    start, end = presentation_window(event)
     contact = event.get('contact_ms')
     if contact is None:
         contact = proof['frame_ms']

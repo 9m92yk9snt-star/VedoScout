@@ -61,3 +61,29 @@ def test_sparse_source_time_gap_is_not_bridged(monkeypatch):
     frames, rows, obs, _ = fixture(monkeypatch)
     frames[2]['media_ms'] = 149
     assert run(frames, rows, obs) == []
+
+
+def test_completed_interval_is_checkpointed_before_later_decode_timeout(monkeypatch):
+    import match_room_contours as source
+    import native_player_segmentation as segmentation
+    import match_room_tracking as tracking
+    frames, rows, obs, _ = fixture(monkeypatch)
+    for o in obs: o['player_box'] = [.3, .2, .21, .6]
+    obs.append({**obs[-1], 'frame_id': 'f400', 'media_ms': 400})
+    for frame in frames: frame['image'] = np.zeros((100, 100, 3), np.uint8)
+    clock = [0]
+    def stream(*args, **kwargs):
+        yield from frames
+        clock[0] = 99
+        yield {'media_ms': 250, 'image': np.zeros((100,100,3), np.uint8), 'gray': frames[0]['gray']}
+    monkeypatch.setattr(localized.time, 'monotonic', lambda: clock[0])
+    monkeypatch.setattr(source, 'read_clip', stream)
+    monkeypatch.setattr(source, 'detect_frame', lambda *args: deepcopy(rows[0]))
+    monkeypatch.setattr(segmentation, 'PersonSegmenter', lambda: object())
+    monkeypatch.setattr(tracking, 'foreground_polygons', lambda *args: [[[.3,.2],[.5,.2],[.5,.8]]])
+    saved, diagnostic = [], {}
+    result = localized.contour_segments('unused', obs, 0, 400, deadline=100,
+                                        diagnostics=diagnostic, on_segment=saved.append)
+    assert len(saved) == len(result) == 1
+    assert result[0]['samples'][-1]['media_ms'] == 200
+    assert diagnostic['status'] == 'TIME_BUDGET'

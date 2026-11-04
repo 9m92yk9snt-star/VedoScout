@@ -44,10 +44,16 @@ def bound_samples(event, selection, result, validate_response, *, packet='positi
         previous = ms
     rows = validate_response(receipt['raw_response'], frames)
     proof = event['proof']
+    context = result.get('context_after_ms', 0)
+    if context:
+        from match_room import position_window
+        lo, hi, permitted = position_window(event)
+        if context != 750 or permitted != 750 or result.get('window_ms') != [lo, hi]:
+            raise ValueError('LOCALIZATION_CONTEXT_NOT_IN_ENCODED_CLIP')
     samples = []
     identified = False
     for row in rows:
-        if not proof['proof_start_ms'] <= row['media_ms'] <= proof['proof_end_ms']:
+        if not proof['proof_start_ms'] <= row['media_ms'] <= proof['proof_end_ms']+context:
             continue
         sample = {'frame_id': row['frame'], 'media_ms': row['media_ms'],
                   'identity_status': row['target_status'],

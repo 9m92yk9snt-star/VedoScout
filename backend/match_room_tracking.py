@@ -274,7 +274,8 @@ def compute(video, anchors, events, checkpoint=None):
         observations = event.get('visual_samples') or []
         if not observations:
             continue
-        start, end = event['proof']['proof_start_ms'], event['proof']['proof_end_ms']
+        from match_room import presentation_window
+        start, end = presentation_window(event)
         result = {'version': 1, 'source_video_sha256': event['source_video_sha256'],
                   'event_id': event['event_id'], 'method': 'TAP_OPTICAL_GROUND_PROXY', 'segments': [],
                   'observed_samples': pass_motion(video, event, observed_motion(video, observations))}
@@ -288,8 +289,14 @@ def compute(video, anchors, events, checkpoint=None):
                         sample.pop(key, None)
         output[event['event_id']] = result
         save()  # keep completed sparse graphics if the optional contour work times out
+        explicit = event.get('localization_method') == 'EXPLICIT_SOURCE_POSITIONS'
+        if explicit:
+            result['method'] = 'SOURCE_OBSERVATION_INSTANCE_CONTOUR'
         try:
-            add_foreground(video, result['observed_samples'], deadline)
+            # Explicit positions use fresh source-frame masks in ball_playback.
+            # Sparse endpoint masks are not displayed and must not consume its budget.
+            if not explicit:
+                add_foreground(video, result['observed_samples'], deadline)
         except (ImportError, OSError, ValueError, cv2.error):
             pass  # graphics remain optional; no unmasked replacement is invented
         save()
@@ -311,15 +318,21 @@ def compute(video, anchors, events, checkpoint=None):
                 contours = []
                 lo = max(start, min(s['media_ms'] for s in observations))
                 hi = min(end, max(s['media_ms'] for s in observations))
+                def preserve(segment):
+                    result['segments'].append(segment)
+                    save()
                 while lo < hi and time.monotonic() < deadline-1:
-                    stop = min(hi, lo+1500)
+                    boundaries = [s['media_ms'] for s in observations if lo < s['media_ms'] <= min(hi, lo+1500)]
+                    if not boundaries:
+                        break
+                    stop = max(boundaries)
                     part = {}
                     contours.extend(position_contours(video, observations, lo, stop,
-                                                      deadline=deadline, diagnostics=part))
+                                                      deadline=deadline, diagnostics=part, on_segment=preserve))
                     diagnostic.setdefault('windows', []).append(part)
                     if stop == hi:
                         break
-                    lo = stop-250
+                    lo = stop
                 diagnostic.update(method=position_method, status='SUPPORTED_SOURCE_OBSERVATIONS' if contours else 'NO_AGREED_INTERVAL')
             else:
                 contours = contour_segments(video, anchors, observations, start, end, deadline=deadline,
@@ -357,6 +370,7 @@ def compute(video, anchors, events, checkpoint=None):
             save()
         # Preserve the completed player track before optional moving arrows.
         if explicit:
+            save()
             continue
         try:
             result['ball_playback'], result['ball_playback_diagnostics'] = build_ball_playback(

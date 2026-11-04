@@ -85,3 +85,26 @@ def test_ball_can_continue_after_identified_player_exits_but_not_across_uncertai
     assert 'ball' not in bind()[2]
     rows['frames'][0].update(target_status='ABSENT',ground=None,box=None,feet_visible=False)
     assert all('ball' not in r for r in bind())
+
+
+def test_duel_recovery_uses_clip_context_without_changing_canonical_proof():
+    from match_room import position_window, presentation_window
+    event, selection, result = fixture()
+    event['proof']['frame_ms'] = 100
+    event['proof']['proof_end_ms'] = 200
+    event['canonical_action_type'] = 'DUEL'
+    before = deepcopy(event)
+    start,end,context = position_window(event)
+    result.update(context_after_ms=context, window_ms=[start,end])
+    assert bound_samples(event,selection,result,validate)[-1]['media_ms'] == 300
+    assert event == before and presentation_window(event) == (100,200)
+    event.update(localization_method='EXPLICIT_SOURCE_POSITIONS', graphics_context_ms=750)
+    assert presentation_window(event) == (100,950)
+    assert event['proof']['proof_end_ms'] == 200
+    result['context_after_ms'] = 751
+    with pytest.raises(ValueError,match='CONTEXT_NOT_IN_ENCODED_CLIP'):
+        bound_samples(event,selection,result,validate)
+    result['context_after_ms'] = 750
+    event['canonical_action_type'] = 'PASS'
+    with pytest.raises(ValueError,match='CONTEXT_NOT_IN_ENCODED_CLIP'):
+        bound_samples(event,selection,result,validate)

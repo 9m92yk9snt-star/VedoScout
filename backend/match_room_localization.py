@@ -15,6 +15,7 @@ import cv2
 import sequence_pilot as pilot
 import sequence_pilot_transport as transport
 from match_room_position_evidence import selection_digest, bound_samples
+from match_room import position_window
 from sequence_run_checkpoint import reusable_receipt
 from video_timebase import read_frame_at
 
@@ -53,12 +54,11 @@ def packet_id(event):
 
 
 def prepare(video, selection, event, work, reference_images=None):
-    """A <=2.5s source window; all taps remain original human references."""
+    """Bounded source window including duel recovery in existing clip context."""
     work = Path(work)
     work.mkdir(parents=True, exist_ok=True)
     proof = event['proof']
-    start = max(proof['proof_start_ms'], proof['frame_ms']-750)
-    end = min(proof['proof_end_ms'], start+2500)
+    start, end, context = position_window(event)
     cap = cv2.VideoCapture(str(video))
     items = [{'type': 'text', 'text': PROMPT}]
     references, frames = [], []
@@ -107,7 +107,7 @@ def prepare(video, selection, event, work, reference_images=None):
               'source_video_sha256': event['source_video_sha256'],
               'original_selection_values_sha256': selection_digest(selection),
               'frames': frames, 'references': references, 'request': request,
-              'window_ms': [start, end]}
+              'window_ms': [start, end], 'context_after_ms': context}
     job = {'packet_id': packet_id(event), 'items': items, 'reasoning_effort': 'medium',
            'image_detail': 'high', 'max_output_tokens': 10000}
     return record, job
@@ -172,6 +172,8 @@ async def localize(video, doc, *, checkpoint, event_ids=None, run_jobs=None, bud
                     samples = bound_samples(event, selection, record, validate, packet=packet_id(event))
                     event['visual_samples'] = samples
                     event['localization_method'] = 'EXPLICIT_SOURCE_POSITIONS'
+                    if record.get('context_after_ms') == 750:
+                        event['graphics_context_ms'] = 750
                     record['status'] = 'OBSERVATIONS_RETURNED'
                     record.pop('error', None)
                 except ValueError:

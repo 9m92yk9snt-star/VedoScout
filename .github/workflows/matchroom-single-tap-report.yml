@@ -14,7 +14,7 @@ jobs:
       github.event.pull_request.draft == true &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.event.pull_request.head.ref == 'codex/matchroom-graphics' &&
-      github.event.before == '44563433bad264625382c8992ebd676086957979' &&
+      github.event.before == '8c85584b389b14951a75f5f337736566beff0a95' &&
       github.run_attempt == 1
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -38,17 +38,17 @@ jobs:
         run: python -m pytest backend/tests/test_match_room_localization.py backend/tests/test_match_room_position_evidence.py backend/tests/test_match_room_position_contours.py backend/tests/test_single_tap_source.py backend/tests/test_position_probe.py backend/tests/test_sequence_request_windows.py backend/tests/test_sequence_pilot.py -q
       - name: Verify frontend source-position acceptance
         run: node frontend/scripts/test-matchroom-localization.cjs
-      - name: Restore the completed all-tap position request
+      - name: Restore all eight completed position requests
         uses: actions/download-artifact@v4
         with:
-          name: matchroom-single-tap-report-41770125538
-          run-id: 41770125538
+          name: matchroom-single-tap-report-41771330758
+          run-id: 41771330758
           github-token: ${{ github.token }}
           path: ${{ runner.temp }}/previous-all-taps
-      - name: Complete missing report graphics with all original taps
+      - name: Complete only duel recovery; reuse seven paid position results
         env:
           EMERGENT_LLM_KEY: ${{ secrets.EMERGENT_LLM_KEY }}
-        run: python -u backend/scripts/run_matchroom_retained_trial.py --work "$RUNNER_TEMP/single-tap-input" --output "$RUNNER_TEMP/single-tap-report" --event-limit 8 --run-model --resume-document "$RUNNER_TEMP/previous-all-taps/single-tap-report/report-document.json"
+        run: python -u backend/scripts/run_matchroom_retained_trial.py --work "$RUNNER_TEMP/single-tap-input" --output "$RUNNER_TEMP/single-tap-report" --event-limit 8 --run-model --max-new-requests 1 --resume-document "$RUNNER_TEMP/previous-all-taps/single-tap-report/report-document.json"
       - name: Preserve report, source-bound graphics and model receipts
         if: always()
         uses: actions/upload-artifact@v4

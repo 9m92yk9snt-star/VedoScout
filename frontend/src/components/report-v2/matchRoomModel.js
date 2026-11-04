@@ -134,7 +134,7 @@ export function graphicsAt(room, mediaMs) {
   const previous = sample ? room.samples[room.samples.indexOf(sample)-1] : null;
   const moves = (a,b) => a && b && Math.hypot(b[0]-a[0],b[1]-a[1]) > .008;
   const staticPair = sample && previous && sample.camera_static_from_previous && sample.media_ms > previous.media_ms && sample.media_ms-previous.media_ms <= 300;
-  const ballTrail = sample?.ballTrail || (staticPair && moves(previous.ball,sample.ball) ? [previous.ball,sample.ball] : null);
+  const ballTrail = room.sourcePositionsOnly ? null : sample?.ballTrail || (staticPair && moves(previous.ball,sample.ball) ? [previous.ball,sample.ball] : null);
   const withBall = mark => mark ? {...mark, ballTrail, foreground: mark.sourceFrameContour ? mark.foreground : sample?.foreground} : ballTrail ? {...sample, ground:null, groundTrail:null, ballTrail} : null;
   // A source-observed endpoint takes precedence over an optical box proxy.
   const observed = nearest(room.samples.filter(s => s.groundTrail && Math.abs(s.media_ms-mediaMs) <= 60));
