@@ -240,7 +240,7 @@ def test_refinement_preserves_initial_paths_and_ball_evidence_with_separate_budg
                      'segments':[{'id':'measured'}], 'ball_playback':[{'id':'must-not-replace'}]}}, 'COMPLETED'
     monkeypatch.setattr(tracking, '_bounded_event', run)
     result, status = tracking.bounded_tracks('video', [], events)
-    assert calls == [(e['event_id'],False) for e in events]+[('missing2','small'),('missing1','medium'),('missing3','medium')]
+    assert calls == [(e['event_id'],False) for e in events]+[('missing2','medium'),('missing1','medium'),('missing3','medium')]
     assert result['covered'] == originals['covered']
     assert result['missing4'] == originals['missing4']
     for eid in ('missing1','missing2','missing3'):

@@ -3,6 +3,7 @@
 const fs = require('fs');
 const path = require('path');
 const assert = require('node:assert/strict');
+const {execFileSync} = require('node:child_process');
 (async () => {
   const document = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
   const source = fs.readFileSync(path.join(__dirname, '../src/components/report-v2/matchRoomModel.js'));
@@ -40,12 +41,20 @@ const assert = require('node:assert/strict');
   // Missing feet alone are no longer a reason to suppress an identity-bound
   // display bridge. The raw observation remains unchanged.
   assert.ok(graphicsAt(duel, 12783), 'Missing independently measured post-duel recovery');
+  const duelRow = rows.find(r => r.event_id === '88aa8bbdedbec570d4de');
+  const clip = path.join(path.dirname(process.argv[2]), 'frames', path.basename(duelRow.tele_clip_url));
+  const decoded = JSON.parse(execFileSync('ffprobe', ['-v','error','-select_streams','v:0',
+    '-show_entries','frame=best_effort_timestamp_time','-of','json',clip], {encoding:'utf8'}));
+  const recoveryFrames = decoded.frames.map(f => Math.round((Number(f.best_effort_timestamp_time)+duelRow.tele_clip_start)*1000))
+    .filter(ms => ms >= 11883 && ms <= 12883);
+  assert.ok(recoveryFrames.length >= 25, 'Insufficient decoded recovery pictures');
+  for (const ms of recoveryFrames) assert.ok(graphicsAt(duel, ms)?.ground, `Ellipse disappears during recovery at ${ms}`);
   const shot = rooms.get('a512ae64e102f24b3383');
   const arrow = ballAt(shot, 31115);
   assert.ok(arrow, 'Missing observed post-kick direction');
   const [a,b] = arrow.ballTrail;
   assert.ok(b[0]>a[0] && b[1]<a[1], 'This source shot travels up/right');
-  console.log(JSON.stringify({technical_checks_passed:true,visual_acceptance:'REQUIRES_CONTINUOUS_PLAYBACK_REVIEW',original_taps:10,report_clips:8,ellipse_cards:8,arrow_cards:8,
+  console.log(JSON.stringify({technical_checks_passed:true,continuous_recovery_frames:recoveryFrames.length,visual_acceptance:'REQUIRES_CONTINUOUS_PLAYBACK_REVIEW',original_taps:10,report_clips:8,ellipse_cards:8,arrow_cards:8,
     ellipse_segments:ellipses,moving_ball_segments:arrows,hiddenPlayerObservations:hiddenPlayer,
     hiddenBallObservations:hiddenBall,post_duel_recovery:true,post_kick_direction:true,new_model_requests:0}));
 })().catch(error=>{console.error(error.message);process.exitCode=1;});

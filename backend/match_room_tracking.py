@@ -509,8 +509,8 @@ def bounded_tracks(video, anchors, events):
         return any(w.get('status') == 'TIME_BUDGET' for w in
                    (previous.get('contour_diagnostics') or {}).get('windows', []))
     attempted = 0
-    # Retry incomplete coverage too. Empty interrupted paths get a fresh small
-    # pass; fragmented paths get the stronger model only in uncovered windows.
+    # Retry incomplete coverage with the stronger model only in uncovered
+    # windows. Repeating the same weak model can reproduce the same gap.
     for event in sorted(unique, key=lambda e: (not interrupted(e), -sum(b-a for a,b in missing_display_windows(e, output.get(e.get('event_id')) or {})))):
         if not event.get('event_id'):
             continue
@@ -524,7 +524,7 @@ def bounded_tracks(video, anchors, events):
         attempted += 1
         request_event = {**event, '_display_refinement_windows': missing} if missing else event
         retried, status = _bounded_event(video, anchors, [request_event],
-                                         refinement='small' if interrupted(event) and not previous.get('segments') else 'medium')
+                                         refinement='medium')
         result = retried.get(event['event_id']) or {}
         if (result.get('event_id') == event['event_id'] and result.get('method') == previous.get('method')
                 and result.get('source_video_sha256') == event.get('source_video_sha256')):
