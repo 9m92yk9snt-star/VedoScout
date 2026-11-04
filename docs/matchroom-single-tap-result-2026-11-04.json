@@ -1,0 +1,67 @@
+{
+  "date": "2026-11-04",
+  "status": "REPORT_READY_GRAPHICS_ACCEPTANCE_FAILED",
+  "source_video_sha256": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+  "original_tap_index": 4,
+  "original_tap_seconds": 21.48,
+  "human_tap_count": 1,
+  "source_run": 41763810937,
+  "ready_report_run": 41765803280,
+  "ready_report_artifact": 13293250987,
+  "ready_report_artifact_sha256": "58af7bab96a1b000f2e020c35ebe78dac1bc15f02017f65961a8c47b4e270595",
+  "source_requests_completed": 14,
+  "canonical_events": 19,
+  "report_clips": 8,
+  "source_phase_reused": true,
+  "source_resume_seconds": 0.052,
+  "report_stage_seconds": 204.77,
+  "writer_model": "gpt-6-astra",
+  "frontend_inventory": {
+    "cards": 8,
+    "source_samples": 0,
+    "dense_player_segments": 0,
+    "moving_ball_segments": 0,
+    "tracking_status": "NO_TRACK_INPUT"
+  },
+  "position_probe": {
+    "run": 41766372164,
+    "artifact": 13291934029,
+    "artifact_sha256": "0ddebe7469a4d187a59e461fd83c28ffbe53614e2729aaaac2367564334825e9",
+    "event_id": "d2681bfea7368ba44893",
+    "payload_bytes": 14722199,
+    "payload_sha256": "728be67aef1e07fee46366332ac357228706bb53feedaadc3e5412053b91737c",
+    "response_sha256": "f0b5307d9da9c20ceadd6f1687003c267b0460f7e9ffe2ef44f204cc80a744d8",
+    "timeline_frames": 48,
+    "ground_observations": 18,
+    "ball_observations": 41,
+    "in_proof_bound_ground": 9,
+    "in_proof_bound_ball": 7,
+    "first_target_absent_ms": 23982,
+    "first_post_cut_uncertain_ms": 25566,
+    "review": "12 sampled source images visually inspected; no full visual acceptance",
+    "contour_window_ms": [
+      23482,
+      24982
+    ],
+    "decoded_contour_frames": 91,
+    "agreed_contour_intervals": 0,
+    "report_modified": false
+  },
+  "validation": {
+    "targeted_report_retry_tests": 59,
+    "production_verification_run": 41766372185,
+    "production_verification_jobs_passed": 6
+  },
+  "limits": [
+    "A complete report is not a successful automatic graphics trial.",
+    "Optional position observations were absent from all 19 canonical events.",
+    "Separate position probe is diagnostic and not integrated with normal report flow.",
+    "The selected player leaves the shot view; identity is uncertain after the following cut.",
+    "No continuous measured player contour passed the existing agreement requirements.",
+    "Authenticated upload UI still requires three taps and was not exercised."
+  ],
+  "draft": true,
+  "deployed": false,
+  "production_database_used": false,
+  "notifications_sent": 0
+}
