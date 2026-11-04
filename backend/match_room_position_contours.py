@@ -19,7 +19,8 @@ def refinement_model():
     from player_segmentation_assets import ensure_model_asset
     ensure_model_asset(MODEL_PATH, MODEL_SHA256)
     model = PersonSegmenter.__new__(PersonSegmenter)
-    model.net = cv2.dnn.readNetFromONNX(str(MODEL_PATH))
+    from match_room_inference import load_cpu_net
+    model.net = load_cpu_net(MODEL_PATH)
     model.sha256 = MODEL_SHA256
     return model
 
