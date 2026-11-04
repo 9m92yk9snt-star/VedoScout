@@ -169,7 +169,8 @@ export function ballAt(room, mediaMs) {
   if (!sample) return null;
   const smooth = t => { const x = Math.max(0, Math.min(1, t)); return x*x*(3-2*x); };
   const fade = segment.end_ms > segment.arrival_ms ? 1-smooth((mediaMs-segment.arrival_ms)/(segment.end_ms-segment.arrival_ms)) : 1;
-  return {...sample, opacity: smooth((mediaMs-segment.start_ms)/120)*fade};
+  const fadeInMs = Math.min(120, (segment.arrival_ms-segment.start_ms)/3);
+  return {...sample, opacity: smooth((mediaMs-segment.start_ms)/fadeInMs)*fade};
 }
 
 // Clip a direction line to the visible picture, preserving its orientation.

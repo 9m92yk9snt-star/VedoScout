@@ -2,7 +2,7 @@ const fs = require('fs');
 const assert = require('node:assert/strict');
 (async () => {
  const source = fs.readFileSync(require('path').join(__dirname, '../src/components/report-v2/matchRoomModel.js'));
- const {roomFor, graphicsAt} = await import('data:text/javascript;base64,'+source.toString('base64'));
+ const {roomFor, graphicsAt, ballAt} = await import('data:text/javascript;base64,'+source.toString('base64'));
  const points = [100,125,150,175,200].map(t=>({media_ms:t,frame_id:`s${t}`,ground:[.4,.7],player_width:.05,confidence:.9,
   foreground:{method:'SOURCE_PERSON_MASK',media_ms:t,frame_id:`s${t}`,polygons:[[[.3,.4],[.5,.4],[.5,.7]]]}}));
  const raw = {version:1,event_id:'e',source_video_sha256:'source',coordinate_space:'FULL_FRAME_NORMALIZED',start_ms:0,end_ms:1000,
@@ -23,5 +23,8 @@ const assert = require('node:assert/strict');
  bad=comment();bad.match_room.samples[0].ball=[.4,.5];bad.match_room.samples[1].ball=[.6,.5];
  bad.match_room.samples[1].camera_static_from_previous=true;
  assert.equal(graphicsAt(roomFor(bad,0),200).ballTrail,null);
- console.log('7 localization frontend contracts passed');
+ const moving={movingBall:[{start_ms:100,arrival_ms:220,end_ms:220,samples:[{media_ms:140}]}]};
+ assert.equal(ballAt(moving,140).opacity,1);
+ assert.equal(ballAt(moving,221),null);
+ console.log('9 localization frontend contracts passed');
 })().catch(e=>{console.error(e);process.exitCode=1;});
