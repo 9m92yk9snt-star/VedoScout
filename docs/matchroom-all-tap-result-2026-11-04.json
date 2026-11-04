@@ -1,0 +1,180 @@
+{
+  "status": "PASSED_SCOPED_GRAPHICS_CHECK",
+  "all_original_taps": 10,
+  "source_video_sha256": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+  "canonical_events": 17,
+  "report_clips": 8,
+  "source_analysis_reused": true,
+  "report_prose_reused": true,
+  "manual_position_inputs": false,
+  "initial_all_tap_run": 41770125538,
+  "all_eight_graphics_run": 41771330758,
+  "duel_recovery_run": 41772727152,
+  "duel_recovery_artifact": 13295513510,
+  "duel_recovery_artifact_sha256": "8895ccd59ff2c9dfd3e8179675707ae9fb82debada01ba136164965739e0197e",
+  "duel_window_ms": [
+    8750,
+    12883
+  ],
+  "duel_request_bytes": 11558751,
+  "duel_timeline_frames": 34,
+  "request_cap_bytes": 19500000,
+  "duel_run_new_requests": 1,
+  "duel_run_reused_requests": 7,
+  "normal_asset_pipeline": true,
+  "normal_authenticated_upload_ui_tested": false,
+  "production_database_used": false,
+  "notifications_sent": 0,
+  "merge_or_deploy": false,
+  "draft": true,
+  "code_head": "2850c69f08ac62240e42b09466060be2816687f4",
+  "report_status": "ready",
+  "last_replay_new_model_requests": 0,
+  "last_replay_reused_requests": 8,
+  "ellipse_cards": 6,
+  "arrow_cards": 8,
+  "ellipse_segments": 11,
+  "moving_ball_segments": 24,
+  "duel_recovery_interval_ms": [
+    12749,
+    12883
+  ],
+  "duel_recovery_native_frames": 9,
+  "observed_shot_direction": "up and right after source contact at 30915ms; visually checked in actual player at 31115ms",
+  "browser_continuous": [
+    {
+      "card": 5,
+      "decoded_frames": 43,
+      "ellipse_frames": 9,
+      "arrow_frames": 0
+    },
+    {
+      "card": 2,
+      "decoded_frames": 62,
+      "ellipse_frames": 8,
+      "arrow_frames": 13
+    }
+  ],
+  "browser_errors": [],
+  "uncertainty_verification": {
+    "passed": true,
+    "hiddenPlayerObservations": 76,
+    "hiddenBallObservations": 65
+  },
+  "production_verification_run": 41773659919,
+  "production_verification_jobs_passed": 6,
+  "cards": [
+    {
+      "event_id": "9e9a8a68c1772db2614f",
+      "action": "PASS",
+      "ellipse_intervals_ms": [],
+      "accepted_ellipse_segments": 0,
+      "accepted_ball_segments": 2
+    },
+    {
+      "event_id": "dc2acb1e19ba55950e7f",
+      "action": "SHOT",
+      "ellipse_intervals_ms": [],
+      "accepted_ellipse_segments": 0,
+      "accepted_ball_segments": 2
+    },
+    {
+      "event_id": "a512ae64e102f24b3383",
+      "action": "SHOT",
+      "ellipse_intervals_ms": [
+        [
+          31649,
+          31765
+        ]
+      ],
+      "accepted_ellipse_segments": 1,
+      "accepted_ball_segments": 4
+    },
+    {
+      "event_id": "ec74209ace700fa49d2e",
+      "action": "PASS",
+      "ellipse_intervals_ms": [
+        [
+          43882,
+          44015
+        ],
+        [
+          44765,
+          44882
+        ]
+      ],
+      "accepted_ellipse_segments": 2,
+      "accepted_ball_segments": 4
+    },
+    {
+      "event_id": "9a392fb19c052dfe6719",
+      "action": "PASS",
+      "ellipse_intervals_ms": [
+        [
+          50998,
+          51115
+        ]
+      ],
+      "accepted_ellipse_segments": 1,
+      "accepted_ball_segments": 1
+    },
+    {
+      "event_id": "88aa8bbdedbec570d4de",
+      "action": "DUEL",
+      "ellipse_intervals_ms": [
+        [
+          12749,
+          12883
+        ]
+      ],
+      "accepted_ellipse_segments": 1,
+      "accepted_ball_segments": 3
+    },
+    {
+      "event_id": "1349b8676c1e07e88c00",
+      "action": "DRIBBLE",
+      "ellipse_intervals_ms": [
+        [
+          28399,
+          28516
+        ]
+      ],
+      "accepted_ellipse_segments": 1,
+      "accepted_ball_segments": 4
+    },
+    {
+      "event_id": "a8b5662ae46646b8f0ae",
+      "action": "DRIBBLE",
+      "ellipse_intervals_ms": [
+        [
+          1633,
+          1767
+        ],
+        [
+          1767,
+          1883
+        ],
+        [
+          1883,
+          2017
+        ],
+        [
+          2017,
+          2133
+        ],
+        [
+          2133,
+          2267
+        ]
+      ],
+      "accepted_ellipse_segments": 5,
+      "accepted_ball_segments": 4
+    }
+  ],
+  "limitations": [
+    "Ellipse coverage is short and incomplete; two cards have no accepted contour.",
+    "Authenticated upload-to-report UI has not been tested.",
+    "Retained all-10-tap source analysis and report prose were reused; new model calls measured graphics only.",
+    "This one-match check does not establish performance on all matches."
+  ]
+}
