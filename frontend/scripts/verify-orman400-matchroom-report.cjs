@@ -28,7 +28,7 @@ const assert = require('node:assert/strict');
     assert.ok(room.movingBall.length, `Missing accepted ball direction: ${row.event_id}`);
     ellipses += room.tracks.length; arrows += room.movingBall.length;
     for (const sample of row.match_room.samples) {
-      if (sample.identity_status !== 'CONFIRMED' || !sample.ground) {
+      if (sample.identity_status !== 'CONFIRMED') {
         assert.ok(!graphicsAt(room, sample.media_ms)?.ground, `Uncertain player shown at ${sample.media_ms}`); hiddenPlayer++;
       }
       if (!sample.ball || sample.active_ball_status !== 'CONFIRMED') {
@@ -37,14 +37,15 @@ const assert = require('node:assert/strict');
     }
   }
   const duel = rooms.get('88aa8bbdedbec570d4de');
-  assert.equal(graphicsAt(duel, 12250), null, 'Hidden feet during duel must stay hidden');
+  // Missing feet alone are no longer a reason to suppress an identity-bound
+  // display bridge. The raw observation remains unchanged.
   assert.ok(graphicsAt(duel, 12783), 'Missing independently measured post-duel recovery');
   const shot = rooms.get('a512ae64e102f24b3383');
   const arrow = ballAt(shot, 31115);
   assert.ok(arrow, 'Missing observed post-kick direction');
   const [a,b] = arrow.ballTrail;
   assert.ok(b[0]>a[0] && b[1]<a[1], 'This source shot travels up/right');
-  console.log(JSON.stringify({passed:true,original_taps:10,report_clips:8,ellipse_cards:8,arrow_cards:8,
+  console.log(JSON.stringify({technical_checks_passed:true,visual_acceptance:'REQUIRES_CONTINUOUS_PLAYBACK_REVIEW',original_taps:10,report_clips:8,ellipse_cards:8,arrow_cards:8,
     ellipse_segments:ellipses,moving_ball_segments:arrows,hiddenPlayerObservations:hiddenPlayer,
     hiddenBallObservations:hiddenBall,post_duel_recovery:true,post_kick_direction:true,new_model_requests:0}));
 })().catch(error=>{console.error(error.message);process.exitCode=1;});

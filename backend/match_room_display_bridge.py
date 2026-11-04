@@ -42,3 +42,64 @@ def display_bridge(media_ms, camera_from_reference, stable_start, stable_end,
                        'source_ground_observation': False})
     return {'kind': 'REVIEW_ONLY_CAMERA_SPACE_DISPLAY', 'samples': result,
             'report_identity_approved': False}
+
+
+def tracked_display_positions(frames, detections, interval, *, deadline):
+    """Use the approved display curve only inside a caller-verified identity path.
+
+    The source ground stays absent. Measured masks and both independently bound
+    paths remain mandatory on every frame. Camera failure rejects the bridge.
+    """
+    import time
+    from motion_compensation import estimate_camera
+
+    indices, owners = interval['indices'], interval['instances']
+    selected = [dict(detections[i][j]) for i, j in zip(indices, owners)]
+    endpoints = interval.get('source_endpoint_ground') or {}
+    for k, i in enumerate(indices):
+        if i in endpoints:
+            selected[k]['ground'] = endpoints[i]
+    if not endpoints and all(row.get('ground') is not None for row in selected):
+        return {}
+    if selected[0].get('ground') is None or selected[-1].get('ground') is None:
+        return None
+    cameras = [np.eye(3)]
+    for ai, bi in zip(indices, indices[1:]):
+        if time.monotonic() >= deadline-1:
+            return None
+        # Every detected person is excluded from the background estimate.
+        matrix, _ = estimate_camera(frames[ai]['gray'], frames[bi]['gray'],
+                                    [r['box'] for k in (ai, bi) for r in detections[k]])
+        if matrix is None:
+            return None
+        cameras.append(np.vstack([matrix, [0, 0, 1]]) @ cameras[-1])
+    h, w = frames[indices[0]]['gray'].shape
+    stable = {k: (np.linalg.inv(cameras[k]) @ np.r_[np.array(r['ground'])*[w,h], 1])[:2]
+              for k, r in enumerate(selected) if r.get('ground') is not None}
+    result = {i: {'display_ground': point, 'display_estimated': True,
+                  'display_origin': 'BOUND_SOURCE_OBSERVATION', 'source_ground_observation': False}
+              for i, point in endpoints.items()}
+    measured = list(stable)
+    for a, b in zip(measured, measured[1:]):
+        if b == a+1:
+            continue
+        stamps = [frames[indices[k]]['media_ms'] for k in range(a, b+1)]
+        # Measured neighbours supply endpoint velocity; the endpoint secant is
+        # the fallback at a window edge. The shared curve bounds overshoot.
+        def velocity(x, y):
+            return (stable[y]-stable[x])/(frames[indices[y]]['media_ms']-frames[indices[x]]['media_ms'])
+        incoming = velocity(a-1, a) if a-1 in stable else velocity(a, b)
+        outgoing = velocity(b, b+1) if b+1 in stable else velocity(a, b)
+        try:
+            bridge = display_bridge(stamps, cameras[a:b+1], stable[a], stable[b], incoming, outgoing)
+        except ValueError:
+            return None
+        for k, sample in zip(range(a, b+1), bridge['samples']):
+            if k in stable:
+                continue
+            point = np.array(sample['display_position_px'])/[w,h]
+            if not np.isfinite(point).all() or (point < 0).any() or (point > 1).any():
+                return None
+            result[indices[k]] = {'display_ground': point.tolist(), 'display_estimated': True,
+                                  'source_ground_observation': False}
+    return result

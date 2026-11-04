@@ -79,7 +79,7 @@ def test_asset_renderer_attaches_event_bound_tracks_without_changing_samples():
     tree=ast.parse((Path(__file__).parents[1]/'sequence_report_runtime.py').read_text())
     function=next(n for n in tree.body if isinstance(n,ast.FunctionDef) and n.name=='render_assets')
     namespace={'Path':Path,'pilot':types.SimpleNamespace(digest=lambda p:'source'),
-               'attach_clip_authority':lambda *args:None}
+               'attach_clip_authority':lambda *args:None, 'validate_rendered_clip':lambda path:None}
     exec(compile(ast.Module(body=[function],type_ignores=[]),'<renderer>','exec'),namespace)
     cap=types.SimpleNamespace(release=lambda:None)
     fake_cv=types.SimpleNamespace(VideoCapture=lambda p:cap,imwrite=lambda *a:True)
@@ -91,7 +91,7 @@ def test_asset_renderer_attaches_event_bound_tracks_without_changing_samples():
     enhanced=[{**observations()[0], 'motion_method':'BACKGROUND_AFFINE_ENDPOINTS', 'motion_start_ms':1000, 'groundTrail':[[.4,.59],[.45,.59]]},
               {'frame_id':'ball-source','media_ms':1200,'ball':[.6,.7],'ball_motion_method':'BACKGROUND_AFFINE_BALL_ENDPOINTS','ball_motion_start_ms':1080,'ballTrail':[[.5,.7],[.6,.7]]}]
     tracks={'e':{'version':1,'event_id':'e','source_video_sha256':'source','segments':[], 'observed_samples':enhanced}}
-    with tempfile.TemporaryDirectory() as directory, patch.dict(sys.modules,{'cv2':fake_cv,'video_timebase':fake_time,'media_binaries':types.SimpleNamespace(FFMPEG_BIN='ffmpeg')}), patch.object(tracking,'bounded_tracks',return_value=(tracks,'COMPLETED')) as build, patch.object(subprocess,'run'):
+    with tempfile.TemporaryDirectory() as directory, patch.dict(sys.modules,{'cv2':fake_cv,'video_timebase':fake_time,'media_binaries':types.SimpleNamespace(FFMPEG_BIN='ffmpeg')}), patch.object(tracking,'bounded_tracks',return_value=(tracks,'COMPLETED')) as build, patch.object(subprocess,'run',side_effect=lambda command,**kw: Path(command[-1]).write_bytes(b'unit-test-clip')):
         namespace['render_assets']('video',full,{'source_video_sha256':'source','events':[event]},directory,[{'t':1}])
         assert build.call_args.args[1]==[{'t':1}]
         room=full['video_comments'][0]['match_room']
@@ -259,3 +259,38 @@ def test_failed_refinement_keeps_original_evidence(monkeypatch):
     monkeypatch.setattr(tracking, '_bounded_event', run)
     result, status = tracking.bounded_tracks('video', [], [event])
     assert result['e'] == original and status == 'TRACKING_PARTIAL'
+
+
+def test_explicit_display_does_not_spend_budget_on_unused_sparse_ground_motion(monkeypatch):
+    import player_tracking, cv2
+    calls = []
+    cap = type('Cap', (), {'release': lambda self: None})()
+    monkeypatch.setattr(cv2, 'VideoCapture', lambda *a: cap)
+    monkeypatch.setattr(player_tracking, '_read_window', lambda *a, **kw: calls.append(a) or [])
+    observations = [{'media_ms': 1000, 'ground': [.4,.7]}, {'media_ms': 1100, 'ground': [.5,.7]}]
+    assert tracking.observed_motion('unused', observations, include_ground=False) == observations
+    assert calls == []
+    for sample in observations: sample['ball'] = [.6,.7]
+    tracking.observed_motion('unused', observations, include_ground=False)
+    assert len(calls) == 1  # Observed ball direction retains its independent work.
+
+
+def test_partial_ellipse_triggers_targeted_refinement_without_erasing_existing(monkeypatch):
+    from copy import deepcopy
+    obs = [{'media_ms': t, 'identity_status': 'CONFIRMED', 'ground': [.4,.7]} for t in (0,125,250,375,500)]
+    event = {'event_id':'e','source_video_sha256':'source','localization_method':'EXPLICIT_SOURCE_POSITIONS','visual_samples':obs}
+    original = {'event_id':'e','source_video_sha256':'source','method':'SOURCE_OBSERVATION_INSTANCE_CONTOUR',
+                'segments':[{'id':'original','samples':[{'media_ms':375},{'media_ms':500}]}],
+                'ball_playback':[{'id':'keep-ball'}]}
+    assert tracking.missing_display_windows(event, original) == [[0,375]]
+    def run(video, anchors, events, *, refinement=False):
+        if not refinement: return {'e':deepcopy(original)}, 'COMPLETED'
+        assert refinement == 'medium'
+        assert events[0]['_display_refinement_windows'] == [[0,375]]
+        return {'e':{**original,'segments':[{'id':'bridge','samples':[{'media_ms':0},{'media_ms':375}]}]}}, 'COMPLETED'
+    monkeypatch.setattr(tracking, '_bounded_event', run)
+    result, status = tracking.bounded_tracks('video', [], [event])
+    assert [s['id'] for s in result['e']['segments']] == ['original','bridge']
+    assert result['e']['ball_playback'] == original['ball_playback']
+    assert '_display_refinement_windows' not in event
+    assert status == 'COMPLETED'

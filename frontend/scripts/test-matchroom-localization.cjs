@@ -26,5 +26,30 @@ const assert = require('node:assert/strict');
  const moving={movingBall:[{start_ms:100,arrival_ms:220,end_ms:220,samples:[{media_ms:140}]}]};
  assert.equal(ballAt(moving,140).opacity,1);
  assert.equal(ballAt(moving,221),null);
- console.log('9 localization frontend contracts passed');
+ const bridged=comment();
+ const bridge=bridged.match_room.tracking.segments[0];
+ bridge.ground_method='CAMERA_SPACE_DISPLAY_BRIDGE';
+ bridge.identity_method='BIDIRECTIONAL_INSTANCE_AGREEMENT';
+ bridge.camera_method='BACKGROUND_AFFINE';
+ Object.assign(bridge.samples[2],{ground:null,display_ground:[.42,.7],display_estimated:true,source_ground_observation:false});
+ bridged.match_room.samples.push({frame_id:'hidden-foot',media_ms:150,identity_status:'CONFIRMED',ground:null});
+ assert.ok(graphicsAt(roomFor(bridged,0),150)?.ground);
+ assert.equal(bridge.samples[2].ground,null); // Source evidence never rewritten.
+ assert.equal(graphicsAt(roomFor(bridged,0),225),null);
+ for (const alter of [
+  c=>c.match_room.samples.at(-1).identity_status='UNCERTAIN',
+  c=>c.match_room.tracking.segments[0].camera_method=null,
+  c=>c.match_room.tracking.segments[0].identity_method=null,
+  c=>c.match_room.tracking.segments[0].samples[2].foreground=null,
+  c=>c.match_room.tracking.segments[0].samples[2].source_ground_observation=true,
+  c=>c.match_room.tracking.segments[0].samples[0].ground=null,
+ ]) {const c=structuredClone(bridged);alter(c);assert.equal(roomFor(c,0).tracks.length,0);}
+ const sourceEndpoint=structuredClone(bridged);
+ Object.assign(sourceEndpoint.match_room.tracking.segments[0].samples[0],{ground:null,display_ground:[.4,.7],display_estimated:true,display_origin:'BOUND_SOURCE_OBSERVATION',source_ground_observation:false});
+ assert.ok(graphicsAt(roomFor(sourceEndpoint,0),100)?.ground);
+ sourceEndpoint.match_room.tracking.segments[0].samples[0].display_ground=[.6,.7];
+ assert.equal(roomFor(sourceEndpoint,0).tracks.length,0);
+ const nullRow=structuredClone(bridged);nullRow.match_room.tracking.segments[0].samples[0]=null;
+ assert.equal(roomFor(nullRow,0).tracks.length,0);
+ console.log('Localization and camera-space display bridge contracts passed');
 })().catch(e=>{console.error(e);process.exitCode=1;});

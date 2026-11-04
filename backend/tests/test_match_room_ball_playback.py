@@ -97,7 +97,7 @@ def test_encoded_clip_preserves_source_frame_times_including_vfr_gaps(tmp_path, 
     tree = ast.parse((Path(__file__).parents[1]/'sequence_report_runtime.py').read_text())
     function = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == 'render_assets')
     namespace = {'Path': Path, 'pilot': types.SimpleNamespace(digest=lambda _: 'source'), 'attach_clip_authority': lambda *a: None}
-    exec(compile(ast.Module(body=[function], type_ignores=[]), '<renderer>', 'exec'), namespace)
+    exec(compile(ast.Module(body=[next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == 'validate_rendered_clip'), function], type_ignores=[]), '<renderer>', 'exec'), namespace)
     monkeypatch.setitem(sys.modules, 'media_binaries', types.SimpleNamespace(FFMPEG_BIN=ffmpeg))
     monkeypatch.setattr(match_room_tracking, 'bounded_tracks', lambda *a: ({}, 'NO_TRACK_INPUT'))
     event = {'canonical_action_type': 'DRIBBLE', 'canonical_ms': 1000, 'event_id': 'e', 'source_video_sha256': 'source',

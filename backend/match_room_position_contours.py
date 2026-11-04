@@ -2,7 +2,8 @@
 
 Call only after binding model receipts with match_room_position_evidence.
 These seeds are model observations, never original human selections. Nothing
-is drawn across an uncertain identity, an unmeasured foot, or conflicting flow.
+is drawn across uncertain identity or conflicting flow. Short missing-foot
+intervals use the approved camera-corrected presentation bridge.
 """
 import time
 from match_room_contours import agrees_with_observation, follow_instance
@@ -23,20 +24,81 @@ def refinement_model():
     return model
 
 
-def agreed_intervals(frames, detections, observations, *, deadline):
+def endpoint_pairs(observations):
+    """Missing feet may be bridged; a missing identity may never be skipped."""
+    previous = None
+    last_time = None
+    for row in observations:
+        if last_time is not None and not 0 < row['media_ms']-last_time <= 250:
+            previous = None
+        last_time = row['media_ms']
+        if row.get('identity_status') != 'CONFIRMED':
+            previous = None
+            continue
+        if not row.get('ground'):
+            continue
+        if previous is not None and row['media_ms']-previous['media_ms'] <= 800:
+            yield previous, row
+        previous = row
+
+
+def agrees_with_source_box(row, observation, shape):
+    """Bind the lower contour to the observed body, not a nearby opponent's boot."""
+    box = observation.get('player_box')
+    if not box:
+        return True
+    h, w = shape
+    x, y, bw, bh = row['box']
+    ox, oy, ow, oh = [box[0]*w, box[1]*h, box[2]*w, box[3]*h]
+    intersection = max(0, min(x+bw, ox+ow)-max(x, ox))*max(0, min(y+bh, oy+oh)-max(y, oy))
+    return intersection/max(1, bw*bh+ow*oh-intersection) >= .5
+
+
+def feature_paths(frames, rows, owners, deadline):
+    """Reuse appearance and reversible feature links; never motion prediction."""
+    import cv2
+    from match_room_reacquisition import IdentityAssociator
+    if any('_appearance' not in row for detections in rows for row in detections):
+        return {}, {}
+    engine = IdentityAssociator.__new__(IdentityAssociator)
+    engine.frames, engine.rows = frames, rows
+    engine.indices, engine.sources = [0, len(frames)-1], owners
+    engine.shape = frames[0]['gray'].shape
+    engine.pair_cache = {}
+    engine.histograms = [[row['_appearance'] for row in detections] for detections in rows]
+    paths = []
+    for at, owner, step in ((0, owners[0], 1), (len(frames)-1, owners[1], -1)):
+        path = {at: owner}
+        for k in range(at+step, len(frames) if step == 1 else -1, step):
+            if time.monotonic() >= deadline-1 or not 0 < abs(frames[k]['media_ms']-frames[at]['media_ms']) <= 75:
+                break
+            a = cv2.resize(frames[at]['gray'], (160,90))
+            b = cv2.resize(frames[k]['gray'], (160,90))
+            if float(cv2.absdiff(a,b).mean()) > 45:
+                break
+            owner = engine.feature_link(at, k, owner)
+            if owner is None:
+                break
+            path[k] = owner
+            at = k
+        paths.append(path)
+    return paths
+
+
+def agreed_intervals(frames, detections, observations, *, deadline, allow_display_bridge=False):
     """Require both endpoint observations and both complete optical paths."""
     if not frames or len(frames) != len(detections):
         return []
     by_time = {f['media_ms']: i for i, f in enumerate(frames)}
     accepted = []
-    for a, b in zip(observations, observations[1:]):
+    for a, b in (endpoint_pairs(observations) if allow_display_bridge else zip(observations, observations[1:])):
         if time.monotonic() >= deadline:
             break
         # Empty/uncertain rows are deliberate barriers; do not filter them out.
         if any(s.get('identity_status') != 'CONFIRMED' or not s.get('ground') for s in (a, b)):
             continue
         ai, bi = by_time.get(a['media_ms']), by_time.get(b['media_ms'])
-        if ai is None or bi is None or bi-ai < 4 or not 0 < b['media_ms']-a['media_ms'] <= 250:
+        if ai is None or bi is None or bi-ai < 4 or not 0 < b['media_ms']-a['media_ms'] <= (800 if allow_display_bridge else 250):
             continue
         local, rows = frames[ai:bi+1], detections[ai:bi+1]
         if any(not 0 < y['media_ms']-x['media_ms'] <= 75 for x, y in zip(local, local[1:])):
@@ -44,26 +106,39 @@ def agreed_intervals(frames, detections, observations, *, deadline):
         owners = []
         for index, observation in ((0, a), (len(local)-1, b)):
             candidates = [j for j, row in enumerate(rows[index])
-                          if row.get('ground') is not None and
-                          agrees_with_observation(row, observation, local[index]['gray'].shape)]
+                          if (allow_display_bridge or row.get('ground') is not None) and
+                          agrees_with_observation(row, observation, local[index]['gray'].shape) and
+                          agrees_with_source_box(row, observation, local[index]['gray'].shape)]
             owners.append(candidates[0] if len(candidates) == 1 else None)
         if None in owners:
             continue
         forward = follow_instance(local, rows, 0, owners[0])
         backward = follow_instance(local, rows, len(local)-1, owners[1])
+        if (allow_display_bridge and not any(forward[i] != backward[i] for i in set(forward) & set(backward))
+                and any(i not in forward or i not in backward for i in range(len(local)))):
+            ff, bb = feature_paths(local, rows, owners, deadline)
+            if all(i in ff and ff.get(i) == bb.get(i) for i in range(len(local))):
+                # A feature path may complete a missing link, never contradict
+                # an already observed instance from either contour direction.
+                if all(ff[i] == j for path in (forward, backward) for i, j in path.items()):
+                    forward, backward = ff, bb
         if any(i not in forward or forward.get(i) != backward.get(i)
-               or rows[i][forward[i]].get('ground') is None for i in range(len(local))):
+               or (not allow_display_bridge and rows[i][forward[i]].get('ground') is None) for i in range(len(local))):
             continue
         accepted.append({'indices': list(range(ai, bi+1)),
                          'instances': [forward[i] for i in range(len(local))],
                          'reference_frames': [a['frame_id'], b['frame_id']]})
+        if allow_display_bridge:
+            accepted[-1]['source_endpoint_ground'] = {i: observation['ground']
+                for i, j, observation in ((ai, owners[0], a), (bi, owners[1], b))
+                if detections[i][j].get('ground') is None}
     return accepted
 
 
 def observation_windows(observations, start, end):
-    """Partition confirmed visible-ground runs; prioritize measured recovery.
+    """Partition confirmed identity runs; prioritize recovery.
 
-    Unknown/hidden feet are barriers. Windows share only one observation, so
+    Unknown identity is a barrier; hidden feet retain the identity run. Windows share only one observation, so
     no interval is processed twice. Recovery is checked independently at both
     ends and gets budget before optional repetition of the pre-occlusion run.
     """
@@ -71,7 +146,7 @@ def observation_windows(observations, start, end):
     for row in observations:
         if not start <= row['media_ms'] <= end:
             continue
-        valid = row.get('identity_status') == 'CONFIRMED' and row.get('ground') and row.get('player_box')
+        valid = row.get('identity_status') == 'CONFIRMED'
         gap = current and row['media_ms']-current[-1]['media_ms'] > 250
         if not valid or gap:
             if current: groups.append((interrupted, current))
@@ -81,11 +156,16 @@ def observation_windows(observations, start, end):
     if current: groups.append((interrupted, current))
     windows = []
     for recovery, rows in groups:
+        grounded = [i for i, row in enumerate(rows) if row.get('ground')]
+        if len(grounded) < 2:
+            continue
+        rows = rows[grounded[0]:grounded[-1]+1]
         at = 0
         while at < len(rows)-1:
-            last = max(i for i in range(at, len(rows)) if rows[i]['media_ms']-rows[at]['media_ms'] <= 1500)
+            last = max(i for i in range(at, len(rows)) if rows[i].get('ground') and rows[i]['media_ms']-rows[at]['media_ms'] <= 1500)
             if last == at: break
-            windows.append((recovery, rows[at]['media_ms'], rows[last]['media_ms']))
+            needs_recovery = recovery or any(not r.get('ground') for r in rows[:at+1])
+            windows.append((needs_recovery, rows[at]['media_ms'], rows[last]['media_ms']))
             at = last
     # Most recent recovery first; uninterrupted evidence retains source order.
     windows.sort(key=lambda w: (not w[0], -w[1] if w[0] else w[1]))
@@ -102,10 +182,8 @@ def contour_segments(video, observations, start, end, *, deadline, diagnostics, 
              if s.get('identity_status') == 'CONFIRMED' and s.get('ground') and s.get('player_box')]
     if not 0 < end-start <= 1500 or len(boxes) < 2:
         return []
-    pairs = [(a, b) for a, b in zip(observations, observations[1:])
-             if all(s.get('identity_status') == 'CONFIRMED' and s.get('ground') for s in (a, b))
-             and start <= a['media_ms'] < b['media_ms'] <= end
-             and b['media_ms']-a['media_ms'] <= 250]
+    pairs = [(a, b) for a, b in endpoint_pairs(observations)
+             if start <= a['media_ms'] < b['media_ms'] <= end]
     if not pairs:
         return []
     start, end = min(a['media_ms'] for a, _ in pairs), max(b['media_ms'] for _, b in pairs)
@@ -126,6 +204,11 @@ def contour_segments(video, observations, start, end, *, deadline, diagnostics, 
             bottom = min(h, int((max(b[1]+b[3] for b in boxes)+.1)*h)+1)
             roi = (0, top, w, bottom)
             detections.append(detect_frame(frame, roi, model))
+            import cv2
+            hsv = cv2.cvtColor(frame['image'], cv2.COLOR_BGR2HSV)
+            for row in detections[-1]:
+                hist = cv2.calcHist([hsv], [0,1], measured_mask(row), [24,16], [0,180,0,256])
+                row['_appearance'] = cv2.normalize(hist, None, norm_type=cv2.NORM_L1)
             frame.pop('image')
             frames.append(frame)
             pair = pending.get(frame['media_ms'])
@@ -133,8 +216,12 @@ def contour_segments(video, observations, start, end, *, deadline, diagnostics, 
                 continue
             # Complete and preserve each independently checked interval before
             # decoding more frames. A later timeout cannot erase earlier proof.
-            intervals = agreed_intervals(frames, detections, pair, deadline=deadline)
+            intervals = agreed_intervals(frames, detections, pair, deadline=deadline, allow_display_bridge=True)
             for interval in intervals:
+                from match_room_display_bridge import tracked_display_positions
+                display = tracked_display_positions(frames, detections, interval, deadline=deadline)
+                if display is None:
+                    continue
                 samples = []
                 for i, j in zip(interval['indices'], interval['instances']):
                     h, w = frames[i]['gray'].shape
@@ -146,6 +233,7 @@ def contour_segments(video, observations, start, end, *, deadline, diagnostics, 
                     row, ms = detections[i][j], frames[i]['media_ms']
                     fid = f'position-contour:{ms}'
                     samples.append({'media_ms': ms, 'frame_id': fid, 'ground': row['ground'],
+                                    **display.get(i, {}),
                                     'player_width': row['player_width'], 'confidence': row['confidence'],
                                     'foreground': {'method': 'SOURCE_PERSON_MASK', 'frame_id': fid,
                                                    'media_ms': ms, 'polygons': polygons}})
@@ -155,7 +243,9 @@ def contour_segments(video, observations, start, end, *, deadline, diagnostics, 
                                'reference_frame': refs[0], 'observation_reference_frames': refs,
                                'overlap_frames': len(samples),
                                'segmenter_sha256': getattr(model, 'sha256', None),
-                               'ground_method': 'LOWER_VISIBLE_CONTOUR',
+                               'ground_method': 'CAMERA_SPACE_DISPLAY_BRIDGE' if display else 'LOWER_VISIBLE_CONTOUR',
+                               'identity_method': 'BIDIRECTIONAL_INSTANCE_AGREEMENT',
+                               'camera_method': 'BACKGROUND_AFFINE' if display else None,
                                'source_frame_coverage': 'COMPLETE_SEGMENT', 'samples': samples}
                     segments.append(segment)
                     if on_segment is not None:

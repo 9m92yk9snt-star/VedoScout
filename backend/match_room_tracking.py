@@ -15,6 +15,7 @@ MAX_GAP_MS = 120
 MAX_EVENTS = 8
 TIMEOUT_S = 25
 MAX_REFINEMENT_EVENTS = 3
+MEDIUM_TIMEOUT_S = 90
 
 
 def finite(x):
@@ -115,7 +116,7 @@ def endpoint_arrow(previous, current, matrix, width, height, *, field='ground', 
     return [tail, tip]
 
 
-def observed_motion(video, observations, *, ball_gap_ms=300, separate_bands=False):
+def observed_motion(video, observations, *, ball_gap_ms=300, separate_bands=False, include_ground=True):
     """Reuse the background affine estimator between observed source endpoints.
 
     Every intervening decoded frame must support the camera transform. Exclude
@@ -133,7 +134,7 @@ def observed_motion(video, observations, *, ball_gap_ms=300, separate_bands=Fals
     try:
         for previous, current in zip(samples, samples[1:]):
             gap = current['media_ms']-previous['media_ms']
-            ground = 0 < gap <= 1000 and all(point(s.get('ground')) for s in (previous, current))
+            ground = include_ground and 0 < gap <= 1000 and all(point(s.get('ground')) for s in (previous, current))
             ball = 0 < gap <= ball_gap_ms and all(point(s.get('ball')) for s in (previous, current))
             if not (ground or ball):
                 continue
@@ -279,7 +280,8 @@ def compute(video, anchors, events, checkpoint=None):
         start, end = presentation_window(event)
         result = {'version': 1, 'source_video_sha256': event['source_video_sha256'],
                   'event_id': event['event_id'], 'method': 'TAP_OPTICAL_GROUND_PROXY', 'segments': [],
-                  'observed_samples': pass_motion(video, event, observed_motion(video, observations))}
+                  'observed_samples': pass_motion(video, event, observed_motion(video, observations,
+                      include_ground=event.get('localization_method') != 'EXPLICIT_SOURCE_POSITIONS'))}
         if event.get('localization_method') == 'EXPLICIT_SOURCE_POSITIONS' and event.get('canonical_action_type') in {'SHOT', 'PASS'}:
             contact = event.get('contact_ms')
             interval = event.get('contact_interval_ms')
@@ -383,7 +385,7 @@ def compute_refinement(video, anchors, events, checkpoint=None, segmenter_kind='
     from match_room import presentation_window
     from match_room_position_contours import contour_segments, observation_windows, refinement_model, METHOD
     cv2.setNumThreads(2)
-    deadline = time.monotonic() + TIMEOUT_S - 3
+    deadline = time.monotonic() + (MEDIUM_TIMEOUT_S if segmenter_kind == 'medium' else TIMEOUT_S) - 3
     output = {}
     def save():
         if checkpoint is not None:
@@ -413,7 +415,7 @@ def compute_refinement(video, anchors, events, checkpoint=None, segmenter_kind='
         def preserve(segment):
             result['segments'].append(segment)
             save()
-        for lo, hi in observation_windows(observations, start, end):
+        for lo, hi in event.get('_display_refinement_windows') or observation_windows(observations, start, end):
             if time.monotonic() >= deadline-1:
                 break
             part = {'start_ms': lo, 'end_ms': hi}
@@ -434,7 +436,8 @@ def _bounded_event(video, anchors, events, *, refinement=False):
                                        'refinement': refinement}))
         try:
             subprocess.run([sys.executable, str(Path(__file__).resolve()), str(request), str(result)],
-                           timeout=TIMEOUT_S, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                           timeout=MEDIUM_TIMEOUT_S if refinement == 'medium' else TIMEOUT_S,
+                           check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             return json.loads(result.read_text()), 'COMPLETED'
         except subprocess.TimeoutExpired:
             try:
@@ -448,11 +451,40 @@ def _bounded_event(video, anchors, events, *, refinement=False):
             return {}, 'TRACKING_UNAVAILABLE'
 
 
+def missing_display_windows(event, previous):
+    """Find unrendered source intervals; a brief existing mark is not coverage."""
+    from match_room_position_contours import endpoint_pairs
+    observations = event.get('visual_samples') or []
+    if any(not finite(s.get('media_ms')) for s in observations):
+        return []
+    spans = sorted((rows[0]['media_ms'], rows[-1]['media_ms'])
+                   for segment in previous.get('segments', [])
+                   if (rows := segment.get('samples')))
+    missing = []
+    for a, b in endpoint_pairs(observations):
+        lo, hi = a['media_ms'], b['media_ms']
+        if hi-lo < 60:
+            continue
+        covered = lo
+        for start, stop in spans:
+            if start <= covered+2 and stop > covered:
+                covered = stop
+        if covered >= hi-2:
+            continue
+        if missing and lo == missing[-1][1] and hi-missing[-1][0] <= 1500:
+            missing[-1][1] = hi
+        else:
+            missing.append([lo, hi])
+    # Resolve the last visible recovery before earlier repetition.
+    return list(reversed(missing))
+
+
 def bounded_tracks(video, anchors, events):
     """One bounded child per distinct clip; repeated report cards share results.
 
     At most MAX_EVENTS initial children plus MAX_REFINEMENT_EVENTS optional
-    retries, each hard-limited to TIMEOUT_S. Every initial result is complete
+    retries. Initial/small passes allow 25s; medium refinements allow 90s
+    (at most 470s total). Every initial result is complete
     before retries begin; no retry can spend another clip's original budget.
     A difficult earlier clip cannot consume a later clip's inference budget.
     """
@@ -477,26 +509,30 @@ def bounded_tracks(video, anchors, events):
         return any(w.get('status') == 'TIME_BUDGET' for w in
                    (previous.get('contour_diagnostics') or {}).get('windows', []))
     attempted = 0
-    # A time-limited source path needs its original model and fresh budget,
-    # not a more expensive model. Prioritize these before complete-model misses.
-    for event in sorted(unique, key=lambda e: not interrupted(e)):
+    # Retry incomplete coverage too. Empty interrupted paths get a fresh small
+    # pass; fragmented paths get the stronger model only in uncovered windows.
+    for event in sorted(unique, key=lambda e: (not interrupted(e), -sum(b-a for a,b in missing_display_windows(e, output.get(e.get('event_id')) or {})))):
         if not event.get('event_id'):
             continue
         previous = output.get(event['event_id']) or {}
-        if (attempted >= MAX_REFINEMENT_EVENTS or previous.get('segments')
+        missing = missing_display_windows(event, previous)
+        if (attempted >= MAX_REFINEMENT_EVENTS or (previous.get('segments') and not missing)
                 or event.get('localization_method') != 'EXPLICIT_SOURCE_POSITIONS'
                 or previous.get('method') != 'SOURCE_OBSERVATION_INSTANCE_CONTOUR'
                 or previous.get('source_video_sha256') != event.get('source_video_sha256')):
             continue
         attempted += 1
-        retried, status = _bounded_event(video, anchors, [event],
-                                         refinement='small' if interrupted(event) else 'medium')
+        request_event = {**event, '_display_refinement_windows': missing} if missing else event
+        retried, status = _bounded_event(video, anchors, [request_event],
+                                         refinement='small' if interrupted(event) and not previous.get('segments') else 'medium')
         result = retried.get(event['event_id']) or {}
         if (result.get('event_id') == event['event_id'] and result.get('method') == previous.get('method')
                 and result.get('source_video_sha256') == event.get('source_video_sha256')):
             # Preserve original observations, moving arrows and completed paths.
             previous['refinement_diagnostics'] = result.get('refinement_diagnostics', {})
-            previous['segments'] = result.get('segments', [])
+            merged = {s['id']: s for s in previous.get('segments', [])}
+            merged.update({s['id']: s for s in result.get('segments', [])})
+            previous['segments'] = list(merged.values())
         statuses.append(status)
     if all(s == 'COMPLETED' for s in statuses):
         return output,'COMPLETED'
