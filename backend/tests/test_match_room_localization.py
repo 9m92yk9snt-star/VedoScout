@@ -75,3 +75,15 @@ def test_bad_response_is_checkpointed_without_any_graphics(monkeypatch):
         run_jobs=lambda *a, **k: [record['receipt']]))
     assert not bundle['events'][0].get('visual_samples')
     assert saved[-1]['events']['event']['error'] == 'LOCALIZATION_OBSERVATIONS_REJECTED'
+
+
+def test_paid_response_is_persisted_before_batch_failure(monkeypatch):
+    doc,record=setup(monkeypatch);saved=[]
+    async def checkpoint(a):saved.append(deepcopy(a))
+    def interrupted(*args,**kwargs):
+        kwargs['on_result'](record['receipt'])
+        raise RuntimeError('transport interrupted after result')
+    with pytest.raises(RuntimeError,match='transport interrupted'):
+        asyncio.run(loc.localize('source',doc,checkpoint=checkpoint,run_jobs=interrupted))
+    assert saved[-1]['events']['event']['receipt']==record['receipt']
+    assert saved[-1]['events']['event']['status']=='OBSERVATIONS_RETURNED'

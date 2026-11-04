@@ -295,6 +295,16 @@ def compute(video, anchors, events, checkpoint=None):
         save()
         diagnostic = {}
         explicit = event.get('localization_method') == 'EXPLICIT_SOURCE_POSITIONS'
+        from match_room_ball_playback import build_ball_playback
+        if explicit:
+            # Preserve measured kick direction before optional dense contours
+            # can consume the event's shared wall-clock allowance.
+            try:
+                result['ball_playback'], result['ball_playback_diagnostics'] = build_ball_playback(
+                    video, event, result['observed_samples'], min(deadline, time.monotonic()+8))
+            except (ImportError, OSError, ValueError, cv2.error):
+                result['ball_playback_diagnostics'] = {'status': 'UNAVAILABLE'}
+            save()
         try:
             if explicit:
                 from match_room_position_contours import contour_segments as position_contours, METHOD as position_method
@@ -346,7 +356,8 @@ def compute(video, anchors, events, checkpoint=None):
             result['segments'] = segments
             save()
         # Preserve the completed player track before optional moving arrows.
-        from match_room_ball_playback import build_ball_playback
+        if explicit:
+            continue
         try:
             result['ball_playback'], result['ball_playback_diagnostics'] = build_ball_playback(
                 video, event, result['observed_samples'], deadline)

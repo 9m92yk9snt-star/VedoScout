@@ -72,7 +72,7 @@ def status_app(doc):
     reads = []
 
     async def find_one(query, projection):
-        assert projection == {"sequence_audit": 0, "sequence_retry": 0}
+        assert projection == {"sequence_audit": 0, "sequence_retry": 0, "match_room_localization": 0}
         reads.append(query)
         result = copy.deepcopy(doc)
         if result:

@@ -412,7 +412,7 @@ def render_assets(video, full, bundle, directory, anchors=None):
                        tele_clip_timebase="SOURCE_PTS_ALIGNED")
             from match_room import presentation
             row["match_room"] = presentation(event, event.get("visual_samples"))
-            row["match_room"]["tracking_status"] = tracking_status
+            row["match_room"]["tracking_status"] = tracking_status if event['event_id'] in tracks else 'NO_TRACK_INPUT'
             row["match_room"]["tracking"] = tracks.get(event["event_id"])
             tracked = tracks.get(event["event_id"]) or {}
             observed = tracked.get("observed_samples")

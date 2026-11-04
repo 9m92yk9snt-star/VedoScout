@@ -52,7 +52,7 @@ def packet_id(event):
     return 'positions_' + event['event_id']
 
 
-def prepare(video, selection, event, work):
+def prepare(video, selection, event, work, reference_images=None):
     """A <=2.5s source window; all taps remain original human references."""
     work = Path(work)
     work.mkdir(parents=True, exist_ok=True)
@@ -75,8 +75,13 @@ def prepare(video, selection, event, work):
         return {'frame_id': f's{round(actual*1000):09}', 'media_ms': round(actual*1000),
                 'path': str(path), 'sha256': pilot.digest(path)}
     try:
-        for tap in pilot.original_taps(selection):
-            f = image(tap['requested_ms'], tap['reference_id'], 85)
+        taps = pilot.original_taps(selection)
+        if reference_images is not None and (len(reference_images) != len(taps) or any(
+                any(saved.get(k) != tap[k] for k in ('reference_id', 'requested_ms', 'box', 'target_point', 'selection_hints'))
+                for tap, saved in zip(taps, reference_images))):
+            raise ValueError('LOCALIZATION_REFERENCE_CACHE_CHANGED')
+        for i, tap in enumerate(taps):
+            f = deepcopy(reference_images[i]) if reference_images is not None else image(tap['requested_ms'], tap['reference_id'], 85)
             references.append({**f, **tap})
             items.extend([{'type': 'text', 'text': 'ORIGINAL HUMAN IDENTITY REFERENCE '+json.dumps({
                 'frame': f['frame_id'], 'reference_id': tap['reference_id'],
@@ -130,45 +135,64 @@ async def localize(video, doc, *, checkpoint, event_ids=None, run_jobs=None, bud
     previous = (doc.get('match_room_localization') or {}).get('events') or {}
     audit = {'version': 2, 'source_video_sha256': bundle['source_video_sha256'],
              'original_selection_values_sha256': selection_digest(selection), 'events': {}}
-    stopped = False
-    for event in candidates:
-        eid = event['event_id']
-        if stopped or time.monotonic()-started >= budget_seconds:
-            audit['events'][eid] = {'status': 'NOT_SENT', 'error': 'LOCALIZATION_BUDGET_OR_ACCESS_STOP'}
-            continue
-        with tempfile.TemporaryDirectory(prefix='matchroom-positions-') as work:
+    loop = asyncio.get_running_loop()
+    jobs, records, by_packet = [], {}, {}
+    reference_images = None
+    with tempfile.TemporaryDirectory(prefix='matchroom-positions-') as work:
+        for event in candidates:
+            eid = event['event_id']
+            if time.monotonic()-started >= budget_seconds:
+                audit['events'][eid] = {'status': 'NOT_SENT', 'error': 'LOCALIZATION_TIME_BUDGET'}
+                continue
             try:
-                record, job = await asyncio.to_thread(prepare, video, selection, event, work)
+                if reference_images is None:
+                    record, job = await asyncio.to_thread(prepare, video, selection, event, Path(work)/eid)
+                    reference_images = record.get('references')
+                else:
+                    record, job = await asyncio.to_thread(prepare, video, selection, event, Path(work)/eid, reference_images)
             except (ValueError, OSError, cv2.error):
                 audit['events'][eid] = {'status': 'UNAVAILABLE', 'error': 'LOCALIZATION_PREFLIGHT_FAILED'}
-                await checkpoint(deepcopy(audit))
                 continue
+            records[eid], by_packet[packet_id(event)] = record, event
             old = previous.get(eid) or {}
             cached = old.get('receipt') or {}
             if reusable_receipt(cached, record['request'], provider='emergent',
                                 model='gpt-6-astra', packet_id=packet_id(event)):
-                receipt = deepcopy(cached)
-                record['reused'] = True
+                record.update(receipt=deepcopy(cached), reused=True)
             else:
-                result = await asyncio.to_thread(run_jobs, [job], 'emergent', 'gpt-6-astra',
-                    deadline=started+budget_seconds, per_call_s=150, workers=1)
-                receipt = result[0]
                 record['reused'] = False
-            record['receipt'] = receipt
-            record['status'] = 'UNAVAILABLE'
+                jobs.append(job)
+        def accept(receipt):
+            event = by_packet[receipt['packet_id']]
+            eid = event['event_id']
+            record = records[eid]
+            record.update(receipt=deepcopy(receipt), status='UNAVAILABLE')
             if receipt.get('status') == 'COMPLETED':
                 try:
                     samples = bound_samples(event, selection, record, validate, packet=packet_id(event))
                     event['visual_samples'] = samples
                     event['localization_method'] = 'EXPLICIT_SOURCE_POSITIONS'
                     record['status'] = 'OBSERVATIONS_RETURNED'
+                    record.pop('error', None)
                 except ValueError:
                     record['error'] = 'LOCALIZATION_OBSERVATIONS_REJECTED'
             else:
                 record['error'] = receipt.get('error', 'LOCALIZATION_MODEL_FAILED')
-                stopped = record['error'] in transport.STOP_ERRORS
-            audit['events'][eid] = record
-            await checkpoint(deepcopy(audit))
+            audit['events'][eid] = deepcopy(record)
+        for record in records.values():
+            if record['reused']:
+                accept(record['receipt'])
+        await checkpoint(deepcopy(audit))
+        def finished(receipt):
+            accept(receipt)
+            # The transport invokes callbacks sequentially on its owned thread.
+            # Persist every completed paid result before the next callback.
+            asyncio.run_coroutine_threadsafe(checkpoint(deepcopy(audit)), loop).result()
+        if jobs:
+            results = await asyncio.to_thread(run_jobs, jobs, 'emergent', 'gpt-6-astra',
+                deadline=started+budget_seconds, per_call_s=150, workers=2, on_result=finished)
+            for receipt in results:
+                accept(receipt)
     audit['elapsed_seconds'] = round(time.monotonic()-started, 3)
     await checkpoint(deepcopy(audit))
     return bundle

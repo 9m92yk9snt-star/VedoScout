@@ -57,6 +57,14 @@ def contour_segments(video, observations, start, end, *, deadline, diagnostics):
              if s.get('identity_status') == 'CONFIRMED' and s.get('ground') and s.get('player_box')]
     if not 0 < end-start <= 1500 or len(boxes) < 2:
         return []
+    pairs = [(a, b) for a, b in zip(observations, observations[1:])
+             if all(s.get('identity_status') == 'CONFIRMED' and s.get('ground') for s in (a, b))
+             and start <= a['media_ms'] < b['media_ms'] <= end
+             and b['media_ms']-a['media_ms'] <= 250]
+    if not pairs:
+        return []
+    start, end = min(a['media_ms'] for a, _ in pairs), max(b['media_ms'] for _, b in pairs)
+    boxes = [s['player_box'] for pair in pairs for s in pair if s.get('player_box')]
     model = PersonSegmenter()
     frames, detections = [], []
     stream = read_clip(video, start, end, sample_step=0)
@@ -66,8 +74,8 @@ def contour_segments(video, observations, start, end, *, deadline, diagnostics):
                 diagnostics['status'] = 'TIME_BUDGET'
                 return []
             h, w = frame['gray'].shape
-            # One source-observation-derived vertical band; no estimated player
-            # trajectory or generated human point is used to steer detections.
+            # One fixed band from the observed boxes. Keep the full width so
+            # competing players remain in the same detector view.
             top = max(0, int((min(b[1] for b in boxes)-.1)*h))
             bottom = min(h, int((max(b[1]+b[3] for b in boxes)+.1)*h)+1)
             detections.append(detect_frame(frame, (0, top, w, bottom), model))
