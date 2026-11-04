@@ -89,6 +89,11 @@ async def trial(video, anchors, output, *, player_details=None, source_receipts=
             raise ValueError("EXACT_RETRY_INPUTS_CHANGED")
         doc.update(analysis_engine="SEQUENCE_V1", full_report_status="failed",
                    sequence_retry=deepcopy(prior["sequence_retry"]))
+        if prior.get("sequence_audit"):
+            if not sequence_report_runtime.retained_source(prior, source_sha, selection_sha):
+                raise ValueError("COMPLETE_SOURCE_CHECKPOINT_CHANGED")
+            doc["sequence_audit"] = deepcopy(prior["sequence_audit"])
+            doc["sequence_timings"] = deepcopy(prior.get("sequence_timings") or {})
     if source_receipts:
         import hashlib
         retained = json.loads(source_receipts.read_text())

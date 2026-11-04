@@ -14,7 +14,7 @@ jobs:
       github.event.pull_request.draft == true &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.event.pull_request.head.ref == 'codex/matchroom-graphics' &&
-      github.event.before == '64177032667d3fd81f5345f83c42f0229bd3fcf9' &&
+      github.event.before == 'a9d20bfeb80a787f70793966e91a27ade2c8923c' &&
       github.run_attempt == 1
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -39,12 +39,13 @@ jobs:
       - name: Restore the exact visible-selection checkpoint
         uses: actions/download-artifact@v4
         with:
-          name: matchroom-single-tap-report-41727716774
-          run-id: 41727716774
+          name: matchroom-single-tap-report-41763810937
+          run-id: 41763810937
           github-token: ${{ github.token }}
           path: ${{ runner.temp }}/previous-single-tap
-      - name: Resume missing source responses once after provider throttling
+      - name: Finish report from validated complete source checkpoint
         env:
+          SEQUENCE_REPORT_WRITER_MODEL: gpt-6-astra
           EMERGENT_LLM_KEY: ${{ secrets.EMERGENT_LLM_KEY }}
         run: python -u backend/scripts/run_matchroom_single_tap_trial.py --work "$RUNNER_TEMP/single-tap-input" --output "$RUNNER_TEMP/single-tap-report" --tap-index 4 --retry-document "$RUNNER_TEMP/previous-single-tap/single-tap-report/report-document.json"
       - name: Preserve report, source-bound graphics and model receipts
