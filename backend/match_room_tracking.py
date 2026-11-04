@@ -14,7 +14,7 @@ from pathlib import Path
 MAX_GAP_MS = 120
 MAX_EVENTS = 8
 TIMEOUT_S = 25
-MAX_REFINEMENT_EVENTS = 2
+MAX_REFINEMENT_EVENTS = 3
 
 
 def finite(x):
@@ -377,7 +377,7 @@ def compute(video, anchors, events, checkpoint=None):
     return output
 
 
-def compute_refinement(video, anchors, events, checkpoint=None):
+def compute_refinement(video, anchors, events, checkpoint=None, segmenter_kind='medium'):
     """A separate budget for missing ellipses; never recompute ball evidence."""
     import cv2
     from match_room import presentation_window
@@ -402,7 +402,14 @@ def compute_refinement(video, anchors, events, checkpoint=None):
                   'method': METHOD, 'segments': [], 'refinement_diagnostics': {'windows': []}}
         output[event['event_id']] = result
         save()
-        model = refinement_model()
+        if segmenter_kind == 'small':
+            from native_player_segmentation import PersonSegmenter
+            model = PersonSegmenter()
+        elif segmenter_kind == 'medium':
+            model = refinement_model()
+        else:
+            raise ValueError('UNSUPPORTED_REFINEMENT_MODEL')
+        result['refinement_diagnostics']['segmenter_kind'] = segmenter_kind
         def preserve(segment):
             result['segments'].append(segment)
             save()
@@ -465,8 +472,14 @@ def bounded_tracks(video, anchors, events):
         result,status = _bounded_event(video,anchors,[event])
         output.update(result)
         statuses.append(status)
+    def interrupted(event):
+        previous = output.get(event.get('event_id')) or {}
+        return any(w.get('status') == 'TIME_BUDGET' for w in
+                   (previous.get('contour_diagnostics') or {}).get('windows', []))
     attempted = 0
-    for event in unique:
+    # A time-limited source path needs its original model and fresh budget,
+    # not a more expensive model. Prioritize these before complete-model misses.
+    for event in sorted(unique, key=lambda e: not interrupted(e)):
         if not event.get('event_id'):
             continue
         previous = output.get(event['event_id']) or {}
@@ -476,7 +489,8 @@ def bounded_tracks(video, anchors, events):
                 or previous.get('source_video_sha256') != event.get('source_video_sha256')):
             continue
         attempted += 1
-        retried, status = _bounded_event(video, anchors, [event], refinement=True)
+        retried, status = _bounded_event(video, anchors, [event],
+                                         refinement='small' if interrupted(event) else 'medium')
         result = retried.get(event['event_id']) or {}
         if (result.get('event_id') == event['event_id'] and result.get('method') == previous.get('method')
                 and result.get('source_video_sha256') == event.get('source_video_sha256')):
@@ -494,7 +508,10 @@ def bounded_tracks(video, anchors, events):
 if __name__ == '__main__':
     request = json.loads(Path(sys.argv[1]).read_text())
     result = Path(sys.argv[2])
-    operation = compute_refinement if request.pop('refinement', False) else compute
-    operation(**request, checkpoint=result)
+    kind = request.pop('refinement', False)
+    if kind:
+        compute_refinement(**request, checkpoint=result, segmenter_kind=kind)
+    else:
+        compute(**request, checkpoint=result)
     if not result.exists():
         result.write_text('{}')

@@ -14,7 +14,7 @@ jobs:
       github.event.pull_request.draft == true &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.event.pull_request.head.ref == 'codex/matchroom-graphics' &&
-      github.event.before == 'c2f3719389a9193d90e6320b050b2a06ca79b9eb' &&
+      github.event.before == '2e19ccfe06e2243327cb44672fcb00a39ac62cdb' &&
       github.run_attempt == 1
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -47,6 +47,8 @@ jobs:
           path: ${{ runner.temp }}/previous-all-taps
       - name: Verify refined graphics using only retained position results
         run: python -u backend/scripts/run_matchroom_retained_trial.py --work "$RUNNER_TEMP/single-tap-input" --output "$RUNNER_TEMP/single-tap-report" --event-limit 8 --run-model --max-new-requests 0 --resume-document "$RUNNER_TEMP/previous-all-taps/single-tap-report/report-document.json"
+      - name: Verify actual report coverage, recovery and uncertainty gates
+        run: node frontend/scripts/verify-orman400-matchroom-report.cjs "$RUNNER_TEMP/single-tap-report/report-document.json"
       - name: Preserve report, source-bound graphics and model receipts
         if: always()
         uses: actions/upload-artifact@v4

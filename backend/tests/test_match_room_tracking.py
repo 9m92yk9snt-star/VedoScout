@@ -226,11 +226,12 @@ def test_refinement_preserves_initial_paths_and_ball_evidence_with_separate_budg
     from copy import deepcopy
     method = 'SOURCE_OBSERVATION_INSTANCE_CONTOUR'
     events = [{'event_id': e, 'source_video_sha256':'source', 'localization_method':'EXPLICIT_SOURCE_POSITIONS',
-               'visual_samples':[{}]} for e in ('covered','missing1','missing2','missing3')]
+               'visual_samples':[{}]} for e in ('covered','missing1','missing2','missing3','missing4')]
     originals = {e['event_id']:{'event_id':e['event_id'], 'source_video_sha256':'source', 'method':method,
                   'segments':[{'id':'original'}] if e['event_id']=='covered' else [],
                   'ball_playback':[{'id':'ball-'+e['event_id']}], 'observed_samples':[{'identity_status':'UNCERTAIN'}]}
                  for e in events}
+    originals['missing2']['contour_diagnostics'] = {'windows':[{'status':'TIME_BUDGET'}]}
     calls = []
     def run(video, anchors, batch, *, refinement=False):
         eid = batch[0]['event_id']; calls.append((eid,refinement))
@@ -239,10 +240,10 @@ def test_refinement_preserves_initial_paths_and_ball_evidence_with_separate_budg
                      'segments':[{'id':'measured'}], 'ball_playback':[{'id':'must-not-replace'}]}}, 'COMPLETED'
     monkeypatch.setattr(tracking, '_bounded_event', run)
     result, status = tracking.bounded_tracks('video', [], events)
-    assert calls == [(e['event_id'],False) for e in events]+[('missing1',True),('missing2',True)]
+    assert calls == [(e['event_id'],False) for e in events]+[('missing2','small'),('missing1','medium'),('missing3','medium')]
     assert result['covered'] == originals['covered']
-    assert result['missing3'] == originals['missing3']
-    for eid in ('missing1','missing2'):
+    assert result['missing4'] == originals['missing4']
+    for eid in ('missing1','missing2','missing3'):
         assert result[eid]['segments'] == [{'id':'measured'}]
         assert result[eid]['ball_playback'] == originals[eid]['ball_playback']
         assert result[eid]['observed_samples'] == originals[eid]['observed_samples']

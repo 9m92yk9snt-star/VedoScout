@@ -1,0 +1,50 @@
+// Acceptance of the retained real-video fixture, using production playback gates.
+// Expected recovery/direction are assertions only; never inputs to localization.
+const fs = require('fs');
+const path = require('path');
+const assert = require('node:assert/strict');
+(async () => {
+  const document = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+  const source = fs.readFileSync(path.join(__dirname, '../src/components/report-v2/matchRoomModel.js'));
+  const {roomFor, graphicsAt, ballAt} = await import('data:text/javascript;base64,'+source.toString('base64'));
+  const original = JSON.parse(fs.readFileSync(path.join(__dirname, '../../testdata/sequence-pilot-orman400/anchors.json')));
+  const parse = value => typeof value === 'string' ? parse(JSON.parse(value)) : value;
+  assert.deepEqual(parse(document.raw_marker_anchors), parse(original.raw_marker_anchors));
+  assert.equal(parse(document.raw_marker_anchors).length, 10);
+  assert.equal(document.canonical_events.source_video_sha256, 'b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999');
+  assert.equal(document.canonical_events.events.length, 17);
+  assert.equal(document.full_report_status, 'ready');
+  const receipts = Object.values(document.match_room_localization.events);
+  assert.equal(receipts.length, 8);
+  assert.ok(receipts.every(r => r.reused === true), 'No fresh provider requests in this replay');
+  const rows = document.full_report.video_comments;
+  assert.equal(rows.length, 8);
+  let ellipses=0, arrows=0, hiddenPlayer=0, hiddenBall=0;
+  const rooms = new Map();
+  for (const row of rows) {
+    const room = roomFor(row, row.evidence_time_ms/1000);
+    rooms.set(row.event_id, room);
+    assert.ok(room.tracks.length, `Missing accepted ellipse: ${row.event_id}`);
+    assert.ok(room.movingBall.length, `Missing accepted ball direction: ${row.event_id}`);
+    ellipses += room.tracks.length; arrows += room.movingBall.length;
+    for (const sample of row.match_room.samples) {
+      if (sample.identity_status !== 'CONFIRMED' || !sample.ground) {
+        assert.ok(!graphicsAt(room, sample.media_ms)?.ground, `Uncertain player shown at ${sample.media_ms}`); hiddenPlayer++;
+      }
+      if (!sample.ball || sample.active_ball_status !== 'CONFIRMED') {
+        assert.ok(!ballAt(room, sample.media_ms), `Uncertain ball shown at ${sample.media_ms}`); hiddenBall++;
+      }
+    }
+  }
+  const duel = rooms.get('88aa8bbdedbec570d4de');
+  assert.equal(graphicsAt(duel, 12250), null, 'Hidden feet during duel must stay hidden');
+  assert.ok(graphicsAt(duel, 12783), 'Missing independently measured post-duel recovery');
+  const shot = rooms.get('a512ae64e102f24b3383');
+  const arrow = ballAt(shot, 31115);
+  assert.ok(arrow, 'Missing observed post-kick direction');
+  const [a,b] = arrow.ballTrail;
+  assert.ok(b[0]>a[0] && b[1]<a[1], 'This source shot travels up/right');
+  console.log(JSON.stringify({passed:true,original_taps:10,report_clips:8,ellipse_cards:8,arrow_cards:8,
+    ellipse_segments:ellipses,moving_ball_segments:arrows,hiddenPlayerObservations:hiddenPlayer,
+    hiddenBallObservations:hiddenBall,post_duel_recovery:true,post_kick_direction:true,new_model_requests:0}));
+})().catch(error=>{console.error(error.message);process.exitCode=1;});
