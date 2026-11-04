@@ -97,6 +97,7 @@ export function roomFor(comment, fallbackSeconds) {
       return [{...segment, samples: rows}];
     }) : [];
   return {
+    sourcePositionsOnly: bound && Array.isArray(raw.samples) && raw.samples.some(s => typeof s?.identity_status === 'string'),
     movingBall,
     tracks,
     start,
@@ -144,6 +145,7 @@ export function graphicsAt(room, mediaMs) {
     if (candidates.every(s => Math.hypot(s.ground[0]-chosen.ground[0], s.ground[1]-chosen.ground[1]) <= Math.min(s.player_width, chosen.player_width)*.5)) return withBall(chosen);
     return withBall(null);
   }
+  if (room.sourcePositionsOnly) return null;
   if (observed) return withBall({...observed, endpointMotion: true});
   // Brief exact-frame marks; never interpolate across occlusion, camera motion or sparse samples.
   if (!sample) return null;
