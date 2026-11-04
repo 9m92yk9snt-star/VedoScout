@@ -64,7 +64,7 @@ def _cut_flags(frames):
     return flags
 
 
-def _read_window(cap, w0: float, w1: float, step: float, fps=None, *, seed_time=None, on_frame=None):
+def _read_window(cap, w0: float, w1: float, step: float, fps=None, *, seed_time=None, on_frame=None, max_frames=None):
     """Returns [(t, gray_480w, hsv_240w, tiny_160w_f32), ...].
 
     FIX 03/04 canonical contract: adaptive-preroll seek at/before w0, then
@@ -103,6 +103,8 @@ def _read_window(cap, w0: float, w1: float, step: float, fps=None, *, seed_time=
                 frames.append((t, g, hsv, tiny))
                 if on_frame is not None:
                     on_frame(t, fr)
+                if max_frames is not None and len(frames) >= max_frames:
+                    break
         ok, t, used_fallback = video_timebase.grab_frame_time_seconds(cap, fps)
     return frames
 

@@ -1,0 +1,68 @@
+[
+  {
+    "index": 5,
+    "start": 8750,
+    "end": 12883,
+    "label": "whole_duel",
+    "frames": 249,
+    "visible": 228,
+    "missing": [
+      10016,
+      10033,
+      10050,
+      10066,
+      10083,
+      10100,
+      10116,
+      10133,
+      10150,
+      10166,
+      10183,
+      10200,
+      10216,
+      10233,
+      11016,
+      11033,
+      11050,
+      11066,
+      11083,
+      11100,
+      11116
+    ]
+  },
+  {
+    "index": 5,
+    "start": 11883,
+    "end": 12883,
+    "label": "recovery",
+    "frames": 61,
+    "visible": 61,
+    "missing": []
+  },
+  {
+    "index": 2,
+    "start": 30765,
+    "end": 32015,
+    "label": "kick",
+    "frames": 76,
+    "visible": 76,
+    "missing": []
+  },
+  {
+    "index": 2,
+    "start": 30949,
+    "end": 31249,
+    "label": "ball_direction",
+    "ball": true,
+    "frames": 19,
+    "visible": 13,
+    "missing": [
+      31165,
+      31182,
+      31199,
+      31215,
+      31232,
+      31249
+    ]
+  }
+]

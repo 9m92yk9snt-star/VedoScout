@@ -117,6 +117,40 @@ def endpoint_arrow(previous, current, matrix, width, height, *, field='ground', 
     return [tail, tip]
 
 
+class _MotionWindowReader:
+    """Reuse nearby decoded motion frames; resample each interval independently."""
+    def __init__(self, cap):
+        self.cap, self.frames, self.start, self.end = cap, [], None, None
+
+    def read(self, start, end):
+        from player_tracking import _read_window
+        from video_timebase import should_sample
+        lo, hi = start-.02, end+.025
+        if hi-lo > 1.5:
+            return _read_window(self.cap, lo, hi, 1/30, seed_time=start)
+        if self.start is None or lo < self.start or hi > self.end:
+            self.start, self.end = lo, lo+1.5
+            self.frames = _read_window(self.cap, lo, self.end, 0, seed_time=start, max_frames=96)
+            if len(self.frames) >= 96:
+                self.frames, self.start, self.end = [], None, None
+                return _read_window(self.cap, lo, hi, 1/30, seed_time=start)
+        # Keep the original per-interval sampling phase and seed-frame rule.
+        result, previous, seed_seen = [], None, False
+        for frame in self.frames:
+            t = frame[0]
+            if t > hi+1e-3:
+                break
+            regular = t >= max(0., lo)-1e-3 and should_sample(t, previous, (1/30)*.8)
+            seed = not seed_seen and t >= start-1e-3
+            if seed:
+                seed_seen = True
+            if regular or (seed and abs(t-start) <= .025):
+                if regular:
+                    previous = t
+                result.append(frame)
+        return result
+
+
 def observed_motion(video, observations, *, ball_gap_ms=300, separate_bands=False, include_ground=True):
     """Reuse the background affine estimator between observed source endpoints.
 
@@ -132,6 +166,7 @@ def observed_motion(video, observations, *, ball_gap_ms=300, separate_bands=Fals
     from motion_compensation import estimate_camera
     samples = sorted(deepcopy(observations), key=lambda s: s['media_ms'])
     cap = cv2.VideoCapture(str(video))
+    reader = _MotionWindowReader(cap)
     try:
         for previous, current in zip(samples, samples[1:]):
             gap = current['media_ms']-previous['media_ms']
@@ -140,7 +175,7 @@ def observed_motion(video, observations, *, ball_gap_ms=300, separate_bands=Fals
             if not (ground or ball):
                 continue
             start, end = previous['media_ms']/1000, current['media_ms']/1000
-            frames = _read_window(cap, start-.02, end+.025, 1/30, seed_time=start)
+            frames = reader.read(start, end)
             if len(frames) < 2 or abs(frames[0][0]-start) > .025 or abs(frames[-1][0]-end) > .025:
                 continue
             cuts = _cut_flags(frames)
