@@ -1,86 +1,64 @@
 {
   "status": "PASSED_SCOPED_GRAPHICS_CHECK",
+  "code_head": "5d6e9709c9c2c8fc1a58a794368b955b375b08ac",
+  "run_id": 41778466214,
+  "report_status": "ready",
   "all_original_taps": 10,
-  "source_video_sha256": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
   "canonical_events": 17,
   "report_clips": 8,
-  "source_analysis_reused": true,
-  "report_prose_reused": true,
-  "manual_position_inputs": false,
-  "initial_all_tap_run": 41770125538,
-  "all_eight_graphics_run": 41771330758,
-  "duel_recovery_run": 41772727152,
-  "duel_recovery_artifact": 13295513510,
-  "duel_recovery_artifact_sha256": "8895ccd59ff2c9dfd3e8179675707ae9fb82debada01ba136164965739e0197e",
-  "duel_window_ms": [
-    8750,
-    12883
-  ],
-  "duel_request_bytes": 11558751,
-  "duel_timeline_frames": 34,
-  "request_cap_bytes": 19500000,
-  "duel_run_new_requests": 1,
-  "duel_run_reused_requests": 7,
-  "normal_asset_pipeline": true,
-  "normal_authenticated_upload_ui_tested": false,
-  "production_database_used": false,
-  "notifications_sent": 0,
-  "merge_or_deploy": false,
-  "draft": true,
-  "code_head": "2850c69f08ac62240e42b09466060be2816687f4",
-  "report_status": "ready",
-  "last_replay_new_model_requests": 0,
-  "last_replay_reused_requests": 8,
-  "ellipse_cards": 6,
+  "ellipse_cards": 8,
+  "ellipse_segments": 14,
   "arrow_cards": 8,
-  "ellipse_segments": 11,
-  "moving_ball_segments": 24,
-  "duel_recovery_interval_ms": [
-    12749,
-    12883
-  ],
-  "duel_recovery_native_frames": 9,
-  "observed_shot_direction": "up and right after source contact at 30915ms; visually checked in actual player at 31115ms",
-  "browser_continuous": [
-    {
-      "card": 5,
-      "decoded_frames": 43,
-      "ellipse_frames": 9,
-      "arrow_frames": 0
-    },
-    {
-      "card": 2,
-      "decoded_frames": 62,
-      "ellipse_frames": 8,
-      "arrow_frames": 13
-    }
-  ],
-  "browser_errors": [],
+  "moving_ball_segments": 21,
+  "reused_position_requests": 8,
+  "new_model_requests": 0,
   "uncertainty_verification": {
     "passed": true,
     "hiddenPlayerObservations": 76,
     "hiddenBallObservations": 65
   },
-  "production_verification_run": 41773659919,
-  "production_verification_jobs_passed": 6,
+  "browser_errors": [],
+  "upload_marker_roundtrip": {
+    "passed": true,
+    "original_taps": 10,
+    "frontend_serializer_used": true,
+    "server_detachment_used": true,
+    "authenticated_upload_ui_tested": false
+  },
+  "normal_authenticated_upload_ui_tested": false,
+  "production_database_used": false,
+  "notifications_sent": 0,
+  "merge_or_deploy": false,
+  "draft": true,
   "cards": [
     {
       "event_id": "9e9a8a68c1772db2614f",
-      "action": "PASS",
-      "ellipse_intervals_ms": [],
-      "accepted_ellipse_segments": 0,
+      "ellipse_intervals_ms": [
+        [
+          56264,
+          56381
+        ],
+        [
+          56514,
+          56648
+        ]
+      ],
+      "accepted_ellipse_segments": 2,
       "accepted_ball_segments": 2
     },
     {
       "event_id": "dc2acb1e19ba55950e7f",
-      "action": "SHOT",
-      "ellipse_intervals_ms": [],
-      "accepted_ellipse_segments": 0,
+      "ellipse_intervals_ms": [
+        [
+          23666,
+          23749
+        ]
+      ],
+      "accepted_ellipse_segments": 1,
       "accepted_ball_segments": 2
     },
     {
       "event_id": "a512ae64e102f24b3383",
-      "action": "SHOT",
       "ellipse_intervals_ms": [
         [
           31649,
@@ -92,23 +70,17 @@
     },
     {
       "event_id": "ec74209ace700fa49d2e",
-      "action": "PASS",
       "ellipse_intervals_ms": [
         [
           43882,
           44015
-        ],
-        [
-          44765,
-          44882
         ]
       ],
-      "accepted_ellipse_segments": 2,
-      "accepted_ball_segments": 4
+      "accepted_ellipse_segments": 1,
+      "accepted_ball_segments": 3
     },
     {
       "event_id": "9a392fb19c052dfe6719",
-      "action": "PASS",
       "ellipse_intervals_ms": [
         [
           50998,
@@ -120,19 +92,29 @@
     },
     {
       "event_id": "88aa8bbdedbec570d4de",
-      "action": "DUEL",
       "ellipse_intervals_ms": [
         [
           12749,
           12883
+        ],
+        [
+          11750,
+          11883
+        ],
+        [
+          9383,
+          9500
+        ],
+        [
+          9500,
+          9633
         ]
       ],
-      "accepted_ellipse_segments": 1,
+      "accepted_ellipse_segments": 4,
       "accepted_ball_segments": 3
     },
     {
       "event_id": "1349b8676c1e07e88c00",
-      "action": "DRIBBLE",
       "ellipse_intervals_ms": [
         [
           28399,
@@ -140,11 +122,10 @@
         ]
       ],
       "accepted_ellipse_segments": 1,
-      "accepted_ball_segments": 4
+      "accepted_ball_segments": 3
     },
     {
       "event_id": "a8b5662ae46646b8f0ae",
-      "action": "DRIBBLE",
       "ellipse_intervals_ms": [
         [
           1633,
@@ -157,24 +138,834 @@
         [
           1883,
           2017
-        ],
-        [
-          2017,
-          2133
-        ],
-        [
-          2133,
-          2267
         ]
       ],
-      "accepted_ellipse_segments": 5,
-      "accepted_ball_segments": 4
+      "accepted_ellipse_segments": 3,
+      "accepted_ball_segments": 3
     }
   ],
+  "artifact_id": 13298760601,
+  "artifact_sha256": "de2283c13cd342e7870b86036ae4fd0af7d8ece1597e96d4ee9f2b6fa6b06b35",
+  "production_verification_run": 41778459424,
+  "production_verification_jobs_passed": 6,
+  "backend_controls_passed": 207,
+  "frontend_controls_passed": 9,
+  "duel_recovery_interval_ms": [
+    12749,
+    12883
+  ],
+  "observed_shot_direction": "up/right after contact at30915ms, visually checked at31115ms",
   "limitations": [
-    "Ellipse coverage is short and incomplete; two cards have no accepted contour.",
-    "Authenticated upload-to-report UI has not been tested.",
-    "Retained all-10-tap source analysis and report prose were reused; new model calls measured graphics only.",
-    "This one-match check does not establish performance on all matches."
-  ]
+    "Short measured intervals, not continuous tracking.",
+    "Authenticated upload-to-report UI untested.",
+    "One retained match does not establish accuracy on all matches."
+  ],
+  "browser_continuous": {
+    "output": [
+      {
+        "index": 0,
+        "event_id": "9e9a8a68c1772db2614f",
+        "offset": 55.264455999999996,
+        "frames": [
+          {
+            "source_ms": 56231,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 56248,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 56264,
+            "ellipse_ms": 56264,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 56281,
+            "ellipse_ms": 56281,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 56248,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 56281,
+            "ellipse_ms": 56281,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 56298,
+            "ellipse_ms": 56298,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 56314,
+            "ellipse_ms": 56314,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 56331,
+            "ellipse_ms": 56331,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 56348,
+            "ellipse_ms": 56348,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 56364,
+            "ellipse_ms": 56364,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 56381,
+            "ellipse_ms": 56381,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 56398,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 56414,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 56431,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 56448,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 56464,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 56481,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 56498,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 56514,
+            "ellipse_ms": 56514,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 56531,
+            "ellipse_ms": 56531,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 56548,
+            "ellipse_ms": 56548,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 56564,
+            "ellipse_ms": 56564,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 56581,
+            "ellipse_ms": 56581,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 56598,
+            "ellipse_ms": 56598,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 56614,
+            "ellipse_ms": 56614,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 56631,
+            "ellipse_ms": 56631,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 56648,
+            "ellipse_ms": 56648,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 56664,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 56681,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 56698,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 56714,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 56731,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 56748,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 56764,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          }
+        ]
+      },
+      {
+        "index": 1,
+        "event_id": "dc2acb1e19ba55950e7f",
+        "offset": 22.74909,
+        "frames": [
+          {
+            "source_ms": 23632,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 23649,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 23666,
+            "ellipse_ms": 23666,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 23682,
+            "ellipse_ms": 23682,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 23699,
+            "ellipse_ms": 23699,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 23666,
+            "ellipse_ms": 23666,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 23682,
+            "ellipse_ms": 23682,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 23699,
+            "ellipse_ms": 23699,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 23716,
+            "ellipse_ms": 23716,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 23732,
+            "ellipse_ms": 23732,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 23749,
+            "ellipse_ms": 23749,
+            "arrow_ms": 23749
+          },
+          {
+            "source_ms": 23766,
+            "ellipse_ms": null,
+            "arrow_ms": 23766
+          },
+          {
+            "source_ms": 23782,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 23799,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 23816,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 23832,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 23849,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 23866,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          }
+        ]
+      },
+      {
+        "index": 5,
+        "event_id": "88aa8bbdedbec570d4de",
+        "offset": 7.99968,
+        "frames": [
+          {
+            "source_ms": 12166,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 12183,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 12200,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 12216,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 12250,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 12266,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 12283,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 12300,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 12316,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 12333,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 12350,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 12366,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 12383,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 12400,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 12416,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 12433,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 12450,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 12466,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 12483,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 12500,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 12516,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 12533,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 12549,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 12566,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 12583,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 12599,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 12616,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 12633,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 12649,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 12666,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 12683,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 12699,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 12716,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 12733,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 12749,
+            "ellipse_ms": 12749,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 12766,
+            "ellipse_ms": 12766,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 12783,
+            "ellipse_ms": 12783,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 12799,
+            "ellipse_ms": 12799,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 12816,
+            "ellipse_ms": 12816,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 12833,
+            "ellipse_ms": 12833,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 12849,
+            "ellipse_ms": 12849,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 12866,
+            "ellipse_ms": 12866,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 12883,
+            "ellipse_ms": 12883,
+            "arrow_ms": null
+          }
+        ]
+      },
+      {
+        "index": 2,
+        "event_id": "a512ae64e102f24b3383",
+        "offset": 30.015466,
+        "frames": [
+          {
+            "source_ms": 30932,
+            "ellipse_ms": null,
+            "arrow_ms": 30932
+          },
+          {
+            "source_ms": 30899,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 30949,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 30965,
+            "ellipse_ms": null,
+            "arrow_ms": 30965
+          },
+          {
+            "source_ms": 30982,
+            "ellipse_ms": null,
+            "arrow_ms": 30982
+          },
+          {
+            "source_ms": 30999,
+            "ellipse_ms": null,
+            "arrow_ms": 30999
+          },
+          {
+            "source_ms": 31015,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 31032,
+            "ellipse_ms": null,
+            "arrow_ms": 31032
+          },
+          {
+            "source_ms": 31049,
+            "ellipse_ms": null,
+            "arrow_ms": 31049
+          },
+          {
+            "source_ms": 31065,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 31082,
+            "ellipse_ms": null,
+            "arrow_ms": 31082
+          },
+          {
+            "source_ms": 31099,
+            "ellipse_ms": null,
+            "arrow_ms": 31099
+          },
+          {
+            "source_ms": 31115,
+            "ellipse_ms": null,
+            "arrow_ms": 31115
+          },
+          {
+            "source_ms": 31132,
+            "ellipse_ms": null,
+            "arrow_ms": 31132
+          },
+          {
+            "source_ms": 31149,
+            "ellipse_ms": null,
+            "arrow_ms": 31149
+          },
+          {
+            "source_ms": 31182,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 31199,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 31215,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 31232,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 31249,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 31265,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 31282,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 31249,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 31282,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 31299,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 31315,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 31332,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 31349,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 31365,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 31382,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 31399,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 31415,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 31432,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 31449,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 31465,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 31482,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 31499,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 31515,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 31532,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 31549,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 31565,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 31582,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 31599,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 31615,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 31632,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 31649,
+            "ellipse_ms": 31649,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 31665,
+            "ellipse_ms": 31665,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 31682,
+            "ellipse_ms": 31682,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 31699,
+            "ellipse_ms": 31699,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 31715,
+            "ellipse_ms": 31715,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 31732,
+            "ellipse_ms": 31732,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 31749,
+            "ellipse_ms": 31749,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 31765,
+            "ellipse_ms": 31765,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 31782,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 31799,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 31815,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 31832,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 31849,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          },
+          {
+            "source_ms": 31865,
+            "ellipse_ms": null,
+            "arrow_ms": null
+          }
+        ]
+      }
+    ],
+    "errors": []
+  }
 }
