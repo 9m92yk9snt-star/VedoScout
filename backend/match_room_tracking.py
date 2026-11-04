@@ -471,8 +471,8 @@ def missing_display_windows(event, previous):
                 covered = stop
         if covered >= hi-2:
             continue
-        if missing and lo == missing[-1][1] and hi-missing[-1][0] <= 1500:
-            missing[-1][1] = hi
+        if missing and lo <= missing[-1][1] and hi-missing[-1][0] <= 1500:
+            missing[-1][1] = max(missing[-1][1], hi)
         else:
             missing.append([lo, hi])
     # Resolve the last visible recovery before earlier repetition.

@@ -47,14 +47,16 @@ def display_bridge(media_ms, camera_from_reference, stable_start, stable_end,
 def tracked_display_positions(frames, detections, interval, *, deadline):
     """Use the approved display curve only inside a caller-verified identity path.
 
-    The source ground stays absent. Measured masks and both independently bound
-    paths remain mandatory on every frame. Camera failure rejects the bridge.
+    The source ground stays absent. Pixel-tracked intervals keep both paths;
+    source-endpoint presentation leaves middle identities unmeasured. Fresh
+    foreground masks and valid camera motion remain mandatory.
     """
     import time
+    import cv2
     from motion_compensation import estimate_camera
 
     indices, owners = interval['indices'], interval['instances']
-    selected = [dict(detections[i][j]) for i, j in zip(indices, owners)]
+    selected = [dict(detections[i][j]) if j is not None else {'ground':None} for i, j in zip(indices, owners)]
     endpoints = interval.get('source_endpoint_ground') or {}
     for k, i in enumerate(indices):
         if i in endpoints:
@@ -66,6 +68,10 @@ def tracked_display_positions(frames, detections, interval, *, deadline):
     cameras = [np.eye(3)]
     for ai, bi in zip(indices, indices[1:]):
         if time.monotonic() >= deadline-1:
+            return None
+        a = cv2.resize(frames[ai]['gray'], (160,90))
+        b = cv2.resize(frames[bi]['gray'], (160,90))
+        if float(cv2.absdiff(a,b).mean()) > 45:
             return None
         # Every detected person is excluded from the background estimate.
         matrix, _ = estimate_camera(frames[ai]['gray'], frames[bi]['gray'],

@@ -204,6 +204,7 @@ export function MatchRoomPlayer({
         setSlow(next);
         if (video.current) video.current.playbackRate = next ? .5 : 1;
       }}>{slow ? '0.5×' : '1×'}</button></div>
+    {room.tracks.some(rows => rows.some(row => row.display_estimated === true)) && <p className="mr-position-note">Player position between observations is estimated.</p>}
     {error && <p role="alert">Video could not play. <button type="button" onClick={play}>Try again</button></p>}
     {done && <div className="mr-explanation" aria-live="polite"><span className="mr-kicker">WHAT TO TAKE FROM THIS</span><p>{observation}</p>{typeof skill?.next_level === 'string' && <p>{skill.next_level}</p>}<button type="button" onClick={restart}><RotateCcw size={16} /> Watch again</button></div>}
   </section>;

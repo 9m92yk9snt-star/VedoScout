@@ -51,5 +51,23 @@ const assert = require('node:assert/strict');
  assert.equal(roomFor(sourceEndpoint,0).tracks.length,0);
  const nullRow=structuredClone(bridged);nullRow.match_room.tracking.segments[0].samples[0]=null;
  assert.equal(roomFor(nullRow,0).tracks.length,0);
+ const chain={movingBall:[
+  {start_ms:100,arrival_ms:200,end_ms:200,reference_frames:['a','b'],samples:[{media_ms:100,ballTrail:[[.2,.5],[.4,.5]]},{media_ms:200,ballTrail:[[.2,.5],[.4,.5]]}]},
+  {start_ms:200,arrival_ms:300,end_ms:300,reference_frames:['b','c'],samples:[{media_ms:200,ballTrail:[[.4,.5],[.6,.5]]},{media_ms:217,ballTrail:[[.4,.5],[.6,.5]]},{media_ms:300,ballTrail:[[.4,.5],[.6,.5]]}]}
+ ]};
+ assert.equal(ballAt(chain,200).opacity,1);
+ assert.equal(ballAt(chain,217).opacity,1);
+ assert.equal(ballAt(chain,350),null);
+ const unrelated=structuredClone(chain);unrelated.movingBall[1].reference_frames[0]='other';
+ assert.equal(ballAt(unrelated,200),null);
+ const conflicting=structuredClone(chain);conflicting.movingBall[1].samples[0].ballTrail[0]=[.8,.8];
+ assert.equal(ballAt(conflicting,200),null);
+ const ranked={sourcePositionsOnly:true,samples:[],tracks:[
+  [{media_ms:200,ground:[.4,.7],player_width:.05,confidence:.8,contourTrack:true,sourceFrameContour:true}],
+  [{media_ms:200,ground:[.47,.7],player_width:.05,confidence:.9,contourTrack:true,sourceFrameContour:true,display_estimated:true}]
+ ]};
+ assert.deepEqual(graphicsAt(ranked,200).ground,[.4,.7]);
+ ranked.tracks[0][0].display_estimated=true;
+ assert.equal(graphicsAt(ranked,200),null);
  console.log('Localization and camera-space display bridge contracts passed');
 })().catch(e=>{console.error(e);process.exitCode=1;});

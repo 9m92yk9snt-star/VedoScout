@@ -170,3 +170,67 @@ def test_reversible_features_can_complete_but_not_contradict_contour_path(monkey
     assert len(localized.agreed_intervals(frames, rows, obs, deadline=time.monotonic()+5, allow_display_bridge=True)) == 1
     monkeypatch.setattr(localized, 'follow_instance', lambda f,r,i,j: {0:0,1:1} if i == 0 else {4:0})
     assert localized.agreed_intervals(frames, rows, obs, deadline=time.monotonic()+5, allow_display_bridge=True) == []
+
+
+def test_endpoint_presentation_is_bound_to_source_bodies_and_keeps_estimates_separate(monkeypatch):
+    import cv2
+    import motion_compensation
+    from match_room_display_bridge import tracked_display_positions
+    frames, rows, obs, _ = fixture(monkeypatch)
+    for row in rows:
+        row[0]['_appearance'] = np.array([[1.,0.]], dtype=np.float32)
+    for o in obs: o['player_box'] = [.3,.2,.21,.6]
+    interval = localized.source_bound_display_interval(frames, rows, obs)
+    assert interval['presentation_only']
+    assert interval['instances'] == [0,None,None,None,0]
+    monkeypatch.setattr(motion_compensation, 'estimate_camera', lambda *a: (np.array([[1,0,0],[0,1,0]]), 30))
+    display = tracked_display_positions(frames, rows, interval, deadline=time.monotonic()+5)
+    assert len(display) == 3
+    assert all(v['display_estimated'] and not v['source_ground_observation'] for v in display.values())
+    assert all(row[0]['ground'] == [.4,.79] for row in rows)
+    bad = deepcopy(obs);bad.insert(1, {'media_ms':100,'identity_status':'UNCERTAIN'})
+    assert localized.source_bound_display_interval(frames, rows, bad) is None
+    rows[-1][0]['_appearance'] = np.array([[0.,1.]], dtype=np.float32)
+    assert localized.source_bound_display_interval(frames, rows, obs) is None
+    rows[-1][0]['_appearance'] = rows[0][0]['_appearance']
+    rows[-1].append(deepcopy(rows[-1][0]))
+    assert localized.source_bound_display_interval(frames, rows, obs) is None
+
+
+def test_presentation_curve_cannot_leave_intermediate_source_body(monkeypatch):
+    frames, rows, obs, _ = fixture(monkeypatch)
+    support = [{'media_ms':100,'identity_status':'CONFIRMED','player_box':[.3,.2,.21,.6]}]
+    interval = {'indices':list(range(5))}
+    assert localized.display_fits_source_bodies(frames,interval,{2:{'display_ground':[.4,.79]}},support)
+    assert not localized.display_fits_source_bodies(frames,interval,{2:{'display_ground':[.8,.79]}},support)
+
+
+def test_contact_observations_do_not_create_sub_frame_count_holes():
+    rows = [{'media_ms': t, 'identity_status':'CONFIRMED', 'ground':[.4,.7]} for t in (0,17,133,150,267)]
+    pairs = list(localized.endpoint_pairs(rows))
+    assert all(b['media_ms']-a['media_ms'] >= 125 for a,b in pairs)
+    assert pairs[0][0] is rows[0] and pairs[-1][1] is rows[-1]
+
+
+def test_automatic_flow_exports_endpoint_estimates_without_pixel_identity_claim(monkeypatch):
+    import match_room_contours as source
+    import native_player_segmentation as segmentation
+    import match_room_tracking as tracking
+    import motion_compensation
+    frames, rows, obs, _ = fixture(monkeypatch)
+    for o in obs: o['player_box'] = [.3,.2,.21,.6]
+    for frame in frames: frame['image'] = np.zeros((100,100,3), np.uint8)
+    monkeypatch.setattr(localized, 'follow_instance', lambda f,r,i,j: {i:j})
+    monkeypatch.setattr(localized, 'feature_paths', lambda *a: ({},{}))
+    monkeypatch.setattr(source, 'read_clip', lambda *a,**kw: (f for f in deepcopy(frames)))
+    monkeypatch.setattr(source, 'detect_frame', lambda *a: deepcopy(rows[0]))
+    monkeypatch.setattr(segmentation, 'PersonSegmenter', lambda: object())
+    monkeypatch.setattr(tracking, 'foreground_polygons', lambda *a: [[[.3,.2],[.5,.2],[.5,.8]]])
+    monkeypatch.setattr(motion_compensation, 'estimate_camera', lambda *a: (np.array([[1,0,0],[0,1,0]]),30))
+    segments = localized.contour_segments('unused',obs,0,200,deadline=time.monotonic()+5,diagnostics={})
+    assert segments[0]['identity_method'] == 'SOURCE_CONFIRMED_ENDPOINT_BRIDGE'
+    middle = segments[0]['samples'][2]
+    assert middle['ground'] is None and middle['display_ground'] == [.4,.79]
+    assert middle['source_ground_observation'] is False
+    monkeypatch.setattr(motion_compensation, 'estimate_camera', lambda *a: (None,'failure'))
+    assert localized.contour_segments('unused',obs,0,200,deadline=time.monotonic()+5,diagnostics={}) == []

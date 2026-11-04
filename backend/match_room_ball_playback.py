@@ -7,6 +7,7 @@ import time
 
 METHOD = 'SOURCE_FRAME_BALL_DIRECTION'
 MAX_FRAMES = 150
+MAX_SEGMENTS = 16
 
 
 def build_ball_playback(video, event, observations, deadline):
@@ -44,7 +45,7 @@ def build_ball_playback(video, event, observations, deadline):
                     continue
             elif any(start < s['media_ms'] < end for s in observations):
                 continue
-            if len(segments) >= 4 or time.monotonic() >= deadline-1:
+            if len(segments) >= MAX_SEGMENTS or time.monotonic() >= deadline-1:
                 failures.append('BUDGET')
                 break
             # A short source-bound fade after reception, only within the proof.

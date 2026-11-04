@@ -2,8 +2,8 @@
 
 Call only after binding model receipts with match_room_position_evidence.
 These seeds are model observations, never original human selections. Nothing
-is drawn across uncertain identity or conflicting flow. Short missing-foot
-intervals use the approved camera-corrected presentation bridge.
+is drawn across uncertain source identity. Pixel paths remain measurement
+evidence; source-confirmed endpoint bridges are explicitly presentation only.
 """
 import time
 from match_room_contours import agrees_with_observation, follow_instance
@@ -24,7 +24,7 @@ def refinement_model():
     return model
 
 
-def endpoint_pairs(observations):
+def _adjacent_endpoint_pairs(observations):
     """Missing feet may be bridged; a missing identity may never be skipped."""
     previous = None
     last_time = None
@@ -40,6 +40,27 @@ def endpoint_pairs(observations):
         if previous is not None and row['media_ms']-previous['media_ms'] <= 800:
             yield previous, row
         previous = row
+
+
+def endpoint_pairs(observations):
+    """Keep tightly spaced observations inside an independently checked window.
+
+    A 17ms contact observation must not split a valid track into sub-five-frame
+    pieces. Borrow adjacent endpoint context, never skip an identity barrier.
+    """
+    pairs = list(_adjacent_endpoint_pairs(observations))
+    seen = set()
+    for i, (a, b) in enumerate(pairs):
+        if b['media_ms']-a['media_ms'] < 125:
+            if i and pairs[i-1][1] is a and b['media_ms']-pairs[i-1][0]['media_ms'] <= 800:
+                a = pairs[i-1][0]
+            if (b['media_ms']-a['media_ms'] < 125 and i+1 < len(pairs)
+                    and pairs[i+1][0] is b and pairs[i+1][1]['media_ms']-a['media_ms'] <= 800):
+                b = pairs[i+1][1]
+        key = (a['media_ms'], b['media_ms'])
+        if key not in seen:
+            seen.add(key)
+            yield a, b
 
 
 def agrees_with_source_box(row, observation, shape):
@@ -135,6 +156,85 @@ def agreed_intervals(frames, detections, observations, *, deadline, allow_displa
     return accepted
 
 
+def source_bound_display_interval(frames, detections, observations):
+    """The approved endpoint-based presentation when dense optical links fail.
+
+    Source identity remains the authority. This estimates display positions;
+    it never asserts a newly measured foot or a pixel-tracked middle identity.
+    """
+    import cv2
+    from match_room_reacquisition import IdentityAssociator
+    import numpy as np
+    if len(observations) < 2 or any(o.get('identity_status') != 'CONFIRMED' for o in observations):
+        return None
+    a, b = observations[0], observations[-1]
+    if not a.get('ground') or not b.get('ground') or not 0 < b['media_ms']-a['media_ms'] <= 800:
+        return None
+    by_time = {f['media_ms']: i for i,f in enumerate(frames)}
+    ai, bi = by_time.get(a['media_ms']), by_time.get(b['media_ms'])
+    if ai is None or bi is None or bi-ai < 4:
+        return None
+    if any(not 0 < frames[i+1]['media_ms']-frames[i]['media_ms'] <= 75 for i in range(ai,bi)):
+        return None
+    owners = []
+    for i, observation in ((ai,a),(bi,b)):
+        if not observation.get('player_box'):
+            return None
+        h,w = frames[i]['gray'].shape
+        x,y = observation['ground'][0]*w, observation['ground'][1]*h
+        candidates = []
+        for j,row in enumerate(detections[i]):
+            bx,by,bw,bh = row['box']
+            if (agrees_with_source_box(row, observation, (h,w)) and
+                    bx-bw*.2 <= x <= bx+bw*1.2 and by+bh*.6 <= y <= by+bh*1.2):
+                candidates.append(j)
+        if len(candidates) != 1:
+            return None
+        owners.append(candidates[0])
+    first, last = detections[ai][owners[0]], detections[bi][owners[1]]
+    if '_appearance' not in first or '_appearance' not in last:
+        return None
+    if any(not np.isfinite(row['_appearance']).all() or row['_appearance'].sum() <= 0 for row in (first,last)):
+        return None
+    distance = cv2.compareHist(first['_appearance'], last['_appearance'], cv2.HISTCMP_BHATTACHARYYA)
+    if not np.isfinite(distance) or distance > IdentityAssociator.APPEARANCE_LIMIT:
+        return None
+    return {'indices':list(range(ai,bi+1)), 'instances':[owners[0]]+[None]*(bi-ai-1)+[owners[1]],
+            'reference_frames':[a['frame_id'],b['frame_id']], 'presentation_only':True,
+            'source_endpoint_ground':{by_time[o['media_ms']]:o['ground'] for o in observations
+                                      if o.get('ground') and o['media_ms'] in by_time and
+                                      (o not in (a,b) or detections[by_time[o['media_ms']]][owners[0] if o is a else owners[1]].get('ground') is None)}}
+
+
+def supporting_observations(frames, detections, interval, observations):
+    chosen = dict(zip(interval['indices'], interval['instances']))
+    times = {frames[i]['media_ms']:i for i in interval['indices']}
+    for observed in observations:
+        if observed.get('identity_status') != 'CONFIRMED' or observed['media_ms'] not in times:
+            return False
+        if interval.get('presentation_only') or not observed.get('ground'):
+            continue
+        i = times[observed['media_ms']]
+        row = detections[i][chosen[i]]
+        if not agrees_with_source_box(row, observed, frames[i]['gray'].shape):
+            return False
+    return True
+
+
+def display_fits_source_bodies(frames, interval, display, observations):
+    """Reject a curve that leaves an independently observed player's lower body."""
+    times = {frames[i]['media_ms']:i for i in interval['indices']}
+    for observed in observations:
+        i = times[observed['media_ms']]
+        if i not in display or not observed.get('player_box'):
+            continue
+        x,y = display[i]['display_ground']
+        bx,by,bw,bh = observed['player_box']
+        if not (bx-bw*.3 <= x <= bx+bw*1.3 and by+bh*.55 <= y <= by+bh*1.3):
+            return False
+    return True
+
+
 def observation_windows(observations, start, end):
     """Partition confirmed identity runs; prioritize recovery.
 
@@ -190,7 +290,11 @@ def contour_segments(video, observations, start, end, *, deadline, diagnostics, 
     boxes = [s['player_box'] for pair in pairs for s in pair if s.get('player_box')]
     model = segmenter if segmenter is not None else PersonSegmenter()
     frames, detections, segments = [], [], []
-    pending = {b['media_ms']: (a, b) for a, b in pairs}
+    pending = {}
+    for a, b in pairs:
+        prior = pending.get(b['media_ms'])
+        if prior is None or a['media_ms'] < prior[0]['media_ms']:
+            pending[b['media_ms']] = (a,b)
     stream = read_clip(video, start, end, sample_step=0)
     timed_out = False
     try:
@@ -217,10 +321,30 @@ def contour_segments(video, observations, start, end, *, deadline, diagnostics, 
             # Complete and preserve each independently checked interval before
             # decoding more frames. A later timeout cannot erase earlier proof.
             intervals = agreed_intervals(frames, detections, pair, deadline=deadline, allow_display_bridge=True)
+            support = [o for o in observations if pair[0]['media_ms'] <= o['media_ms'] <= pair[1]['media_ms']]
+            if not intervals:
+                # When a pose hides the detector's foot/body, use the last
+                # source-bound visible endpoint and the independently reacquired
+                # endpoint. Intermediate confirmed source positions shape the
+                # approved curve; none becomes a new pixel observation.
+                last_end = max((s['samples'][-1]['media_ms'] for s in segments), default=start)
+                if segments and frame['media_ms'] == end and frame['media_ms']-last_end < 125:
+                    last_end = segments[-1]['samples'][0]['media_ms']
+                candidates = [o for o in observations if o.get('ground') and
+                              max(start, last_end, frame['media_ms']-800) <= o['media_ms'] < frame['media_ms']]
+                for candidate in candidates:
+                    candidate_support = [o for o in observations if candidate['media_ms'] <= o['media_ms'] <= frame['media_ms']]
+                    estimate = source_bound_display_interval(frames, detections, candidate_support)
+                    if estimate is not None:
+                        intervals, support = [estimate], candidate_support
+                        break
             for interval in intervals:
+                if not supporting_observations(frames, detections, interval, support):
+                    continue
+                interval['reference_frames'] = [o['frame_id'] for o in support if o.get('ground')]
                 from match_room_display_bridge import tracked_display_positions
                 display = tracked_display_positions(frames, detections, interval, deadline=deadline)
-                if display is None:
+                if display is None or not display_fits_source_bodies(frames, interval, display, support):
                     continue
                 samples = []
                 for i, j in zip(interval['indices'], interval['instances']):
@@ -230,7 +354,16 @@ def contour_segments(video, observations, start, end, *, deadline, diagnostics, 
                     if not polygons:
                         samples = []
                         break
-                    row, ms = detections[i][j], frames[i]['media_ms']
+                    ms = frames[i]['media_ms']
+                    if j is not None:
+                        row = detections[i][j]
+                    else:
+                        ai, bi = interval['indices'][0], interval['indices'][-1]
+                        first = detections[ai][interval['instances'][0]]
+                        last = detections[bi][interval['instances'][-1]]
+                        u = (ms-frames[ai]['media_ms'])/(frames[bi]['media_ms']-frames[ai]['media_ms'])
+                        row = {'ground':None, 'player_width':first['player_width']+(last['player_width']-first['player_width'])*u,
+                               'confidence':min(first['confidence'], last['confidence'])}
                     fid = f'position-contour:{ms}'
                     samples.append({'media_ms': ms, 'frame_id': fid, 'ground': row['ground'],
                                     **display.get(i, {}),
@@ -244,7 +377,7 @@ def contour_segments(video, observations, start, end, *, deadline, diagnostics, 
                                'overlap_frames': len(samples),
                                'segmenter_sha256': getattr(model, 'sha256', None),
                                'ground_method': 'CAMERA_SPACE_DISPLAY_BRIDGE' if display else 'LOWER_VISIBLE_CONTOUR',
-                               'identity_method': 'BIDIRECTIONAL_INSTANCE_AGREEMENT',
+                               'identity_method': 'SOURCE_CONFIRMED_ENDPOINT_BRIDGE' if interval.get('presentation_only') else 'BIDIRECTIONAL_INSTANCE_AGREEMENT',
                                'camera_method': 'BACKGROUND_AFFINE' if display else None,
                                'source_frame_coverage': 'COMPLETE_SEGMENT', 'samples': samples}
                     segments.append(segment)

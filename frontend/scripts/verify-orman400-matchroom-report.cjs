@@ -15,6 +15,8 @@ const {execFileSync} = require('node:child_process');
   assert.equal(document.canonical_events.source_video_sha256, 'b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999');
   assert.equal(document.canonical_events.events.length, 17);
   assert.equal(document.full_report_status, 'ready');
+  assert.equal(document.test_scope?.normal_asset_pipeline, true);
+  assert.notEqual(document.test_scope?.diagnostic_composition, true, 'A composed diagnostic is not an automatic report trial');
   const receipts = Object.values(document.match_room_localization.events);
   assert.equal(receipts.length, 8);
   assert.ok(receipts.every(r => r.reused === true), 'No fresh provider requests in this replay');
@@ -50,11 +52,21 @@ const {execFileSync} = require('node:child_process');
   assert.ok(recoveryFrames.length >= 25, 'Insufficient decoded recovery pictures');
   for (const ms of recoveryFrames) assert.ok(graphicsAt(duel, ms)?.ground, `Ellipse disappears during recovery at ${ms}`);
   const shot = rooms.get('a512ae64e102f24b3383');
+  const shotRow = rows.find(r => r.event_id === 'a512ae64e102f24b3383');
+  const shotClip = path.join(path.dirname(process.argv[2]), 'frames', path.basename(shotRow.tele_clip_url));
+  const shotDecoded = JSON.parse(execFileSync('ffprobe', ['-v','error','-select_streams','v:0',
+    '-show_entries','frame=best_effort_timestamp_time','-of','json',shotClip], {encoding:'utf8'}));
+  const shotFrames = shotDecoded.frames.map(f => Math.round((Number(f.best_effort_timestamp_time)+shotRow.tele_clip_start)*1000))
+    .filter(ms => ms >= 30765 && ms <= 32015);
+  assert.ok(shotFrames.length >= 30, 'Insufficient decoded kick pictures');
+  for (const ms of shotFrames) assert.ok(graphicsAt(shot, ms)?.ground, `Ellipse disappears during kick at ${ms}`);
+  const directionFrames = shotFrames.filter(ms => ms >= 30949 && ms <= 31249);
+  for (const ms of directionFrames) assert.ok(ballAt(shot,ms)?.opacity > 0, `Observed arrow blinks at ${ms}`);
   const arrow = ballAt(shot, 31115);
   assert.ok(arrow, 'Missing observed post-kick direction');
   const [a,b] = arrow.ballTrail;
   assert.ok(b[0]>a[0] && b[1]<a[1], 'This source shot travels up/right');
-  console.log(JSON.stringify({technical_checks_passed:true,continuous_recovery_frames:recoveryFrames.length,visual_acceptance:'REQUIRES_CONTINUOUS_PLAYBACK_REVIEW',original_taps:10,report_clips:8,ellipse_cards:8,arrow_cards:8,
+  console.log(JSON.stringify({technical_checks_passed:true,continuous_recovery_frames:recoveryFrames.length,continuous_kick_frames:shotFrames.length,continuous_direction_frames:directionFrames.length,visual_acceptance:'REQUIRES_CONTINUOUS_PLAYBACK_REVIEW',original_taps:10,report_clips:8,ellipse_cards:8,arrow_cards:8,
     ellipse_segments:ellipses,moving_ball_segments:arrows,hiddenPlayerObservations:hiddenPlayer,
     hiddenBallObservations:hiddenBall,post_duel_recovery:true,post_kick_direction:true,new_model_requests:0}));
 })().catch(error=>{console.error(error.message);process.exitCode=1;});

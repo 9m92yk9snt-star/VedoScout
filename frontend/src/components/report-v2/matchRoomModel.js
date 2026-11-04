@@ -61,8 +61,9 @@ export function roomFor(comment, fallbackSeconds) {
       const localized = tracking.method === "SOURCE_OBSERVATION_INSTANCE_CONTOUR";
       const sourceFrameContour = localized || tracking.method === "TAP_OBSERVATION_BOUND_CONTOUR";
       const bridge = localized && segment.ground_method === 'CAMERA_SPACE_DISPLAY_BRIDGE';
-      if (bridge && (segment.identity_method !== 'BIDIRECTIONAL_INSTANCE_AGREEMENT' || segment.camera_method !== 'BACKGROUND_AFFINE' || segment.samples.length < 5 || segment.samples.at(-1).media_ms-segment.samples[0].media_ms > 800 || ![segment.samples[0], segment.samples.at(-1)].every(s => point(s.ground) || (s.display_origin === 'BOUND_SOURCE_OBSERVATION' && point(s.display_ground) && raw.samples.some(o => o.media_ms === s.media_ms && o.identity_status === 'CONFIRMED' && point(o.ground) && Math.hypot(...o.ground.map((v,i) => v-s.display_ground[i])) < .002))))) return [];
+      if (bridge && (!['BIDIRECTIONAL_INSTANCE_AGREEMENT','SOURCE_CONFIRMED_ENDPOINT_BRIDGE'].includes(segment.identity_method) || segment.camera_method !== 'BACKGROUND_AFFINE' || segment.samples.length < 5 || segment.samples.at(-1).media_ms-segment.samples[0].media_ms > 800 || ![segment.samples[0], segment.samples.at(-1)].every(s => point(s.ground) || (s.display_origin === 'BOUND_SOURCE_OBSERVATION' && point(s.display_ground) && raw.samples.some(o => o.media_ms === s.media_ms && o.identity_status === 'CONFIRMED' && point(o.ground) && Math.hypot(...o.ground.map((v,i) => v-s.display_ground[i])) < .002))))) return [];
       if (segment.samples.some(s => !s || (s.display_ground !== undefined && (!bridge || s.ground != null || !point(s.display_ground) || s.display_estimated !== true || s.source_ground_observation !== false)))) return [];
+      if (segment.samples.some(s => s.display_origin === 'BOUND_SOURCE_OBSERVATION' && (!point(s.display_ground) || !raw.samples.some(o => o.media_ms === s.media_ms && o.identity_status === 'CONFIRMED' && point(o.ground) && Math.hypot(...o.ground.map((v,i) => v-s.display_ground[i])) < .002)))) return [];
       if (contour && ((!bridge && segment.ground_method !== "LOWER_VISIBLE_CONTOUR") || !samples.some(s => s.frame_id === segment.reference_frame) || !finite(segment.overlap_frames) || segment.overlap_frames < 5)) return [];
       if (localized) {
         const refs = segment.observation_reference_frames;
@@ -83,7 +84,7 @@ export function roomFor(comment, fallbackSeconds) {
     }) : [];
   // Only complete, event-bound sequences with a fresh mask on every source frame.
   const movingBall = bound && tracking?.version === 1 && tracking.event_id === raw.event_id && tracking.source_video_sha256 === raw.source_video_sha256 && Array.isArray(tracking.ball_playback)
-    ? tracking.ball_playback.slice(0, 4).flatMap(segment => {
+    ? tracking.ball_playback.slice(0, 16).flatMap(segment => {
       if (!segment || !Array.isArray(segment.reference_frames) || segment.reference_frames.length !== 2) return [];
       const [first, last] = segment.reference_frames;
       const release = samples.find(s => s.frame_id === first && s.media_ms === segment.start_ms && s.ball);
@@ -143,9 +144,13 @@ export function graphicsAt(room, mediaMs) {
   const observed = nearest(room.samples.filter(s => s.groundTrail && Math.abs(s.media_ms-mediaMs) <= 60));
   const candidates = (room.tracks || []).map(rows => stanceAt(rows, mediaMs)).filter(s => s && Math.abs(s.media_ms-mediaMs) <= (s.contourTrack ? 40 : 60));
   if (candidates.length) {
-    const chosen = candidates.sort((a,b) => b.confidence-a.confidence)[0];
-    // Competing tap windows must agree; do not choose a nearby teammate by confidence.
-    if (candidates.every(s => Math.hypot(s.ground[0]-chosen.ground[0], s.ground[1]-chosen.ground[1]) <= Math.min(s.player_width, chosen.player_width)*.5)) return withBall(chosen);
+    // A coarse presentation estimate fills a missing measurement; it must not
+    // erase a fresh measured contour when both cover the same source picture.
+    const measured = candidates.filter(s => s.display_estimated !== true);
+    const supported = measured.length ? measured : candidates;
+    const chosen = supported.sort((a,b) => b.confidence-a.confidence)[0];
+    // Competing evidence at the same level must still agree.
+    if (supported.every(s => Math.hypot(s.ground[0]-chosen.ground[0], s.ground[1]-chosen.ground[1]) <= Math.min(s.player_width, chosen.player_width)*.5)) return withBall(chosen);
     return withBall(null);
   }
   if (room.sourcePositionsOnly) return null;
@@ -163,17 +168,35 @@ export function graphicsAt(room, mediaMs) {
 
 // Call with presented frame PTS, never an advancing wall clock. Seeking, pausing
 // and changing playback speed reproduce the same geometry and opacity.
+function continuesBallDirection(a, b) {
+  if (!a || !b || a === b || a.end_ms !== a.arrival_ms || a.arrival_ms !== b.start_ms ||
+      !Array.isArray(a.reference_frames) || !Array.isArray(b.reference_frames) ||
+      a.reference_frames.length !== 2 || b.reference_frames.length !== 2 ||
+      a.reference_frames[1] !== b.reference_frames[0]) return false;
+  const tip = a.samples?.at(-1)?.ballTrail?.[1], tail = b.samples?.[0]?.ballTrail?.[0];
+  return point(tip) && point(tail) && Math.hypot(...tip.map((v,i) => v-tail[i])) <= .002;
+}
+
 export function ballAt(room, mediaMs) {
   if (!finite(mediaMs)) return null;
   const candidates = (room.movingBall || []).filter(s => mediaMs >= s.start_ms-2 && mediaMs <= s.end_ms+2);
-  if (candidates.length !== 1) return null;
-  const segment = candidates[0];
+  let segment;
+  if (candidates.length === 1) segment = candidates[0];
+  else if (candidates.length === 2) {
+    const [a,b] = candidates.slice().sort((a,b) => a.start_ms-b.start_ms);
+    if (!continuesBallDirection(a,b)) return null;
+    segment = b;
+  } else return null;
   const sample = segment.samples.find(s => Math.abs(s.media_ms-mediaMs) <= 2);
   if (!sample) return null;
   const smooth = t => { const x = Math.max(0, Math.min(1, t)); return x*x*(3-2*x); };
   const fade = segment.end_ms > segment.arrival_ms ? 1-smooth((mediaMs-segment.arrival_ms)/(segment.end_ms-segment.arrival_ms)) : 1;
   const fadeInMs = Math.min(120, (segment.arrival_ms-segment.start_ms)/3);
-  return {...sample, opacity: smooth((mediaMs-segment.start_ms)/fadeInMs)*fade};
+  // Adjacent observations of the same ball are one presentation. Do not
+  // flash the arrow off and restart its fade at each measured endpoint.
+  const incoming = (room.movingBall || []).filter(s => continuesBallDirection(s, segment));
+  const fadeIn = incoming.length === 1 ? 1 : smooth((mediaMs-segment.start_ms)/fadeInMs);
+  return {...sample, opacity: fadeIn*fade};
 }
 
 // Clip a direction line to the visible picture, preserving its orientation.
