@@ -25,8 +25,8 @@ KEY_ENV = {"gemini": "GEMINI_API_KEY", "emergent": "EMERGENT_LLM_KEY"}
 MAX_REQUEST_BYTES = 19_500_000
 MAX_RESPONSE_BYTES = 2_000_000
 MAX_CALL_SECONDS = 210.
-MAX_RATE_LIMIT_WAIT_SECONDS = 30.
-RATE_LIMIT_DEFAULT_WAIT_SECONDS = 2.
+MAX_RATE_LIMIT_WAIT_SECONDS = 120.
+RATE_LIMIT_DEFAULT_WAIT_SECONDS = 30.
 STOP_ERRORS = frozenset({"MODEL_ACCESS_DENIED", "MODEL_KEY_NOT_CONFIGURED", "MODEL_QUOTA_OR_RATE_LIMIT"})
 
 
@@ -42,7 +42,19 @@ def limit_diagnostics(exc):
              "rate_limit_exceeded": "RATE_LIMITED", "rate_limit_error": "RATE_LIMITED",
              "too_many_requests": "RATE_LIMITED"}
     try:
-        delay = (exc.headers or {}).get("Retry-After", "")
+        headers = {k.lower(): v for k, v in (exc.headers or {}).items()}
+        # Strict numeric/duration allowlist: never retain cookies, auth or messages.
+        limits = {}
+        for kind in ("requests", "tokens"):
+            for field in ("limit", "remaining", "reset"):
+                name = f"x-ratelimit-{field}-{kind}"
+                value = headers.get(name)
+                pattern = r"(?:\d+(?:\.\d+)?(?:ms|s|m|h))+" if field == "reset" else r"\d{1,16}"
+                if isinstance(value, str) and len(value) <= 64 and re.fullmatch(pattern, value):
+                    limits[name] = value
+        if limits:
+            result["rate_limit_headers"] = limits
+        delay = headers.get("retry-after", "")
         if isinstance(delay, str) and delay.strip():
             # Do not silently retry early when a provider sends an HTTP-date,
             # an excessively long cooldown or an unparseable nonempty header.
@@ -63,7 +75,9 @@ def limit_diagnostics(exc):
         raw = exc.read(4097)
         if len(raw) <= 4096:
             data = json.loads(raw)
-            error = data.get("error") if isinstance(data, dict) else None
+            error = data.get("error", data.get("detail")) if isinstance(data, dict) else None
+            if isinstance(error, dict) and isinstance(error.get("error"), dict):
+                error = error["error"]
             if isinstance(error, dict):
                 for field in ("code", "type"):
                     code = error.get(field)
@@ -232,6 +246,7 @@ def run_jobs(jobs, provider, model, *, deadline, per_call_s=90., workers=2, work
     if provider not in KEY_ENV or not 1 <= workers <= 2 or not 0 < per_call_s <= MAX_CALL_SECONDS:
         raise ValueError("INVALID_EXECUTION_BUDGET")
     pending, active, results, abort = list(jobs), {}, [], False
+    cancel_active = False
     rate_retries, histories, resume_at = set(), {}, 0.
     context = multiprocessing.get_context("spawn")
     try:
@@ -252,9 +267,9 @@ def run_jobs(jobs, provider, model, *, deadline, per_call_s=90., workers=2, work
                         result = pipe.recv()
                     except EOFError:
                         result = {"packet_id": job["packet_id"], "status": "ERROR", "error": "MODEL_CHILD_EXITED"}
-                elif now >= expires or abort or not process.is_alive():
+                elif now >= expires or cancel_active or not process.is_alive():
                     result = {"packet_id": job["packet_id"], "status": "ERROR",
-                              "error": ("MODEL_ACCESS_STOPPED" if abort else
+                              "error": ("MODEL_ACCESS_STOPPED" if cancel_active else
                                         "MODEL_WALL_DEADLINE_EXCEEDED" if now >= expires else "MODEL_CHILD_EXITED")}
                 if result is not None:
                     now = time.monotonic()
@@ -270,8 +285,10 @@ def run_jobs(jobs, provider, model, *, deadline, per_call_s=90., workers=2, work
                     if retry_rate_limit:
                         rate_retries.add(packet_id)
                         histories[packet_id] = {k: result[k] for k in (
-                            "error", "http_status", "limit_kind", "retry_after_seconds") if k in result}
-                        result = {**result, "rate_limit_retry_scheduled": True}
+                            "error", "http_status", "limit_kind", "retry_after_seconds",
+                            "provider_error_code", "rate_limit_headers", "retry_after_unusable") if k in result}
+                        result = {**result, "rate_limit_retry_scheduled": True,
+                                  "rate_limit_wait_seconds": max(1., delay)}
                         pending.insert(0, job)
                         # Pause all new requests, including queued unrelated jobs.
                         # Already running requests retain their ownership/deadline.
@@ -283,7 +300,11 @@ def run_jobs(jobs, provider, model, *, deadline, per_call_s=90., workers=2, work
                         results.append(result)
                     if on_result:
                         on_result(result)
-                    abort = abort or (not retry_rate_limit and result.get("error") in STOP_ERRORS)
+                    stop = not retry_rate_limit and result.get("error") in STOP_ERRORS
+                    abort = abort or stop
+                    # A rate limit prevents NEW calls; already sent siblings may
+                    # still succeed. Keep their bounded deadlines and save results.
+                    cancel_active = cancel_active or (stop and result.get("http_status") != 429)
                     pipe.close(); _stop(process); del active[pid]
             if (now >= deadline or abort) and not active:
                 for job in pending:

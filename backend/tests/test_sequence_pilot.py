@@ -1392,3 +1392,38 @@ def test_runner_splits_initial_before_sending_and_retry_reuses_each_child(tmp_pa
     assert sent==[]
     assert result['status']=='MODEL_OBSERVATIONS_RETURNED'
     assert result['retry_reused_jobs']==2
+
+
+def test_final_429_preserves_paid_running_sibling_and_stops_queue(tmp_path):
+    jobs = [{'packet_id': 'limited', 'marker': str(tmp_path/'limited'),
+             'limit_kind': 'QUOTA_EXHAUSTED'}, {'packet_id': 'sibling'},
+            {'packet_id': 'queued', 'marker': str(tmp_path/'queued')}]
+    saved = []
+    result = t.run_jobs(jobs, 'emergent', 'gpt-6-astra', deadline=time.monotonic()+10,
+                        per_call_s=4, worker=sibling_rate_limit_worker, on_result=saved.append)
+    assert result[0]['http_status'] == 429
+    assert result[1]['status'] == 'COMPLETED'
+    assert result[2]['status'] == 'NOT_SENT'
+    assert not (tmp_path/'queued').exists()
+    assert any(r['packet_id']=='sibling' and r['status']=='COMPLETED' for r in saved)
+
+
+def test_proxy_nested_error_and_safe_limit_headers():
+    import io
+    import urllib.error
+    error = urllib.error.HTTPError('https://synthetic.invalid', 429, 'synthetic', {
+        'retry-after': '60', 'x-ratelimit-limit-tokens': '10000',
+        'x-ratelimit-remaining-tokens': '0', 'x-ratelimit-reset-tokens': '1m2.5s',
+        'x-ratelimit-limit-requests': 'secret-token', 'Authorization': 'secret-token'},
+        io.BytesIO(b'{"detail":{"error":{"code":"rate_limit_exceeded","message":"secret-token"}}}'))
+    result = t.limit_diagnostics(error)
+    assert result['limit_kind'] == 'RATE_LIMITED'
+    assert result['retry_after_seconds'] == 60
+    assert result['provider_error_code'] == 'rate_limit_exceeded'
+    assert len(result['rate_limit_headers']) == 3
+    assert 'secret-token' not in json.dumps(result)
+
+
+def test_default_cooldown_is_conservative_and_bounded():
+    assert t.RATE_LIMIT_DEFAULT_WAIT_SECONDS == 30
+    assert t.MAX_RATE_LIMIT_WAIT_SECONDS == 120
