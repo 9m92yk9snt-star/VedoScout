@@ -98,6 +98,21 @@ export function roomFor(comment, fallbackSeconds) {
       if (Math.hypot(...rows[0].ballTrail[0].map((v, i) => v-release.ball[i])) > .002) return [];
       const endpoint = rows.find(s => Math.abs(s.media_ms-segment.arrival_ms) <= 2);
       if (Math.hypot(...endpoint.ballTrail[1].map((v, i) => v-arrival.ball[i])) > .002) return [];
+      if (segment.kick_reference_frames) {
+        const refs = segment.kick_reference_frames;
+        if (!Array.isArray(refs) || refs.length < 2 || refs.length > 17 || new Set(refs).size !== refs.length ||
+            refs.at(-2) !== first || refs.at(-1) !== last || !finite(raw.contact_ms) ||
+            !['SHOT', 'PASS'].includes(raw.action_type)) return [];
+        const chain = refs.map(id => raw.samples.find(s => s.frame_id === id && point(s.ball)));
+        if (chain.some(s => !s || !samples.some(x => x.frame_id === s.frame_id && x.ball)) || Math.abs(chain[0].media_ms-raw.contact_ms) > 80 ||
+            chain.at(-1).media_ms-chain[0].media_ms > 2000 ||
+            chain.some((s,i) => i > 0 && (s.ball_motion_start_ms !== chain[i-1].media_ms ||
+              s.media_ms <= chain[i-1].media_ms ||
+              (refs.length > 2 && raw.samples.some(x => x.media_ms > chain[i-1].media_ms && x.media_ms < s.media_ms))))) return [];
+        if (rows.some(s => !Array.isArray(s.kickTrail) || s.kickTrail.length !== 2 || !s.kickTrail.every(arrowPoint)) ||
+            Math.hypot(...endpoint.kickTrail[1].map((v,i)=>v-arrival.ball[i])) > .002 ||
+            Math.hypot(...rows[0].kickTrail[1].map((v,i)=>v-release.ball[i])) > .002) return [];
+      } else if (rows.some(s => s.kickTrail)) return [];
       return [{...segment, samples: rows}];
     }) : [];
   return {
@@ -197,7 +212,7 @@ export function ballAt(room, mediaMs) {
   // flash the arrow off and restart its fade at each measured endpoint.
   const incoming = (room.movingBall || []).filter(s => continuesBallDirection(s, segment));
   const fadeIn = incoming.length === 1 ? 1 : smooth((mediaMs-segment.start_ms)/fadeInMs);
-  return {...sample, opacity: fadeIn*fade};
+  return {...sample, ballTrail: sample.kickTrail || sample.ballTrail, opacity: fadeIn*fade};
 }
 
 // Clip a direction line to the visible picture, preserving its orientation.

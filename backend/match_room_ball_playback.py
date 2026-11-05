@@ -11,6 +11,42 @@ MAX_SEGMENTS = 16
 MAX_SOURCE_CACHE_BYTES = 64 * 1024 * 1024
 
 
+def kick_anchor(segments, event, observations, release, arrival, initial, destination, w, h):
+    """Carry the contact point only through consecutive, same-direction evidence."""
+    import numpy as np
+    contact = event.get('contact_ms')
+    if not isinstance(contact, (int, float)) or event.get('canonical_action_type') not in ('SHOT', 'PASS'):
+        return None, []
+    candidates = [s for s in observations if isinstance(s.get('ball'), list) and len(s['ball']) == 2
+                  and abs(s['media_ms']-contact) <= 80]
+    if not candidates:
+        return None, []
+    nearest = min(abs(s['media_ms']-contact) for s in candidates)
+    starts = [s for s in candidates if abs(s['media_ms']-contact) == nearest]
+    if len(starts) != 1:
+        return None, []
+    if release['frame_id'] == starts[0]['frame_id']:
+        return initial.copy(), [release['frame_id'], arrival['frame_id']]
+    if not segments:
+        return None, []
+    previous = segments[-1]
+    refs = previous.get('kick_reference_frames', [])
+    if (not refs or refs[-1] != release['frame_id'] or previous['arrival_ms'] != release['media_ms']
+            or previous['end_ms'] != release['media_ms'] or arrival['media_ms']-contact > 2000
+            or any(release['media_ms'] < s['media_ms'] < arrival['media_ms'] for s in observations)):
+        return None, []
+    last = previous['samples'][-1]
+    a, b = (np.array(p)*[w,h] for p in last['ballTrail'])
+    direction = destination[:2]-initial[:2]
+    if np.linalg.norm(b-initial[:2]) > .002*max(w,h):
+        return None, []
+    norm = np.linalg.norm(b-a)*np.linalg.norm(direction)
+    if norm <= 1e-9 or np.dot(b-a,direction)/norm < .7:
+        return None, []
+    origin = last['kickTrail'][0]
+    return np.array([origin[0]*w, origin[1]*h, 1.]), refs+[arrival['frame_id']]
+
+
 def build_ball_playback(video, event, observations, deadline):
     import cv2
     import numpy as np
@@ -95,6 +131,8 @@ def build_ball_playback(video, event, observations, deadline):
             inverse = np.linalg.inv(cameras[endpoint])
             initial = np.array([release['ball'][0]*w, release['ball'][1]*h, 1.])
             destination = inverse @ np.array([arrival['ball'][0]*w, arrival['ball'][1]*h, 1.])
+            kick, kick_refs = kick_anchor(segments, event, observations, release, arrival,
+                                          initial, destination, w, h)
             rows = []
             if cache_overflow:
                 ok, t, fallback = seek_with_preroll(cap, start/1000)
@@ -119,9 +157,17 @@ def build_ball_playback(video, event, observations, deadline):
                 # SVG clipping handles it; unbounded/invalid transforms do not.
                 if not all(np.isfinite(p).all() and (p >= -1).all() and (p <= 2).all() for p in trail):
                     break
+                kick_trail = None
+                if kick is not None:
+                    progress = max(0., min(1., (source[0]*1000-start)/(end-start)))
+                    tip = initial + progress*(destination-initial)
+                    kick_trail = [(camera @ p)[:2] / [w,h] for p in (kick, tip)]
+                    if not all(np.isfinite(p).all() and (p >= -1).all() and (p <= 2).all() for p in kick_trail):
+                        break
+                mask_trail = trail + (kick_trail or [])
                 height, width = pixels.shape[:2]
-                top = max(0, int((min(p[1] for p in trail)-.3)*height))
-                bottom = min(height, int((max(p[1] for p in trail)+.06)*height)+1)
+                top = max(0, int((min(p[1] for p in mask_trail)-.3)*height))
+                bottom = min(height, int((max(p[1] for p in mask_trail)+.06)*height)+1)
                 if bottom <= top:
                     break
                 instances, _ = _instances(pixels[top:bottom])
@@ -130,14 +176,14 @@ def build_ball_playback(video, event, observations, deadline):
                     break
                 ms = round(t*1000)
                 fid = f'ball-source:{ms}'
-                rows.append({'media_ms': ms, 'frame_id': fid,
+                rows.append({**({'kickTrail': [p.tolist() for p in kick_trail]} if kick_trail is not None else {}), 'media_ms': ms, 'frame_id': fid,
                              'ballTrail': [p.tolist() for p in trail],
                              'foreground': {'method': 'SOURCE_PERSON_MASK', 'media_ms': ms,
                                             'frame_id': fid, 'polygons': polygons}})
             if len(rows) != len(frames):
                 failures.append('FOREGROUND_OR_BUDGET')
                 continue
-            segments.append({'method': METHOD, 'start_ms': start, 'arrival_ms': end,
+            segments.append({**({'kick_reference_frames': kick_refs} if kick_refs else {}), 'method': METHOD, 'start_ms': start, 'arrival_ms': end,
                              'end_ms': rows[-1]['media_ms'], 'reference_frames': [release['frame_id'], arrival['frame_id']],
                              'samples': rows})
     finally:
