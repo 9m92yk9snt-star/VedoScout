@@ -123,3 +123,17 @@ def test_rate_limit_release_migration_keeps_exact_request_gate():
     for field in ('sequence_pilot.py', 'player_selection.py', 'match_room.py', 'sequence_report_adapter.py'):
         assert not retry_code_compatible(_PRE_RATE_LIMIT_CODE, {**current, field: 'changed'})
     assert not retry_code_compatible({**_PRE_RATE_LIMIT_CODE, 'sequence_pilot_transport.py': 'unknown'}, current)
+
+
+def test_failed_retry_cannot_erase_intact_completed_response():
+    import hashlib
+    from sequence_run_checkpoint import merge_retry_receipts
+    good = dict(packet_id='one', status='COMPLETED', origin='LIVE_MODEL_REQUEST',
+                provider='emergent', requested_model='gpt-6-astra', payload_sha256='old',
+                raw_response='{}', response_sha256=hashlib.sha256(b'{}').hexdigest())
+    for status in ('NOT_SENT', 'ERROR', 'INVALID_OBSERVATION_RESPONSE'):
+        assert merge_retry_receipts([good], [dict(packet_id='one', status=status)]) == [good]
+    newer = {**good, 'payload_sha256': 'new'}
+    assert merge_retry_receipts([good], [newer]) == [newer]
+    failed = dict(packet_id='one', status='ERROR')
+    assert merge_retry_receipts([{**good, 'raw_response':'damaged'}], [failed]) == [failed]

@@ -20,7 +20,7 @@ import sequence_pilot_transport as transport
 import sequence_report_adapter as adapter
 from evidence_authority import attach_clip_authority, compute_proof_frame_verified
 from report_fact_authority import assessment_prompt
-from sequence_run_checkpoint import code_fingerprint, failure_metadata, retry_code_compatible
+from sequence_run_checkpoint import code_fingerprint, failure_metadata, retry_code_compatible, merge_retry_receipts
 
 
 def enabled():
@@ -115,9 +115,8 @@ async def discover(video, anchors_document, work, *, checkpoint=None, resume=Non
             manifest["packets"] = plan["packets"]
         # Retain previous completed work even if this retry is interrupted before
         # the rebuilt runner has reached its packet. Every reuse is checked again.
-        by_id = {r["packet_id"]: r for r in (resume or {}).get("receipts", [])}
-        by_id.update({p.stem: pilot.read_json(p) for p in sorted((output / "responses").glob("*.json"))})
-        rows = [by_id[k] for k in sorted(by_id)]
+        rows = merge_retry_receipts((resume or {}).get("receipts", []),
+            [pilot.read_json(p) for p in sorted((output / "responses").glob("*.json"))])
         value = {"code_sha256": code_fingerprint(), "source_video_sha256": manifest["source_video_sha256"],
                  "original_taps_sha256": manifest["original_taps_sha256"], "receipts": rows}
         payload = json.dumps(value, sort_keys=True).encode()

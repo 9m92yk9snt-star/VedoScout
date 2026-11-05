@@ -26,6 +26,24 @@ def reusable_receipt(receipt, request, *, provider, model, packet_id):
             and hashlib.sha256(raw.encode()).hexdigest() == receipt.get("response_sha256"))
 
 
+def merge_retry_receipts(previous, current):
+    """An unsuccessful attempt must not erase an intact completed response.
+
+    Retention is not reuse: the runner still verifies the rebuilt request hash.
+    A new completed response supersedes the old one for its packet ID.
+    """
+    by_id = {r["packet_id"]: r for r in previous}
+    for row in current:
+        prior = by_id.get(row["packet_id"])
+        if prior and row.get("status") != "COMPLETED" and reusable_receipt(
+                prior, {"payload_sha256": prior.get("payload_sha256")},
+                provider=prior.get("provider"), model=prior.get("requested_model"),
+                packet_id=row["packet_id"]):
+            continue
+        by_id[row["packet_id"]] = row
+    return [by_id[k] for k in sorted(by_id)]
+
+
 SAFE_ERRORS = frozenset({
     "MODEL_ACCESS_DENIED", "MODEL_KEY_NOT_CONFIGURED", "MODEL_QUOTA_OR_RATE_LIMIT",
     "MODEL_HTTP_ERROR", "MODEL_CONNECTION_FAILED", "MODEL_CALL_TIMEOUT", "MODEL_CHILD_EXITED",
