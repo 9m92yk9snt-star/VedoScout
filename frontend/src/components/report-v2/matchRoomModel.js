@@ -259,42 +259,79 @@ function displayStance(room) {
   stanceCache.set(room,map);return map;
 }
 
-// Filter presentation only; every displayed frame retains its own fresh mask.
-// Do not borrow positions across missing/ambiguous source-frame identity.
+// Precompute display geometry per continuous source run. A weighted mean avoids
+// the staircase jumps of a sliding median. Keep the ring centred on the player,
+// so the centre follows both feet without snapping between stance anchors.
+const ellipseCache = new WeakMap();
+function displayEllipses(room) {
+  if (ellipseCache.has(room)) return ellipseCache.get(room);
+  const stamps = [...new Set(room.tracks.flatMap(r => r.map(s => s.media_ms)))].sort((a,b)=>a-b);
+  const stance = displayStance(room), map = new Map();
+  let run = [];
+  const flush = () => {
+    if (!run.length) return;
+    const geometry = run.map((s,i) => {
+      const nearby = [s];
+      for(const direction of [-1,1]) {
+        for(let j=i+direction;j>=0 && j<run.length && Math.abs(run[j].media_ms-s.media_ms)<=100;j+=direction) nearby.push(run[j]);
+      }
+      const mean = get => {
+        let sum=0, weights=0;
+        for (const r of nearby) {
+          const w=Math.exp(-.5*((r.media_ms-s.media_ms)/45)**2);
+          sum+=w*get(r); weights+=w;
+        }
+        return sum/weights;
+      };
+      const centre = r => {
+        const b=stance.get(r.media_ms);
+        return b && Math.abs((b[0]+b[1])/2-r.ground[0])<=r.player_width
+          ? (b[0]+b[1])/2 : r.ground[0];
+      };
+      const ground=[mean(centre),mean(r=>r.ground[1])];
+      const width=mean(r=>r.player_width);
+      // Average measured stance extents rather than enlarging the ring to
+      // compensate for a transient centre-offset observation.
+      const radius=mean(r=> {
+        const b=stance.get(r.media_ms);
+        return b && Math.abs((b[0]+b[1])/2-r.ground[0])<=r.player_width
+          ? Math.max(r.player_width*.8,(b[1]-b[0])/2+r.player_width*.3)
+          : r.player_width*.8;
+      });
+      return {ground,width,radius};
+    });
+    // A symmetric release envelope widens ahead of a measured long stride and
+    // contracts gradually afterwards. No temporal state depends on seeking.
+    const envelope=geometry.map(g=>g.radius);
+    for(let i=1;i<run.length;i++) {
+      const release=geometry[i].width*(run[i].media_ms-run[i-1].media_ms)/400;
+      envelope[i]=Math.max(envelope[i],envelope[i-1]-release);
+    }
+    for(let i=run.length-2;i>=0;i--) {
+      const release=geometry[i].width*(run[i+1].media_ms-run[i].media_ms)/250;
+      envelope[i]=Math.max(envelope[i],envelope[i+1]-release);
+    }
+    for(let i=0;i<run.length;i++) {
+      const g=geometry[i];
+      map.set(run[i].media_ms,{ground:g.ground,player_width:g.width,
+        ellipseGround:g.ground,ellipseRadius:envelope[i],displayFiltered:true});
+    }
+    run=[];
+  };
+  for(const t of stamps) {
+    const s=rawGraphicsAt(room,t);
+    if(!s?.sourceFrameContour || !s.ground) {flush();continue;}
+    if(run.length && t-run[run.length-1].media_ms>40) flush();
+    run.push({...s,media_ms:t});
+  }
+  flush(); ellipseCache.set(room,map); return map;
+}
+
 export function graphicsAt(room, mediaMs) {
-  const current = rawGraphicsAt(room, mediaMs);
-  if (!current?.sourceFrameContour || !current.ground) return current;
-  const stamps = [...new Set(room.tracks.flatMap(rows => rows.map(s => s.media_ms)))].sort((a,b)=>a-b);
-  const i = stamps.findIndex(t => Math.abs(t-mediaMs)<=2);
-  if (i < 0) return current;
-  const stance = displayStance(room);
-  const rows = [{...current, stance_bounds:stance.get(stamps[i])}];
-  for (const direction of [-1,1]) {
-    let last = stamps[i];
-    for (let j=i+direction; j>=0 && j<stamps.length && Math.abs(stamps[j]-stamps[i])<=50; j+=direction) {
-      if (Math.abs(stamps[j]-last)>40) break;
-      const next = rawGraphicsAt(room, stamps[j]);
-      if (!next?.sourceFrameContour || !next.ground) break;
-      rows.push({...next, stance_bounds:stance.get(stamps[j])}); last=stamps[j];
-    }
-  }
-  if(rows.length<3) return current;
-  const median = values => values.sort((a,b)=>a-b)[Math.floor(values.length/2)];
-  const ground = [0,1].map(axis=>median(rows.map(s=>s.ground[axis])));
-  const width = median(rows.map(s=>s.player_width));
-  const stanceRows = rows.filter(s => Array.isArray(s.stance_bounds) && s.stance_bounds.length === 2 &&
-    s.stance_bounds.every(x=>finite(x)&&x>=0&&x<=1) && s.stance_bounds[1]>s.stance_bounds[0] &&
-    s.stance_bounds[1]-s.stance_bounds[0]<=3*s.player_width);
-  let ellipseGround = ground, ellipseRadius = width*.7;
-  if(stanceRows.length>=3) {
-    const lo = median(stanceRows.map(s=>s.stance_bounds[0]));
-    const hi = median(stanceRows.map(s=>s.stance_bounds[1]));
-    const center = (lo+hi)/2;
-    // Leave tracking coordinates untouched; only the ground graphic adapts.
-    if(Math.abs(center-ground[0])<=width) {
-      ellipseGround = [center,ground[1]];
-      ellipseRadius = Math.max(width*.7,(hi-lo)/2+width*.15);
-    }
-  }
-  return {...current, ground, player_width:width, ellipseGround, ellipseRadius, displayFiltered:true};
+  const current=rawGraphicsAt(room,mediaMs);
+  if(!current?.sourceFrameContour || !current.ground) return current;
+  const map=displayEllipses(room);
+  const time=[...map.keys()].find(t=>Math.abs(t-mediaMs)<=2);
+  // The source observation and its exact foreground mask remain untouched.
+  return time===undefined ? current : {...current,...map.get(time)};
 }
