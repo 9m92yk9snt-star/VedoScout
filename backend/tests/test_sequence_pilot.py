@@ -623,7 +623,7 @@ def test_transport_persists_result_before_returning_the_batch():
 
 
 @pytest.mark.parametrize("change,expected_sent", [
-    (None, ["second"]), ("request", ["first", "second"]),
+    (None, ["second"]), ("legacy_code", ["second"]), ("request", ["first", "second"]),
     ("response", ["first", "second"]), ("model", ["first", "second"]),
     ("status", ["first", "second"]), ("invalid_json", ["first", "second"]),
 ])
@@ -660,6 +660,9 @@ def test_retry_only_sends_unfinished_or_changed_exact_requests(tmp_path, monkeyp
         first["response_sha256"] = hashlib.sha256(b"not JSON").hexdigest()
     retry = {"code_sha256": code_fingerprint(), "source_video_sha256": manifest["source_video_sha256"],
              "original_taps_sha256": "selections", "receipts": [first]}
+    if change == "legacy_code":
+        from sequence_run_checkpoint import _PRE_SPLIT_CODE
+        retry["code_sha256"] = _PRE_SPLIT_CODE
     retry_path = tmp_path / "retry.json"; p.write_json(retry_path, retry)
     sent = []
     def send(jobs, *a, on_result, **kw):
@@ -673,8 +676,8 @@ def test_retry_only_sends_unfinished_or_changed_exact_requests(tmp_path, monkeyp
                  retry_receipts=retry_path)
     assert sent == expected_sent
     assert result["status"] == "MODEL_OBSERVATIONS_RETURNED"
-    assert result["retry_reused_packet_ids"] == (["first"] if change is None else [])
-    assert result["fresh_end_to_end_run"] is (change is not None)
+    assert result["retry_reused_packet_ids"] == (["first"] if change in (None, "legacy_code") else [])
+    assert result["fresh_end_to_end_run"] is (change not in (None, "legacy_code"))
     for name in ("first", "second"):
         assert p.read_json(tmp_path / "result/responses" / (name + ".json"))["status"] == "COMPLETED"
 
@@ -957,7 +960,7 @@ def test_changed_source_checksum_stops_before_sampling(tmp_path):
         p.prepare(root, tmp_path / "prepared")
 
 
-def test_oversized_packet_does_not_prevent_other_packet_from_running(tmp_path, monkeypatch):
+def test_irreducible_oversized_packet_stops_before_paid_work(tmp_path, monkeypatch):
     root = source_export(tmp_path)
     manifest = p.prepare(root, tmp_path / "prepared")
     second = deepcopy(manifest["packets"][0]); second["packet_id"] = "second"
@@ -966,9 +969,7 @@ def test_oversized_packet_does_not_prevent_other_packet_from_running(tmp_path, m
     original, attempts, executed = t.build_request, [], []
     def preflight(*args, **kwargs):
         attempts.append(True)
-        if len(attempts) == 1:
-            raise ValueError("REQUEST_IMAGE_BUDGET_EXCEEDED")
-        return original(*args, **kwargs)
+        raise ValueError("REQUEST_IMAGE_BUDGET_EXCEEDED")
     def jobs(rows, *args, **kwargs):
         executed.extend(r["packet_id"] for r in rows)
         return [{"packet_id": r["packet_id"], "status": "COMPLETED", "raw_response": '{"plays":[]}',
@@ -978,9 +979,9 @@ def test_oversized_packet_does_not_prevent_other_packet_from_running(tmp_path, m
     monkeypatch.setattr(t, "build_request", preflight)
     monkeypatch.setattr(t, "run_jobs", jobs)
     result = run(tmp_path / "prepared" / "manifest.json", tmp_path / "result", max_followups=0)
-    assert executed == ["second"]
+    assert executed == []
     assert result["status"] == "PARTIAL_MODEL_RUN"
-    assert result["model_jobs_completed"] == 1
+    assert result["model_jobs_completed"] == 0
     assert result["model_jobs"][0]["error"] == "REQUEST_IMAGE_BUDGET_EXCEEDED"
 
 
@@ -1344,3 +1345,50 @@ def test_runner_preserves_initial_observations_if_targeted_preparation_fails(tmp
     assert result["error_code"] == "DETAIL_PREPARATION_TIME_BUDGET_EXHAUSTED"
     assert len(result["events"]) == 1 and result["counts"] == {}
     assert result["independent_visual_correctness_verified"] is False
+
+
+
+def test_runner_splits_initial_before_sending_and_retry_reuses_each_child(tmp_path, monkeypatch):
+    from scripts import run_sequence_pilot as runner
+    from sequence_run_checkpoint import code_fingerprint
+    manifest,packet,_=fixture()
+    source=tmp_path/'source.bin';source.write_bytes(b'synthetic source')
+    manifest.update(source_video=str(source),source_video_sha256=p.digest(source),original_taps_sha256='taps',
+                    references=[{'reference_id':'r1'}])
+    path=tmp_path/'manifest.json';p.write_json(path,manifest)
+    monkeypatch.setenv('EMERGENT_LLM_KEY','SYNTHETIC_NO_NETWORK')
+    monkeypatch.setattr(p,'packet_items',lambda m,j:[{'type':'text','text':json.dumps(j)}])
+    monkeypatch.setattr(runner,'original_spatial_items',lambda *a:([],[]))
+    monkeypatch.setattr(p,'plan_contact_reviews',lambda *a,**k:[])
+    monkeypatch.setattr(p,'plan_outcome_reviews',lambda *a,**k:[])
+    original=t.build_request
+    def preflight(provider,model,items,**kwargs):
+        packet=json.loads(items[0]['text'])
+        if len(packet['frame_ids'])>12: raise ValueError('REQUEST_IMAGE_BUDGET_EXCEEDED')
+        return original(provider,model,items,**kwargs)
+    monkeypatch.setattr(t,'build_request',preflight)
+    sent=[]
+    def send(jobs,provider,model,**kw):
+        result=[]
+        for job in jobs:
+            sent.append(job['packet_id'])
+            audit=preflight(provider,model,job['items'],reasoning_effort=job['reasoning_effort'],image_detail=job['image_detail'])[2]
+            raw='{"plays":[]}'
+            result.append({**audit,'packet_id':job['packet_id'],'provider':provider,'requested_model':model,
+                'status':'COMPLETED','origin':'LIVE_MODEL_REQUEST','raw_response':raw,
+                'response_sha256':hashlib.sha256(raw.encode()).hexdigest()})
+        return result
+    monkeypatch.setattr(t,'run_jobs',send)
+    opts=dict(provider='emergent',fresh_originals=True,contact_reviews=True,automatic_outcomes=True,max_followups=0)
+    result=run(path,tmp_path/'first',**opts)
+    assert result['status']=='MODEL_OBSERVATIONS_RETURNED'
+    assert len(sent)==2 and 'first' not in sent
+    plan=p.read_json(tmp_path/'first/initial-packets.json')
+    assert set().union(*(set(j['frame_ids']) for j in plan['packets']))==set(packet['frame_ids'])
+    retry={'code_sha256':code_fingerprint(),'source_video_sha256':manifest['source_video_sha256'],
+           'original_taps_sha256':'taps','receipts':[p.read_json(f) for f in (tmp_path/'first/responses').glob('*.json')]}
+    p.write_json(tmp_path/'retry.json',retry);sent.clear()
+    result=run(path,tmp_path/'retry',retry_receipts=tmp_path/'retry.json',**opts)
+    assert sent==[]
+    assert result['status']=='MODEL_OBSERVATIONS_RETURNED'
+    assert result['retry_reused_jobs']==2

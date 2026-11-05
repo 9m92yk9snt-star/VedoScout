@@ -20,7 +20,7 @@ import sequence_pilot_transport as transport
 import sequence_report_adapter as adapter
 from evidence_authority import attach_clip_authority, compute_proof_frame_verified
 from report_fact_authority import assessment_prompt
-from sequence_run_checkpoint import code_fingerprint, failure_metadata
+from sequence_run_checkpoint import code_fingerprint, failure_metadata, retry_code_compatible
 
 
 def enabled():
@@ -108,6 +108,11 @@ async def discover(video, anchors_document, work, *, checkpoint=None, resume=Non
         if not checkpoint or not (prepared / "manifest.json").exists():
             return
         manifest = pilot.read_json(prepared / "manifest.json")
+        if (output / "initial-packets.json").exists():
+            plan = pilot.read_json(output / "initial-packets.json")
+            if plan["source_video_sha256"] != manifest["source_video_sha256"]:
+                raise ValueError("SOURCE_VIDEO_CHANGED")
+            manifest["packets"] = plan["packets"]
         # Retain previous completed work even if this retry is interrupted before
         # the rebuilt runner has reached its packet. Every reuse is checked again.
         by_id = {r["packet_id"]: r for r in (resume or {}).get("receipts", [])}
@@ -154,6 +159,11 @@ async def discover(video, anchors_document, work, *, checkpoint=None, resume=Non
         await persist_progress()
     result = pilot.read_json(output / "result.json")
     manifest = pilot.read_json(prepared / "manifest.json")
+    if (output / "initial-packets.json").exists():
+        plan = pilot.read_json(output / "initial-packets.json")
+        if plan["source_video_sha256"] != manifest["source_video_sha256"]:
+            raise ValueError("SOURCE_VIDEO_CHANGED")
+        manifest["packets"] = plan["packets"]
     frames = {f["frame_id"]: f for f in manifest["frames"]}
     for path in sorted(output.rglob("contact-review-manifest.json")):
         review = pilot.read_json(path)
@@ -271,7 +281,7 @@ def retained_retry(doc, source, selection_sha):
             and doc.get("id") and retry.get("report_id") == doc["id"]
             and retry.get("source_video_sha256") == source
             and retry.get("original_selection_values_sha256") == selection_sha
-            and retry.get("code_sha256") == code_fingerprint()):
+            and retry_code_compatible(retry.get("code_sha256"))):
         return deepcopy(retry)
     return None
 

@@ -18,7 +18,7 @@ import time
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import sequence_pilot as pilot
 import sequence_pilot_transport as transport
-from sequence_run_checkpoint import code_fingerprint, reusable_receipt
+from sequence_run_checkpoint import code_fingerprint, reusable_receipt, retry_code_compatible
 
 FRESH_IDENTITY_INSTRUCTION = "Read all original selections afresh; no inferred appearance profile or past action answer is supplied. A local original point locates the intended physical player at that instant. Connect identity by readable numbers and continuous movement, not guessed facial hair or shadow. At every candidate release distinguish that person's body/boot movement from nearby players. Compare before and after occlusion. A separate teammate can finish first time: the receiving and striking contact may be the same action. Do not invent an extra settled touch or conflate the releaser with the receiver. Keep opposing brushes distinct from controlled possession. If contacts or actors remain ambiguous, retain a specific question. Return the actual result, including unsuccessful actions. No expected answers or target count is supplied."
 
@@ -39,6 +39,44 @@ def original_spatial_items(manifest, packet, output):
     lo,hi=packet.get("core_start_ms",packet["start_ms"]),packet.get("core_end_ms",packet["end_ms"]+1)
     local=[r for r in manifest["references"] if lo <= r["media_ms"] < hi]
     return spatial_reference_items(manifest,{**packet,"core_start_ms":lo,"core_end_ms":hi},local,output)
+
+
+def bounded_initial_packets(packet, manifest, fits, *, max_parts=4):
+    """Split oversized initial timelines, preserving pixels/taps and 1s overlap.
+
+    Fitting packets keep their original ID and bytes for exact receipt reuse.
+    Each child is checked against the actual encoded wire limit. No frame is
+    dropped and no resolution, JPEG quality, model or byte cap is changed.
+    """
+    if fits(packet):
+        return [packet]
+    frames = {f["frame_id"]: f for f in manifest["frames"]}
+    pending, finished = [packet], []
+    while pending:
+        part = pending.pop(0)
+        times = sorted({frames[i]["media_ms"] for i in part["frame_ids"]})
+        if len(times) < 2 or len(finished) + len(pending) + 2 > max_parts:
+            raise ValueError("REQUEST_IMAGE_BUDGET_EXCEEDED")
+        middle = times[len(times)//2]
+        left = [i for i in part["frame_ids"] if frames[i]["media_ms"] <= middle+500]
+        right = [i for i in part["frame_ids"] if frames[i]["media_ms"] >= middle-500]
+        if len(left) == len(part["frame_ids"]) or len(right) == len(part["frame_ids"]):
+            raise ValueError("REQUEST_IMAGE_BUDGET_EXCEEDED")
+        for suffix, ids, lo, hi in (
+                ("a", left, part.get("core_start_ms",part["start_ms"]), middle),
+                ("b", right, middle, part.get("core_end_ms",part["end_ms"]+1))):
+            child = {**part, "packet_id": part["packet_id"]+"_"+suffix,
+                     "initial_parent_packet_id": packet["packet_id"], "frame_ids": ids,
+                     "start_ms": min(frames[i]["media_ms"] for i in ids),
+                     "end_ms": max(frames[i]["media_ms"] for i in ids),
+                     "core_start_ms": lo, "core_end_ms": hi}
+            if fits(child):
+                finished.append(child)
+            else:
+                pending.append(child)
+    finished.sort(key=lambda p: (p["start_ms"],p["packet_id"]))
+    assert set().union(*(set(p["frame_ids"]) for p in finished)) == set(packet["frame_ids"])
+    return finished
 
 
 def bounded_detail_packets(packet, manifest, overview_ids, fits):
@@ -127,7 +165,7 @@ def run(manifest_path, output_dir, *, provider="gemini", model="gemini-2.5-pro",
         raise ValueError("SOURCE_VIDEO_CHANGED")
     deadline, resolved_results, receipts = started + budget_s, [], []
     saved_retry = pilot.read_json(retry_receipts) if retry_receipts else {}
-    if saved_retry and (saved_retry.get("code_sha256") != summary["code_sha256"]
+    if saved_retry and (not retry_code_compatible(saved_retry.get("code_sha256"), summary["code_sha256"])
             or saved_retry.get("source_video_sha256") != manifest["source_video_sha256"]
             or saved_retry.get("original_taps_sha256") != manifest["original_taps_sha256"]):
         raise ValueError("INITIAL_RECEIPT_INPUT_MISMATCH")
@@ -156,7 +194,12 @@ def run(manifest_path, output_dir, *, provider="gemini", model="gemini-2.5-pro",
         expanded = []
         for packet in packets:
             if packet.get("phase") != "FOLLOWUP":
-                expanded.append(packet)
+                try:
+                    expanded.extend(bounded_initial_packets(packet, current_manifest, fits))
+                except ValueError as exc:
+                    if str(exc) != "REQUEST_IMAGE_BUDGET_EXCEEDED":
+                        raise
+                    expanded.append(packet)
                 continue
             try:
                 expanded.extend(bounded_detail_packets(packet, current_manifest,
@@ -166,7 +209,15 @@ def run(manifest_path, output_dir, *, provider="gemini", model="gemini-2.5-pro",
                     raise
                 # Retain the normal NOT_SENT receipt without blocking other jobs.
                 expanded.append(packet)
+        if packets is manifest["packets"] and len(expanded) > max_initial:
+            raise ValueError("REQUEST_IMAGE_BUDGET_EXCEEDED")
         packets[:] = expanded
+        if packets is manifest["packets"]:
+            pilot.write_json(out / "initial-packets.json", {
+                "source_video_sha256": manifest["source_video_sha256"], "packets": packets})
+        summary.setdefault("initial_window_plan", []).extend(
+            {k: p[k] for k in ("packet_id", "initial_parent_packet_id", "frame_ids", "start_ms", "end_ms")}
+            for p in packets if p.get("initial_parent_packet_id"))
         summary.setdefault("detail_window_plan", []).extend({k: packet[k] for k in
             ("packet_id", "detail_parent_packet_id", "frame_ids", "detail_frame_ids", "start_ms", "end_ms")}
             for packet in packets if packet.get("detail_parent_packet_id"))
@@ -219,6 +270,9 @@ def run(manifest_path, output_dir, *, provider="gemini", model="gemini-2.5-pro",
             pilot.write_json(out / "responses" / (receipt["packet_id"] + ".json"), receipt)
         for receipt in reused:
             save_receipt(receipt)
+        if any(r.get("status") == "NOT_SENT" and r.get("error") == "REQUEST_IMAGE_BUDGET_EXCEEDED"
+               and r.get("packet_id") in {p["packet_id"] for p in packets} for r in receipts):
+            jobs = []
         responses = reused + (transport.run_jobs(jobs, provider, model, deadline=deadline,
                                                 per_call_s=per_call_s if call_seconds is None else call_seconds,
                                                 on_result=save_receipt) if jobs else [])
