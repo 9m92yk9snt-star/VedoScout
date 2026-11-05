@@ -233,6 +233,32 @@ export function clipArrowToFrame(trail) {
   return lo < hi ? [lo, hi].map(t => a.map((v, i) => v+t*d[i])) : null;
 }
 
+const stanceCache = new WeakMap();
+function displayStance(room) {
+  if(stanceCache.has(room)) return stanceCache.get(room);
+  const times=[...new Set(room.tracks.flatMap(r=>r.map(s=>s.media_ms)))].sort((a,b)=>a-b);
+  const rows=times.map(t=>rawGraphicsAt(room,t));
+  const valid=s=>s?.sourceFrameContour && s.ground && Array.isArray(s.stance_bounds) && s.stance_bounds.length===2 &&
+    s.stance_bounds.every(x=>finite(x)&&x>=0&&x<=1) && s.stance_bounds[1]>s.stance_bounds[0] && s.stance_bounds[1]-s.stance_bounds[0]<=3*s.player_width;
+  const map=new Map();let previous=-1;
+  for(let i=0;i<rows.length;i++) {
+    if(!rows[i]?.sourceFrameContour || !rows[i].ground || (i&&times[i]-times[i-1]>40)) previous=-1;
+    if(!valid(rows[i])) continue;
+    map.set(times[i],rows[i].stance_bounds);
+    if(previous>=0 && times[i]-times[previous]<=800) {
+      const a=rows[previous],b=rows[i];
+      for(let j=previous+1;j<i;j++) {
+        const r=rows[j],u=(times[j]-times[previous])/(times[i]-times[previous]);
+        // Presentation estimate in player-relative coordinates; never a new
+        // foot observation, and never across an unknown identity/source gap.
+        map.set(times[j],[0,1].map(k=>r.ground[0]+r.player_width*((1-u)*(a.stance_bounds[k]-a.ground[0])/a.player_width+u*(b.stance_bounds[k]-b.ground[0])/b.player_width)));
+      }
+    }
+    previous=i;
+  }
+  stanceCache.set(room,map);return map;
+}
+
 // Filter presentation only; every displayed frame retains its own fresh mask.
 // Do not borrow positions across missing/ambiguous source-frame identity.
 export function graphicsAt(room, mediaMs) {
@@ -241,18 +267,34 @@ export function graphicsAt(room, mediaMs) {
   const stamps = [...new Set(room.tracks.flatMap(rows => rows.map(s => s.media_ms)))].sort((a,b)=>a-b);
   const i = stamps.findIndex(t => Math.abs(t-mediaMs)<=2);
   if (i < 0) return current;
-  const rows = [current];
+  const stance = displayStance(room);
+  const rows = [{...current, stance_bounds:stance.get(stamps[i])}];
   for (const direction of [-1,1]) {
     let last = stamps[i];
     for (let j=i+direction; j>=0 && j<stamps.length && Math.abs(stamps[j]-stamps[i])<=50; j+=direction) {
       if (Math.abs(stamps[j]-last)>40) break;
       const next = rawGraphicsAt(room, stamps[j]);
       if (!next?.sourceFrameContour || !next.ground) break;
-      rows.push(next); last=stamps[j];
+      rows.push({...next, stance_bounds:stance.get(stamps[j])}); last=stamps[j];
     }
   }
   if(rows.length<3) return current;
   const median = values => values.sort((a,b)=>a-b)[Math.floor(values.length/2)];
-  return {...current, ground:[0,1].map(axis=>median(rows.map(s=>s.ground[axis]))),
-    player_width:median(rows.map(s=>s.player_width)), displayFiltered:true};
+  const ground = [0,1].map(axis=>median(rows.map(s=>s.ground[axis])));
+  const width = median(rows.map(s=>s.player_width));
+  const stanceRows = rows.filter(s => Array.isArray(s.stance_bounds) && s.stance_bounds.length === 2 &&
+    s.stance_bounds.every(x=>finite(x)&&x>=0&&x<=1) && s.stance_bounds[1]>s.stance_bounds[0] &&
+    s.stance_bounds[1]-s.stance_bounds[0]<=3*s.player_width);
+  let ellipseGround = ground, ellipseRadius = width*.7;
+  if(stanceRows.length>=3) {
+    const lo = median(stanceRows.map(s=>s.stance_bounds[0]));
+    const hi = median(stanceRows.map(s=>s.stance_bounds[1]));
+    const center = (lo+hi)/2;
+    // Leave tracking coordinates untouched; only the ground graphic adapts.
+    if(Math.abs(center-ground[0])<=width) {
+      ellipseGround = [center,ground[1]];
+      ellipseRadius = Math.max(width*.7,(hi-lo)/2+width*.15);
+    }
+  }
+  return {...current, ground, player_width:width, ellipseGround, ellipseRadius, displayFiltered:true};
 }

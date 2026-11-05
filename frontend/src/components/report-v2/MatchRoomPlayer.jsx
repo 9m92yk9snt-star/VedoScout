@@ -187,8 +187,8 @@ export function MatchRoomPlayer({
         </defs>
         <g mask={depth ? `url(#people-${id})` : undefined}>
           {mark?.ground && <g data-testid="match-room-player-marker" data-display-estimated={mark.display_estimated === true ? "true" : "false"} data-source-ms={mark.foreground?.media_ms}>
-            <ellipse cx={mark.ground[0] * 1000} cy={Math.min(1, mark.ground[1]) * yScale} rx={mark.player_width * 850} ry={mark.player_width * 170} fill={`url(#ground-${id})`} />
-            <ellipse cx={mark.ground[0] * 1000} cy={Math.min(1, mark.ground[1]) * yScale} rx={mark.player_width * 700} ry={mark.player_width * 135} fill="#62ed7b" fillOpacity=".18" stroke="#91ffa3" strokeOpacity=".92" strokeWidth="2" vectorEffect="non-scaling-stroke" />
+            <ellipse cx={(mark.ellipseGround || mark.ground)[0] * 1000} cy={Math.min(1, mark.ground[1]) * yScale} rx={(mark.ellipseRadius ?? mark.player_width * .7) * 1000 * (850/700)} ry={mark.player_width * 170} fill={`url(#ground-${id})`} />
+            <ellipse cx={(mark.ellipseGround || mark.ground)[0] * 1000} cy={Math.min(1, mark.ground[1]) * yScale} rx={(mark.ellipseRadius ?? mark.player_width * .7) * 1000} ry={mark.player_width * 135} fill="#62ed7b" fillOpacity=".18" stroke="#91ffa3" strokeOpacity=".92" strokeWidth="2" vectorEffect="non-scaling-stroke" />
           </g>}
         </g>
         {arrow && <g data-testid="match-room-ball-arrow" data-source-ms={arrow.media_ms} mask={`url(#ball-people-${id})`} opacity={arrow.opacity}>
