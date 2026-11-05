@@ -345,10 +345,11 @@ def compute(video, anchors, events, checkpoint=None):
         from match_room_ball_playback import build_ball_playback
         if explicit:
             # Preserve measured kick direction before optional dense contours
-            # can consume the event's shared wall-clock allowance.
+            # can consume the event's shared wall-clock allowance. Allow masks
+            # enough time on one CPU; the overall child deadline is unchanged.
             try:
                 result['ball_playback'], result['ball_playback_diagnostics'] = build_ball_playback(
-                    video, event, result['observed_samples'], min(deadline, time.monotonic()+8))
+                    video, event, result['observed_samples'], min(deadline, time.monotonic()+12))
             except (ImportError, OSError, ValueError, cv2.error):
                 result['ball_playback_diagnostics'] = {'status': 'UNAVAILABLE'}
             save()
