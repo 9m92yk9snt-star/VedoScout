@@ -1,0 +1,127 @@
+[
+  {
+    "mask_details": [
+      {
+        "same_box": true,
+        "changed_mask_pixels": 0,
+        "mask_pixels": 7615
+      },
+      {
+        "same_box": true,
+        "changed_mask_pixels": 0,
+        "mask_pixels": 12466
+      },
+      {
+        "same_box": true,
+        "changed_mask_pixels": 1,
+        "mask_pixels": 15290
+      },
+      {
+        "same_box": true,
+        "changed_mask_pixels": 0,
+        "mask_pixels": 6332
+      },
+      {
+        "same_box": true,
+        "changed_mask_pixels": 0,
+        "mask_pixels": 10256
+      },
+      {
+        "same_box": true,
+        "changed_mask_pixels": 0,
+        "mask_pixels": 1533
+      }
+    ],
+    "ms": 11750,
+    "seconds": {
+      "opencv": 1.6815303609982948,
+      "onnxruntime": 1.1087742629970307
+    },
+    "identical_masks_boxes": false
+  },
+  {
+    "mask_details": [
+      {
+        "same_box": true,
+        "changed_mask_pixels": 1,
+        "mask_pixels": 7178
+      },
+      {
+        "same_box": true,
+        "changed_mask_pixels": 0,
+        "mask_pixels": 12190
+      },
+      {
+        "same_box": true,
+        "changed_mask_pixels": 0,
+        "mask_pixels": 12756
+      },
+      {
+        "same_box": true,
+        "changed_mask_pixels": 0,
+        "mask_pixels": 6566
+      },
+      {
+        "same_box": true,
+        "changed_mask_pixels": 0,
+        "mask_pixels": 9630
+      },
+      {
+        "same_box": true,
+        "changed_mask_pixels": 0,
+        "mask_pixels": 1494
+      },
+      {
+        "same_box": true,
+        "changed_mask_pixels": 0,
+        "mask_pixels": 1705
+      }
+    ],
+    "ms": 11766,
+    "seconds": {
+      "opencv": 1.6039751829994202,
+      "onnxruntime": 1.2339398529984464
+    },
+    "identical_masks_boxes": false
+  },
+  {
+    "mask_details": [
+      {
+        "same_box": true,
+        "changed_mask_pixels": 0,
+        "mask_pixels": 13432
+      },
+      {
+        "same_box": true,
+        "changed_mask_pixels": 0,
+        "mask_pixels": 7306
+      },
+      {
+        "same_box": true,
+        "changed_mask_pixels": 0,
+        "mask_pixels": 11983
+      },
+      {
+        "same_box": true,
+        "changed_mask_pixels": 0,
+        "mask_pixels": 6770
+      },
+      {
+        "same_box": true,
+        "changed_mask_pixels": 0,
+        "mask_pixels": 10324
+      },
+      {
+        "same_box": true,
+        "changed_mask_pixels": 0,
+        "mask_pixels": 1843
+      }
+    ],
+    "ms": 11783,
+    "seconds": {
+      "opencv": 1.6134168070020678,
+      "onnxruntime": 1.187611867000669
+    },
+    "identical_masks_boxes": true
+  }
+]

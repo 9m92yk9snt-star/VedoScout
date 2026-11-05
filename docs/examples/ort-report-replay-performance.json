@@ -1,0 +1,174 @@
+{
+  "base_commit": "46fdc01136db7237ea63b2b1060de7333e60fdee",
+  "experiment": "preparation batches plus ONNX Runtime, same pinned weights",
+  "ort_version": "1.31.1",
+  "cpu_affinity": [
+    0
+  ],
+  "wall_seconds": 607.5782358389988,
+  "cpu_seconds": 608.448239,
+  "peak_process_tree_rss_bytes": null,
+  "ram_limit_enforced": false,
+  "opencv_version": "4.13.0",
+  "numpy_version": "2.4.6",
+  "new_paid_requests_allowed": 0,
+  "error": null,
+  "stages": [
+    {
+      "stage": "load_retained_analysis",
+      "wall_seconds": 0.029,
+      "cpu_seconds": 0.076
+    },
+    {
+      "stage": "reconstruct_fixture",
+      "wall_seconds": 0.039,
+      "cpu_seconds": 0.039
+    },
+    {
+      "stage": "prepare_position_packet",
+      "wall_seconds": 10.033,
+      "cpu_seconds": 10.031
+    },
+    {
+      "stage": "prepare_position_packet",
+      "wall_seconds": 5.022,
+      "cpu_seconds": 5.021
+    },
+    {
+      "stage": "prepare_position_packet",
+      "wall_seconds": 2.652,
+      "cpu_seconds": 2.649
+    },
+    {
+      "stage": "prepare_position_packet",
+      "wall_seconds": 3.948,
+      "cpu_seconds": 3.949
+    },
+    {
+      "stage": "prepare_position_packet",
+      "wall_seconds": 1.553,
+      "cpu_seconds": 1.553
+    },
+    {
+      "stage": "prepare_position_packet",
+      "wall_seconds": 2.085,
+      "cpu_seconds": 2.089
+    },
+    {
+      "stage": "prepare_position_packet",
+      "wall_seconds": 3.751,
+      "cpu_seconds": 3.754
+    },
+    {
+      "stage": "prepare_position_packet",
+      "wall_seconds": 2.298,
+      "cpu_seconds": 2.298
+    },
+    {
+      "stage": "localization_receipt_reuse",
+      "wall_seconds": 31.4,
+      "cpu_seconds": 31.401
+    },
+    {
+      "stage": "tracking_event",
+      "wall_seconds": 23.98,
+      "cpu_seconds": 23.952,
+      "event_id": "9e9a8a68c1772db2614f",
+      "refinement": false,
+      "status": "COMPLETED"
+    },
+    {
+      "stage": "tracking_event",
+      "wall_seconds": 26.504,
+      "cpu_seconds": 26.481,
+      "event_id": "dc2acb1e19ba55950e7f",
+      "refinement": false,
+      "status": "COMPLETED"
+    },
+    {
+      "stage": "tracking_event",
+      "wall_seconds": 26.325,
+      "cpu_seconds": 26.308,
+      "event_id": "a512ae64e102f24b3383",
+      "refinement": false,
+      "status": "COMPLETED"
+    },
+    {
+      "stage": "tracking_event",
+      "wall_seconds": 31.384,
+      "cpu_seconds": 31.348,
+      "event_id": "ec74209ace700fa49d2e",
+      "refinement": false,
+      "status": "COMPLETED"
+    },
+    {
+      "stage": "tracking_event",
+      "wall_seconds": 17.175,
+      "cpu_seconds": 17.134,
+      "event_id": "9a392fb19c052dfe6719",
+      "refinement": false,
+      "status": "COMPLETED"
+    },
+    {
+      "stage": "tracking_event",
+      "wall_seconds": 31.99,
+      "cpu_seconds": 31.937,
+      "event_id": "88aa8bbdedbec570d4de",
+      "refinement": false,
+      "status": "COMPLETED"
+    },
+    {
+      "stage": "tracking_event",
+      "wall_seconds": 20.877,
+      "cpu_seconds": 20.833,
+      "event_id": "1349b8676c1e07e88c00",
+      "refinement": false,
+      "status": "COMPLETED"
+    },
+    {
+      "stage": "tracking_event",
+      "wall_seconds": 31.482,
+      "cpu_seconds": 31.429,
+      "event_id": "a8b5662ae46646b8f0ae",
+      "refinement": false,
+      "status": "COMPLETED"
+    },
+    {
+      "stage": "tracking_event",
+      "wall_seconds": 102.484,
+      "cpu_seconds": 102.464,
+      "event_id": "a8b5662ae46646b8f0ae",
+      "refinement": "medium",
+      "status": "COMPLETED"
+    },
+    {
+      "stage": "tracking_event",
+      "wall_seconds": 19.991,
+      "cpu_seconds": 19.983,
+      "event_id": "ec74209ace700fa49d2e",
+      "refinement": "medium",
+      "status": "COMPLETED"
+    },
+    {
+      "stage": "tracking_event",
+      "wall_seconds": 206.963,
+      "cpu_seconds": 206.892,
+      "event_id": "88aa8bbdedbec570d4de",
+      "refinement": "medium",
+      "status": "COMPLETED"
+    },
+    {
+      "stage": "tracking_total",
+      "wall_seconds": 539.162,
+      "cpu_seconds": 538.764
+    },
+    {
+      "stage": "render_assets_including_tracking",
+      "wall_seconds": 573.587,
+      "cpu_seconds": 572.991
+    }
+  ],
+  "samples": [],
+  "memory_measurement_valid": false,
+  "memory_measurement_note": "psutil monitor failed with NoSuchProcess; zero is not a measurement"
+}

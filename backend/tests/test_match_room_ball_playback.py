@@ -15,7 +15,11 @@ def fixture(monkeypatch):
         def release(self): pass
     cap = Capture()
     monkeypatch.setattr(cv2, 'VideoCapture', lambda _: cap)
-    monkeypatch.setattr(player_tracking, '_read_window', lambda *a, **k: frames)
+    def read(*a, **k):
+        for row, image in zip(frames, images):
+            k['on_frame'](row[0], image)
+        return frames
+    monkeypatch.setattr(player_tracking, '_read_window', read)
     monkeypatch.setattr(player_tracking, '_cut_flags', lambda _: [False]*3)
     monkeypatch.setattr(motion_compensation, 'estimate_camera', lambda *a: (np.array([[1., 0, 10], [0, 1, 0]]), 20))
     monkeypatch.setattr(video_timebase, 'seek_with_preroll', lambda *a: (True, 1., False))
@@ -119,3 +123,12 @@ def test_encoded_clip_preserves_source_frame_times_including_vfr_gaps(tmp_path, 
     assert np.max(np.abs(encoded-expected)) < 1
     assert np.max(np.diff(encoded)) > 60  # absent frames were not duplicated
     assert row['tele_clip_timebase'] == 'SOURCE_PTS_ALIGNED'
+
+
+def test_source_cache_limit_preserves_original_streaming_fallback(monkeypatch):
+    event, observations, calls = fixture(monkeypatch)
+    monkeypatch.setattr(playback, 'MAX_SOURCE_CACHE_BYTES', 1)
+    sequences, diagnostic = playback.build_ball_playback('video', event, observations, time.monotonic()+10)
+    assert calls == [0, 1, 2]
+    assert len(sequences[0]['samples']) == 3
+    assert not diagnostic['failures']

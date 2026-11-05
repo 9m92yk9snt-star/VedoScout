@@ -28,7 +28,8 @@ class PersonSegmenter:
         self.sha256 = None
         ensure_model_asset(MODEL_PATH, MODEL_SHA256)
         self.sha256 = MODEL_SHA256
-        self.net = cv2.dnn.readNetFromONNX(str(MODEL_PATH))
+        from match_room_inference import load_cpu_net
+        self.net = load_cpu_net(MODEL_PATH)
         self.net.setPreferableBackend(cv2.dnn.DNN_BACKEND_OPENCV)
         self.net.setPreferableTarget(cv2.dnn.DNN_TARGET_CPU)
 

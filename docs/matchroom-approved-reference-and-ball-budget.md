@@ -1,0 +1,11 @@
+# Approved Match Room reference and ball gap diagnosis
+
+Reference: MatchRoom_ellipse_og_boldpil.mp4, Library libfile_55b427c205708191918a156118d1109b. Materialized file SHA256 7deada81864f36e5ab326c416c4e9808dadfb363775114cf6e28e63fb3fa2485 matches docs/matchroom-combined-validation.json exactly. Source fixture SHA256 a659197551270a396fa5754239066c176fbacf2d5af400e63eea876ebfe06082. The fixture explicitly uses the production React/SVG renderer, not an unrelated replacement design. Extracted source-time frames and the full contact sheet were inspected; this is not a completed continuous-playback comparison with the new report.
+
+Preserve the existing green ground ellipse and pale-yellow direction arrow, foreground-person occlusion, camera correction, same-player recovery and uncertainty barriers. The arrow connects documented ball endpoints in the camera view; it is not an assertion that every intermediate ball position was measured. The historical preview includes its intended fade after reception. No universal lifetime/timing may be inferred for another action.
+
+New diagnostic: replayed only build_ball_playback on the latest ORT report's existing shot observations with 30s diagnostic allowance instead of its normal 8s. Same source, same pinned model and data, unchanged drawing. Completed in 7.870s with no failure diagnostics; five intervals ending 30949, 31015, 31065, 31149, 31249ms. Production function normally checks deadline-1, effectively reserving the final second. Normal full run had four intervals and FOREGROUND_OR_BUDGET, ending31149ms.
+
+A diagnostic composition substituting only those generated arrow segments into the report passed all19/19 native-frame arrow visibility checks, versus13/19 in normal full run. This is NOT an automatic-report acceptance or visual approval. It isolates the missing final interval as available evidence whose computation did not finish within the normal allowance. Ellipse remains175/249 through the duel. No production timeout change, no model/runtime integration, and no graphics redesign was made.
+
+Next implementation target: avoid repeated decoding/processing in the existing ball-playback path, then repeat normal bounded report flow and actual-render visual comparison. Do not turn this diagnostic composition into claimed full-report success. Keep PR56 draft.

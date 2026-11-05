@@ -5,6 +5,7 @@ A measured box is a ground proxy, not a measured foot landmark.
 """
 import json
 import math
+import os
 import subprocess
 import sys
 import tempfile
@@ -117,6 +118,40 @@ def endpoint_arrow(previous, current, matrix, width, height, *, field='ground', 
     return [tail, tip]
 
 
+class _MotionWindowReader:
+    """Reuse nearby decoded motion frames; resample each interval independently."""
+    def __init__(self, cap):
+        self.cap, self.frames, self.start, self.end = cap, [], None, None
+
+    def read(self, start, end):
+        from player_tracking import _read_window
+        from video_timebase import should_sample
+        lo, hi = start-.02, end+.025
+        if hi-lo > 1.5:
+            return _read_window(self.cap, lo, hi, 1/30, seed_time=start)
+        if self.start is None or lo < self.start or hi > self.end:
+            self.start, self.end = lo, lo+1.5
+            self.frames = _read_window(self.cap, lo, self.end, 0, seed_time=start, max_frames=96)
+            if len(self.frames) >= 96:
+                self.frames, self.start, self.end = [], None, None
+                return _read_window(self.cap, lo, hi, 1/30, seed_time=start)
+        # Keep the original per-interval sampling phase and seed-frame rule.
+        result, previous, seed_seen = [], None, False
+        for frame in self.frames:
+            t = frame[0]
+            if t > hi+1e-3:
+                break
+            regular = t >= max(0., lo)-1e-3 and should_sample(t, previous, (1/30)*.8)
+            seed = not seed_seen and t >= start-1e-3
+            if seed:
+                seed_seen = True
+            if regular or (seed and abs(t-start) <= .025):
+                if regular:
+                    previous = t
+                result.append(frame)
+        return result
+
+
 def observed_motion(video, observations, *, ball_gap_ms=300, separate_bands=False, include_ground=True):
     """Reuse the background affine estimator between observed source endpoints.
 
@@ -132,6 +167,7 @@ def observed_motion(video, observations, *, ball_gap_ms=300, separate_bands=Fals
     from motion_compensation import estimate_camera
     samples = sorted(deepcopy(observations), key=lambda s: s['media_ms'])
     cap = cv2.VideoCapture(str(video))
+    reader = _MotionWindowReader(cap)
     try:
         for previous, current in zip(samples, samples[1:]):
             gap = current['media_ms']-previous['media_ms']
@@ -140,7 +176,7 @@ def observed_motion(video, observations, *, ball_gap_ms=300, separate_bands=Fals
             if not (ground or ball):
                 continue
             start, end = previous['media_ms']/1000, current['media_ms']/1000
-            frames = _read_window(cap, start-.02, end+.025, 1/30, seed_time=start)
+            frames = reader.read(start, end)
             if len(frames) < 2 or abs(frames[0][0]-start) > .025 or abs(frames[-1][0]-end) > .025:
                 continue
             cuts = _cut_flags(frames)
@@ -309,10 +345,11 @@ def compute(video, anchors, events, checkpoint=None):
         from match_room_ball_playback import build_ball_playback
         if explicit:
             # Preserve measured kick direction before optional dense contours
-            # can consume the event's shared wall-clock allowance.
+            # can consume the event's shared wall-clock allowance. Allow masks
+            # enough time on one CPU; the overall child deadline is unchanged.
             try:
                 result['ball_playback'], result['ball_playback_diagnostics'] = build_ball_playback(
-                    video, event, result['observed_samples'], min(deadline, time.monotonic()+8))
+                    video, event, result['observed_samples'], min(deadline, time.monotonic()+12))
             except (ImportError, OSError, ValueError, cv2.error):
                 result['ball_playback_diagnostics'] = {'status': 'UNAVAILABLE'}
             save()
@@ -386,7 +423,7 @@ def compute_refinement(video, anchors, events, checkpoint=None, segmenter_kind='
     from match_room import presentation_window
     from match_room_position_contours import contour_segments, observation_windows, refinement_model, METHOD
     cv2.setNumThreads(2)
-    deadline = time.monotonic() + (MEDIUM_TIMEOUT_S if segmenter_kind == 'medium' else TIMEOUT_S) - 3
+    deadline = time.monotonic() + (_refinement_budget(events) if segmenter_kind == 'medium' else TIMEOUT_S) - 3
     output = {}
     def save():
         if checkpoint is not None:
@@ -413,6 +450,7 @@ def compute_refinement(video, anchors, events, checkpoint=None, segmenter_kind='
         else:
             raise ValueError('UNSUPPORTED_REFINEMENT_MODEL')
         result['refinement_diagnostics']['segmenter_kind'] = segmenter_kind
+        result['refinement_diagnostics']['budget_seconds'] = _refinement_budget(events) if segmenter_kind == 'medium' else TIMEOUT_S
         def preserve(segment):
             result['segments'].append(segment)
             save()
@@ -427,6 +465,28 @@ def compute_refinement(video, anchors, events, checkpoint=None, segmenter_kind='
     return output
 
 
+def _refinement_budget(events):
+    value = events[0].get('_refinement_budget_seconds', MEDIUM_TIMEOUT_S) if events else MEDIUM_TIMEOUT_S
+    return max(4., min(float(value), MAX_REFINEMENT_EVENTS*MEDIUM_TIMEOUT_S)) if finite(value) else MEDIUM_TIMEOUT_S
+
+
+def _refinement_context(event, windows):
+    """Include source context without crossing identity barriers or 1.5s bounds."""
+    observations = event.get('visual_samples') or []
+    result = []
+    for lo, hi in windows:
+        lower, start, previous = max(lo-800, hi-1500), lo, lo
+        for row in reversed([r for r in observations if r.get('media_ms', lo+1) <= lo]):
+            stamp = row['media_ms']
+            if stamp < lower or previous-stamp > 250 or row.get('identity_status') != 'CONFIRMED':
+                break
+            if row.get('ground'):
+                start = stamp
+            previous = stamp
+        result.append([start, hi])
+    return result
+
+
 def _bounded_event(video, anchors, events, *, refinement=False):
     """One owned child, hard wall-clock bound; failure keeps sparse graphics."""
     if not any(e.get('visual_samples') for e in events):
@@ -437,8 +497,9 @@ def _bounded_event(video, anchors, events, *, refinement=False):
                                        'refinement': refinement}))
         try:
             subprocess.run([sys.executable, str(Path(__file__).resolve()), str(request), str(result)],
-                           timeout=MEDIUM_TIMEOUT_S if refinement == 'medium' else TIMEOUT_S if refinement else SOURCE_TIMEOUT_S if any(e.get('localization_method') == 'EXPLICIT_SOURCE_POSITIONS' for e in events) else TIMEOUT_S,
-                           check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                           timeout=_refinement_budget(events) if refinement == 'medium' else TIMEOUT_S if refinement else SOURCE_TIMEOUT_S if any(e.get('localization_method') == 'EXPLICIT_SOURCE_POSITIONS' for e in events) else TIMEOUT_S,
+                           check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                           env={**os.environ, 'SCOUTMEPLAY_MATCHROOM_ENGINE': 'onnxruntime'})
             return json.loads(result.read_text()), 'COMPLETED'
         except subprocess.TimeoutExpired:
             try:
@@ -485,7 +546,7 @@ def bounded_tracks(video, anchors, events):
 
     At most MAX_EVENTS initial children plus MAX_REFINEMENT_EVENTS optional
     retries. Source-position passes allow 35s; legacy/small passes allow 25s;
-    medium refinements allow 210s (at most 910s total). Every initial result is complete
+    medium refinements share 630s (at most 910s total). Every initial result is complete
     before retries begin; no retry can spend another clip's original budget.
     A difficult earlier clip cannot consume a later clip's inference budget.
     """
@@ -509,21 +570,33 @@ def bounded_tracks(video, anchors, events):
         previous = output.get(event.get('event_id')) or {}
         return any(w.get('status') == 'TIME_BUDGET' for w in
                    (previous.get('contour_diagnostics') or {}).get('windows', []))
-    attempted = 0
-    # Retry incomplete coverage with the stronger model only in uncovered
-    # windows. Repeating the same weak model can reproduce the same gap.
+    # The existing 3*210s total allowance is shared, not enlarged. Reserve
+    # half a nominal refinement for every remaining selected candidate.
+    pending = []
     for event in sorted(unique, key=lambda e: (not interrupted(e), -sum(b-a for a,b in missing_display_windows(e, output.get(e.get('event_id')) or {})))):
-        if not event.get('event_id'):
-            continue
-        previous = output.get(event['event_id']) or {}
+        previous = output.get(event.get('event_id')) or {}
         missing = missing_display_windows(event, previous)
-        if (attempted >= MAX_REFINEMENT_EVENTS or (previous.get('segments') and not missing)
+        if (not event.get('event_id') or (previous.get('segments') and not missing)
                 or event.get('localization_method') != 'EXPLICIT_SOURCE_POSITIONS'
                 or previous.get('method') != 'SOURCE_OBSERVATION_INSTANCE_CONTOUR'
                 or previous.get('source_video_sha256') != event.get('source_video_sha256')):
             continue
-        attempted += 1
-        request_event = {**event, '_display_refinement_windows': missing} if missing else event
+        pending.append((event, previous, missing))
+        if len(pending) >= MAX_REFINEMENT_EVENTS:
+            break
+    refinement_deadline = time.monotonic()+MAX_REFINEMENT_EVENTS*MEDIUM_TIMEOUT_S
+    for index, (event, previous, missing) in enumerate(pending):
+        remaining = refinement_deadline-time.monotonic()
+        if remaining <= 4:
+            break
+        others = len(pending)-index-1
+        reserve = min(MEDIUM_TIMEOUT_S/2, remaining/(others+1))
+        allowance = remaining-others*reserve
+        if allowance <= 4:
+            break
+        request_event = {**event, '_refinement_budget_seconds': allowance}
+        if missing:
+            request_event['_display_refinement_windows'] = _refinement_context(event, missing)
         retried, status = _bounded_event(video, anchors, [request_event],
                                          refinement='medium')
         result = retried.get(event['event_id']) or {}

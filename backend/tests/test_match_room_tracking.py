@@ -308,3 +308,30 @@ def test_source_graphics_have_a_bounded_budget_that_does_not_truncate_valid_tail
     assert timeouts == [35, 210]
     assert tracking.TIMEOUT_S == 25
     assert tracking.MAX_EVENTS*tracking.SOURCE_TIMEOUT_S+tracking.MAX_REFINEMENT_EVENTS*tracking.MEDIUM_TIMEOUT_S == 910
+
+
+def test_refinement_context_keeps_earlier_source_support_without_crossing_barrier():
+    rows=[{'media_ms':t,'identity_status':'CONFIRMED','ground':[.4,.6]} for t in range(10000,13001,125)]
+    event={'visual_samples':rows}
+    assert tracking._refinement_context(event, [[11000,11750]]) == [[10250,11750]]
+    rows[6]['identity_status']='UNCERTAIN'  # 10750 is an explicit barrier
+    assert tracking._refinement_context(event, [[11000,11750]]) == [[10875,11750]]
+    assert tracking._refinement_context(event, [[11500,13000]]) == [[11500,13000]]
+
+
+def test_refinements_share_only_existing_total_budget(monkeypatch):
+    clock=[0.]; allowances=[]
+    monkeypatch.setattr(tracking.time,'monotonic',lambda:clock[0])
+    events=[{'event_id':str(i),'source_video_sha256':'s','localization_method':'EXPLICIT_SOURCE_POSITIONS','visual_samples':[{}]} for i in range(3)]
+    def run(video,anchors,batch,*,refinement=False):
+        event=batch[0]
+        if refinement:
+            allowance=event['_refinement_budget_seconds'];allowances.append(allowance)
+            clock[0]+=allowance  # each worker uses its entire assigned budget
+        return {event['event_id']:{'event_id':event['event_id'],'source_video_sha256':'s','method':'SOURCE_OBSERVATION_INSTANCE_CONTOUR','segments':[]}},'COMPLETED'
+    monkeypatch.setattr(tracking,'_bounded_event',run)
+    tracking.bounded_tracks('v',[],events)
+    assert allowances == [420,105,105]
+    assert sum(allowances)==tracking.MAX_REFINEMENT_EVENTS*tracking.MEDIUM_TIMEOUT_S
+    assert all('_refinement_budget_seconds' not in e for e in events)
+    assert tracking._refinement_budget([{'_refinement_budget_seconds':1000000}]) == 630

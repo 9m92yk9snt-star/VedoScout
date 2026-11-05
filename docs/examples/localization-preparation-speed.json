@@ -1,0 +1,93 @@
+{
+  "base_commit": "46fdc01136db7237ea63b2b1060de7333e60fdee",
+  "cpu_affinity": [
+    0
+  ],
+  "opencv": "4.13.0",
+  "new_model_calls": 0,
+  "before_seconds": 155.3731097839991,
+  "after_seconds": 34.15188959200168,
+  "scope": "Only localization.prepare, all eight events and ten original taps. Not full analysis or tracking acceptance. Alternating before/after per event. No 4GB memory cap.",
+  "results": [
+    {
+      "event_id": "a8b5662ae46646b8f0ae",
+      "seconds": {
+        "before": 22.394638418001705,
+        "after": 10.986445747999824
+      },
+      "identical_images": true,
+      "identical_request": true,
+      "frames": 20
+    },
+    {
+      "event_id": "88aa8bbdedbec570d4de",
+      "seconds": {
+        "before": 27.09122016999754,
+        "after": 5.353974865000055
+      },
+      "identical_images": true,
+      "identical_request": true,
+      "frames": 34
+    },
+    {
+      "event_id": "dc2acb1e19ba55950e7f",
+      "seconds": {
+        "before": 16.13836223999897,
+        "after": 2.793051729000581
+      },
+      "identical_images": true,
+      "identical_request": true,
+      "frames": 23
+    },
+    {
+      "event_id": "1349b8676c1e07e88c00",
+      "seconds": {
+        "before": 25.17138646999956,
+        "after": 4.387718237001536
+      },
+      "identical_images": true,
+      "identical_request": true,
+      "frames": 25
+    },
+    {
+      "event_id": "a512ae64e102f24b3383",
+      "seconds": {
+        "before": 7.583708812002442,
+        "after": 2.04886273000011
+      },
+      "identical_images": true,
+      "identical_request": true,
+      "frames": 17
+    },
+    {
+      "event_id": "ec74209ace700fa49d2e",
+      "seconds": {
+        "before": 15.929692536999937,
+        "after": 2.4513709019993257
+      },
+      "identical_images": true,
+      "identical_request": true,
+      "frames": 21
+    },
+    {
+      "event_id": "9a392fb19c052dfe6719",
+      "seconds": {
+        "before": 27.41678421799952,
+        "after": 3.7657335469993996
+      },
+      "identical_images": true,
+      "identical_request": true,
+      "frames": 27
+    },
+    {
+      "event_id": "9e9a8a68c1772db2614f",
+      "seconds": {
+        "before": 13.647316918999422,
+        "after": 2.3647318340008496
+      },
+      "identical_images": true,
+      "identical_request": true,
+      "frames": 14
+    }
+  ]
+}

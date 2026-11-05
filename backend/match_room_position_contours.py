@@ -11,6 +11,25 @@ from match_room_contours import agrees_with_observation, follow_instance
 METHOD = 'SOURCE_OBSERVATION_INSTANCE_CONTOUR'
 
 
+def stance_bounds(row, width):
+    """Display-only extent of the selected instance's visible lower contour."""
+    import numpy as np
+    from match_room_contours import measured_mask
+    if row.get('ground') is None or not ('mask' in row or 'mask_bits' in row):
+        return {}
+    ys, xs = np.nonzero(measured_mask(row))
+    if len(xs) < 20:
+        return {}
+    lower = xs[ys >= ys.min() + .55*(ys.max()-ys.min())]
+    if len(lower) < 10:
+        return {}
+    lo, hi = np.quantile(lower, [.01, .99])/width
+    pw = row['player_width']
+    if not 0 <= lo < hi <= 1 or hi-lo > 3*pw:
+        return {}
+    return {'stance_bounds': [float(lo), float(hi)]}
+
+
 def refinement_model():
     """Load the pinned, local medium segmenter only after a small-model miss."""
     import cv2
@@ -19,7 +38,8 @@ def refinement_model():
     from player_segmentation_assets import ensure_model_asset
     ensure_model_asset(MODEL_PATH, MODEL_SHA256)
     model = PersonSegmenter.__new__(PersonSegmenter)
-    model.net = cv2.dnn.readNetFromONNX(str(MODEL_PATH))
+    from match_room_inference import load_cpu_net
+    model.net = load_cpu_net(MODEL_PATH)
     model.sha256 = MODEL_SHA256
     return model
 
@@ -383,6 +403,7 @@ def contour_segments(video, observations, start, end, *, deadline, diagnostics, 
                     fid = f'position-contour:{ms}'
                     samples.append({'media_ms': ms, 'frame_id': fid, 'ground': row['ground'],
                                     **display.get(i, {}),
+                                    **stance_bounds(row, w),
                                     'player_width': row['player_width'], 'confidence': row['confidence'],
                                     'foreground': {'method': 'SOURCE_PERSON_MASK', 'frame_id': fid,
                                                    'media_ms': ms, 'polygons': polygons}})

@@ -98,6 +98,21 @@ export function roomFor(comment, fallbackSeconds) {
       if (Math.hypot(...rows[0].ballTrail[0].map((v, i) => v-release.ball[i])) > .002) return [];
       const endpoint = rows.find(s => Math.abs(s.media_ms-segment.arrival_ms) <= 2);
       if (Math.hypot(...endpoint.ballTrail[1].map((v, i) => v-arrival.ball[i])) > .002) return [];
+      if (segment.kick_reference_frames) {
+        const refs = segment.kick_reference_frames;
+        if (!Array.isArray(refs) || refs.length < 2 || refs.length > 17 || new Set(refs).size !== refs.length ||
+            refs.at(-2) !== first || refs.at(-1) !== last || !finite(raw.contact_ms) ||
+            !['SHOT', 'PASS'].includes(raw.action_type)) return [];
+        const chain = refs.map(id => raw.samples.find(s => s.frame_id === id && point(s.ball)));
+        if (chain.some(s => !s || !samples.some(x => x.frame_id === s.frame_id && x.ball)) || Math.abs(chain[0].media_ms-raw.contact_ms) > 80 ||
+            chain.at(-1).media_ms-chain[0].media_ms > 2000 ||
+            chain.some((s,i) => i > 0 && (s.ball_motion_start_ms !== chain[i-1].media_ms ||
+              s.media_ms <= chain[i-1].media_ms ||
+              (refs.length > 2 && raw.samples.some(x => x.media_ms > chain[i-1].media_ms && x.media_ms < s.media_ms))))) return [];
+        if (rows.some(s => !Array.isArray(s.kickTrail) || s.kickTrail.length !== 2 || !s.kickTrail.every(arrowPoint)) ||
+            Math.hypot(...endpoint.kickTrail[1].map((v,i)=>v-arrival.ball[i])) > .002 ||
+            Math.hypot(...rows[0].kickTrail[1].map((v,i)=>v-release.ball[i])) > .002) return [];
+      } else if (rows.some(s => s.kickTrail)) return [];
       return [{...segment, samples: rows}];
     }) : [];
   return {
@@ -132,7 +147,7 @@ function stanceAt(rows, mediaMs) {
     player_width:a.player_width+(b.player_width-a.player_width)*u,
     confidence:Math.min(a.confidence,b.confidence), groundTrail:null};
 }
-export function graphicsAt(room, mediaMs) {
+function rawGraphicsAt(room, mediaMs) {
   const nearest = rows => rows.reduce((best, s) => Math.abs(s.media_ms-mediaMs) < Math.abs((best?.media_ms ?? Infinity)-mediaMs) ? s : best, null);
   const sample = nearest(room.samples.filter(s => Math.abs(s.media_ms-mediaMs) <= 60));
   const previous = sample ? room.samples[room.samples.indexOf(sample)-1] : null;
@@ -197,7 +212,7 @@ export function ballAt(room, mediaMs) {
   // flash the arrow off and restart its fade at each measured endpoint.
   const incoming = (room.movingBall || []).filter(s => continuesBallDirection(s, segment));
   const fadeIn = incoming.length === 1 ? 1 : smooth((mediaMs-segment.start_ms)/fadeInMs);
-  return {...sample, opacity: fadeIn*fade};
+  return {...sample, ballTrail: sample.kickTrail || sample.ballTrail, opacity: fadeIn*fade};
 }
 
 // Clip a direction line to the visible picture, preserving its orientation.
@@ -216,4 +231,107 @@ export function clipArrowToFrame(trail) {
     }
   }
   return lo < hi ? [lo, hi].map(t => a.map((v, i) => v+t*d[i])) : null;
+}
+
+const stanceCache = new WeakMap();
+function displayStance(room) {
+  if(stanceCache.has(room)) return stanceCache.get(room);
+  const times=[...new Set(room.tracks.flatMap(r=>r.map(s=>s.media_ms)))].sort((a,b)=>a-b);
+  const rows=times.map(t=>rawGraphicsAt(room,t));
+  const valid=s=>s?.sourceFrameContour && s.ground && Array.isArray(s.stance_bounds) && s.stance_bounds.length===2 &&
+    s.stance_bounds.every(x=>finite(x)&&x>=0&&x<=1) && s.stance_bounds[1]>s.stance_bounds[0] && s.stance_bounds[1]-s.stance_bounds[0]<=3*s.player_width;
+  const map=new Map();let previous=-1;
+  for(let i=0;i<rows.length;i++) {
+    if(!rows[i]?.sourceFrameContour || !rows[i].ground || (i&&times[i]-times[i-1]>40)) previous=-1;
+    if(!valid(rows[i])) continue;
+    map.set(times[i],rows[i].stance_bounds);
+    if(previous>=0 && times[i]-times[previous]<=800) {
+      const a=rows[previous],b=rows[i];
+      for(let j=previous+1;j<i;j++) {
+        const r=rows[j],u=(times[j]-times[previous])/(times[i]-times[previous]);
+        // Presentation estimate in player-relative coordinates; never a new
+        // foot observation, and never across an unknown identity/source gap.
+        map.set(times[j],[0,1].map(k=>r.ground[0]+r.player_width*((1-u)*(a.stance_bounds[k]-a.ground[0])/a.player_width+u*(b.stance_bounds[k]-b.ground[0])/b.player_width)));
+      }
+    }
+    previous=i;
+  }
+  stanceCache.set(room,map);return map;
+}
+
+// Precompute display geometry per continuous source run. A weighted mean avoids
+// the staircase jumps of a sliding median. Keep the ring centred on the player,
+// so the centre follows both feet without snapping between stance anchors.
+const ellipseCache = new WeakMap();
+function displayEllipses(room) {
+  if (ellipseCache.has(room)) return ellipseCache.get(room);
+  const stamps = [...new Set(room.tracks.flatMap(r => r.map(s => s.media_ms)))].sort((a,b)=>a-b);
+  const stance = displayStance(room), map = new Map();
+  let run = [];
+  const flush = () => {
+    if (!run.length) return;
+    const geometry = run.map((s,i) => {
+      const nearby = [s];
+      for(const direction of [-1,1]) {
+        for(let j=i+direction;j>=0 && j<run.length && Math.abs(run[j].media_ms-s.media_ms)<=100;j+=direction) nearby.push(run[j]);
+      }
+      const mean = get => {
+        let sum=0, weights=0;
+        for (const r of nearby) {
+          const w=Math.exp(-.5*((r.media_ms-s.media_ms)/45)**2);
+          sum+=w*get(r); weights+=w;
+        }
+        return sum/weights;
+      };
+      const centre = r => {
+        const b=stance.get(r.media_ms);
+        return b && Math.abs((b[0]+b[1])/2-r.ground[0])<=r.player_width
+          ? (b[0]+b[1])/2 : r.ground[0];
+      };
+      const ground=[mean(centre),mean(r=>r.ground[1])];
+      const width=mean(r=>r.player_width);
+      // Average measured stance extents rather than enlarging the ring to
+      // compensate for a transient centre-offset observation.
+      const radius=mean(r=> {
+        const b=stance.get(r.media_ms);
+        return b && Math.abs((b[0]+b[1])/2-r.ground[0])<=r.player_width
+          ? Math.max(r.player_width*.8,(b[1]-b[0])/2+r.player_width*.3)
+          : r.player_width*.8;
+      });
+      return {ground,width,radius};
+    });
+    // A symmetric release envelope widens ahead of a measured long stride and
+    // contracts gradually afterwards. No temporal state depends on seeking.
+    const envelope=geometry.map(g=>g.radius);
+    for(let i=1;i<run.length;i++) {
+      const release=geometry[i].width*(run[i].media_ms-run[i-1].media_ms)/400;
+      envelope[i]=Math.max(envelope[i],envelope[i-1]-release);
+    }
+    for(let i=run.length-2;i>=0;i--) {
+      const release=geometry[i].width*(run[i+1].media_ms-run[i].media_ms)/250;
+      envelope[i]=Math.max(envelope[i],envelope[i+1]-release);
+    }
+    for(let i=0;i<run.length;i++) {
+      const g=geometry[i];
+      map.set(run[i].media_ms,{ground:g.ground,player_width:g.width,
+        ellipseGround:g.ground,ellipseRadius:envelope[i],displayFiltered:true});
+    }
+    run=[];
+  };
+  for(const t of stamps) {
+    const s=rawGraphicsAt(room,t);
+    if(!s?.sourceFrameContour || !s.ground) {flush();continue;}
+    if(run.length && t-run[run.length-1].media_ms>40) flush();
+    run.push({...s,media_ms:t});
+  }
+  flush(); ellipseCache.set(room,map); return map;
+}
+
+export function graphicsAt(room, mediaMs) {
+  const current=rawGraphicsAt(room,mediaMs);
+  if(!current?.sourceFrameContour || !current.ground) return current;
+  const map=displayEllipses(room);
+  const time=[...map.keys()].find(t=>Math.abs(t-mediaMs)<=2);
+  // The source observation and its exact foreground mask remain untouched.
+  return time===undefined ? current : {...current,...map.get(time)};
 }

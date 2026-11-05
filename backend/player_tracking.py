@@ -64,13 +64,15 @@ def _cut_flags(frames):
     return flags
 
 
-def _read_window(cap, w0: float, w1: float, step: float, fps=None, *, seed_time=None):
+def _read_window(cap, w0: float, w1: float, step: float, fps=None, *, seed_time=None, on_frame=None, max_frames=None):
     """Returns [(t, gray_480w, hsv_240w, tiny_160w_f32), ...].
 
     FIX 03/04 canonical contract: adaptive-preroll seek at/before w0, then
     grab → read the ACTUAL post-grab PTS → retrieve that SAME frame. Only
     frames whose actual media time lies within [w0, w1] are included, and
-    sampling is by elapsed ACTUAL media time — never frame_index/fps."""
+    sampling is by elapsed ACTUAL media time — never frame_index/fps.
+    Optional on_frame receives that same decoded BGR image and timestamp;
+    callers retaining pixels must bound their own cache."""
     frames = []
     lo = max(0.0, w0)
     ok, t, used_fallback = video_timebase.seek_with_preroll(cap, lo, fps)
@@ -99,6 +101,10 @@ def _read_window(cap, w0: float, w1: float, step: float, fps=None, *, seed_time=
                 )
                 tiny = cv2.resize(g, (160, max(2, int(g.shape[0] * 160 / g.shape[1])))).astype("float32")
                 frames.append((t, g, hsv, tiny))
+                if on_frame is not None:
+                    on_frame(t, fr)
+                if max_frames is not None and len(frames) >= max_frames:
+                    break
         ok, t, used_fallback = video_timebase.grab_frame_time_seconds(cap, fps)
     return frames
 
