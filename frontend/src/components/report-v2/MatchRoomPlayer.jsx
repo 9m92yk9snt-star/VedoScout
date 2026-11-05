@@ -47,6 +47,13 @@ export function MatchRoomPlayer({
   const arrowSource = movingArrow || (depth && mark?.ballTrail ? {...mark, foreground: depth, opacity: 1} : null);
   const visibleTrail = arrowSource && clipArrowToFrame(arrowSource.ballTrail);
   const arrow = visibleTrail ? {...arrowSource, ballTrail: visibleTrail} : null;
+  // markerUnits=strokeWidth follows the non-scaling 2px shaft. A fixed
+  // 10px head can cover almost an entire short, source-bound direction line.
+  // Keep the approved maximum size, but reserve at least 70% for the shaft.
+  const arrowPixels = arrow && Number.isFinite(bounds.width) && Number.isFinite(bounds.height)
+    ? Math.hypot((arrow.ballTrail[1][0]-arrow.ballTrail[0][0])*bounds.width,
+                 (arrow.ballTrail[1][1]-arrow.ballTrail[0][1])*bounds.height) : 0;
+  const arrowHeadSize = Math.min(5, arrowPixels * .3 / 2);
   const yScale = 1000 / ratio;
   const observation = (skill?.lines || []).filter(x => typeof x === 'string').join(' ') || raw?.comment || 'Review the documented action in your match.';
   useEffect(() => {
@@ -172,7 +179,7 @@ export function MatchRoomPlayer({
         <defs>
           <radialGradient id={`ground-${id}`}><stop offset="0" stopColor="#79f58a" stopOpacity=".72" /><stop offset="1" stopColor="#9fe870" stopOpacity="0" /></radialGradient>
           {arrow && <linearGradient id={`pass-${id}`} x1={arrow?.ballTrail?.[0][0] * 1000} y1={arrow?.ballTrail?.[0][1] * yScale} x2={arrow?.ballTrail?.[1][0] * 1000} y2={arrow?.ballTrail?.[1][1] * yScale} gradientUnits="userSpaceOnUse"><stop offset="0" stopColor="#ecea94" stopOpacity=".25" /><stop offset="1" stopColor="#f0ed9c" stopOpacity=".95" /></linearGradient>}
-          <marker id={`arrow-${id}`} markerWidth="5" markerHeight="5" refX="5" refY="2.5" orient="auto" viewBox="0 0 5 5"><path d="M0 0L5 2.5L0 5Z" fill="#f0ed9c" /></marker>
+          <marker id={`arrow-${id}`} markerWidth={arrowHeadSize} markerHeight={arrowHeadSize} refX="5" refY="2.5" orient="auto" viewBox="0 0 5 5"><path d="M0 0L5 2.5L0 5Z" fill="#f0ed9c" /></marker>
           {depth && <mask id={`people-${id}`} maskUnits="userSpaceOnUse" x="0" y="0" width="1000" height={yScale}><rect width="1000" height={yScale} fill="white" />{depth.polygons.map((polygon, i) => <polygon key={i} points={polygon.map(p => `${p[0]*1000},${p[1]*yScale}`).join(' ')} fill="black" stroke="black" strokeWidth="1" />)}</mask>}
           {arrow && <mask id={`ball-people-${id}`} maskUnits="userSpaceOnUse" x="0" y="0" width="1000" height={yScale}><rect width="1000" height={yScale} fill="white" />{arrow.foreground.polygons.map((polygon, i) => <polygon key={i} points={polygon.map(p => `${p[0]*1000},${p[1]*yScale}`).join(' ')} fill="black" stroke="black" strokeWidth="1" />)}</mask>}
         </defs>
