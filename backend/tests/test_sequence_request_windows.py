@@ -114,3 +114,12 @@ def test_retry_code_migration_is_narrow_and_payload_still_must_match():
            response_sha256=hashlib.sha256(b'{}').hexdigest())
     assert reusable_receipt(r,{'payload_sha256':'same'},provider='emergent',model='gemini-2.5-pro',packet_id='sequence_001')
     assert not reusable_receipt(r,{'payload_sha256':'different'},provider='emergent',model='gemini-2.5-pro',packet_id='sequence_001')
+
+
+def test_rate_limit_release_migration_keeps_exact_request_gate():
+    from sequence_run_checkpoint import retry_code_compatible, _PRE_RATE_LIMIT_CODE, code_fingerprint
+    current = code_fingerprint()
+    assert retry_code_compatible(_PRE_RATE_LIMIT_CODE, current)
+    for field in ('sequence_pilot.py', 'player_selection.py', 'match_room.py', 'sequence_report_adapter.py'):
+        assert not retry_code_compatible(_PRE_RATE_LIMIT_CODE, {**current, field: 'changed'})
+    assert not retry_code_compatible({**_PRE_RATE_LIMIT_CODE, 'sequence_pilot_transport.py': 'unknown'}, current)

@@ -72,10 +72,14 @@ def failure_metadata(phase, elapsed, *, returncode=None, timeout=False, result=N
 _PRE_SPLIT_CODE = {'match_room.py': 'a3443e30891199a91a7dbc3d8c88cb8a7372a7507ed0c00334abf82ba294bf3d', 'player_selection.py': 'ea5f699ccd586fcf9f1e1f813eabb8ca2f389c5b80251fdb7e064f3d59e59f4d', 'run_sequence_pilot.py': '0d49574586cd5ad547563966a7f4a4f0a34842e3af120643363693fcd45d3a02', 'sequence_action_evidence.py': 'e922d414e6656b37fb4b3a8c9de88fc29218cab958b35228fadd761202d4876c', 'sequence_foot_evidence.py': 'ac9cf01076d82dd85e26ec3e3a574842a843c525cbb2b65b3fd96f3fed9c6186', 'sequence_pilot.py': '89bc18abdddeb83b2f8b9d89dd6c0a1f0e04712a31523eac074a9aa3c38cf01a', 'sequence_pilot_transport.py': '25b85d01426662f662e37c3bbe94888b2904e3683d4f961c157338e2a32a6cdf', 'sequence_report_adapter.py': '9719e53b65727fc6184b89fc6007fc8db51ae21d29a6a6903afc35e720befb6f', 'sequence_report_runtime.py': 'bc096796f7948bc9fa0834877da031b079129303f5f2e1807c4e1bcf647c9b81', 'sequence_run_checkpoint.py': 'd534250fda9b7b66a29664c185e423b171279205d3d5a50fb50aa5d7e30ad652'}
 
 
+_PRE_RATE_LIMIT_CODE = {'match_room.py': 'a3443e30891199a91a7dbc3d8c88cb8a7372a7507ed0c00334abf82ba294bf3d', 'player_selection.py': 'ea5f699ccd586fcf9f1e1f813eabb8ca2f389c5b80251fdb7e064f3d59e59f4d', 'run_sequence_pilot.py': '52d64ec0e71803641fc833596b19d6485ac607333e6f97dc4831e2c6e3f87107', 'sequence_action_evidence.py': 'e922d414e6656b37fb4b3a8c9de88fc29218cab958b35228fadd761202d4876c', 'sequence_foot_evidence.py': 'ac9cf01076d82dd85e26ec3e3a574842a843c525cbb2b65b3fd96f3fed9c6186', 'sequence_pilot.py': '89bc18abdddeb83b2f8b9d89dd6c0a1f0e04712a31523eac074a9aa3c38cf01a', 'sequence_pilot_transport.py': '25b85d01426662f662e37c3bbe94888b2904e3683d4f961c157338e2a32a6cdf', 'sequence_report_adapter.py': '9719e53b65727fc6184b89fc6007fc8db51ae21d29a6a6903afc35e720befb6f', 'sequence_report_runtime.py': 'fa80d2a02d78ef7ba8f94bc2ae52927a6a568389e728213a466c35072762e103', 'sequence_run_checkpoint.py': '3bea039bb707fbdbec4c32b9f72438764770b9f0b1aa8ff7dd727459c8b82a8d'}
+
+
 def retry_code_compatible(saved, current=None):
     current = code_fingerprint() if current is None else current
     if saved == current:
         return True
     changed = {"run_sequence_pilot.py", "sequence_report_runtime.py", "sequence_run_checkpoint.py"}
-    return (saved == _PRE_SPLIT_CODE and set(current) == set(saved)
+    changed.add("sequence_pilot_transport.py")
+    return (saved in (_PRE_SPLIT_CODE, _PRE_RATE_LIMIT_CODE) and set(current) == set(saved)
             and all(current[k] == saved[k] for k in saved if k not in changed))
