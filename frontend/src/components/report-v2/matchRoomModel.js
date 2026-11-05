@@ -147,7 +147,7 @@ function stanceAt(rows, mediaMs) {
     player_width:a.player_width+(b.player_width-a.player_width)*u,
     confidence:Math.min(a.confidence,b.confidence), groundTrail:null};
 }
-export function graphicsAt(room, mediaMs) {
+function rawGraphicsAt(room, mediaMs) {
   const nearest = rows => rows.reduce((best, s) => Math.abs(s.media_ms-mediaMs) < Math.abs((best?.media_ms ?? Infinity)-mediaMs) ? s : best, null);
   const sample = nearest(room.samples.filter(s => Math.abs(s.media_ms-mediaMs) <= 60));
   const previous = sample ? room.samples[room.samples.indexOf(sample)-1] : null;
@@ -231,4 +231,28 @@ export function clipArrowToFrame(trail) {
     }
   }
   return lo < hi ? [lo, hi].map(t => a.map((v, i) => v+t*d[i])) : null;
+}
+
+// Filter presentation only; every displayed frame retains its own fresh mask.
+// Do not borrow positions across missing/ambiguous source-frame identity.
+export function graphicsAt(room, mediaMs) {
+  const current = rawGraphicsAt(room, mediaMs);
+  if (!current?.sourceFrameContour || !current.ground) return current;
+  const stamps = [...new Set(room.tracks.flatMap(rows => rows.map(s => s.media_ms)))].sort((a,b)=>a-b);
+  const i = stamps.findIndex(t => Math.abs(t-mediaMs)<=2);
+  if (i < 0) return current;
+  const rows = [current];
+  for (const direction of [-1,1]) {
+    let last = stamps[i];
+    for (let j=i+direction; j>=0 && j<stamps.length && Math.abs(stamps[j]-stamps[i])<=50; j+=direction) {
+      if (Math.abs(stamps[j]-last)>40) break;
+      const next = rawGraphicsAt(room, stamps[j]);
+      if (!next?.sourceFrameContour || !next.ground) break;
+      rows.push(next); last=stamps[j];
+    }
+  }
+  if(rows.length<3) return current;
+  const median = values => values.sort((a,b)=>a-b)[Math.floor(values.length/2)];
+  return {...current, ground:[0,1].map(axis=>median(rows.map(s=>s.ground[axis]))),
+    player_width:median(rows.map(s=>s.player_width)), displayFiltered:true};
 }
