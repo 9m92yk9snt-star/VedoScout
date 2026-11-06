@@ -4,6 +4,7 @@ on:
     types: [synchronize]
     paths:
       - '.github/workflows/matchroom-onnx-source-cache.yml'
+      - 'backend/scripts/verify_matchroom_onnx_source_cache.py'
 
 permissions:
   contents: read
@@ -31,7 +32,7 @@ jobs:
           python-version: '3.11'
       - name: Install source-bound CPU inference dependencies
         run: python -m pip install 'numpy==2.4.6' 'opencv-python-headless==4.13.0.92' 'onnxruntime>=1.20,<2' 'Pillow==12.2.0' 'python-dotenv==1.2.2'
-      - name: Verify retained receipts, source video SHA, and real ONNX cache parity
+      - name: Verify exact bundled source video and raw ONNX model parity
         run: python -u backend/scripts/verify_matchroom_onnx_source_cache.py
       - name: Retain non-sensitive measurements
         if: always()
