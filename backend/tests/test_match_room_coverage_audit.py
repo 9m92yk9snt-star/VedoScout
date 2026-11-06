@@ -83,3 +83,27 @@ def test_complete_masked_source_stamps_have_no_audited_holes():
     previous["segments"][0]["samples"] = [sample(t) for t in range(0, 501, 25)]
     assert source_gap_audit(event, previous)["holes"] == []
     assert audited_display_spans(previous) == [[0, 500]]
+
+
+def test_invalid_geometry_or_foreground_polygon_never_counts_as_coverage():
+    event, previous = fixture()
+    original = audited_display_spans(previous)
+    assert original == [[0, 132], [360, 500]]
+    changes = [
+        {"player_width": .7},
+        {"confidence": .2},
+        {"ground": [1.4, .75]},
+        {"foreground": {"method": "SOURCE_PERSON_MASK",
+                        "frame_id": "wrong-source-frame",
+                        "media_ms": 0,
+                        "polygons": [[[.4, .5], [.5, .5], [.5, .8]]]}},
+        {"foreground": {"method": "SOURCE_PERSON_MASK",
+                        "frame_id": "position-contour:0",
+                        "media_ms": 0,
+                        "polygons": [[[.4, .5], [1.2, .5], [.5, .8]]]}}
+    ]
+    for change in changes:
+        changed = deepcopy(previous)
+        changed["segments"][0]["samples"][0].update(change)
+        assert audited_display_spans(changed)[0][0] != 0
+        assert source_gap_audit(event, changed)["status"] == "AUDITED"
