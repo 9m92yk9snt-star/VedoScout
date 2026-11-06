@@ -58,6 +58,127 @@ def tracked_fields(snapshot, eid):
     return {key: row.get(key) for key in ('method', 'segments', 'observed_samples', 'ball_playback')}
 
 
+
+def first_differences(left, right, limit=12):
+    """Bounded audit of nested source-bound differences; never emits mask pixels."""
+    out = []
+    def walk(a, b, path):
+        if len(out) >= limit or a == b:
+            return
+        if isinstance(a, dict) and isinstance(b, dict):
+            for key in sorted(set(a) | set(b), key=str):
+                k = path + '.' + str(key)[:80]
+                if key not in a or key not in b:
+                    out.append({'path': k, 'reason': 'FIELD_MISSING'})
+                else:
+                    walk(a[key], b[key], k)
+                if len(out) >= limit:
+                    return
+        elif isinstance(a, list) and isinstance(b, list):
+            if len(a) != len(b):
+                out.append({'path': path, 'reason': 'LENGTH_CHANGED',
+                            'before': len(a), 'after': len(b)})
+            for i, (x, y) in enumerate(zip(a, b)):
+                walk(x, y, path + '[' + str(i) + ']')
+                if len(out) >= limit:
+                    return
+        elif type(a) in (int, float) and type(b) in (int, float):
+            out.append({'path': path, 'reason': 'NUMBER_CHANGED',
+                        'before': a, 'after': b, 'abs_delta': abs(float(a)-float(b))})
+        else:
+            out.append({'path': path, 'reason': 'VALUE_OR_TYPE_CHANGED'})
+    walk(left, right, '    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument('--report', type=Path, required=True)
+    ap.add_argument('--work', type=Path, required=True)
+    ap.add_argument('--output', type=Path, required=True)
+    args = ap.parse_args()
+    if args.output.exists() or args.work.exists():
+        ap.error('fresh work and output paths required')
+    doc = json.loads(args.report.read_text())
+    bundle = doc['canonical_events']
+    if bundle['source_video_sha256'] != PINNED_SOURCE:
+        raise ValueError('RETAINED_REPORT_SOURCE_MISMATCH')
+    raw = doc['raw_marker_anchors']
+    while isinstance(raw, str):
+        raw = json.loads(raw)
+    selection = {'raw_marker_anchors': raw}
+    taps = pilot.original_taps(selection)
+    fixture = json.loads((ROOT / 'testdata/sequence-pilot-orman400/anchors.json').read_text())
+    original = fixture['raw_marker_anchors']
+    while isinstance(original, str):
+        original = json.loads(original)
+    if raw != original or len(taps) != 10:
+        raise ValueError('ORIGINAL_HUMAN_TAPS_CHANGED')
+    audit = doc.get('match_room_localization') or {}
+    if (audit.get('source_video_sha256') != PINNED_SOURCE or
+            audit.get('original_selection_values_sha256') != selection_digest(selection)):
+        raise ValueError('LOCALIZATION_AUDIT_SOURCE_OR_SELECTION_CHANGED')
+    video, _ = prepare(ROOT / 'testdata/sequence-pilot-orman400', args.work)
+    with video.open('rb') as stream:
+        if hashlib.file_digest(stream, 'sha256').hexdigest() != PINNED_SOURCE:
+            raise ValueError('ACTUAL_VIDEO_BYTES_CHANGED')
+    events_by_id = {e['event_id']: e for e in bundle['events']}
+    report_ids = {row['event_id'] for row in doc['full_report']['video_comments']}
+    selected = []
+    for eid in TARGET_EVENT_IDS:
+        if eid not in report_ids or eid not in events_by_id:
+            raise ValueError('TARGET_EVENT_NOT_IN_RETAINED_REPORT')
+        event = deepcopy(events_by_id[eid])
+        record = (audit.get('events') or {}).get(eid)
+        if not isinstance(record, dict):
+            raise ValueError('VERIFIED_LOCALIZATION_RECEIPT_MISSING')
+        event['visual_samples'] = observations_from_retained(event, selection, record)
+        event['localization_method'] = 'EXPLICIT_SOURCE_POSITIONS'
+        if record.get('context_after_ms') == 750:
+            event['graphics_context_ms'] = 750
+        selected.append(event)
+    anchors = [{'t': t['requested_ms'] / 1000, 'box': t['box'],
+                'target_point': t['target_point'], **t['selection_hints']}
+               for t in taps]
+
+    start = time.monotonic()
+    baseline, base_status = bounded_tracks(video, anchors, selected, reuse_predictions=False)
+    base_seconds = time.monotonic() - start
+    start = time.monotonic()
+    cached, cache_status = bounded_tracks(video, anchors, selected, reuse_predictions=True)
+    cache_seconds = time.monotonic() - start
+    comparison = []
+    for eid in TARGET_EVENT_IDS:
+        original_fields = tracked_fields(baseline, eid)
+        cache_fields = tracked_fields(cached, eid)
+        equality = {key: original_fields[key] == cache_fields[key]
+                    for key in original_fields}
+        comparison.append({'event_id': eid, 'parity': equality,
+                           'baseline_segments': len(original_fields['segments'] or []),
+                           'cached_segments': len(cache_fields['segments'] or []),
+                           'source_observations': len(next(e['visual_samples'] for e in selected
+                                                           if e['event_id'] == eid))})
+    output = {
+        'scope': 'TWO_SAME_SOURCE_REAL_REPORT_CLIPS_COMPLETE_ONNX_SCHEDULER',
+        'source_video_sha256': PINNED_SOURCE, 'original_human_taps': len(taps),
+        'events': comparison, 'engine': 'onnxruntime', 'new_provider_model_requests': 0,
+        'baseline_status': base_status, 'cached_status': cache_status,
+        'baseline_seconds': round(base_seconds, 3),
+        'cached_seconds': round(cache_seconds, 3),
+        'all_segments_and_ball_evidence_identical':
+            all(all(row['parity'].values()) for row in comparison),
+        'full_report_verified': False, 'production_cache_enabled': False,
+        'live_deployment_verified': False,
+    }
+    args.output.write_text(json.dumps(output, indent=2))
+    print('MATCHROOM_ONNX_SCHEDULER_RESULT=' + json.dumps(output), flush=True)
+    if base_status != 'COMPLETED' or cache_status != 'COMPLETED':
+        raise RuntimeError('ONNX_SCHEDULER_INCOMPLETE')
+    if not output['all_segments_and_ball_evidence_identical']:
+        raise RuntimeError('ONNX_SCHEDULER_PARITY_CHANGED')
+
+
+if __name__ == '__main__':
+    main()
+)
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument('--report', type=Path, required=True)
