@@ -325,6 +325,11 @@ def contour_segments(video, observations, start, end, *, deadline, diagnostics, 
     boxes = [s['player_box'] for pair in pairs for s in pair if s.get('player_box')]
     model = segmenter if segmenter is not None else PersonSegmenter()
     frames, detections, segments = [], [], []
+    # Endpoint contexts overlap. Geometry depends only on this window's exact
+    # decoded frame and instance, not on the interval being emitted. Keep even
+    # rejected foreground results so another interval cannot redo the work.
+    # Lifetime and size are bounded by read_clip's MAX_FRAMES, never a report.
+    foreground_cache, stance_cache = {}, {}
     pending = {}
     for a, b in pairs:
         prior = pending.get(b['media_ms'])
@@ -385,14 +390,19 @@ def contour_segments(video, observations, start, end, *, deadline, diagnostics, 
                 samples = []
                 for i, j in zip(interval['indices'], interval['instances']):
                     h, w = frames[i]['gray'].shape
-                    polygons = foreground_polygons([{'class_id': 0, 'mask': measured_mask(d)}
-                                                    for d in detections[i]], w, h)
+                    if i not in foreground_cache:
+                        foreground_cache[i] = foreground_polygons(
+                            [{'class_id': 0, 'mask': measured_mask(d)} for d in detections[i]], w, h)
+                    polygons = foreground_cache[i]
                     if not polygons:
                         samples = []
                         break
                     ms = frames[i]['media_ms']
                     if j is not None:
                         row = detections[i][j]
+                        if (i, j) not in stance_cache:
+                            stance_cache[i, j] = stance_bounds(row, w)
+                        stance = stance_cache[i, j]
                     else:
                         ai, bi = interval['indices'][0], interval['indices'][-1]
                         first = detections[ai][interval['instances'][0]]
@@ -400,10 +410,11 @@ def contour_segments(video, observations, start, end, *, deadline, diagnostics, 
                         u = (ms-frames[ai]['media_ms'])/(frames[bi]['media_ms']-frames[ai]['media_ms'])
                         row = {'ground':None, 'player_width':first['player_width']+(last['player_width']-first['player_width'])*u,
                                'confidence':min(first['confidence'], last['confidence'])}
+                        stance = {}
                     fid = f'position-contour:{ms}'
                     samples.append({'media_ms': ms, 'frame_id': fid, 'ground': row['ground'],
                                     **display.get(i, {}),
-                                    **stance_bounds(row, w),
+                                    **stance,
                                     'player_width': row['player_width'], 'confidence': row['confidence'],
                                     'foreground': {'method': 'SOURCE_PERSON_MASK', 'frame_id': fid,
                                                    'media_ms': ms, 'polygons': polygons}})

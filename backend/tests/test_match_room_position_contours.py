@@ -1,7 +1,57 @@
 from copy import deepcopy
+import json
 import time
 import numpy as np
 import match_room_position_contours as localized
+
+
+def test_overlapping_intervals_reuse_only_exact_window_geometry(monkeypatch):
+    import match_room_contours as source
+    import match_room_tracking as tracking
+    mask = np.zeros((100, 100), np.uint8)
+    mask[20:80, 30:51] = 1
+    row = {'mask': mask, 'box': [30, 20, 21, 60], 'ground': [.4, .79],
+           'player_width': .2, 'confidence': .9}
+    obs = [{'frame_id': f'f{t}', 'media_ms': t, 'identity_status': 'CONFIRMED',
+            'ground': [.4, .79], 'player_box': [.3, .2, .21, .6]} for t in (0, 100, 200, 300)]
+    def stream(*args, **kwargs):
+        for t in range(0, 301, 25):
+            yield {'media_ms': t, 'gray': np.zeros((100, 100), np.uint8),
+                   'image': np.zeros((100, 100, 3), np.uint8)}
+    monkeypatch.setattr(source, 'read_clip', stream)
+    monkeypatch.setattr(source, 'detect_frame', lambda *a: [deepcopy(row)])
+    monkeypatch.setattr(localized, 'endpoint_pairs', lambda _: iter([(obs[0], obs[2]), (obs[1], obs[3])]))
+    def intervals(frames, detections, pair, **kwargs):
+        indices = [i for i, f in enumerate(frames) if pair[0]['media_ms'] <= f['media_ms'] <= pair[1]['media_ms']]
+        return [{'indices': indices, 'instances': [0]*len(indices)}]
+    monkeypatch.setattr(localized, 'agreed_intervals', intervals)
+    monkeypatch.setattr(localized, 'supporting_observations', lambda *a: True)
+    original_foreground, original_stance = tracking.foreground_polygons, localized.stance_bounds
+    calls = {'foreground': 0, 'stance': 0}
+    def foreground(*args):
+        calls['foreground'] += 1
+        return original_foreground(*args)
+    def stance(*args):
+        calls['stance'] += 1
+        return original_stance(*args)
+    monkeypatch.setattr(tracking, 'foreground_polygons', foreground)
+    monkeypatch.setattr(localized, 'stance_bounds', stance)
+    def run_window():
+        return localized.contour_segments('unused', obs, 0, 300, deadline=time.monotonic()+5,
+                                          diagnostics={}, segmenter=object())
+    first = run_window()
+    assert len(first) == 2
+    assert sum(len(s['samples']) for s in first) == 18
+    assert calls == {'foreground': 13, 'stance': 13}
+    expected_polygons = original_foreground([{'class_id': 0, 'mask': mask}], 100, 100)
+    for segment in first:
+        for sample in segment['samples']:
+            assert sample['foreground']['polygons'] == expected_polygons
+            assert sample['stance_bounds'] == original_stance(row, 100)['stance_bounds']
+    # Another source/window never inherits geometry from this invocation.
+    second = run_window()
+    assert json.dumps(first, sort_keys=True) == json.dumps(second, sort_keys=True)
+    assert calls == {'foreground': 26, 'stance': 26}
 
 
 def fixture(monkeypatch):
@@ -250,3 +300,4 @@ def test_middle_source_knot_is_shared_by_overlapping_curves_without_rewriting_me
     other = {'indices':list(range(5)), 'instances':[0]*5}
     localized.bind_source_display_knots(frames, rows, other, obs)
     assert other['source_endpoint_ground'] == {}
+
