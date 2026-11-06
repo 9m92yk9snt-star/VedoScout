@@ -126,7 +126,7 @@ def feature_paths(frames, rows, owners, deadline):
     return paths
 
 
-def agreed_intervals(frames, detections, observations, *, deadline, allow_display_bridge=False):
+def agreed_intervals(frames, detections, observations, *, deadline, allow_display_bridge=False, association_cache=None):
     """Require both endpoint observations and both complete optical paths."""
     if not frames or len(frames) != len(detections):
         return []
@@ -153,8 +153,9 @@ def agreed_intervals(frames, detections, observations, *, deadline, allow_displa
             owners.append(candidates[0] if len(candidates) == 1 else None)
         if None in owners:
             continue
-        forward = follow_instance(local, rows, 0, owners[0])
-        backward = follow_instance(local, rows, len(local)-1, owners[1])
+        cache_args = {'association_cache': association_cache} if association_cache is not None else {}
+        forward = follow_instance(local, rows, 0, owners[0], **cache_args)
+        backward = follow_instance(local, rows, len(local)-1, owners[1], **cache_args)
         if (allow_display_bridge and not any(forward[i] != backward[i] for i in set(forward) & set(backward))
                 and any(i not in forward or i not in backward for i in range(len(local)))):
             ff, bb = feature_paths(local, rows, owners, deadline)
@@ -330,6 +331,7 @@ def contour_segments(video, observations, start, end, *, deadline, diagnostics, 
     # rejected foreground results so another interval cannot redo the work.
     # Lifetime and size are bounded by read_clip's MAX_FRAMES, never a report.
     foreground_cache, stance_cache, camera_cache = {}, {}, {}
+    association_cache = {}
     pending = {}
     for a, b in pairs:
         prior = pending.get(b['media_ms'])
@@ -360,7 +362,8 @@ def contour_segments(video, observations, start, end, *, deadline, diagnostics, 
                 continue
             # Complete and preserve each independently checked interval before
             # decoding more frames. A later timeout cannot erase earlier proof.
-            intervals = agreed_intervals(frames, detections, pair, deadline=deadline, allow_display_bridge=True)
+            intervals = agreed_intervals(frames, detections, pair, deadline=deadline, allow_display_bridge=True,
+                                         association_cache=association_cache)
             support = [o for o in observations if pair[0]['media_ms'] <= o['media_ms'] <= pair[1]['media_ms']]
             if not intervals:
                 # When a pose hides the detector's foot/body, use the last

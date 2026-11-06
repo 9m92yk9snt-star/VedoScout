@@ -71,7 +71,7 @@ def fixture(monkeypatch):
     frames = [{'media_ms': t, 'gray': np.zeros((100, 100), np.uint8)} for t in range(0, 201, 50)]
     detections = [[deepcopy(row)] for _ in frames]
     path = dict.fromkeys(range(len(frames)), 0)
-    monkeypatch.setattr(localized, 'follow_instance', lambda *a: path)
+    monkeypatch.setattr(localized, 'follow_instance', lambda *a, **k: path)
     obs = [{'frame_id': f'f{t}', 'media_ms': t, 'identity_status': 'CONFIRMED',
             'ground': [.4, .79], 'player_width': .2} for t in (0, 200)]
     return frames, detections, obs, path
@@ -279,7 +279,7 @@ def test_automatic_flow_exports_endpoint_estimates_without_pixel_identity_claim(
     frames, rows, obs, _ = fixture(monkeypatch)
     for o in obs: o['player_box'] = [.3,.2,.21,.6]
     for frame in frames: frame['image'] = np.zeros((100,100,3), np.uint8)
-    monkeypatch.setattr(localized, 'follow_instance', lambda f,r,i,j: {i:j})
+    monkeypatch.setattr(localized, 'follow_instance', lambda f,r,i,j, **k: {i:j})
     monkeypatch.setattr(localized, 'feature_paths', lambda *a: ({},{}))
     monkeypatch.setattr(source, 'read_clip', lambda *a,**kw: (f for f in deepcopy(frames)))
     monkeypatch.setattr(source, 'detect_frame', lambda *a: deepcopy(rows[0]))
