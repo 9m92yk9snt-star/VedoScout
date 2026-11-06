@@ -2,12 +2,32 @@
   "purpose": "Strict primary acceptance scope for ScoutMePlay/VedoScout PR #59",
   "analysis_name": "Orman1000",
   "primary_evidence_archive": {
-    "filename": "dd5a84b1-3dc9-40b0-80c4-89232903774f-evidence (2).zip",
+    "filename": "dd5a84b1-3dc9-40b0-80c4-89232903774f-evidence (2)(1).zip",
     "library_record_size_bytes": 37556202,
     "library_record_created_utc": "2026-11-06T01:53:34Z",
-    "archive_bytes_directly_verified_in_current_runtime": false,
-    "archive_sha256": null,
-    "original_source_video_sha256_from_latest_archive": null
+    "archive_bytes_directly_verified_in_current_runtime": true,
+    "archive_sha256": "3b27260511ed965952a497f97d1c6345a0f1b4bef1b89a60912a62e0f6530c0c",
+    "original_source_video_sha256_from_latest_archive": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2",
+    "verified_payload_files": 118,
+    "checksum_mismatches": 0,
+    "zip_integrity_test": "PASS",
+    "export_manifest_complete": false,
+    "original_mov_available_in_archive": false,
+    "web_mp4_bytes": 31659779,
+    "web_mp4_frame_count": 4606,
+    "web_mp4_width": 1080,
+    "web_mp4_height": 1920,
+    "timebase": "Measured decoded source PTS via OpenCV CAP_PROP_POS_MSEC",
+    "source_report_status": "ready",
+    "canonical_event_coverage_complete": false,
+    "canonical_event_count": 21,
+    "match_room_card_count": 8,
+    "original_human_selections": 10,
+    "processing_seconds": 1567.662,
+    "assets_seconds": 1166.845,
+    "source_analysis_seconds": 245.088,
+    "original_selection_digest": "ca4bc63080b8de6b986c370f809c89ad1050b5d1c883fe7e748da0ab8400d016",
+    "source_archive_verification": "Passed locally on exact attached ZIP and embedded canonical web MP4"
   },
   "previous_zip_versions_not_primary": [
     "dd5a84b1-3dc9-40b0-80c4-89232903774f-evidence.zip",
@@ -20,7 +40,8 @@
     "clip_0044_accepted_ellipse_frames": 91,
     "clip_0044_unmarked_frames": 45,
     "full_latest_zip_visual_acceptance": false,
-    "stored_diagnostic_source_matches_latest_zip_source": "NOT_YET_VERIFIED"
+    "stored_diagnostic_source_matches_latest_zip_source": true,
+    "stored_diagnostic_is_a_separate_experiment": true
   },
   "excluded_release_evidence": {
     "other_video_name": "Orman400",
@@ -28,7 +49,7 @@
     "restriction": "Only isolated engineering regression input; NEVER evidence of Orman1000 production readiness"
   },
   "required_gates": [
-    "Read the exact newest ZIP and verify raw archive and its original video SHA-256",
+    "DONE: Verified 118 payload checksums, ZIP SHA and embedded canonical web-video SHA fa56f933... (original .mov is not in ZIP)",
     "Bind all original selections, player identity, report clips, outcomes and score evidence to that exact source",
     "Measure exact decoded source PTS and accepted Match Room overlays for Orman1000",
     "Diagnose the 45 missing 00:44 frames: visible target versus occluded/absent/uncertain; do not invent marks",
@@ -38,6 +59,44 @@
     "Obtain user approval before merge or deploy"
   ],
   "production_cache_enabled": false,
-  "current_release_acceptance": "BLOCKED_PENDING_LATEST_ZIP_RAW_BYTES",
-  "production_or_main_changes_allowed_without_user_approval": false
+  "current_release_acceptance": "ARCHIVE_VERIFIED_BUT_SOURCE_SPECIFIC_LIVE_GRAPHICS_AND_EVENT_COVERAGE_OPEN",
+  "production_or_main_changes_allowed_without_user_approval": false,
+  "actual_latest_zip_source_pts_audit": {
+    "scope": "Raw source-bound mask samples at exact decoded original web-video PTS ±2ms; not a direct frontend acceptance or revised-model run",
+    "00:44": {
+      "frames": 136,
+      "stored_mask_covered": 69,
+      "independent_confirmed_ground_supported": 91,
+      "supported_but_unmasked": 22,
+      "no_confirmed_ground_support_and_unmasked": 45,
+      "last_confirmed_ground_ms": 45382,
+      "next_confirmed_no_ground_ms": [
+        45498,
+        45515
+      ],
+      "first_absent_ms": 45632
+    },
+    "00:31": {
+      "frames": 83,
+      "stored_mask_covered": 39,
+      "independent_confirmed_ground_supported": 83,
+      "supported_but_unmasked": 44
+    },
+    "00:08": {
+      "frames": 279,
+      "stored_mask_covered": 151,
+      "stored_localization_ends_ms": 10000,
+      "reported_clip_ends_ms": 12133,
+      "source_evidence_completion_receipt_available": true,
+      "source_evidence_completion_receipt_status": "OBSERVATIONS_RETURNED",
+      "source_evidence_completion_rows": 17
+    },
+    "00:56": {
+      "frames": 69,
+      "stored_mask_covered": 31,
+      "independent_confirmed_ground_supported": 48,
+      "supported_but_unmasked": 17
+    },
+    "caveat": "Ground support is a conservative candidate window between independent CONFIRMED ground+box observations <=250ms apart; it does NOT authorize per-frame identity, interpolation, or a continuous ellipse."
+  }
 }
