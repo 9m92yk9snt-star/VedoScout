@@ -5,6 +5,44 @@ import tempfile
 import match_room_tracking as tracking
 
 
+def test_initial_contours_reuse_weights_but_keep_every_window_and_reset_per_run(monkeypatch):
+    import native_player_segmentation as native
+    import match_room_position_contours as contours
+    import match_room_ball_playback as ball
+    loaded, calls = [], []
+    def load():
+        model = object()
+        loaded.append(model)
+        return model
+    def window(video, observations, lo, hi, *, segmenter, on_segment, **kwargs):
+        calls.append((lo, hi, segmenter))
+        segment = {'id': f'{lo}:{hi}', 'samples': [{'media_ms': lo}, {'media_ms': hi}]}
+        on_segment(segment)
+        return [segment]
+    monkeypatch.setattr(native, 'PersonSegmenter', load)
+    monkeypatch.setattr(contours, 'observation_windows', lambda *args: [(100, 200), (200, 300)])
+    monkeypatch.setattr(contours, 'contour_segments', window)
+    monkeypatch.setattr(tracking, 'observed_motion', lambda video, rows, **kw: deepcopy(rows))
+    monkeypatch.setattr(tracking, 'pass_motion', lambda video, event, rows: rows)
+    monkeypatch.setattr(ball, 'build_ball_playback', lambda *args: ({'unchanged': True}, {}))
+    event = {'event_id': 'e', 'source_video_sha256': 'source',
+             'localization_method': 'EXPLICIT_SOURCE_POSITIONS',
+             'proof': {'proof_start_ms': 100, 'proof_end_ms': 300},
+             'visual_samples': [{'media_ms': 100}, {'media_ms': 300}]}
+    before = deepcopy(event)
+    first = tracking.compute('video', [], [event])
+    second = tracking.compute('video', [], [event])
+    assert first == second
+    assert event == before
+    assert len(loaded) == 2 and loaded[0] is not loaded[1]
+    assert calls == [(100, 200, loaded[0]), (200, 300, loaded[0]),
+                     (100, 200, loaded[1]), (200, 300, loaded[1])]
+    assert [s['id'] for s in first['e']['segments']] == ['100:200', '200:300']
+    assert first['e']['ball_playback'] == {'unchanged': True}
+    assert tracking.compute('video', [], [{**event, 'visual_samples': []}]) == {}
+    assert len(loaded) == 2
+
+
 def points(times=(1., 1.08, 1.16)):
     return [dict(t=t, x=.4, y=.3, w=.1, h=.3, conf=.8) for t in times]
 

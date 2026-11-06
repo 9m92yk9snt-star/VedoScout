@@ -302,6 +302,9 @@ def compute(video, anchors, events, checkpoint=None):
     cv2.setNumThreads(2)
     deadline = time.monotonic() + (SOURCE_TIMEOUT_S if any(e.get('localization_method') == 'EXPLICIT_SOURCE_POSITIONS' for e in events) else TIMEOUT_S) - 3
     output = {}
+    # Owned by this sequential worker only. Reuse immutable weights across
+    # source windows; every frame still receives a fresh prediction.
+    position_model = None
     def save():
         if checkpoint is not None:
             temporary = Path(str(checkpoint)+'.tmp')
@@ -365,9 +368,13 @@ def compute(video, anchors, events, checkpoint=None):
                 for lo, stop in observation_windows(observations, lo, hi):
                     if time.monotonic() >= deadline-1:
                         break
+                    if position_model is None:
+                        from native_player_segmentation import PersonSegmenter
+                        position_model = PersonSegmenter()
                     part = {'start_ms': lo, 'end_ms': stop}
                     contours.extend(position_contours(video, observations, lo, stop,
-                                                      deadline=deadline, diagnostics=part, on_segment=preserve))
+                                                      deadline=deadline, diagnostics=part, on_segment=preserve,
+                                                      segmenter=position_model))
                     diagnostic.setdefault('windows', []).append(part)
                 diagnostic.update(method=position_method, status='SUPPORTED_SOURCE_OBSERVATIONS' if contours else 'NO_AGREED_INTERVAL')
             else:
