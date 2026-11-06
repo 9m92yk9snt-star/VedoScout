@@ -17,10 +17,10 @@ jobs:
       github.event.pull_request.draft == true &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.event.pull_request.head.ref == 'codex/matchroom-window-geometry-reuse' &&
-      github.event.before == 'e7c14f68be1095fbcde521a162e9178cd3ef07b3' &&
+      github.event.before == '2fd8dc44e0fefce8514113c89bf0c30895daeaa2' &&
       github.run_attempt == 1
     runs-on: ubuntu-latest
-    timeout-minutes: 23
+    timeout-minutes: 35
     env:
       PYTHONPATH: backend
       PYTHONDONTWRITEBYTECODE: '1'
@@ -35,8 +35,8 @@ jobs:
           python-version: '3.11'
       - name: Install pinned offline source video and CPU runtime dependencies
         run: |
-          sudo apt-get -qq update
-          sudo apt-get -y -qq install ffmpeg
+          # No apt update/install: OpenCV reads the bundled MP4 directly.
+          # Prior run blocked in apt update for >22 minutes before any test.
           python -m pip install 'numpy==2.4.6' 'opencv-python-headless==4.13.0.92' 'onnxruntime==1.31.1' 'Pillow==12.2.0' 'python-dotenv==1.2.2'
       - name: Restore earlier no-new-model paid receipts and all ten original taps
         uses: actions/download-artifact@v4
