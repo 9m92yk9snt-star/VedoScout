@@ -53,12 +53,21 @@ def packet_id(event):
     return 'positions_' + event['event_id']
 
 
-def prepare(video, selection, event, work, reference_images=None):
+def prepare(video, selection, event, work, reference_images=None, *, window=None):
     """Bounded source window including duel recovery in existing clip context."""
     work = Path(work)
     work.mkdir(parents=True, exist_ok=True)
     proof = event['proof']
     start, end, context = position_window(event)
+    pid = packet_id(event)
+    if window is not None:
+        start, end = window
+        if (type(start) is not int or type(end) is not int
+                or not proof['proof_start_ms'] <= start <= end <= proof['proof_end_ms']
+                or end-start > 2500):
+            raise ValueError('LOCALIZATION_COMPLETION_WINDOW_INVALID')
+        context = 0
+        pid += f'_coverage_{start}_{end}'
     cap = cv2.VideoCapture(str(video))
     items = [{'type': 'text', 'text': PROMPT}]
     references, frames = [], []
@@ -116,14 +125,41 @@ def prepare(video, selection, event, work, reference_images=None):
         cap.release()
     _, _, request = transport.build_request('emergent', 'gpt-6-astra', items,
         reasoning_effort='medium', image_detail='high', max_output_tokens=10000)
-    record = {'version': 2, 'event_id': event['event_id'], 'packet_id': packet_id(event),
+    record = {'version': 2, 'event_id': event['event_id'], 'packet_id': pid,
               'source_video_sha256': event['source_video_sha256'],
               'original_selection_values_sha256': selection_digest(selection),
               'frames': frames, 'references': references, 'request': request,
               'window_ms': [start, end], 'context_after_ms': context}
-    job = {'packet_id': packet_id(event), 'items': items, 'reasoning_effort': 'medium',
+    job = {'packet_id': pid, 'items': items, 'reasoning_effort': 'medium',
            'image_detail': 'high', 'max_output_tokens': 10000}
     return record, job
+
+
+def completion_windows(event, record):
+    """Unobserved clip edges only, retaining the existing 125ms cadence.
+
+    UNCERTAIN/ABSENT rows inside a completed request are not missing work.
+    Limit extra work to two windows per event; report any remaining gap.
+    """
+    frames = record.get('frames') or []
+    if not frames:
+        return []
+    lo, hi = record.get('window_ms') or [frames[0]['media_ms'], frames[-1]['media_ms']]
+    proof = event['proof']
+    ranges = []
+    if proof['proof_start_ms'] < lo:
+        ranges.append((proof['proof_start_ms'], max(proof['proof_start_ms'], lo-125)))
+    if hi < proof['proof_end_ms']:
+        ranges.append((min(hi+125, proof['proof_end_ms']), proof['proof_end_ms']))
+    windows = []
+    for start, end in ranges:
+        while start <= end and len(windows) < 2:
+            stop = min(start+2500, end)
+            windows.append([start, stop])
+            if stop == end:
+                break
+            start = min(stop+125, end)
+    return windows
 
 
 async def localize(video, doc, *, checkpoint, event_ids=None, run_jobs=None, budget_seconds=420):
@@ -155,7 +191,8 @@ async def localize(video, doc, *, checkpoint, event_ids=None, run_jobs=None, bud
         for event in candidates:
             eid = event['event_id']
             if time.monotonic()-started >= budget_seconds:
-                audit['events'][eid] = {'status': 'NOT_SENT', 'error': 'LOCALIZATION_TIME_BUDGET'}
+                audit['events'][eid] = {**deepcopy(previous.get(eid) or {}),
+                    'status': 'NOT_SENT', 'error': 'LOCALIZATION_TIME_BUDGET'}
                 continue
             try:
                 if reference_images is None:
@@ -164,10 +201,14 @@ async def localize(video, doc, *, checkpoint, event_ids=None, run_jobs=None, bud
                 else:
                     record, job = await asyncio.to_thread(prepare, video, selection, event, Path(work)/eid, reference_images)
             except (ValueError, OSError, cv2.error):
-                audit['events'][eid] = {'status': 'UNAVAILABLE', 'error': 'LOCALIZATION_PREFLIGHT_FAILED'}
+                audit['events'][eid] = {**deepcopy(previous.get(eid) or {}),
+                    'status': 'UNAVAILABLE', 'error': 'LOCALIZATION_PREFLIGHT_FAILED'}
                 continue
             records[eid], by_packet[packet_id(event)] = record, event
             old = previous.get(eid) or {}
+            # Keep paid supplementary receipts through the initial checkpoint.
+            # Each is revalidated against a freshly rebuilt request below.
+            record['completion'] = deepcopy(old.get('completion') or {})
             cached = old.get('receipt') or {}
             if reusable_receipt(cached, record['request'], provider='emergent',
                                 model='gpt-6-astra', packet_id=packet_id(event)):
@@ -208,6 +249,81 @@ async def localize(video, doc, *, checkpoint, event_ids=None, run_jobs=None, bud
                 deadline=started+budget_seconds, per_call_s=150, workers=2, on_result=finished)
             for receipt in results:
                 accept(receipt)
+        # Complete clip edges without changing the original request/cache key.
+        # Existing uncertain rows are preserved, never retried to obtain a
+        # more convenient identity. Supplemental jobs share the same deadline.
+        extra_jobs, extra_records = [], {}
+        for event in candidates:
+            eid = event['event_id']
+            record = records.get(eid)
+            if not record or record.get('status') != 'OBSERVATIONS_RETURNED':
+                continue
+            for window in completion_windows(event, record):
+                pid = packet_id(event)+f'_coverage_{window[0]}_{window[1]}'
+                if time.monotonic()-started >= budget_seconds:
+                    record['completion_error'] = 'LOCALIZATION_TIME_BUDGET'
+                    break
+                try:
+                    extra, job = await asyncio.to_thread(prepare, video, selection, event,
+                        Path(work)/pid, reference_images, window=window)
+                except (ValueError, OSError, cv2.error):
+                    record['completion_error'] = 'LOCALIZATION_PREFLIGHT_FAILED'
+                    continue
+                cached = (record['completion'].get(pid) or {}).get('receipt') or {}
+                extra['reused'] = reusable_receipt(cached, extra['request'],
+                    provider='emergent', model='gpt-6-astra', packet_id=pid)
+                if extra['reused']:
+                    extra['receipt'] = deepcopy(cached)
+                else:
+                    extra_jobs.append(job)
+                record['completion'][pid] = extra
+                extra_records[pid] = (event, record, extra)
+        def accept_extra(receipt):
+            event, record, extra = extra_records[receipt['packet_id']]
+            extra.update(receipt=deepcopy(receipt), status='UNAVAILABLE')
+            if receipt.get('status') == 'COMPLETED':
+                try:
+                    rows = bound_samples(event, selection, extra, validate, packet=receipt['packet_id'])
+                    if any(not extra['window_ms'][0]-50 <= r['media_ms'] <= extra['window_ms'][1]+50 for r in rows):
+                        raise ValueError('LOCALIZATION_COMPLETION_OUTSIDE_WINDOW')
+                    # Never silently resolve conflicting low-frame-rate
+                    # observations in favour of either request.
+                    merged = {r['media_ms']: r for r in event['visual_samples']}
+                    if any(r['media_ms'] in merged and merged[r['media_ms']] != r for r in rows):
+                        raise ValueError('LOCALIZATION_COMPLETION_OVERLAP')
+                    for row in rows:
+                        merged.setdefault(row['media_ms'], row)
+                    event['visual_samples'] = sorted(merged.values(), key=lambda r:r['media_ms'])
+                    extra['status'] = 'OBSERVATIONS_RETURNED'
+                    extra.pop('error', None)
+                except ValueError:
+                    extra['error'] = 'LOCALIZATION_OBSERVATIONS_REJECTED'
+            else:
+                extra['error'] = receipt.get('error', 'LOCALIZATION_MODEL_FAILED')
+            audit['events'][event['event_id']] = deepcopy(record)
+        for event, record, extra in extra_records.values():
+            if extra['reused']:
+                accept_extra(extra['receipt'])
+            audit['events'][event['event_id']] = deepcopy(record)
+        await checkpoint(deepcopy(audit))
+        def finished_extra(receipt):
+            accept_extra(receipt)
+            asyncio.run_coroutine_threadsafe(checkpoint(deepcopy(audit)), loop).result()
+        if extra_jobs:
+            results = await asyncio.to_thread(run_jobs, extra_jobs, 'emergent', 'gpt-6-astra',
+                deadline=started+budget_seconds, per_call_s=150, workers=2, on_result=finished_extra)
+            for receipt in results:
+                accept_extra(receipt)
+        for event in candidates:
+            record = records.get(event['event_id'])
+            if record:
+                times = [s['media_ms'] for s in event.get('visual_samples') or []]
+                record['coverage'] = {
+                    'required_window_ms': [event['proof']['proof_start_ms'], event['proof']['proof_end_ms']],
+                    'returned_span_ms': [min(times), max(times)] if times else None,
+                    'clip_edges_observed': bool(times and min(times) <= event['proof']['proof_start_ms']+50
+                                               and max(times) >= event['proof']['proof_end_ms']-50)}
+                audit['events'][event['event_id']] = deepcopy(record)
     audit['elapsed_seconds'] = round(time.monotonic()-started, 3)
     await checkpoint(deepcopy(audit))
     return bundle
