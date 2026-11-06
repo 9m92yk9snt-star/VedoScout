@@ -62,3 +62,27 @@ def test_empty_predictions_are_reused(tmp_path,monkeypatch):
     assert c.predict(image)==[]
     assert c.predict(image)==[]
     assert len(calls)==1
+
+
+def test_truncated_packed_mask_is_recomputed_not_zero_padded(tmp_path,monkeypatch):
+    monkeypatch.setenv('SCOUTMEPLAY_MATCHROOM_ENGINE','opencv')
+    m=Model();c=CachedSegmenter(m,tmp_path,'source');image=np.ones((4,4,3),np.uint8)
+    c.predict(image);path=next(tmp_path.glob('*.npz'))
+    with np.load(path,allow_pickle=False) as data:
+        stored={key:data[key].copy() for key in data.files}
+    stored['bits']=stored['bits'][:1]
+    np.savez_compressed(path,**stored)
+    assert c.predict(image)[0]['mask'].sum()==16
+    assert m.calls==2
+
+
+def test_invalid_cache_metadata_recomputes_instead_of_interrupting(tmp_path,monkeypatch):
+    monkeypatch.setenv('SCOUTMEPLAY_MATCHROOM_ENGINE','opencv')
+    m=Model();c=CachedSegmenter(m,tmp_path,'source');image=np.ones((4,4,3),np.uint8)
+    c.predict(image);path=next(tmp_path.glob('*.npz'))
+    with np.load(path,allow_pickle=False) as data:
+        stored={key:data[key].copy() for key in data.files}
+    stored['meta']='null'
+    np.savez_compressed(path,**stored)
+    assert c.predict(image)[0]['mask'].sum()==16
+    assert m.calls==2

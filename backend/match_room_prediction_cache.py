@@ -36,12 +36,16 @@ class CachedSegmenter:
                 if (str(data['key']) != key or len(shape) != 3 or not 0 <= shape[0] <= 24
                         or shape[1:] != image.shape[:2] or len(meta) != shape[0]):
                     raise ValueError('Invalid prediction cache')
-                masks = np.unpackbits(data['bits'], count=int(np.prod(shape))).reshape(shape)
+                bits = data['bits']
+                count = int(np.prod(shape))
+                if bits.dtype != np.uint8 or bits.ndim != 1 or bits.size != (count + 7) // 8:
+                    raise ValueError('Incomplete prediction mask')
+                masks = np.unpackbits(bits, count=count).reshape(shape)
                 rows = [{**row, 'box': tuple(row['box']), 'mask': mask.copy()}
                         for row, mask in zip(meta, masks)]
             self.hits += 1
             return rows
-        except (OSError, ValueError, KeyError, EOFError, zipfile.BadZipFile):
+        except (OSError, ValueError, KeyError, EOFError, TypeError, IndexError, OverflowError, zipfile.BadZipFile):
             pass
         self.misses += 1
         rows = self.model.predict(image)
