@@ -1,6 +1,7 @@
 name: Real-source ONNX cache parity (offline, one scoped trial)
 on:
-  push:
+  pull_request:
+    types: [synchronize]
     paths:
       - '.github/workflows/matchroom-onnx-source-cache.yml'
 
@@ -11,7 +12,9 @@ jobs:
   source_bound_onnx_cache:
     if: >-
       github.repository == '9m92yk9snt-star/VedoScout' &&
-      github.ref == 'refs/heads/codex/matchroom-window-geometry-reuse' &&
+      github.event.pull_request.number == 59 &&
+      github.event.pull_request.head.ref == 'codex/matchroom-window-geometry-reuse' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
       github.run_attempt == 1
     runs-on: ubuntu-latest
     timeout-minutes: 20
