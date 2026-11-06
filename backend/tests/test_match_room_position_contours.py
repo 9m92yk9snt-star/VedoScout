@@ -39,7 +39,7 @@ def test_overlapping_intervals_reuse_only_exact_window_geometry(monkeypatch):
     diagnostics = {}
     def run_window():
         return localized.contour_segments('unused', obs, 0, 300, deadline=time.monotonic()+5,
-                                          diagnostics=diagnostics, segmenter=object())
+                                          diagnostics=diagnostics, segmenter=object(), audit_pairs=True)
     first = run_window()
     assert len(first) == 2
     assert sum(len(s['samples']) for s in first) == 18
@@ -165,7 +165,7 @@ def test_completed_interval_is_checkpointed_before_later_decode_timeout(monkeypa
     monkeypatch.setattr(tracking, 'foreground_polygons', lambda *args: [[[.3,.2],[.5,.2],[.5,.8]]])
     saved, diagnostic = [], {}
     result = localized.contour_segments('unused', obs, 0, 400, deadline=100,
-                                        diagnostics=diagnostic, on_segment=saved.append)
+                                        diagnostics=diagnostic, on_segment=saved.append, audit_pairs=True)
     assert len(saved) == len(result) == 1
     assert result[0]['samples'][-1]['media_ms'] == 200
     assert diagnostic['status'] == 'TIME_BUDGET'
@@ -187,7 +187,7 @@ def test_completed_interval_is_checkpointed_before_later_decode_timeout(monkeypa
     monkeypatch.setattr(source, 'read_clip', missing_endpoint)
     diagnostic = {}
     segments = localized.contour_segments('unused', obs, 0, 400, deadline=100,
-                                          diagnostics=diagnostic)
+                                          diagnostics=diagnostic, audit_pairs=True)
     assert len(segments) == 1
     assert diagnostic['status'] == 'SUPPORTED_SOURCE_OBSERVATIONS'
     assert diagnostic['source_pairs_unreached'] == 1
