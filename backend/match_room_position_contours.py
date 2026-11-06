@@ -493,7 +493,7 @@ def contour_segments(video, observations, start, end, *, deadline, diagnostics, 
                 'start_ms': pair[0]['media_ms'],
                 'end_ms': pair[1]['media_ms'],
                 'accepted_segments': 0,
-                'rejection_codes': ['NOT_DECODED_BEFORE_DEADLINE'],
+                'rejection_codes': ['TIME_BUDGET_BEFORE_ENDPOINT' if timed_out else 'ENDPOINT_NOT_DECODED'],
             })
     diagnostics['source_pair_results'].sort(key=lambda r: (r['start_ms'], r['end_ms']))
     diagnostics['source_pairs_unreached'] = (diagnostics['source_pairs_expected']
