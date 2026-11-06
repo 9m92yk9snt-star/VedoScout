@@ -195,6 +195,15 @@ def test_completed_interval_is_checkpointed_before_later_decode_timeout(monkeypa
         'start_ms': 200, 'end_ms': 400, 'accepted_segments': 0,
         'rejection_codes': ['ENDPOINT_NOT_DECODED']
     }
+    # Detailed audit is OFF for the real analysis path; enabling it is
+    # observational only and cannot change accepted source-bound segments.
+    default_diagnostics = {}
+    default_segments = localized.contour_segments(
+        'unused', obs, 0, 400, deadline=100, diagnostics=default_diagnostics
+    )
+    assert default_segments == segments
+    assert 'source_pair_results' not in default_diagnostics
+    assert default_diagnostics['source_pairs_unreached'] == 1
 
 
 def test_recovery_window_gets_budget_first_without_duplicate_intervals():
