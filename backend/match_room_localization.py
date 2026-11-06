@@ -53,6 +53,24 @@ def packet_id(event):
     return 'positions_' + event['event_id']
 
 
+def bounded_request_runner(run_jobs, maximum):
+    """Cap newly submitted jobs across primary AND supplemental batches.
+
+    Reserve before transport: an interrupted call may already have been paid.
+    This caps submitted jobs, not retries internal to the existing transport.
+    """
+    if type(maximum) is not int or maximum < 0:
+        raise ValueError('INVALID_GRAPHICS_REQUEST_LIMIT')
+    submitted = 0
+    def run(jobs, *args, **kwargs):
+        nonlocal submitted
+        if submitted+len(jobs) > maximum:
+            raise ValueError('NEW_GRAPHICS_REQUEST_LIMIT_EXCEEDED')
+        submitted += len(jobs)
+        return run_jobs(jobs, *args, **kwargs)
+    return run
+
+
 def prepare(video, selection, event, work, reference_images=None, *, window=None):
     """Bounded source window including duel recovery in existing clip context."""
     work = Path(work)
@@ -181,9 +199,13 @@ async def localize(video, doc, *, checkpoint, event_ids=None, run_jobs=None, bud
     chosen = set(event_ids if event_ids is not None else
                  [r['event_id'] for r in doc['full_report']['video_comments']])
     candidates = [e for e in bundle['events'] if e['event_id'] in chosen and not e.get('visual_samples')][:8]
-    previous = (doc.get('match_room_localization') or {}).get('events') or {}
+    previous_audit = doc.get('match_room_localization') or {}
+    previous = previous_audit.get('events') or {}
+    same_context = (previous_audit.get('source_video_sha256') == bundle['source_video_sha256']
+                    and previous_audit.get('original_selection_values_sha256') == selection_digest(selection))
     audit = {'version': 2, 'source_video_sha256': bundle['source_video_sha256'],
-             'original_selection_values_sha256': selection_digest(selection), 'events': {}}
+             'original_selection_values_sha256': selection_digest(selection),
+             'events': deepcopy(previous) if same_context else {}}
     loop = asyncio.get_running_loop()
     jobs, records, by_packet = [], {}, {}
     reference_images = None

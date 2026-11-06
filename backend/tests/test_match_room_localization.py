@@ -8,6 +8,47 @@ import match_room_localization as loc
 from test_match_room_position_evidence import fixture
 
 
+def test_request_limit_is_shared_by_primary_and_completion_batches():
+    calls = []
+    run = loc.bounded_request_runner(lambda jobs, *a, **k: calls.extend(jobs), 1)
+    run([{'packet_id': 'primary'}])
+    with pytest.raises(ValueError, match='REQUEST_LIMIT_EXCEEDED'):
+        run([{'packet_id': 'completion'}])
+    assert calls == [{'packet_id': 'primary'}]
+    zero = loc.bounded_request_runner(lambda *a, **k: pytest.fail('paid call'), 0)
+    with pytest.raises(ValueError, match='REQUEST_LIMIT_EXCEEDED'):
+        zero([{}])
+
+
+def test_interrupted_transport_still_consumes_reserved_request_allowance():
+    calls=[]
+    def failed(jobs):
+        calls.append(jobs)
+        raise RuntimeError('response interrupted')
+    run=loc.bounded_request_runner(failed, 1)
+    with pytest.raises(RuntimeError): run([{}])
+    with pytest.raises(ValueError, match='REQUEST_LIMIT_EXCEEDED'): run([{}])
+    assert len(calls)==1
+
+
+def test_selective_retry_keeps_other_paid_event_receipts(monkeypatch):
+    doc, primary, extra = completion_setup(monkeypatch)
+    audit=doc['match_room_localization']
+    audit.update(source_video_sha256='source',
+                 original_selection_values_sha256=primary['original_selection_values_sha256'])
+    audit['events']['other']={'receipt': {'retained': 'paid result'}, 'status': 'OBSERVATIONS_RETURNED'}
+    saved=[]
+    async def checkpoint(a): saved.append(deepcopy(a))
+    asyncio.run(loc.localize('source',doc,checkpoint=checkpoint,event_ids=['event'],
+        run_jobs=lambda *a,**k:[extra['receipt']]))
+    assert all(a['events']['other']==audit['events']['other'] for a in saved)
+    audit['source_video_sha256']='different'
+    saved.clear()
+    asyncio.run(loc.localize('source',doc,checkpoint=checkpoint,event_ids=[],
+        run_jobs=lambda *a,**k:pytest.fail('no selected jobs')))
+    assert 'other' not in saved[-1]['events']
+
+
 def test_prepare_preserves_all_ten_original_reference_points(tmp_path, monkeypatch):
     anchors = [{'t': i, 'target_point': {'x': .4, 'y': .5},
                 'box': {'x': .3, 'y': .3, 'w': .2, 'h': .3}} for i in range(10)]
