@@ -1,0 +1,59 @@
+name: Retained report Match Room coverage audit (no-model once)
+on:
+  pull_request:
+    types: [synchronize]
+    paths:
+      - '.github/workflows/matchroom-coverage-audit-once.yml'
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  audited_retained_coverage:
+    if: >-
+      github.repository == '9m92yk9snt-star/VedoScout' &&
+      github.event.pull_request.number == 59 &&
+      github.event.pull_request.draft == true &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.head.ref == 'codex/matchroom-window-geometry-reuse' &&
+      github.event.before == 'b204e873b850f2509fc93ca5e946d4660779992c' &&
+      github.run_attempt == 1
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      PYTHONPATH: backend
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Run no-model source and audit regressions
+        run: |
+          python -m py_compile backend/match_room_coverage_audit.py backend/scripts/audit_matchroom_report_coverage.py
+          python -m pip install 'pytest==9.0.3'
+          python -m pytest -q backend/tests/test_match_room_coverage_audit.py
+      - name: Restore real retained all-tap report without provider calls
+        uses: actions/download-artifact@v4
+        with:
+          name: matchroom-single-tap-report-41772727152
+          run-id: 41772727152
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/retained
+      - name: Audit source-bound report metadata only
+        run: |
+          python -u backend/scripts/audit_matchroom_report_coverage.py \
+            --report "$RUNNER_TEMP/retained/single-tap-report/report-document.json" \
+            --output "$RUNNER_TEMP/matchroom-coverage-audit.json"
+      - name: Preserve source-bound audit counts only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: matchroom-coverage-audit-${{ github.run_id }}
+          path: ${{ runner.temp }}/matchroom-coverage-audit.json
+          retention-days: 14
+          if-no-files-found: ignore
