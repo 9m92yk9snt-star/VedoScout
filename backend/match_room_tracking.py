@@ -423,7 +423,7 @@ def compute_refinement(video, anchors, events, checkpoint=None, segmenter_kind='
     from match_room import presentation_window
     from match_room_position_contours import contour_segments, observation_windows, refinement_model, METHOD
     cv2.setNumThreads(2)
-    deadline = time.monotonic() + (_refinement_budget(events) if segmenter_kind == 'medium' else TIMEOUT_S) - 3
+    deadline = time.monotonic() + _refinement_timeout(events, segmenter_kind) - 3
     output = {}
     def save():
         if checkpoint is not None:
@@ -450,7 +450,7 @@ def compute_refinement(video, anchors, events, checkpoint=None, segmenter_kind='
         else:
             raise ValueError('UNSUPPORTED_REFINEMENT_MODEL')
         result['refinement_diagnostics']['segmenter_kind'] = segmenter_kind
-        result['refinement_diagnostics']['budget_seconds'] = _refinement_budget(events) if segmenter_kind == 'medium' else TIMEOUT_S
+        result['refinement_diagnostics']['budget_seconds'] = _refinement_timeout(events, segmenter_kind)
         def preserve(segment):
             result['segments'].append(segment)
             save()
@@ -468,6 +468,15 @@ def compute_refinement(video, anchors, events, checkpoint=None, segmenter_kind='
 def _refinement_budget(events):
     value = events[0].get('_refinement_budget_seconds', MEDIUM_TIMEOUT_S) if events else MEDIUM_TIMEOUT_S
     return max(4., min(float(value), MAX_REFINEMENT_EVENTS*MEDIUM_TIMEOUT_S)) if finite(value) else MEDIUM_TIMEOUT_S
+
+
+def _refinement_timeout(events, kind):
+    if kind == 'medium':
+        return _refinement_budget(events)
+    if kind == 'small':
+        value = events[0].get('_refinement_budget_seconds', TIMEOUT_S) if events else TIMEOUT_S
+        return max(4., min(float(value), SOURCE_TIMEOUT_S)) if finite(value) else TIMEOUT_S
+    raise ValueError('UNSUPPORTED_REFINEMENT_MODEL')
 
 
 def _refinement_context(event, windows):
@@ -497,7 +506,7 @@ def _bounded_event(video, anchors, events, *, refinement=False):
                                        'refinement': refinement}))
         try:
             subprocess.run([sys.executable, str(Path(__file__).resolve()), str(request), str(result)],
-                           timeout=_refinement_budget(events) if refinement == 'medium' else TIMEOUT_S if refinement else SOURCE_TIMEOUT_S if any(e.get('localization_method') == 'EXPLICIT_SOURCE_POSITIONS' for e in events) else TIMEOUT_S,
+                           timeout=_refinement_timeout(events, refinement) if refinement else SOURCE_TIMEOUT_S if any(e.get('localization_method') == 'EXPLICIT_SOURCE_POSITIONS' for e in events) else TIMEOUT_S,
                            check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                            env={**os.environ, 'SCOUTMEPLAY_MATCHROOM_ENGINE': 'onnxruntime'})
             return json.loads(result.read_text()), 'COMPLETED'
@@ -544,9 +553,9 @@ def missing_display_windows(event, previous):
 def bounded_tracks(video, anchors, events):
     """One bounded child per distinct clip; repeated report cards share results.
 
-    At most MAX_EVENTS initial children plus MAX_REFINEMENT_EVENTS optional
-    retries. Source-position passes allow 35s; legacy/small passes allow 25s;
-    medium refinements share 630s (at most 910s total). Every initial result is complete
+    At most MAX_EVENTS initial children plus two children per refinement.
+    Source-position passes allow 35s; legacy passes allow 25s. Small completion
+    and medium refinements share 630s (at most 910s total). Every initial result is complete
     before retries begin; no retry can spend another clip's original budget.
     A difficult earlier clip cannot consume a later clip's inference budget.
     """
@@ -585,6 +594,17 @@ def bounded_tracks(video, anchors, events):
         if len(pending) >= MAX_REFINEMENT_EVENTS:
             break
     refinement_deadline = time.monotonic()+MAX_REFINEMENT_EVENTS*MEDIUM_TIMEOUT_S
+    def merge(event, previous, retried, kind):
+        result = retried.get(event['event_id']) or {}
+        if (result.get('event_id') != event['event_id'] or result.get('method') != previous.get('method')
+                or result.get('source_video_sha256') != event.get('source_video_sha256')):
+            return False
+        key = 'small_completion_diagnostics' if kind == 'small' else 'refinement_diagnostics'
+        previous[key] = result.get('refinement_diagnostics', {})
+        merged = {s['id']: s for s in previous.get('segments', [])}
+        merged.update({s['id']: s for s in result.get('segments', [])})
+        previous['segments'] = list(merged.values())
+        return True
     for index, (event, previous, missing) in enumerate(pending):
         remaining = refinement_deadline-time.monotonic()
         if remaining <= 4:
@@ -594,19 +614,30 @@ def bounded_tracks(video, anchors, events):
         allowance = remaining-others*reserve
         if allowance <= 4:
             break
+        if interrupted(event) and missing:
+            # A timed-out small pass is not a failed recognition. Finish its
+            # missing source windows before paying for a larger model. Use the
+            # same identity/mask gates and charge this against the same budget.
+            request_event = {**event, '_refinement_budget_seconds': min(SOURCE_TIMEOUT_S, allowance),
+                             '_display_refinement_windows': _refinement_context(event, missing)}
+            retried, status = _bounded_event(video, anchors, [request_event], refinement='small')
+            statuses.append(status)
+            if merge(event, previous, retried, 'small'):
+                missing = missing_display_windows(event, previous)
+                if previous.get('segments') and not missing:
+                    continue
+            remaining = refinement_deadline-time.monotonic()
+            # Keep the reservation made before this clip's completion attempt.
+            # Its extra work must not reduce a later clip's reserved time.
+            allowance = remaining-others*reserve
+            if allowance <= 4:
+                break
         request_event = {**event, '_refinement_budget_seconds': allowance}
         if missing:
             request_event['_display_refinement_windows'] = _refinement_context(event, missing)
         retried, status = _bounded_event(video, anchors, [request_event],
                                          refinement='medium')
-        result = retried.get(event['event_id']) or {}
-        if (result.get('event_id') == event['event_id'] and result.get('method') == previous.get('method')
-                and result.get('source_video_sha256') == event.get('source_video_sha256')):
-            # Preserve original observations, moving arrows and completed paths.
-            previous['refinement_diagnostics'] = result.get('refinement_diagnostics', {})
-            merged = {s['id']: s for s in previous.get('segments', [])}
-            merged.update({s['id']: s for s in result.get('segments', [])})
-            previous['segments'] = list(merged.values())
+        merge(event, previous, retried, 'medium')
         statuses.append(status)
     if all(s == 'COMPLETED' for s in statuses):
         return output,'COMPLETED'

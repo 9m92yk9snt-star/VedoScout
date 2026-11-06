@@ -261,6 +261,81 @@ def test_failed_refinement_keeps_original_evidence(monkeypatch):
     assert result['e'] == original and status == 'TRACKING_PARTIAL'
 
 
+def test_small_completion_avoids_medium_only_after_all_missing_intervals_are_filled(monkeypatch):
+    from copy import deepcopy
+    observations = [{'media_ms': t, 'identity_status': 'CONFIRMED', 'ground': [.4,.7]}
+                    for t in (0,125,250,375,500)]
+    event = {'event_id':'e', 'source_video_sha256':'source',
+             'localization_method':'EXPLICIT_SOURCE_POSITIONS', 'visual_samples':observations}
+    original = {'event_id':'e', 'source_video_sha256':'source',
+                'method':'SOURCE_OBSERVATION_INSTANCE_CONTOUR',
+                'contour_diagnostics':{'windows':[{'status':'TIME_BUDGET'}]},
+                'segments':[{'id':'original','samples':[{'media_ms':0},{'media_ms':125}]}],
+                'observed_samples':observations, 'ball_playback':[{'id':'keep'}]}
+    for complete, correct_source in ((True,True),(False,True),(True,False)):
+        calls, clock = [], [0.]
+        monkeypatch.setattr(tracking.time, 'monotonic', lambda: clock[0])
+        def run(video, anchors, batch, *, refinement=False):
+            calls.append((refinement, batch[0].get('_refinement_budget_seconds')))
+            if not refinement:
+                return {'e':deepcopy(original)}, 'COMPLETED'
+            clock[0] += batch[0]['_refinement_budget_seconds']
+            end = 500 if refinement == 'medium' or complete else 375
+            return {'e':{'event_id':'e', 'source_video_sha256':'source' if refinement == 'medium' or correct_source else 'other',
+                         'method':original['method'], 'segments':[{'id':str(refinement),
+                         'samples':[{'media_ms':125},{'media_ms':end}]}],
+                         'ball_playback':[{'id':'must-not-replace'}]}}, 'COMPLETED'
+        monkeypatch.setattr(tracking, '_bounded_event', run)
+        result, status = tracking.bounded_tracks('video', [], [event])
+        assert [kind for kind, _ in calls] == ([False,'small'] if complete and correct_source else [False,'small','medium'])
+        assert calls[1][1] == 35
+        assert sum(budget or 0 for _, budget in calls) <= 630
+        assert tracking.missing_display_windows(event, result['e']) == []
+        assert result['e']['ball_playback'] == original['ball_playback']
+        assert result['e']['observed_samples'] == observations
+        assert result['e']['segments'][0] == original['segments'][0]
+        if not correct_source:
+            assert 'small' not in [s['id'] for s in result['e']['segments']]
+        assert '_display_refinement_windows' not in event
+        assert status == 'COMPLETED'
+
+
+def test_small_completion_timeout_is_bounded_in_child_and_scheduler(monkeypatch):
+    event = {'visual_samples':[{}], '_refinement_budget_seconds':999}
+    timeouts = []
+    def expire(command, **kwargs):
+        timeouts.append(kwargs['timeout'])
+        raise subprocess.TimeoutExpired(command, kwargs['timeout'])
+    monkeypatch.setattr(subprocess, 'run', expire)
+    tracking._bounded_event('unused', [], [event], refinement='small')
+    assert timeouts == [35]
+    assert tracking._refinement_timeout([{'_refinement_budget_seconds':10}], 'small') == 10
+    assert tracking._refinement_timeout([], 'small') == 25
+
+
+def test_failed_small_completions_share_budget_and_keep_later_reserves(monkeypatch):
+    clock, calls = [0.], []
+    observations = [{'media_ms':t, 'identity_status':'CONFIRMED', 'ground':[.4,.7]} for t in (0,125,250)]
+    events = [{'event_id':str(i), 'source_video_sha256':'source',
+               'localization_method':'EXPLICIT_SOURCE_POSITIONS', 'visual_samples':observations} for i in range(3)]
+    monkeypatch.setattr(tracking.time, 'monotonic', lambda: clock[0])
+    def run(video, anchors, batch, *, refinement=False):
+        event = batch[0]
+        if refinement:
+            budget = event['_refinement_budget_seconds']
+            calls.append((event['event_id'],refinement,budget))
+            clock[0] += budget
+            return {}, 'TRACKING_UNAVAILABLE'
+        return {event['event_id']:{'event_id':event['event_id'], 'source_video_sha256':'source',
+                'method':'SOURCE_OBSERVATION_INSTANCE_CONTOUR', 'segments':[],
+                'contour_diagnostics':{'windows':[{'status':'TIME_BUDGET'}]}}}, 'COMPLETED'
+    monkeypatch.setattr(tracking, '_bounded_event', run)
+    tracking.bounded_tracks('video', [], events)
+    assert calls == [('0','small',35),('0','medium',385),('1','small',35),
+                     ('1','medium',70),('2','small',35),('2','medium',70)]
+    assert clock[0] == 630
+
+
 def test_explicit_display_does_not_spend_budget_on_unused_sparse_ground_motion(monkeypatch):
     import player_tracking, cv2
     calls = []
