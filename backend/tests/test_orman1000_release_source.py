@@ -96,14 +96,17 @@ def test_third_assist_is_explicit_release_block_not_unverified_score_rewrite():
     evidence = load("orman1000-release-source.json")
     discrepancy = evidence["user_reported_goal_assist_discrepancy"]
     assert discrepancy["user_reported_assists_in_video"] == 3
+    assert discrepancy["user_reported_goals_in_video"] == 1
+    assert discrepancy["user_expected_action_tally"] == {"goals": 1, "assists": 3}
+    assert discrepancy["exported_report_action_tally"] == {"goals": 2, "assists": 2}
     assert discrepancy["exported_report_observed_assists"] == 2
     assert discrepancy["exported_report_observed_goals"] == 2
-    assert discrepancy["discrepancy_status"] == "UNRESOLVED_USER_REPORTED_THIRD_ASSIST"
+    assert discrepancy["discrepancy_status"] == "UNRESOLVED_ORIGINAL_REPORT_2_GOALS_2_ASSISTS_VERSUS_USER_1_GOAL_3_ASSISTS"
     assert [e["proof_ms"] for e in discrepancy["confirmed_export_assist_events"]] == [44065, 56264]
     candidate = discrepancy["candidate_for_misattribution_review"]
     assert candidate["event_id"] == "47ad617d2ba76a4683cd"
     assert candidate["proof_ms"] == 49881
     assert candidate["currently_exported_as"] == "SHOT_GOAL"
     assert candidate["goal_scoring_actor_verified_by_independent_review"] is False
-    assert evidence["current_release_acceptance"] == "BLOCKED_UNRESOLVED_THIRD_ASSIST_AND_EVENT_ATTRIBUTION"
+    assert evidence["current_release_acceptance"] == "BLOCKED_USER_CONFIRMED_1_GOAL_3_ASSISTS_NOT_RECONCILED_WITH_EXPORT_2_GOALS_2_ASSISTS"
     assert evidence["production_cache_enabled"] is False
