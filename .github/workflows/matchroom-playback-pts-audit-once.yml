@@ -1,0 +1,55 @@
+name: Retained Match Room exact-PTS playback audit (once)
+on:
+  pull_request:
+    types: [synchronize]
+    paths:
+      - '.github/workflows/matchroom-playback-pts-audit-once.yml'
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  exact_pts_playback_audit:
+    if: >-
+      github.repository == '9m92yk9snt-star/VedoScout' &&
+      github.event.pull_request.number == 59 &&
+      github.event.pull_request.draft == true &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.head.ref == 'codex/matchroom-window-geometry-reuse' &&
+      github.event.before == 'afb2367cb1910e94a7eded599185291d00b2cc4f' &&
+      github.run_attempt == 1
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Require existing ffprobe and validate independent audit code
+        run: |
+          command -v ffprobe
+          node --check frontend/scripts/audit-retained-matchroom-playback.cjs
+      - name: Retrieve same-source prior report and clips (zero provider calls)
+        uses: actions/download-artifact@v4
+        with:
+          name: matchroom-single-tap-report-41772727152
+          run-id: 41772727152
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/retained
+      - name: Audit actual source-aligned video PTS using production playback model
+        run: |
+          node frontend/scripts/audit-retained-matchroom-playback.cjs \
+            "$RUNNER_TEMP/retained/single-tap-report/report-document.json" \
+            "$RUNNER_TEMP/matchroom-pts-coverage.json"
+      - name: Preserve only coverage counts, no video or receipts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: matchroom-pts-coverage-${{ github.run_id }}
+          path: ${{ runner.temp }}/matchroom-pts-coverage.json
+          retention-days: 14
+          if-no-files-found: ignore
