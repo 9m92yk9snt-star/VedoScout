@@ -95,10 +95,46 @@ async function main() {
         gaps[gaps.length-1].end_ms = stamp;
       else gaps.push({start_ms:stamp,end_ms:stamp});
     }
+    // Read-only rejection triage: never treat a raw backend segment as a
+    // drawable frontend segment without passing the production gates.
+    const rawSegments = Array.isArray(tracking.segments) ? tracking.segments : [];
+    const acceptedSourceTimes = new Set(room.tracks.flatMap(trackRows =>
+      trackRows.map(sample => sample.media_ms)));
+    const segmentDiagnostics = rawSegments.slice(0,24).map(segment => {
+      const seg = Array.isArray(segment?.samples) ? segment.samples : [];
+      const times = seg.map(sample => sample?.media_ms).filter(Number.isFinite);
+      const referenced = (segment?.observation_reference_frames || []);
+      return {
+        id: typeof segment?.id === 'string' ? segment.id.slice(0,80) : null,
+        raw_sample_count:seg.length,
+        sample_pts_span_ms:times.length ? [Math.min(...times),Math.max(...times)] : null,
+        raw_foreground_mask_rows:seg.filter(sample =>
+          sample?.foreground?.method === 'SOURCE_PERSON_MASK'
+          && sample.foreground.media_ms === sample.media_ms
+          && sample.foreground.frame_id === sample.frame_id).length,
+        measured_ground_rows:seg.filter(sample => Array.isArray(sample?.ground)).length,
+        estimated_ground_rows:seg.filter(sample =>
+          sample?.display_estimated === true && Array.isArray(sample?.display_ground)).length,
+        source_reference_count:Array.isArray(referenced) ? referenced.length : null,
+        source_references_in_observations:Array.isArray(referenced) &&
+          referenced.every(id => roomRaw.samples?.some(row =>
+            row.frame_id === id && row.identity_status === 'CONFIRMED' && Array.isArray(row.ground))),
+        ground_method:segment?.ground_method || null,
+        identity_method:segment?.identity_method || null,
+        source_frame_coverage:segment?.source_frame_coverage || null,
+        source_sample_times_accepted_in_frontend:times.filter(t => acceptedSourceTimes.has(t)).length
+      };
+    });
     clips.push({
       event_id: row.event_id, canonical_action_type:event.canonical_action_type,
       video_source_sha256:expectedSource, window_ms:[room.start,room.end],
       frontend_accepted_segments:room.tracks.length,
+      backend_raw_segments:rawSegments.length,
+      backend_segment_diagnostics:segmentDiagnostics,
+      backend_contour_window_statuses:(tracking.contour_diagnostics?.windows || [])
+        .map(w => ({status:w.status, start_ms:w.start_ms,end_ms:w.end_ms,
+                    detector_frames:w.detector_frames,agreed_intervals:w.agreed_intervals}))
+        .slice(0,24),
       actual_video_pts_count:stamps.length,
       accepted_source_contour_pts:covered.length,
       unmarked_source_pts:uncovered.length,
