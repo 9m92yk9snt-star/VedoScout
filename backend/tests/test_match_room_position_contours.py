@@ -175,7 +175,7 @@ def test_completed_interval_is_checkpointed_before_later_decode_timeout(monkeypa
     assert diagnostic['last_decoded_ms'] == 200
     assert diagnostic['source_pair_results'][-1] == {
         'start_ms': 200, 'end_ms': 400, 'accepted_segments': 0,
-        'rejection_codes': ['NOT_DECODED_BEFORE_DEADLINE']
+        'rejection_codes': ['TIME_BUDGET_BEFORE_ENDPOINT']
     }
 
 
