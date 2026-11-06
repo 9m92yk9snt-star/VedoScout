@@ -49,11 +49,18 @@ async function main() {
   assert.equal(audit.source_video_sha256, expectedSource);
   const rows = doc.full_report?.video_comments || [];
   assert.equal(rows.length, 8, 'Expected exactly the eight retained source-bound cards');
+  const requested = process.env.SCOUTMEPLAY_PTS_EVENT_IDS
+    ? process.env.SCOUTMEPLAY_PTS_EVENT_IDS.split(',').map(x => x.trim()) : [];
+  const filter = new Set(requested);
+  assert.equal(filter.size, requested.length, 'Duplicate requested audit events');
+  assert.ok(requested.every(id => rows.some(r => r.event_id === id)),
+    'Every selected event must belong to the retained report');
   const events = new Map(doc.canonical_events.events.map(e => [e.event_id,e]));
   const seen = new Set();
   const clips = [];
 
   for (const row of rows) {
+    if (filter.size && !filter.has(row.event_id)) continue;
     const event = events.get(row.event_id);
     assert.ok(event && !seen.has(row.event_id), 'Missing or repeated canonical event');
     seen.add(row.event_id);
@@ -148,6 +155,7 @@ async function main() {
     source_video_sha256:expectedSource,
     original_human_taps:10,
     checked_clips:clips.length,
+    subset_event_ids:requested,
     clips,
     total_pts:clips.reduce((a,x)=>a+x.actual_video_pts_count,0),
     total_accepted_source_contour_pts:clips.reduce((a,x)=>a+x.accepted_source_contour_pts,0),
