@@ -52,6 +52,15 @@ def test_overlapping_intervals_reuse_only_exact_window_geometry(monkeypatch):
     second = run_window()
     assert json.dumps(first, sort_keys=True) == json.dumps(second, sort_keys=True)
     assert calls == {'foreground': 26, 'stance': 26}
+    # An unresolved mask at the shared endpoint remains unresolved in both
+    # intervals; caching cannot turn a rejection into a drawable cutout.
+    calls['foreground'] = 0
+    def reject_shared_frame(*args):
+        calls['foreground'] += 1
+        return None if calls['foreground'] == 5 else original_foreground(*args)
+    monkeypatch.setattr(tracking, 'foreground_polygons', reject_shared_frame)
+    assert run_window() == []
+    assert calls['foreground'] == 5
 
 
 def fixture(monkeypatch):
