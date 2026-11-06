@@ -49,7 +49,7 @@
     "restriction": "Only isolated engineering regression input; NEVER evidence of Orman1000 production readiness"
   },
   "required_gates": [
-    "CRITICAL: Reconcile user's 3 video assists against exported 2 observed assists, review especially 49.881s SHOT GOAL attribution with actual Orman1000 frames and selected-player identity.",
+    "CRITICAL: User-established target in Orman1000 is ONE selected-player goal and THREE assists. The exported report labels two goals/two assists. Inspect 49.881s as candidate incorrectly classified SHOT_GOAL; confirm who touched and scored before changing event or report.",
     "DONE: Verified 118 payload checksums, ZIP SHA and embedded canonical web-video SHA fa56f933... (original .mov is not in ZIP)",
     "Bind all original selections, player identity, report clips, outcomes and score evidence to that exact source",
     "Measure exact decoded source PTS and accepted Match Room overlays for Orman1000",
@@ -60,7 +60,7 @@
     "Obtain user approval before merge or deploy"
   ],
   "production_cache_enabled": false,
-  "current_release_acceptance": "BLOCKED_UNRESOLVED_THIRD_ASSIST_AND_EVENT_ATTRIBUTION",
+  "current_release_acceptance": "BLOCKED_USER_CONFIRMED_1_GOAL_3_ASSISTS_NOT_RECONCILED_WITH_EXPORT_2_GOALS_2_ASSISTS",
   "production_or_main_changes_allowed_without_user_approval": false,
   "actual_latest_zip_source_pts_audit": {
     "scope": "Raw source-bound mask samples at exact decoded original web-video PTS ±2ms; not a direct frontend acceptance or revised-model run",
@@ -104,7 +104,7 @@
     "user_reported_assists_in_video": 3,
     "exported_report_observed_assists": 2,
     "exported_report_observed_goals": 2,
-    "discrepancy_status": "UNRESOLVED_USER_REPORTED_THIRD_ASSIST",
+    "discrepancy_status": "UNRESOLVED_ORIGINAL_REPORT_2_GOALS_2_ASSISTS_VERSUS_USER_1_GOAL_3_ASSISTS",
     "confirmed_export_assist_events": [
       {
         "event_id": "006dbd71ed71d464f19d",
@@ -125,13 +125,22 @@
         49000,
         51500
       ],
-      "requires": "Check whether selected player passes to a different finisher or personally shoots; verify last deliberate touch, receiver, scorer and active ball through the goal.",
+      "requires": "Verify whether the selected player assisted a teammate's goal near 49.881 s rather than scoring it; check the last deliberate touch, original target player, receiver, finisher and active ball. Confirm the other own goal is near 30.915 s. Do not change statistics before source-backed reclassification.",
       "goal_scoring_actor_verified_by_independent_review": false
     },
     "prohibited_shortcuts": [
-      "Do not silently increment assists from 2 to 3.",
-      "Do not turn a proven own goal into an assist without new source-backed evidence.",
-      "Do not alter scores, event timeline, stats or player identity before reclassification is verified."
-    ]
+      "Do not publish the report's 2 goals and 2 assists as verified counts.",
+      "Do not fabricate the third assist or claim that 49.881s is resolved before comparing original video evidence.",
+      "Do not alter source events, player identities, counts, scores or report wording without independently supported video evidence."
+    ],
+    "user_reported_goals_in_video": 1,
+    "user_expected_action_tally": {
+      "goals": 1,
+      "assists": 3
+    },
+    "exported_report_action_tally": {
+      "goals": 2,
+      "assists": 2
+    }
   }
 }
