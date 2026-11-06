@@ -46,6 +46,12 @@ def test_overlapping_intervals_reuse_only_exact_window_geometry(monkeypatch):
     assert calls == {'foreground': 13, 'stance': 13}
     assert diagnostics['detector_frames'] == 13
     assert 0 <= diagnostics['detector_seconds'] < 5
+    assert diagnostics['source_pairs_expected'] == 2
+    assert diagnostics['source_pairs_reached'] == 2
+    assert diagnostics['source_pairs_unreached'] == 0
+    assert diagnostics['source_segments_accepted'] == 2
+    assert diagnostics['source_pairs_no_agreement'] == 0
+    assert diagnostics['last_decoded_ms'] == 300
     expected_polygons = original_foreground([{'class_id': 0, 'mask': mask}], 100, 100)
     for segment in first:
         for sample in segment['samples']:
@@ -65,6 +71,12 @@ def test_overlapping_intervals_reuse_only_exact_window_geometry(monkeypatch):
     monkeypatch.setattr(tracking, 'foreground_polygons', reject_shared_frame)
     assert run_window() == []
     assert calls['foreground'] == 5
+    assert diagnostics['source_pairs_missing_foreground'] >= 1
+    # A diagnosed source conflict must not turn into an accepted segment.
+    monkeypatch.setattr(localized, 'supporting_observations', lambda *a: False)
+    assert run_window() == []
+    assert diagnostics['source_pairs_source_conflict'] == 2
+    assert diagnostics['source_segments_accepted'] == 0
 
 
 def fixture(monkeypatch):
@@ -150,6 +162,10 @@ def test_completed_interval_is_checkpointed_before_later_decode_timeout(monkeypa
     assert len(saved) == len(result) == 1
     assert result[0]['samples'][-1]['media_ms'] == 200
     assert diagnostic['status'] == 'TIME_BUDGET'
+    assert diagnostic['source_pairs_expected'] == 2
+    assert diagnostic['source_pairs_reached'] == 1
+    assert diagnostic['source_pairs_unreached'] == 1
+    assert diagnostic['last_decoded_ms'] == 200
 
 
 def test_recovery_window_gets_budget_first_without_duplicate_intervals():
