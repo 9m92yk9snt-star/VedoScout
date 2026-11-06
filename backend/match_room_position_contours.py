@@ -313,7 +313,8 @@ def contour_segments(video, observations, start, end, *, deadline, diagnostics, 
     from native_player_segmentation import PersonSegmenter
     from match_room_contours import read_clip, detect_frame, measured_mask
     from match_room_tracking import foreground_polygons
-    diagnostics.update(status='UNSUPPORTED_INPUT', method=METHOD)
+    diagnostics.update(status='UNSUPPORTED_INPUT', method=METHOD,
+                       detector_frames=0, detector_seconds=0.0)
     boxes = [s['player_box'] for s in observations
              if s.get('identity_status') == 'CONFIRMED' and s.get('ground') and s.get('player_box')]
     if not 0 < end-start <= 1500 or len(boxes) < 2:
@@ -349,7 +350,11 @@ def contour_segments(video, observations, start, end, *, deadline, diagnostics, 
             top = max(0, int((min(b[1] for b in boxes)-.1)*h))
             bottom = min(h, int((max(b[1]+b[3] for b in boxes)+.1)*h)+1)
             roi = (0, top, w, bottom)
-            detections.append(detect_frame(frame, roi, model))
+            detector_started = time.monotonic()
+            detected = detect_frame(frame, roi, model)
+            diagnostics['detector_seconds'] += time.monotonic() - detector_started
+            diagnostics['detector_frames'] += 1
+            detections.append(detected)
             import cv2
             hsv = cv2.cvtColor(frame['image'], cv2.COLOR_BGR2HSV)
             for row in detections[-1]:

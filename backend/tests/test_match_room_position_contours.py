@@ -36,13 +36,16 @@ def test_overlapping_intervals_reuse_only_exact_window_geometry(monkeypatch):
         return original_stance(*args)
     monkeypatch.setattr(tracking, 'foreground_polygons', foreground)
     monkeypatch.setattr(localized, 'stance_bounds', stance)
+    diagnostics = {}
     def run_window():
         return localized.contour_segments('unused', obs, 0, 300, deadline=time.monotonic()+5,
-                                          diagnostics={}, segmenter=object())
+                                          diagnostics=diagnostics, segmenter=object())
     first = run_window()
     assert len(first) == 2
     assert sum(len(s['samples']) for s in first) == 18
     assert calls == {'foreground': 13, 'stance': 13}
+    assert diagnostics['detector_frames'] == 13
+    assert 0 <= diagnostics['detector_seconds'] < 5
     expected_polygons = original_foreground([{'class_id': 0, 'mask': mask}], 100, 100)
     for segment in first:
         for sample in segment['samples']:
@@ -52,6 +55,7 @@ def test_overlapping_intervals_reuse_only_exact_window_geometry(monkeypatch):
     second = run_window()
     assert json.dumps(first, sort_keys=True) == json.dumps(second, sort_keys=True)
     assert calls == {'foreground': 26, 'stance': 26}
+    assert diagnostics['detector_frames'] == 13  # reset for the new window
     # An unresolved mask at the shared endpoint remains unresolved in both
     # intervals; caching cannot turn a rejection into a drawable cutout.
     calls['foreground'] = 0
