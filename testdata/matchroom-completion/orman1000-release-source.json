@@ -1,0 +1,43 @@
+{
+  "purpose": "Strict primary acceptance scope for ScoutMePlay/VedoScout PR #59",
+  "analysis_name": "Orman1000",
+  "primary_evidence_archive": {
+    "filename": "dd5a84b1-3dc9-40b0-80c4-89232903774f-evidence (2).zip",
+    "library_record_size_bytes": 37556202,
+    "library_record_created_utc": "2026-11-06T01:53:34Z",
+    "archive_bytes_directly_verified_in_current_runtime": false,
+    "archive_sha256": null,
+    "original_source_video_sha256_from_latest_archive": null
+  },
+  "previous_zip_versions_not_primary": [
+    "dd5a84b1-3dc9-40b0-80c4-89232903774f-evidence.zip",
+    "dd5a84b1-3dc9-40b0-80c4-89232903774f-evidence (1).zip"
+  ],
+  "previous_source_bound_orman1000_diagnostics": {
+    "source_video_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2",
+    "diagnostic_source": "testdata/matchroom-completion/prediction-scheduler-verification.json",
+    "clip_0044_source_frame_count": 136,
+    "clip_0044_accepted_ellipse_frames": 91,
+    "clip_0044_unmarked_frames": 45,
+    "full_latest_zip_visual_acceptance": false,
+    "stored_diagnostic_source_matches_latest_zip_source": "NOT_YET_VERIFIED"
+  },
+  "excluded_release_evidence": {
+    "other_video_name": "Orman400",
+    "other_video_sha256": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+    "restriction": "Only isolated engineering regression input; NEVER evidence of Orman1000 production readiness"
+  },
+  "required_gates": [
+    "Read the exact newest ZIP and verify raw archive and its original video SHA-256",
+    "Bind all original selections, player identity, report clips, outcomes and score evidence to that exact source",
+    "Measure exact decoded source PTS and accepted Match Room overlays for Orman1000",
+    "Diagnose the 45 missing 00:44 frames: visible target versus occluded/absent/uncertain; do not invent marks",
+    "Preserve arrow source/bounds, existing analysis correctness and production confidence thresholds",
+    "Measure full Orman1000 processing time and validate CPU/memory/budget without new paid provider calls",
+    "Pass full six-job CI, source-video-specific acceptance and visual review",
+    "Obtain user approval before merge or deploy"
+  ],
+  "production_cache_enabled": false,
+  "current_release_acceptance": "BLOCKED_PENDING_LATEST_ZIP_RAW_BYTES",
+  "production_or_main_changes_allowed_without_user_approval": false
+}
