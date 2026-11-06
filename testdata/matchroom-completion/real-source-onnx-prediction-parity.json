@@ -1,0 +1,32 @@
+{
+  "source_video_sha256": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+  "foreign_localization_video_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2",
+  "source_scope": "Bundled Orman400 test video, not the foreign localization video",
+  "model_sha256": "015043fb9cc94830ad7065dd3e28d6f8e5758fe03071451675120f6a6b6e44e9",
+  "engine": "onnxruntime",
+  "onnxruntime_version": "1.31.1",
+  "opencv_version": "4.13.0",
+  "source_frame_count": 24,
+  "frames_with_person_detections": 24,
+  "baseline_inference_calls": 24,
+  "cold_inference_calls": 24,
+  "warm_inference_calls": 0,
+  "baseline_seconds": 4.105,
+  "cold_seconds": 4.225,
+  "warm_seconds": 0.189,
+  "complete_raw_predictions_identical": true,
+  "source_bound_position_receipts_reused": false,
+  "contour_and_identity_parity_verified": false,
+  "full_report_verified": false,
+  "provider_model_calls": 0,
+  "production_cache_enabled": false,
+  "run_id": 42279313935,
+  "run_url": "https://github.com/9m92yk9snt-star/VedoScout/actions/runs/42279313935",
+  "limitations": [
+    "Single 0.8-second real-source window, not a full contour scheduler or a report.",
+    "Warm-cache timing measures repeated exactly identical source pixels, not typical full-video cache hit rate.",
+    "Saved 00:08 model observations were generated from a different source SHA and were not reused.",
+    "No proof of the source-specific 45 missing ellipse frames, arrow accuracy, or production throughput.",
+    "Neither production code nor default cache policy changed."
+  ]
+}
