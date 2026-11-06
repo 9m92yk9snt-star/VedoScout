@@ -17,7 +17,7 @@ jobs:
       github.event.pull_request.draft == true &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.event.pull_request.head.ref == 'codex/matchroom-window-geometry-reuse' &&
-      github.event.before == 'afb2367cb1910e94a7eded599185291d00b2cc4f' &&
+      github.event.before == '87aa923f210ad51581366cd179c87bba2898e0a9' &&
       github.run_attempt == 1
     runs-on: ubuntu-latest
     timeout-minutes: 9
@@ -29,9 +29,16 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Require existing ffprobe and validate independent audit code
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Supply pinned source decoder without apt/ffprobe
         run: |
-          command -v ffprobe
+          python -m pip install --disable-pip-version-check 'imageio-ffmpeg==0.6.0'
+          FFMPEG_SOURCE="$(python -c 'import imageio_ffmpeg; print(imageio_ffmpeg.get_ffmpeg_exe())')"
+          test -x "$FFMPEG_SOURCE"
+          echo "SCOUTMEPLAY_FFMPEG_BIN=$FFMPEG_SOURCE" >> "$GITHUB_ENV"
+          "$FFMPEG_SOURCE" -hide_banner -version
           node --check frontend/scripts/audit-retained-matchroom-playback.cjs
       - name: Retrieve same-source prior report and clips (zero provider calls)
         uses: actions/download-artifact@v4
