@@ -66,12 +66,12 @@
     }
   ],
   "conclusion": {
-    "exact_prediction_cache_parity_established_for_one_full_onxx_replay": true,
     "stable_repeatability_across_full_replays_established": false,
     "full_report_or_live_verified": false,
     "production_speed_improvement_established": false,
     "model_provider_billing_savings_established": false,
-    "recommendation": "Do not enable prediction reuse in production or merge PR #59 until demonstrated stable parity and worthwhile measured speed improvement"
+    "recommendation": "Do not enable prediction reuse in production or merge PR #59 until demonstrated stable parity and worthwhile measured speed improvement",
+    "exact_prediction_cache_parity_established_for_one_full_onnx_replay": true
   },
   "related_runs": [
     "https://github.com/9m92yk9snt-star/VedoScout/actions/runs/42294726090",
