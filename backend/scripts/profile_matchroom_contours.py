@@ -14,11 +14,28 @@ import sys
 import time
 
 
+def source_window(room, requested_start=None, requested_end=None):
+    """Select one bounded proof window, never clip pixels or foreign timestamps."""
+    if (requested_start is None) != (requested_end is None):
+        raise ValueError('BOTH_WINDOW_BOUNDARIES_REQUIRED')
+    lo, hi = room['start_ms'], room['end_ms']
+    if type(lo) is not int or type(hi) is not int:
+        raise ValueError('INVALID_SOURCE_WINDOW')
+    a = lo if requested_start is None else requested_start
+    b = hi if requested_end is None else requested_end
+    if (type(a) is not int or type(b) is not int or not
+            lo <= a < b <= hi or b-a > 1500):
+        raise ValueError('WINDOW_MUST_BE_WITHIN_SOURCE_PROOF_AND_AT_MOST_1500MS')
+    return a, b
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--report', type=Path, required=True)
     parser.add_argument('--video', type=Path, required=True)
     parser.add_argument('--timestamp', required=True)
+    parser.add_argument('--window-start-ms', type=int)
+    parser.add_argument('--window-end-ms', type=int)
     parser.add_argument('--model', choices=('small', 'medium'), default='small')
     parser.add_argument('--seconds', type=float, default=90)
     parser.add_argument('--one-cpu', action='store_true')
@@ -42,8 +59,10 @@ def main():
         digest = hashlib.file_digest(source, 'sha256').hexdigest()
     if digest != room['source_video_sha256']:
         parser.error('video does not match the exported source SHA-256')
-    if not 0 < room['end_ms']-room['start_ms'] <= 1500:
-        parser.error('choose a single contour window of at most 1500ms')
+    try:
+        start_ms, end_ms = source_window(room, args.window_start_ms, args.window_end_ms)
+    except ValueError as exc:
+        parser.error(str(exc))
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
     os.environ['SCOUTMEPLAY_MATCHROOM_ENGINE'] = 'opencv'
     import cv2
@@ -57,12 +76,13 @@ def main():
     diagnostic = {}
     started = time.monotonic()
     profile.enable()
-    segments = contour_segments(args.video, room['samples'], room['start_ms'], room['end_ms'],
+    segments = contour_segments(args.video, room['samples'], start_ms, end_ms,
                                 deadline=started+args.seconds, diagnostics=diagnostic, segmenter=model,
                                 audit_pairs=args.audit_pairs)
     profile.disable()
     metadata = {'engine': 'opencv', 'opencv_version': cv2.__version__,
                 'source_video_sha256': digest, 'event_id': room['event_id'],
+                'window_ms': [start_ms, end_ms], 'pair_audit_enabled': args.audit_pairs,
                 'model': args.model, 'model_sha256': model.sha256,
                 'one_cpu': args.one_cpu, 'model_load_seconds': load_seconds,
                 'contour_seconds': time.monotonic()-started, 'diagnostic': diagnostic,
