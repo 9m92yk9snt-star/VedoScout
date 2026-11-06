@@ -308,7 +308,7 @@ def bind_source_display_knots(frames, detections, interval, observations):
             knots[i] = observation['ground']
 
 
-def contour_segments(video, observations, start, end, *, deadline, diagnostics, on_segment=None, segmenter=None):
+def contour_segments(video, observations, start, end, *, deadline, diagnostics, on_segment=None, segmenter=None, audit_pairs=False):
     """Bounded short proof only. Partial valid intervals stay separate."""
     from native_player_segmentation import PersonSegmenter
     from match_room_contours import read_clip, detect_frame, measured_mask
@@ -321,8 +321,9 @@ def contour_segments(video, observations, start, end, *, deadline, diagnostics, 
                        source_pairs_display_unavailable=0,
                        source_pairs_display_source_conflict=0,
                        source_pairs_missing_foreground=0,
-                       source_segments_accepted=0, last_decoded_ms=None,
-                       source_pair_results=[])
+                       source_segments_accepted=0, last_decoded_ms=None)
+    if audit_pairs:
+        diagnostics['source_pair_results'] = []
     boxes = [s['player_box'] for s in observations
              if s.get('identity_status') == 'CONFIRMED' and s.get('ground') and s.get('player_box')]
     if not 0 < end-start <= 1500 or len(boxes) < 2:
@@ -350,7 +351,7 @@ def contour_segments(video, observations, start, end, *, deadline, diagnostics, 
         'source_pairs_display_source_conflict',
         'source_pairs_missing_foreground',
     )
-    reached_endpoints = set()
+    reached_endpoints = set() if audit_pairs else None
     pending = {}
     for a, b in pairs:
         prior = pending.get(b['media_ms'])
@@ -387,9 +388,10 @@ def contour_segments(video, observations, start, end, *, deadline, diagnostics, 
             if pair is None:
                 continue
             diagnostics['source_pairs_reached'] += 1
-            reached_endpoints.add(frame['media_ms'])
-            before_rejections = {key: diagnostics[key] for key in reason_counters}
-            segments_before_pair = len(segments)
+            if audit_pairs:
+                reached_endpoints.add(frame['media_ms'])
+                before_rejections = {key: diagnostics[key] for key in reason_counters}
+                segments_before_pair = len(segments)
             # Complete and preserve each independently checked interval before
             # decoding more frames. A later timeout cannot erase earlier proof.
             intervals = agreed_intervals(frames, detections, pair, deadline=deadline, allow_display_bridge=True,
@@ -474,7 +476,7 @@ def contour_segments(video, observations, start, end, *, deadline, diagnostics, 
                     diagnostics['source_segments_accepted'] += 1
                     if on_segment is not None:
                         on_segment(segment)
-            if len(diagnostics['source_pair_results']) < 32:
+            if audit_pairs and len(diagnostics['source_pair_results']) < 32:
                 diagnostics['source_pair_results'].append({
                     'start_ms': pair[0]['media_ms'],
                     'end_ms': pair[1]['media_ms'],
@@ -487,7 +489,7 @@ def contour_segments(video, observations, start, end, *, deadline, diagnostics, 
                 })
     finally:
         stream.close()
-    for endpoint, pair in pending.items():
+    for endpoint, pair in (pending.items() if audit_pairs else ()):
         if endpoint not in reached_endpoints and len(diagnostics['source_pair_results']) < 32:
             diagnostics['source_pair_results'].append({
                 'start_ms': pair[0]['media_ms'],
@@ -495,7 +497,8 @@ def contour_segments(video, observations, start, end, *, deadline, diagnostics, 
                 'accepted_segments': 0,
                 'rejection_codes': ['TIME_BUDGET_BEFORE_ENDPOINT' if timed_out else 'ENDPOINT_NOT_DECODED'],
             })
-    diagnostics['source_pair_results'].sort(key=lambda r: (r['start_ms'], r['end_ms']))
+    if audit_pairs:
+        diagnostics['source_pair_results'].sort(key=lambda r: (r['start_ms'], r['end_ms']))
     diagnostics['source_pairs_unreached'] = (diagnostics['source_pairs_expected']
                                           - diagnostics['source_pairs_reached'])
     diagnostics.update(status='TIME_BUDGET' if timed_out else
