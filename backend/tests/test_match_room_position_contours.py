@@ -394,3 +394,20 @@ def test_window_camera_cache_preserves_bridge_and_failed_estimates(monkeypatch):
     assert display.tracked_display_positions(frames,rows,interval,deadline=time.monotonic()+5,camera_cache=fresh) is None
     assert display.tracked_display_positions(frames,rows,interval,deadline=time.monotonic()+5,camera_cache=fresh) is None
     assert len(failed)==1
+
+
+def test_offline_profiler_accepts_only_source_bound_short_windows():
+    """Long event playback can be investigated without weakening source gates."""
+    import pytest
+    from scripts.profile_matchroom_contours import source_window
+    room = {'start_ms': 10000, 'end_ms': 12500}
+    assert source_window(room, 10000, 11500) == (10000, 11500)
+    assert source_window(room, 11000, 12500) == (11000, 12500)
+    assert source_window({'start_ms': 100, 'end_ms': 200}) == (100, 200)
+    for start, end in (
+        (None, None), (None, 11500), (10000, None),
+        (9999, 11000), (11000, 12501), (10000, 12000),
+        (11000, 11000), (11500, 11000),
+    ):
+        with pytest.raises(ValueError):
+            source_window(room, start, end)
