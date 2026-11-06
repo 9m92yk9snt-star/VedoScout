@@ -321,7 +321,8 @@ def contour_segments(video, observations, start, end, *, deadline, diagnostics, 
                        source_pairs_display_unavailable=0,
                        source_pairs_display_source_conflict=0,
                        source_pairs_missing_foreground=0,
-                       source_segments_accepted=0, last_decoded_ms=None)
+                       source_segments_accepted=0, last_decoded_ms=None,
+                       source_pair_results=[])
     boxes = [s['player_box'] for s in observations
              if s.get('identity_status') == 'CONFIRMED' and s.get('ground') and s.get('player_box')]
     if not 0 < end-start <= 1500 or len(boxes) < 2:
@@ -340,6 +341,16 @@ def contour_segments(video, observations, start, end, *, deadline, diagnostics, 
     # Lifetime and size are bounded by read_clip's MAX_FRAMES, never a report.
     foreground_cache, stance_cache, camera_cache = {}, {}, {}
     association_cache = {}
+    # Keep bounded reason codes tied to actual source endpoint timestamps.
+    # These are diagnostics, never position estimates or identity authority.
+    reason_counters = (
+        'source_pairs_no_agreement',
+        'source_pairs_source_conflict',
+        'source_pairs_display_unavailable',
+        'source_pairs_display_source_conflict',
+        'source_pairs_missing_foreground',
+    )
+    reached_endpoints = set()
     pending = {}
     for a, b in pairs:
         prior = pending.get(b['media_ms'])
@@ -376,6 +387,9 @@ def contour_segments(video, observations, start, end, *, deadline, diagnostics, 
             if pair is None:
                 continue
             diagnostics['source_pairs_reached'] += 1
+            reached_endpoints.add(frame['media_ms'])
+            before_rejections = {key: diagnostics[key] for key in reason_counters}
+            segments_before_pair = len(segments)
             # Complete and preserve each independently checked interval before
             # decoding more frames. A later timeout cannot erase earlier proof.
             intervals = agreed_intervals(frames, detections, pair, deadline=deadline, allow_display_bridge=True,
@@ -460,8 +474,28 @@ def contour_segments(video, observations, start, end, *, deadline, diagnostics, 
                     diagnostics['source_segments_accepted'] += 1
                     if on_segment is not None:
                         on_segment(segment)
+            if len(diagnostics['source_pair_results']) < 32:
+                diagnostics['source_pair_results'].append({
+                    'start_ms': pair[0]['media_ms'],
+                    'end_ms': pair[1]['media_ms'],
+                    'accepted_segments': len(segments) - segments_before_pair,
+                    'rejection_codes': [
+                        key.removeprefix('source_pairs_').upper()
+                        for key in reason_counters
+                        if diagnostics[key] > before_rejections[key]
+                    ],
+                })
     finally:
         stream.close()
+    for endpoint, pair in pending.items():
+        if endpoint not in reached_endpoints and len(diagnostics['source_pair_results']) < 32:
+            diagnostics['source_pair_results'].append({
+                'start_ms': pair[0]['media_ms'],
+                'end_ms': pair[1]['media_ms'],
+                'accepted_segments': 0,
+                'rejection_codes': ['NOT_DECODED_BEFORE_DEADLINE'],
+            })
+    diagnostics['source_pair_results'].sort(key=lambda r: (r['start_ms'], r['end_ms']))
     diagnostics['source_pairs_unreached'] = (diagnostics['source_pairs_expected']
                                           - diagnostics['source_pairs_reached'])
     diagnostics.update(status='TIME_BUDGET' if timed_out else
