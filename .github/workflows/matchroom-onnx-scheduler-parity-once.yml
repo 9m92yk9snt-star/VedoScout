@@ -17,7 +17,7 @@ jobs:
       github.event.pull_request.draft == true &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.event.pull_request.head.ref == 'codex/matchroom-window-geometry-reuse' &&
-      github.event.before == '2fd8dc44e0fefce8514113c89bf0c30895daeaa2' &&
+      github.event.before == '9ee5130f2b3bd7514a2dea72ec004cb6d45dd89b' &&
       github.run_attempt == 1
     runs-on: ubuntu-latest
     timeout-minutes: 35
@@ -37,7 +37,11 @@ jobs:
         run: |
           # No apt update/install: OpenCV reads the bundled MP4 directly.
           # Prior run blocked in apt update for >22 minutes before any test.
-          python -m pip install 'numpy==2.4.6' 'opencv-python-headless==4.13.0.92' 'onnxruntime==1.31.1' 'Pillow==12.2.0' 'python-dotenv==1.2.2'
+          python -m pip install 'numpy==2.4.6' 'opencv-python-headless==4.13.0.92' 'onnxruntime==1.31.1' 'Pillow==12.2.0' 'python-dotenv==1.2.2' 'pytest==9.0.3'
+      - name: Validate comparator and compile diagnostic script
+        run: |
+          python -m py_compile backend/scripts/verify_matchroom_onnx_scheduler_parity.py
+          python -m pytest -q backend/tests/test_match_room_tracking.py -k onnx_scheduler_diff_diagnostics_are_bounded_and_precise
       - name: Restore earlier no-new-model paid receipts and all ten original taps
         uses: actions/download-artifact@v4
         with:
