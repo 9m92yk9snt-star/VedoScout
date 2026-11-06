@@ -310,3 +310,29 @@ def test_middle_source_knot_is_shared_by_overlapping_curves_without_rewriting_me
     localized.bind_source_display_knots(frames, rows, other, obs)
     assert other['source_endpoint_ground'] == {}
 
+
+
+def test_window_camera_cache_preserves_bridge_and_failed_estimates(monkeypatch):
+    import match_room_display_bridge as display
+    import motion_compensation
+    frames, rows, obs, path = fixture(monkeypatch)
+    rows[2][0]['ground'] = None
+    interval = localized.agreed_intervals(frames, rows, obs, deadline=time.monotonic()+5, allow_display_bridge=True)[0]
+    calls=[]
+    def estimate(*args):
+        calls.append(1)
+        return np.array([[1.,0,0],[0,1.,0]]),30
+    monkeypatch.setattr(motion_compensation, 'estimate_camera', estimate)
+    expected=display.tracked_display_positions(frames,rows,interval,deadline=time.monotonic()+5)
+    n=len(calls);cache={}
+    actual=display.tracked_display_positions(frames,rows,interval,deadline=time.monotonic()+5,camera_cache=cache)
+    assert actual==expected and len(calls)==2*n
+    assert display.tracked_display_positions(frames,rows,interval,deadline=time.monotonic()+5,camera_cache=cache)==expected
+    assert len(calls)==2*n
+    # A new window must calculate again; failed estimates are cached too.
+    failed=[]
+    monkeypatch.setattr(motion_compensation,'estimate_camera',lambda *args:(failed.append(1) or None,'unavailable'))
+    fresh={}
+    assert display.tracked_display_positions(frames,rows,interval,deadline=time.monotonic()+5,camera_cache=fresh) is None
+    assert display.tracked_display_positions(frames,rows,interval,deadline=time.monotonic()+5,camera_cache=fresh) is None
+    assert len(failed)==1

@@ -329,7 +329,7 @@ def contour_segments(video, observations, start, end, *, deadline, diagnostics, 
     # decoded frame and instance, not on the interval being emitted. Keep even
     # rejected foreground results so another interval cannot redo the work.
     # Lifetime and size are bounded by read_clip's MAX_FRAMES, never a report.
-    foreground_cache, stance_cache = {}, {}
+    foreground_cache, stance_cache, camera_cache = {}, {}, {}
     pending = {}
     for a, b in pairs:
         prior = pending.get(b['media_ms'])
@@ -384,7 +384,8 @@ def contour_segments(video, observations, start, end, *, deadline, diagnostics, 
                 interval['reference_frames'] = [o['frame_id'] for o in support if o.get('ground')]
                 bind_source_display_knots(frames, detections, interval, support)
                 from match_room_display_bridge import tracked_display_positions
-                display = tracked_display_positions(frames, detections, interval, deadline=deadline)
+                display = tracked_display_positions(frames, detections, interval, deadline=deadline,
+                                                    camera_cache=camera_cache)
                 if display is None or not display_fits_source_bodies(frames, interval, display, support):
                     continue
                 samples = []
