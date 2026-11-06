@@ -22,6 +22,8 @@ def main():
     parser.add_argument('--model', choices=('small', 'medium'), default='small')
     parser.add_argument('--seconds', type=float, default=90)
     parser.add_argument('--one-cpu', action='store_true')
+    parser.add_argument('--audit-pairs', action='store_true',
+                        help='Record source-endpoint rejection reasons only in this offline probe')
     parser.add_argument('--output', type=Path, required=True)
     args = parser.parse_args()
     if not 5 <= args.seconds <= 420:
@@ -56,7 +58,8 @@ def main():
     started = time.monotonic()
     profile.enable()
     segments = contour_segments(args.video, room['samples'], room['start_ms'], room['end_ms'],
-                                deadline=started+args.seconds, diagnostics=diagnostic, segmenter=model)
+                                deadline=started+args.seconds, diagnostics=diagnostic, segmenter=model,
+                                audit_pairs=args.audit_pairs)
     profile.disable()
     metadata = {'engine': 'opencv', 'opencv_version': cv2.__version__,
                 'source_video_sha256': digest, 'event_id': room['event_id'],
