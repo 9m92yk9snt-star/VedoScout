@@ -49,6 +49,7 @@
     "restriction": "Only isolated engineering regression input; NEVER evidence of Orman1000 production readiness"
   },
   "required_gates": [
+    "CRITICAL: Reconcile user's 3 video assists against exported 2 observed assists, review especially 49.881s SHOT GOAL attribution with actual Orman1000 frames and selected-player identity.",
     "DONE: Verified 118 payload checksums, ZIP SHA and embedded canonical web-video SHA fa56f933... (original .mov is not in ZIP)",
     "Bind all original selections, player identity, report clips, outcomes and score evidence to that exact source",
     "Measure exact decoded source PTS and accepted Match Room overlays for Orman1000",
@@ -59,7 +60,7 @@
     "Obtain user approval before merge or deploy"
   ],
   "production_cache_enabled": false,
-  "current_release_acceptance": "ARCHIVE_VERIFIED_BUT_SOURCE_SPECIFIC_LIVE_GRAPHICS_AND_EVENT_COVERAGE_OPEN",
+  "current_release_acceptance": "BLOCKED_UNRESOLVED_THIRD_ASSIST_AND_EVENT_ATTRIBUTION",
   "production_or_main_changes_allowed_without_user_approval": false,
   "actual_latest_zip_source_pts_audit": {
     "scope": "Raw source-bound mask samples at exact decoded original web-video PTS ±2ms; not a direct frontend acceptance or revised-model run",
@@ -98,5 +99,39 @@
       "supported_but_unmasked": 17
     },
     "caveat": "Ground support is a conservative candidate window between independent CONFIRMED ground+box observations <=250ms apart; it does NOT authorize per-frame identity, interpolation, or a continuous ellipse."
+  },
+  "user_reported_goal_assist_discrepancy": {
+    "user_reported_assists_in_video": 3,
+    "exported_report_observed_assists": 2,
+    "exported_report_observed_goals": 2,
+    "discrepancy_status": "UNRESOLVED_USER_REPORTED_THIRD_ASSIST",
+    "confirmed_export_assist_events": [
+      {
+        "event_id": "006dbd71ed71d464f19d",
+        "proof_ms": 44065,
+        "outcome": "PASS_TEAMMATE_GOAL"
+      },
+      {
+        "event_id": "16b70d6326506d906e7d",
+        "proof_ms": 56264,
+        "outcome": "PASS_TEAMMATE_GOAL"
+      }
+    ],
+    "candidate_for_misattribution_review": {
+      "event_id": "47ad617d2ba76a4683cd",
+      "proof_ms": 49881,
+      "currently_exported_as": "SHOT_GOAL",
+      "source_window_ms": [
+        49000,
+        51500
+      ],
+      "requires": "Check whether selected player passes to a different finisher or personally shoots; verify last deliberate touch, receiver, scorer and active ball through the goal.",
+      "goal_scoring_actor_verified_by_independent_review": false
+    },
+    "prohibited_shortcuts": [
+      "Do not silently increment assists from 2 to 3.",
+      "Do not turn a proven own goal into an assist without new source-backed evidence.",
+      "Do not alter scores, event timeline, stats or player identity before reclassification is verified."
+    ]
   }
 }
