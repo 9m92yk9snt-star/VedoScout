@@ -314,7 +314,14 @@ def contour_segments(video, observations, start, end, *, deadline, diagnostics, 
     from match_room_contours import read_clip, detect_frame, measured_mask
     from match_room_tracking import foreground_polygons
     diagnostics.update(status='UNSUPPORTED_INPUT', method=METHOD,
-                       detector_frames=0, detector_seconds=0.0)
+                       detector_frames=0, detector_seconds=0.0,
+                       source_pairs_expected=0, source_pairs_reached=0,
+                       source_pairs_unreached=0, source_pairs_no_agreement=0,
+                       source_pairs_source_conflict=0,
+                       source_pairs_display_unavailable=0,
+                       source_pairs_display_source_conflict=0,
+                       source_pairs_missing_foreground=0,
+                       source_segments_accepted=0, last_decoded_ms=None)
     boxes = [s['player_box'] for s in observations
              if s.get('identity_status') == 'CONFIRMED' and s.get('ground') and s.get('player_box')]
     if not 0 < end-start <= 1500 or len(boxes) < 2:
@@ -338,6 +345,8 @@ def contour_segments(video, observations, start, end, *, deadline, diagnostics, 
         prior = pending.get(b['media_ms'])
         if prior is None or a['media_ms'] < prior[0]['media_ms']:
             pending[b['media_ms']] = (a,b)
+    # Diagnostic counters only: no new detection, source sampling, gates or budget.
+    diagnostics['source_pairs_expected'] = len(pending)
     stream = read_clip(video, start, end, sample_step=0)
     timed_out = False
     try:
@@ -362,9 +371,11 @@ def contour_segments(video, observations, start, end, *, deadline, diagnostics, 
                 row['_appearance'] = cv2.normalize(hist, None, norm_type=cv2.NORM_L1)
             frame.pop('image')
             frames.append(frame)
+            diagnostics['last_decoded_ms'] = frame['media_ms']
             pair = pending.get(frame['media_ms'])
             if pair is None:
                 continue
+            diagnostics['source_pairs_reached'] += 1
             # Complete and preserve each independently checked interval before
             # decoding more frames. A later timeout cannot erase earlier proof.
             intervals = agreed_intervals(frames, detections, pair, deadline=deadline, allow_display_bridge=True,
@@ -386,15 +397,22 @@ def contour_segments(video, observations, start, end, *, deadline, diagnostics, 
                     if estimate is not None:
                         intervals, support = [estimate], candidate_support
                         break
+            if not intervals:
+                diagnostics['source_pairs_no_agreement'] += 1
             for interval in intervals:
                 if not supporting_observations(frames, detections, interval, support):
+                    diagnostics['source_pairs_source_conflict'] += 1
                     continue
                 interval['reference_frames'] = [o['frame_id'] for o in support if o.get('ground')]
                 bind_source_display_knots(frames, detections, interval, support)
                 from match_room_display_bridge import tracked_display_positions
                 display = tracked_display_positions(frames, detections, interval, deadline=deadline,
                                                     camera_cache=camera_cache)
-                if display is None or not display_fits_source_bodies(frames, interval, display, support):
+                if display is None:
+                    diagnostics['source_pairs_display_unavailable'] += 1
+                    continue
+                if not display_fits_source_bodies(frames, interval, display, support):
+                    diagnostics['source_pairs_display_source_conflict'] += 1
                     continue
                 samples = []
                 for i, j in zip(interval['indices'], interval['instances']):
@@ -404,6 +422,7 @@ def contour_segments(video, observations, start, end, *, deadline, diagnostics, 
                             [{'class_id': 0, 'mask': measured_mask(d)} for d in detections[i]], w, h)
                     polygons = foreground_cache[i]
                     if not polygons:
+                        diagnostics['source_pairs_missing_foreground'] += 1
                         samples = []
                         break
                     ms = frames[i]['media_ms']
@@ -438,10 +457,13 @@ def contour_segments(video, observations, start, end, *, deadline, diagnostics, 
                                'camera_method': 'BACKGROUND_AFFINE' if display else None,
                                'source_frame_coverage': 'COMPLETE_SEGMENT', 'samples': samples}
                     segments.append(segment)
+                    diagnostics['source_segments_accepted'] += 1
                     if on_segment is not None:
                         on_segment(segment)
     finally:
         stream.close()
+    diagnostics['source_pairs_unreached'] = (diagnostics['source_pairs_expected']
+                                          - diagnostics['source_pairs_reached'])
     diagnostics.update(status='TIME_BUDGET' if timed_out else
                        'SUPPORTED_SOURCE_OBSERVATIONS' if segments else 'NO_AGREED_INTERVAL',
                        decoded_frames=len(frames), agreed_intervals=len(segments))
