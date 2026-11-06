@@ -17,7 +17,7 @@ jobs:
       github.event.pull_request.draft == true &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.event.pull_request.head.ref == 'codex/matchroom-window-geometry-reuse' &&
-      github.event.before == 'b33b5d858027f067833d8668767ae9fb93496cd2' &&
+      github.event.before == 'eb95024c8a0adad80e19eaa8e1421a1874a6793f' &&
       github.run_attempt == 1
     runs-on: ubuntu-latest
     timeout-minutes: 8
@@ -35,7 +35,7 @@ jobs:
       - name: Run no-model source and audit regressions
         run: |
           python -m py_compile backend/match_room_coverage_audit.py backend/scripts/audit_matchroom_report_coverage.py
-          python -m pip install 'pytest==9.0.3' 'python-dotenv==1.2.2'
+          python -m pip install 'pytest==9.0.3' 'python-dotenv==1.2.2' 'numpy==2.4.6' 'opencv-python-headless==4.13.0.92'
           python -m pytest -q backend/tests/test_match_room_coverage_audit.py
       - name: Restore real retained all-tap report without provider calls
         uses: actions/download-artifact@v4
