@@ -1,0 +1,85 @@
+"""Synthetic, no-model regressions for opt-in Match Room coverage audit."""
+from copy import deepcopy
+
+from match_room_coverage_audit import audited_display_spans, source_gap_audit
+from match_room_tracking import missing_display_windows
+
+
+def observation(t):
+    return {"media_ms": t, "identity_status": "CONFIRMED",
+            "ground": [.5, .75], "frame_id": f"s{t:09}"}
+
+
+def sample(t):
+    return {
+        "media_ms": t, "frame_id": f"position-contour:{t}",
+        "ground": [.5, .75], "player_width": .09, "confidence": .95,
+        "foreground": {"method": "SOURCE_PERSON_MASK", "frame_id": f"position-contour:{t}",
+                       "media_ms": t, "polygons": [[[.4, .5], [.5, .5], [.5, .8]]]},
+    }
+
+
+def fixture():
+    event = {"event_id": "same-event", "source_video_sha256": "same-source",
+             "localization_method": "EXPLICIT_SOURCE_POSITIONS",
+             "visual_samples": [observation(t) for t in (0, 125, 250, 375, 500)]}
+    source_times = list(range(0, 133, 33)) + [360, 393, 426, 459, 492, 500]
+    previous = {
+        "event_id": event["event_id"], "source_video_sha256": event["source_video_sha256"],
+        "method": "SOURCE_OBSERVATION_INSTANCE_CONTOUR",
+        "segments": [{"id": "one-contiguous-claim", "source_frame_coverage": "COMPLETE_SEGMENT",
+                      "reference_frame": "s000000000", "samples": [sample(t) for t in source_times]}],
+    }
+    return event, previous
+
+
+def test_audit_detects_hidden_internal_gap_without_changing_scheduler_output():
+    event, previous = fixture()
+    before = deepcopy((event, previous))
+    # Existing scheduler sees a single 0..500ms span and assumes coverage.
+    assert missing_display_windows(event, previous) == []
+    result = source_gap_audit(event, previous)
+    assert result["status"] == "AUDITED"
+    assert result["declared_spans"] == 1
+    assert result["supported_source_runs"] == 2
+    assert result["count"] == 2
+    assert result["holes"] == [
+        {"start_ms": 125, "end_ms": 250,
+         "reason": "DECLARED_SEGMENT_SPAN_HAS_UNPROVEN_SOURCE_FRAMES"},
+        {"start_ms": 250, "end_ms": 375,
+         "reason": "DECLARED_SEGMENT_SPAN_HAS_UNPROVEN_SOURCE_FRAMES"},
+    ]
+    assert (event, previous) == before
+    assert missing_display_windows(event, previous) == []
+
+
+def test_audit_does_not_invent_coverage_from_absent_foreground_or_hidden_pose():
+    event, previous = fixture()
+    for t in (360, 393, 426):
+        row = next(s for s in previous["segments"][0]["samples"] if s["media_ms"] == t)
+        row["foreground"] = None
+    result = source_gap_audit(event, previous)
+    assert result["count"] >= 2
+    # Source observation with hidden feet is not a measured contact.
+    previous["segments"][0]["samples"][0]["ground"] = None
+    assert audited_display_spans(previous)[0][0] != 0
+
+
+def test_audit_refuses_cross_video_or_unconfirmed_identity_barriers():
+    event, previous = fixture()
+    bad = deepcopy(previous)
+    bad["source_video_sha256"] = "different-video"
+    assert source_gap_audit(event, bad)["status"] == "SOURCE_BINDING_REQUIRED"
+    bad = deepcopy(event)
+    bad["visual_samples"][2]["identity_status"] = "UNCERTAIN"
+    bad["visual_samples"][2]["ground"] = None
+    result = source_gap_audit(bad, previous)
+    assert result["status"] == "AUDITED"
+    assert all(not (h["start_ms"] < 250 < h["end_ms"]) for h in result["holes"])
+
+
+def test_complete_masked_source_stamps_have_no_audited_holes():
+    event, previous = fixture()
+    previous["segments"][0]["samples"] = [sample(t) for t in range(0, 501, 25)]
+    assert source_gap_audit(event, previous)["holes"] == []
+    assert audited_display_spans(previous) == [[0, 500]]
