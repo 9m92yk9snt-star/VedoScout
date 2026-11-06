@@ -16,21 +16,29 @@ def _valid_sample(row):
     ms = row.get("media_ms")
     if type(ms) is not int or ms < 0:
         return False
+    def normalized(p):
+        return (isinstance(p, list) and len(p) == 2
+                and all(type(v) in (int, float) and 0 <= v <= 1 for v in p))
+    if (type(row.get("player_width")) not in (int, float)
+            or not .005 <= row["player_width"] <= .4
+            or type(row.get("confidence")) not in (int, float)
+            or not .55 <= row["confidence"] <= 1):
+        return False
     ground = row.get("ground")
-    estimate = row.get("display_ground")
-    if ground is None and (
-        row.get("display_estimated") is not True
-        or row.get("source_ground_observation") is not False
-        or not (isinstance(estimate, list) and len(estimate) == 2
-                and all(type(v) in (int, float) and 0 <= v <= 1 for v in estimate))
-    ):
+    if not normalized(ground) and not (
+            ground is None
+            and row.get("display_estimated") is True
+            and row.get("source_ground_observation") is False
+            and normalized(row.get("display_ground"))):
         return False
     fg = row.get("foreground") or {}
+    polygons = fg.get("polygons")
     return (fg.get("method") == "SOURCE_PERSON_MASK"
             and fg.get("frame_id") == row.get("frame_id")
             and fg.get("media_ms") == ms
-            and isinstance(fg.get("polygons"), list)
-            and bool(fg["polygons"]))
+            and isinstance(polygons, list) and 0 < len(polygons) <= 48
+            and all(isinstance(p, list) and 3 <= len(p) <= 512
+                    and all(normalized(v) for v in p) for p in polygons))
 
 
 def audited_display_spans(previous):
