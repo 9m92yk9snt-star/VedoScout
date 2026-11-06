@@ -371,6 +371,10 @@ def compute(video, anchors, events, checkpoint=None):
                     if position_model is None:
                         from native_player_segmentation import PersonSegmenter
                         position_model = PersonSegmenter()
+                        if event.get('_contour_prediction_cache'):
+                            from match_room_prediction_cache import CachedSegmenter
+                            position_model = CachedSegmenter(position_model, event['_contour_prediction_cache'],
+                                                             event['source_video_sha256'])
                     part = {'start_ms': lo, 'end_ms': stop}
                     contours.extend(position_contours(video, observations, lo, stop,
                                                       deadline=deadline, diagnostics=part, on_segment=preserve,
@@ -452,6 +456,9 @@ def compute_refinement(video, anchors, events, checkpoint=None, segmenter_kind='
         if segmenter_kind == 'small':
             from native_player_segmentation import PersonSegmenter
             model = PersonSegmenter()
+            if event.get('_contour_prediction_cache'):
+                from match_room_prediction_cache import CachedSegmenter
+                model = CachedSegmenter(model, event['_contour_prediction_cache'], event['source_video_sha256'])
         elif segmenter_kind == 'medium':
             model = refinement_model()
         else:
@@ -557,7 +564,16 @@ def missing_display_windows(event, previous):
     return list(reversed(missing))
 
 
-def bounded_tracks(video, anchors, events):
+def bounded_tracks(video, anchors, events, *, reuse_predictions=False):
+    # Opt-in until full graphics parity and live-engine replay are verified.
+    if not reuse_predictions:
+        return _bounded_tracks(video, anchors, events)
+    with tempfile.TemporaryDirectory(prefix='matchroom-predictions-') as directory:
+        scoped = [{**event, '_contour_prediction_cache': directory} for event in events]
+        return _bounded_tracks(video, anchors, scoped)
+
+
+def _bounded_tracks(video, anchors, events):
     """One bounded child per distinct clip; repeated report cards share results.
 
     At most MAX_EVENTS initial children plus two children per refinement.
