@@ -107,3 +107,31 @@ def test_invalid_geometry_or_foreground_polygon_never_counts_as_coverage():
         changed["segments"][0]["samples"][0].update(change)
         assert audited_display_spans(changed)[0][0] != 0
         assert source_gap_audit(event, changed)["status"] == "AUDITED"
+
+
+def test_retained_report_audit_enforces_source_event_before_any_coverage_claim():
+    import pytest
+    from scripts.audit_matchroom_report_coverage import audit_report
+    event, previous = fixture()
+    sha = "a" * 64
+    previous["source_video_sha256"] = sha
+    row = {"event_id": event["event_id"], "source_video_sha256": sha,
+           "match_room": {"event_id": event["event_id"],
+                          "source_video_sha256": sha,
+                          "samples": event["visual_samples"],
+                          "tracking": previous}}
+    document = {"canonical_events": {"source_video_sha256": sha},
+                "full_report": {"video_comments": [row]}}
+    result = audit_report(document)
+    assert result["checked_events"] == 1
+    assert result["total_hidden_source_pairs"] == 2
+    assert result["model_calls"] == 0
+    assert result["real_video_pts_verified"] is False
+    bad = deepcopy(document)
+    bad["full_report"]["video_comments"][0]["match_room"]["tracking"]["source_video_sha256"] = "b" * 64
+    with pytest.raises(ValueError, match="CROSS_VIDEO_TRACK_DATA_REJECTED"):
+        audit_report(bad)
+    bad = deepcopy(document)
+    bad["full_report"]["video_comments"][0]["match_room"]["tracking"]["event_id"] = "other"
+    with pytest.raises(ValueError, match="TRACK_EVENT_BINDING_CHANGED"):
+        audit_report(bad)
