@@ -177,6 +177,24 @@ def test_completed_interval_is_checkpointed_before_later_decode_timeout(monkeypa
         'start_ms': 200, 'end_ms': 400, 'accepted_segments': 0,
         'rejection_codes': ['TIME_BUDGET_BEFORE_ENDPOINT']
     }
+    # A normally finished decoder with no exact endpoint must not be
+    # misclassified as a deadline overrun or invented source coverage.
+    clock[0] = 0
+    def missing_endpoint(*args, **kwargs):
+        for t in (0, 50, 100, 150, 200):
+            yield {'media_ms': t, 'gray': np.zeros((100,100), np.uint8),
+                   'image': np.zeros((100,100,3), np.uint8)}
+    monkeypatch.setattr(source, 'read_clip', missing_endpoint)
+    diagnostic = {}
+    segments = localized.contour_segments('unused', obs, 0, 400, deadline=100,
+                                          diagnostics=diagnostic)
+    assert len(segments) == 1
+    assert diagnostic['status'] == 'SUPPORTED_SOURCE_OBSERVATIONS'
+    assert diagnostic['source_pairs_unreached'] == 1
+    assert diagnostic['source_pair_results'][-1] == {
+        'start_ms': 200, 'end_ms': 400, 'accepted_segments': 0,
+        'rejection_codes': ['ENDPOINT_NOT_DECODED']
+    }
 
 
 def test_recovery_window_gets_budget_first_without_duplicate_intervals():
