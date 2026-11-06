@@ -3,24 +3,31 @@
 // No model calls, mutations, frame interpolation or browser-success claims.
 const fs = require('node:fs');
 const path = require('node:path');
-const crypto = require('node:crypto');
 const assert = require('node:assert/strict');
-const {execFileSync} = require('node:child_process');
 
 const expectedSource = 'b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999';
 const parse = v => typeof v === 'string' ? parse(JSON.parse(v)) : v;
 
 function sourcePts(clip, offsetSeconds) {
-  const data = JSON.parse(execFileSync('ffprobe', [
-    '-v', 'error', '-select_streams', 'v:0',
-    '-show_entries', 'frame=best_effort_timestamp_time',
-    '-of', 'json', clip
-  ], {encoding:'utf8', timeout:30000}));
-  const stamps = (data.frames || []).map(f => Math.round(
-    (Number(f.best_effort_timestamp_time) + offsetSeconds) * 1000
-  ));
-  assert.ok(stamps.length >= 2 && stamps.every((t,i) => Number.isFinite(t) && (i === 0 || t > stamps[i-1])),
-    'Actual nonmonotonic or missing decoded clip PTS');
+  // FFmpeg showinfo reports the decoded picture PTS. It is part of the
+  // pinned imageio-ffmpeg runtime; ffprobe is not bundled on all runners.
+  // Never substitute frame_index/fps or guessed timestamps.
+  const ffmpeg = process.env.SCOUTMEPLAY_FFMPEG_BIN || 'ffmpeg';
+  const {spawnSync} = require('node:child_process');
+  const run = spawnSync(ffmpeg, [
+    '-hide_banner', '-loglevel', 'info', '-i', clip,
+    '-map', '0:v:0', '-vf', 'showinfo', '-an', '-f', 'null', '-'
+  ], {encoding:'utf8', timeout:30000, maxBuffer:8*1024*1024});
+  assert.equal(run.error, undefined, 'Source frame PTS decoder unavailable');
+  assert.equal(run.status, 0, 'Source clip decoding failed');
+  const entries = (run.stderr || '').split(/\r?\n/).filter(line =>
+    line.includes('Parsed_showinfo_') && /\bpts_time:\s*[-+\d.]+/.test(line));
+  const stamps = entries.map(line => {
+    const match = /\bpts_time:\s*([-+]?\d+(?:\.\d+)?)/.exec(line);
+    return Math.round((Number(match[1]) + offsetSeconds) * 1000);
+  });
+  assert.ok(stamps.length >= 2 && stamps.every((t,i) => Number.isFinite(t) &&
+    (i === 0 || t > stamps[i-1])), 'Actual nonmonotonic or missing decoded clip PTS');
   return stamps;
 }
 
