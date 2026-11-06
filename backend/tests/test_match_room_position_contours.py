@@ -52,6 +52,10 @@ def test_overlapping_intervals_reuse_only_exact_window_geometry(monkeypatch):
     assert diagnostics['source_segments_accepted'] == 2
     assert diagnostics['source_pairs_no_agreement'] == 0
     assert diagnostics['last_decoded_ms'] == 300
+    assert diagnostics['source_pair_results'] == [
+        {'start_ms': 0, 'end_ms': 200, 'accepted_segments': 1, 'rejection_codes': []},
+        {'start_ms': 100, 'end_ms': 300, 'accepted_segments': 1, 'rejection_codes': []},
+    ]
     expected_polygons = original_foreground([{'class_id': 0, 'mask': mask}], 100, 100)
     for segment in first:
         for sample in segment['samples']:
@@ -77,6 +81,9 @@ def test_overlapping_intervals_reuse_only_exact_window_geometry(monkeypatch):
     assert run_window() == []
     assert diagnostics['source_pairs_source_conflict'] == 2
     assert diagnostics['source_segments_accepted'] == 0
+    assert len(diagnostics['source_pair_results']) == 2
+    assert all(item['rejection_codes'] == ['SOURCE_CONFLICT'] for item in diagnostics['source_pair_results'])
+    assert all(item['accepted_segments'] == 0 for item in diagnostics['source_pair_results'])
 
 
 def fixture(monkeypatch):
@@ -166,6 +173,10 @@ def test_completed_interval_is_checkpointed_before_later_decode_timeout(monkeypa
     assert diagnostic['source_pairs_reached'] == 1
     assert diagnostic['source_pairs_unreached'] == 1
     assert diagnostic['last_decoded_ms'] == 200
+    assert diagnostic['source_pair_results'][-1] == {
+        'start_ms': 200, 'end_ms': 400, 'accepted_segments': 0,
+        'rejection_codes': ['NOT_DECODED_BEFORE_DEADLINE']
+    }
 
 
 def test_recovery_window_gets_budget_first_without_duplicate_intervals():
