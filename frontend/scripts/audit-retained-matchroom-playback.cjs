@@ -132,11 +132,31 @@ async function main() {
         source_sample_times_accepted_in_frontend:times.filter(t => acceptedSourceTimes.has(t)).length
       };
     });
+    const identityRows = Array.isArray(roomRaw.samples) ? roomRaw.samples
+      .filter(sample => Number.isFinite(sample?.media_ms) &&
+        typeof sample.identity_status === 'string') : [];
+    const lastAcceptedFrame = covered.length ? Math.max(...covered) : null;
+    const sourceIdentitySummary = {
+      source_observation_count:identityRows.length,
+      confirmed_identity_rows:identityRows.filter(s => s.identity_status === 'CONFIRMED').length,
+      uncertain_or_absent_identity_rows:identityRows.filter(s => s.identity_status !== 'CONFIRMED').length,
+      confirmed_visible_ground_rows:identityRows.filter(s =>
+        s.identity_status === 'CONFIRMED' && Array.isArray(s.ground)).length,
+      last_confirmed_visible_ground_ms:identityRows.filter(s =>
+        s.identity_status === 'CONFIRMED' && Array.isArray(s.ground))
+        .reduce((last,s) => Math.max(last,s.media_ms), -1),
+      source_observations_after_last_accepted_contour:
+        identityRows.filter(s => lastAcceptedFrame === null || s.media_ms > lastAcceptedFrame)
+          .slice(0,60).map(s => ({media_ms:s.media_ms, identity_status:s.identity_status,
+                                    ground_visible:Array.isArray(s.ground),
+                                    player_box_visible:Array.isArray(s.player_box)}))
+    };
     clips.push({
       event_id: row.event_id, canonical_action_type:event.canonical_action_type,
       video_source_sha256:expectedSource, window_ms:[room.start,room.end],
       frontend_accepted_segments:room.tracks.length,
       backend_raw_segments:rawSegments.length,
+      source_identity_evidence_summary:sourceIdentitySummary,
       backend_segment_diagnostics:segmentDiagnostics,
       backend_contour_window_statuses:(tracking.contour_diagnostics?.windows || [])
         .map(w => ({status:w.status, start_ms:w.start_ms,end_ms:w.end_ms,
