@@ -59,124 +59,37 @@ def tracked_fields(snapshot, eid):
 
 
 
-def first_differences(left, right, limit=12):
-    """Bounded audit of nested source-bound differences; never emits mask pixels."""
-    out = []
-    def walk(a, b, path):
-        if len(out) >= limit or a == b:
+def first_differences(a, b, limit=12):
+    """Bounded diff paths and numeric discrepancies; never raw masks or receipts."""
+    rows = []
+    def walk(x, y, path):
+        if len(rows) >= limit or x == y:
             return
-        if isinstance(a, dict) and isinstance(b, dict):
-            for key in sorted(set(a) | set(b), key=str):
-                k = path + '.' + str(key)[:80]
-                if key not in a or key not in b:
-                    out.append({'path': k, 'reason': 'FIELD_MISSING'})
+        if isinstance(x, dict) and isinstance(y, dict):
+            for key in sorted(set(x) | set(y), key=str):
+                sub = path + '.' + str(key)[:80]
+                if key not in x or key not in y:
+                    rows.append({'path': sub, 'reason': 'FIELD_MISSING'})
                 else:
-                    walk(a[key], b[key], k)
-                if len(out) >= limit:
+                    walk(x[key], y[key], sub)
+                if len(rows) >= limit:
                     return
-        elif isinstance(a, list) and isinstance(b, list):
-            if len(a) != len(b):
-                out.append({'path': path, 'reason': 'LENGTH_CHANGED',
-                            'before': len(a), 'after': len(b)})
-            for i, (x, y) in enumerate(zip(a, b)):
-                walk(x, y, path + '[' + str(i) + ']')
-                if len(out) >= limit:
+        elif isinstance(x, list) and isinstance(y, list):
+            if len(x) != len(y):
+                rows.append({'path': path, 'reason': 'LENGTH_CHANGED',
+                             'before_length': len(x), 'after_length': len(y)})
+            for i, (before, after) in enumerate(zip(x, y)):
+                walk(before, after, path + '[' + str(i) + ']')
+                if len(rows) >= limit:
                     return
-        elif type(a) in (int, float) and type(b) in (int, float):
-            out.append({'path': path, 'reason': 'NUMBER_CHANGED',
-                        'before': a, 'after': b, 'abs_delta': abs(float(a)-float(b))})
+        elif type(x) in (int, float) and type(y) in (int, float):
+            rows.append({'path': path, 'reason': 'NUMERIC_DIFFERENCE',
+                         'before': x, 'after': y,
+                         'absolute_difference': abs(float(x)-float(y))})
         else:
-            out.append({'path': path, 'reason': 'VALUE_OR_TYPE_CHANGED'})
-    walk(left, right, '    ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument('--report', type=Path, required=True)
-    ap.add_argument('--work', type=Path, required=True)
-    ap.add_argument('--output', type=Path, required=True)
-    args = ap.parse_args()
-    if args.output.exists() or args.work.exists():
-        ap.error('fresh work and output paths required')
-    doc = json.loads(args.report.read_text())
-    bundle = doc['canonical_events']
-    if bundle['source_video_sha256'] != PINNED_SOURCE:
-        raise ValueError('RETAINED_REPORT_SOURCE_MISMATCH')
-    raw = doc['raw_marker_anchors']
-    while isinstance(raw, str):
-        raw = json.loads(raw)
-    selection = {'raw_marker_anchors': raw}
-    taps = pilot.original_taps(selection)
-    fixture = json.loads((ROOT / 'testdata/sequence-pilot-orman400/anchors.json').read_text())
-    original = fixture['raw_marker_anchors']
-    while isinstance(original, str):
-        original = json.loads(original)
-    if raw != original or len(taps) != 10:
-        raise ValueError('ORIGINAL_HUMAN_TAPS_CHANGED')
-    audit = doc.get('match_room_localization') or {}
-    if (audit.get('source_video_sha256') != PINNED_SOURCE or
-            audit.get('original_selection_values_sha256') != selection_digest(selection)):
-        raise ValueError('LOCALIZATION_AUDIT_SOURCE_OR_SELECTION_CHANGED')
-    video, _ = prepare(ROOT / 'testdata/sequence-pilot-orman400', args.work)
-    with video.open('rb') as stream:
-        if hashlib.file_digest(stream, 'sha256').hexdigest() != PINNED_SOURCE:
-            raise ValueError('ACTUAL_VIDEO_BYTES_CHANGED')
-    events_by_id = {e['event_id']: e for e in bundle['events']}
-    report_ids = {row['event_id'] for row in doc['full_report']['video_comments']}
-    selected = []
-    for eid in TARGET_EVENT_IDS:
-        if eid not in report_ids or eid not in events_by_id:
-            raise ValueError('TARGET_EVENT_NOT_IN_RETAINED_REPORT')
-        event = deepcopy(events_by_id[eid])
-        record = (audit.get('events') or {}).get(eid)
-        if not isinstance(record, dict):
-            raise ValueError('VERIFIED_LOCALIZATION_RECEIPT_MISSING')
-        event['visual_samples'] = observations_from_retained(event, selection, record)
-        event['localization_method'] = 'EXPLICIT_SOURCE_POSITIONS'
-        if record.get('context_after_ms') == 750:
-            event['graphics_context_ms'] = 750
-        selected.append(event)
-    anchors = [{'t': t['requested_ms'] / 1000, 'box': t['box'],
-                'target_point': t['target_point'], **t['selection_hints']}
-               for t in taps]
-
-    start = time.monotonic()
-    baseline, base_status = bounded_tracks(video, anchors, selected, reuse_predictions=False)
-    base_seconds = time.monotonic() - start
-    start = time.monotonic()
-    cached, cache_status = bounded_tracks(video, anchors, selected, reuse_predictions=True)
-    cache_seconds = time.monotonic() - start
-    comparison = []
-    for eid in TARGET_EVENT_IDS:
-        original_fields = tracked_fields(baseline, eid)
-        cache_fields = tracked_fields(cached, eid)
-        equality = {key: original_fields[key] == cache_fields[key]
-                    for key in original_fields}
-        comparison.append({'event_id': eid, 'parity': equality,
-                           'baseline_segments': len(original_fields['segments'] or []),
-                           'cached_segments': len(cache_fields['segments'] or []),
-                           'source_observations': len(next(e['visual_samples'] for e in selected
-                                                           if e['event_id'] == eid))})
-    output = {
-        'scope': 'TWO_SAME_SOURCE_REAL_REPORT_CLIPS_COMPLETE_ONNX_SCHEDULER',
-        'source_video_sha256': PINNED_SOURCE, 'original_human_taps': len(taps),
-        'events': comparison, 'engine': 'onnxruntime', 'new_provider_model_requests': 0,
-        'baseline_status': base_status, 'cached_status': cache_status,
-        'baseline_seconds': round(base_seconds, 3),
-        'cached_seconds': round(cache_seconds, 3),
-        'all_segments_and_ball_evidence_identical':
-            all(all(row['parity'].values()) for row in comparison),
-        'full_report_verified': False, 'production_cache_enabled': False,
-        'live_deployment_verified': False,
-    }
-    args.output.write_text(json.dumps(output, indent=2))
-    print('MATCHROOM_ONNX_SCHEDULER_RESULT=' + json.dumps(output), flush=True)
-    if base_status != 'COMPLETED' or cache_status != 'COMPLETED':
-        raise RuntimeError('ONNX_SCHEDULER_INCOMPLETE')
-    if not output['all_segments_and_ball_evidence_identical']:
-        raise RuntimeError('ONNX_SCHEDULER_PARITY_CHANGED')
-
-
-if __name__ == '__main__':
-    main()
-)
-    return out
+            rows.append({'path': path, 'reason': 'VALUE_OR_TYPE_CHANGED'})
+    walk(a, b, 'root')
+    return rows
 
 
 def main():
@@ -233,16 +146,28 @@ def main():
     baseline, base_status = bounded_tracks(video, anchors, selected, reuse_predictions=False)
     base_seconds = time.monotonic() - start
     start = time.monotonic()
+    # Unchanged-code control distinguishes intrinsic ONNX variability
+    # from any difference caused by the cache.
+    control, control_status = bounded_tracks(video, anchors, selected, reuse_predictions=False)
+    control_seconds = time.monotonic() - start
+    start = time.monotonic()
     cached, cache_status = bounded_tracks(video, anchors, selected, reuse_predictions=True)
     cache_seconds = time.monotonic() - start
     comparison = []
     for eid in TARGET_EVENT_IDS:
         original_fields = tracked_fields(baseline, eid)
+        control_fields = tracked_fields(control, eid)
         cache_fields = tracked_fields(cached, eid)
         equality = {key: original_fields[key] == cache_fields[key]
                     for key in original_fields}
+        control_equality = {key: original_fields[key] == control_fields[key]
+                            for key in original_fields}
         comparison.append({'event_id': eid, 'parity': equality,
+                           'control_parity': control_equality,
+                           'cache_differences': first_differences(original_fields, cache_fields),
+                           'control_differences': first_differences(original_fields, control_fields),
                            'baseline_segments': len(original_fields['segments'] or []),
+                           'control_segments': len(control_fields['segments'] or []),
                            'cached_segments': len(cache_fields['segments'] or []),
                            'source_observations': len(next(e['visual_samples'] for e in selected
                                                            if e['event_id'] == eid))})
@@ -250,9 +175,13 @@ def main():
         'scope': 'TWO_SAME_SOURCE_REAL_REPORT_CLIPS_COMPLETE_ONNX_SCHEDULER',
         'source_video_sha256': PINNED_SOURCE, 'original_human_taps': len(taps),
         'events': comparison, 'engine': 'onnxruntime', 'new_provider_model_requests': 0,
-        'baseline_status': base_status, 'cached_status': cache_status,
+        'baseline_status': base_status, 'control_status': control_status,
+        'cached_status': cache_status,
         'baseline_seconds': round(base_seconds, 3),
+        'control_seconds': round(control_seconds, 3),
         'cached_seconds': round(cache_seconds, 3),
+        'no_cache_control_identical':
+            all(all(row['control_parity'].values()) for row in comparison),
         'all_segments_and_ball_evidence_identical':
             all(all(row['parity'].values()) for row in comparison),
         'full_report_verified': False, 'production_cache_enabled': False,
@@ -260,8 +189,10 @@ def main():
     }
     args.output.write_text(json.dumps(output, indent=2))
     print('MATCHROOM_ONNX_SCHEDULER_RESULT=' + json.dumps(output), flush=True)
-    if base_status != 'COMPLETED' or cache_status != 'COMPLETED':
+    if any(v != 'COMPLETED' for v in (base_status, control_status, cache_status)):
         raise RuntimeError('ONNX_SCHEDULER_INCOMPLETE')
+    if not output['no_cache_control_identical']:
+        raise RuntimeError('ONNX_SCHEDULER_BASELINE_NOT_DETERMINISTIC')
     if not output['all_segments_and_ball_evidence_identical']:
         raise RuntimeError('ONNX_SCHEDULER_PARITY_CHANGED')
 
