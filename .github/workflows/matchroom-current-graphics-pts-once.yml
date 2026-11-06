@@ -1,0 +1,75 @@
+name: Current Match Room graphics vs decoded source PTS (one safe trial)
+on:
+  pull_request:
+    types: [synchronize]
+    paths:
+      - '.github/workflows/matchroom-current-graphics-pts-once.yml'
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  two_source_events_current_graphics:
+    if: >-
+      github.repository == '9m92yk9snt-star/VedoScout' &&
+      github.event.pull_request.number == 59 &&
+      github.event.pull_request.draft == true &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.head.ref == 'codex/matchroom-window-geometry-reuse' &&
+      github.event.before == 'f116020b9575588a55fd62ce2d50fbf8d19973fc' &&
+      github.run_attempt == 1
+    runs-on: ubuntu-latest
+    timeout-minutes: 17
+    env:
+      PYTHONPATH: backend
+      PYTHONDONTWRITEBYTECODE: '1'
+      SCOUTMEPLAY_MATCHROOM_ENGINE: onnxruntime
+      SCOUTMEPLAY_PTS_EVENT_IDS: a512ae64e102f24b3383,ec74209ace700fa49d2e
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install pinned offline inference and video decoding wheels
+        run: |
+          python -m pip install 'numpy==2.4.6' 'opencv-python-headless==4.13.0.92' \
+            'onnxruntime==1.31.1' 'Pillow==12.2.0' 'python-dotenv==1.2.2' \
+            'imageio-ffmpeg==0.6.0'
+          FFMPEG_SOURCE="$(python -c 'import imageio_ffmpeg;print(imageio_ffmpeg.get_ffmpeg_exe())')"
+          test -x "$FFMPEG_SOURCE"
+          echo "SCOUTMEPLAY_FFMPEG_BIN=$FFMPEG_SOURCE" >> "$GITHUB_ENV"
+          node --check frontend/scripts/audit-retained-matchroom-playback.cjs
+          python -m py_compile backend/scripts/rebuild_matchroom_graphics_from_retained.py
+      - name: Read unchanged source-localization receipts and all original taps
+        uses: actions/download-artifact@v4
+        with:
+          name: matchroom-single-tap-report-41772727152
+          run-id: 41772727152
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/retained
+      - name: Generate only current-source offline graphics and preserve existing report prose
+        run: |
+          python -u backend/scripts/rebuild_matchroom_graphics_from_retained.py \
+            --report "$RUNNER_TEMP/retained/single-tap-report/report-document.json" \
+            --work "$RUNNER_TEMP/graphics-work" \
+            --output "$RUNNER_TEMP/retained/single-tap-report/current-matchroom-report.json"
+      - name: Audit two actual source-PTS clip streams against production visibility gates
+        run: |
+          node frontend/scripts/audit-retained-matchroom-playback.cjs \
+            "$RUNNER_TEMP/retained/single-tap-report/current-matchroom-report.json" \
+            "$RUNNER_TEMP/current-graphics-pts-coverage.json"
+      - name: Save only audited coverage counts, not videos or raw receipts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: current-graphics-pts-audit-${{ github.run_id }}
+          path: ${{ runner.temp }}/current-graphics-pts-coverage.json
+          retention-days: 14
+          if-no-files-found: ignore
