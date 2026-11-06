@@ -86,3 +86,42 @@ def test_invalid_cache_metadata_recomputes_instead_of_interrupting(tmp_path,monk
     np.savez_compressed(path,**stored)
     assert c.predict(image)[0]['mask'].sum()==16
     assert m.calls==2
+
+
+def test_pinned_onnx_runtime_exact_prediction_cache_parity(tmp_path, monkeypatch):
+    """Use the real serving CPU engine, not just a fake predictor.
+
+    This is a no-provider-call parity test. It does not approve full-report
+    graphics, source identity, latency, or enabling the cache in production.
+    """
+    import cv2
+    from native_player_segmentation import PersonSegmenter
+
+    monkeypatch.setenv('SCOUTMEPLAY_MATCHROOM_ENGINE', 'onnxruntime')
+    model = PersonSegmenter()  # Checks the SHA-pinned graph from repository parts.
+    original = model.predict
+    calls = []
+
+    def counted(image):
+        calls.append(1)
+        return original(image)
+
+    model.predict = counted
+    image = np.full((160, 256, 3), (52, 128, 48), dtype=np.uint8)
+    cv2.rectangle(image, (90, 24), (115, 120), (180, 80, 35), -1)
+    cv2.circle(image, (102, 17), 12, (180, 80, 35), -1)
+
+    first = CachedSegmenter(model, tmp_path, 'verified-source').predict(image)
+    second = CachedSegmenter(model, tmp_path, 'verified-source').predict(image)
+    assert calls == [1], 'Identical pixels must not cause a second ONNX inference'
+    assert len(first) == len(second)
+    for actual, reused in zip(first, second):
+        assert actual['box'] == reused['box']
+        assert actual['class_id'] == reused['class_id']
+        assert actual['score'] == reused['score']
+        assert np.array_equal(actual['mask'], reused['mask'])
+
+    changed = image.copy()
+    changed[0, 0, 0] ^= 1
+    CachedSegmenter(model, tmp_path, 'verified-source').predict(changed)
+    assert calls == [1, 1], 'Changed pixels must always run real inference'
