@@ -142,5 +142,56 @@
       "goals": 2,
       "assists": 2
     }
+  },
+  "previously_verified_model_findings": {
+    "earlier_analysis": "Orman500",
+    "prior_review_date": "2026-10-19",
+    "total_goals": 1,
+    "total_assists": 3,
+    "original_video_sha256": "NOT_YET_RETRIEVED_FROM_ORIGINAL_ORMAN500_EVIDENCE",
+    "provenance": "Earlier user-approved model trial; this is a diagnostic regression reference, not a replacement Orman1000 video receipt",
+    "chronological_actions": [
+      {
+        "type": "GOAL",
+        "source_action_ms": 30915,
+        "earlier_trial_result": "VERIFIED_IN_ORMAN500"
+      },
+      {
+        "type": "ASSIST",
+        "source_action_ms": 44015,
+        "earlier_trial_result": "VERIFIED_IN_ORMAN500"
+      },
+      {
+        "type": "ASSIST",
+        "source_action_ms_window": [
+          49848,
+          50065
+        ],
+        "earlier_trial_result": "VERIFIED_IN_ORMAN500"
+      },
+      {
+        "type": "ASSIST",
+        "source_action_ms_window": [
+          56264,
+          56514
+        ],
+        "earlier_trial_result": "VERIFIED_IN_ORMAN500"
+      }
+    ],
+    "orman1000_regression_candidate": {
+      "timestamp_ms": 49881,
+      "current_orman1000_event_id": "47ad617d2ba76a4683cd",
+      "current_orman1000_action": "SHOT",
+      "current_orman1000_outcome": "GOAL",
+      "earlier_verified_action": "ASSIST",
+      "status": "RECLASSIFICATION_REGRESSION_SUSPECTED_NOT_YET_SOURCE_RECONCILED"
+    },
+    "required_reuse_policy": [
+      "Do not pay for another model call to rediscover already documented source actions.",
+      "Retrieve the prior Orman500 model/evidence receipt and compare source video hash, reference player and action-specific cited frames to the latest Orman1000 ZIP.",
+      "Reuse only when source/checksum/event/player identity/timeframe evidence permits; otherwise treat historical result as reference, not authority to overwrite current source.",
+      "Inspect the existing Orman1000 contact_review_006 receipt and event-to-causal-chain mapping at 49.881 sec; repair mapping/attribution only when evidence proves the pass and teammate finisher.",
+      "Do not change scores, counters, source event, or report prose by fiat; all three assists and one goal must be independently supportable from the Orman1000 source."
+    ]
   }
 }
