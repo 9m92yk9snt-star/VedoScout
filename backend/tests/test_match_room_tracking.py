@@ -448,3 +448,20 @@ def test_refinements_share_only_existing_total_budget(monkeypatch):
     assert sum(allowances)==tracking.MAX_REFINEMENT_EVENTS*tracking.MEDIUM_TIMEOUT_S
     assert all('_refinement_budget_seconds' not in e for e in events)
     assert tracking._refinement_budget([{'_refinement_budget_seconds':1000000}]) == 630
+
+
+def test_onnx_scheduler_diff_diagnostics_are_bounded_and_precise():
+    """Test-only comparator must not mask even a one-pixel-level discrepancy."""
+    from scripts.verify_matchroom_onnx_scheduler_parity import first_differences
+    baseline = {'segments': [{'samples': [{'media_ms': 1000, 'ground': [.5, .7]}]}],
+                'ball_playback': [], 'method': 'SOURCE_OBSERVATION_INSTANCE_CONTOUR'}
+    assert first_differences(baseline, deepcopy(baseline)) == []
+    changed = deepcopy(baseline)
+    changed['segments'][0]['samples'][0]['ground'][0] = .500001
+    rows = first_differences(baseline, changed)
+    assert rows == [{'path': 'root.segments[0].samples[0].ground[0]',
+                     'reason': 'NUMERIC_DIFFERENCE', 'before': .5,
+                     'after': .500001, 'absolute_difference': .500001-.5}]
+    changed['ball_playback'].append({'id': 'unexpected'})
+    assert any(row['reason'] == 'LENGTH_CHANGED' for row in first_differences(baseline, changed))
+    assert len(first_differences(baseline, changed, limit=1)) == 1
