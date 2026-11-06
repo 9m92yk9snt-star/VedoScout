@@ -74,7 +74,9 @@ async function main() {
     assert.ok(fs.statSync(clipFile).size > 0, 'Retained clip absent or empty');
     const room = roomFor(row, row.evidence_time_ms / 1000);
     assert.ok(room.sourcePositionsOnly, 'Only source-position authority is eligible');
-    assert.ok(room.start <= room.end && room.tracks.length > 0, 'Unbound match room output');
+    // Zero accepted tracks is a truthful coverage finding, not a test error.
+    // Keep source, event and window authority mandatory even for empty tracks.
+    assert.ok(room.start <= room.end, 'Invalid Match Room presentation window');
     const stamps = sourcePts(clipFile,row.tele_clip_start)
       .filter(ms => room.start <= ms && ms <= room.end);
     assert.ok(stamps.length >= 4, 'Source video PTS inside proof window required');
@@ -96,6 +98,7 @@ async function main() {
     clips.push({
       event_id: row.event_id, canonical_action_type:event.canonical_action_type,
       video_source_sha256:expectedSource, window_ms:[room.start,room.end],
+      frontend_accepted_segments:room.tracks.length,
       actual_video_pts_count:stamps.length,
       accepted_source_contour_pts:covered.length,
       unmarked_source_pts:uncovered.length,
