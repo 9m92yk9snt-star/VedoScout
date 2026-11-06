@@ -193,5 +193,48 @@
       "Inspect the existing Orman1000 contact_review_006 receipt and event-to-causal-chain mapping at 49.881 sec; repair mapping/attribution only when evidence proves the pass and teammate finisher.",
       "Do not change scores, counters, source event, or report prose by fiat; all three assists and one goal must be independently supportable from the Orman1000 source."
     ]
+  },
+  "prior_model_conflict_at_50_seconds": {
+    "scope": "Not a mere report formatting/aggregation bug: two separate Orman1000 model receipts assert SHOT/GOAL by selected p1, contradicting previously verified Orman500 ASSIST at the corresponding play.",
+    "orman1000_source_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2",
+    "event_id": "47ad617d2ba76a4683cd",
+    "stored_export_proof_ms": 49881,
+    "receipts": [
+      {
+        "packet_id": "sequence_006",
+        "status": "COMPLETED",
+        "model_decision": "SHOT",
+        "model_outcome": "GOAL",
+        "actor": "p1",
+        "finisher": "p1",
+        "receiver": null,
+        "response_sha256": "1515a8ae2285cb966cea66099cfcad0afd30c3b09de9f6e7e7ad15e253a065e6"
+      },
+      {
+        "packet_id": "contact_review_006",
+        "status": "COMPLETED",
+        "model_decision": "SHOT",
+        "model_outcome": "GOAL",
+        "actor": "p1",
+        "finisher": "p1",
+        "receiver": null,
+        "response_sha256": "7c3fd71f15b0b7736f9b879573c30c38e1426ddc4d6ea7d4daacb2182db06631"
+      }
+    ],
+    "historical_reference": {
+      "earlier_analysis": "Orman500",
+      "review_date": "2026-10-19",
+      "evidence_ms_range": [
+        49848,
+        50065
+      ],
+      "earlier_assistant_review": "Three assists including this second assist confirmed in previous model trial",
+      "earlier_trial_raw_video_sha256": "NOT_RETRIEVED_YET",
+      "authority": "Previously verified reference; must be compared at video/frame identity before transferring conclusions"
+    },
+    "regression_classification": "MODEL_TO_MODEL_ACTION_ATTRIBUTION_DISAGREEMENT",
+    "cause_not_yet_proven": true,
+    "next_safe_step": "Reconcile source-frame images, contact and selected-person/receiver/finisher identity from retained Orman500 evidence against latest Orman1000 ZIP. No new paid model inference or blind canonical score changes.",
+    "production_fix_implemented": false
   }
 }
