@@ -90,3 +90,20 @@ def test_prior_orman1000_cache_timing_is_not_release_or_full_coverage_proof():
     assert old["production_enabled"] is False
     assert old["live_verified"] is False
     assert evidence["previous_source_bound_orman1000_diagnostics"]["stored_diagnostic_is_a_separate_experiment"] is True
+
+
+def test_third_assist_is_explicit_release_block_not_unverified_score_rewrite():
+    evidence = load("orman1000-release-source.json")
+    discrepancy = evidence["user_reported_goal_assist_discrepancy"]
+    assert discrepancy["user_reported_assists_in_video"] == 3
+    assert discrepancy["exported_report_observed_assists"] == 2
+    assert discrepancy["exported_report_observed_goals"] == 2
+    assert discrepancy["discrepancy_status"] == "UNRESOLVED_USER_REPORTED_THIRD_ASSIST"
+    assert [e["proof_ms"] for e in discrepancy["confirmed_export_assist_events"]] == [44065, 56264]
+    candidate = discrepancy["candidate_for_misattribution_review"]
+    assert candidate["event_id"] == "47ad617d2ba76a4683cd"
+    assert candidate["proof_ms"] == 49881
+    assert candidate["currently_exported_as"] == "SHOT_GOAL"
+    assert candidate["goal_scoring_actor_verified_by_independent_review"] is False
+    assert evidence["current_release_acceptance"] == "BLOCKED_UNRESOLVED_THIRD_ASSIST_AND_EVENT_ATTRIBUTION"
+    assert evidence["production_cache_enabled"] is False
