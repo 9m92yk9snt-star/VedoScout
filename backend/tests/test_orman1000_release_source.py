@@ -110,3 +110,26 @@ def test_third_assist_is_explicit_release_block_not_unverified_score_rewrite():
     assert candidate["goal_scoring_actor_verified_by_independent_review"] is False
     assert evidence["current_release_acceptance"] == "BLOCKED_USER_CONFIRMED_1_GOAL_3_ASSISTS_NOT_RECONCILED_WITH_EXPORT_2_GOALS_2_ASSISTS"
     assert evidence["production_cache_enabled"] is False
+
+
+def test_latest_source_receipts_explicitly_conflict_with_previously_verified_assist():
+    evidence = load("orman1000-release-source.json")
+    previous = evidence["previously_verified_model_findings"]
+    assert previous["total_goals"] == 1
+    assert previous["total_assists"] == 3
+    assert previous["original_video_sha256"].startswith("NOT_YET_")
+    assert [row["type"] for row in previous["chronological_actions"]] == [
+        "GOAL", "ASSIST", "ASSIST", "ASSIST"
+    ]
+    conflict = evidence["prior_model_conflict_at_50_seconds"]
+    assert conflict["orman1000_source_sha256"] == SOURCE
+    assert conflict["stored_export_proof_ms"] == 49881
+    assert conflict["regression_classification"] == "MODEL_TO_MODEL_ACTION_ATTRIBUTION_DISAGREEMENT"
+    assert [r["packet_id"] for r in conflict["receipts"]] == [
+        "sequence_006", "contact_review_006"
+    ]
+    assert all((r["model_decision"], r["model_outcome"], r["finisher"]) ==
+               ("SHOT", "GOAL", "p1") for r in conflict["receipts"])
+    assert conflict["historical_reference"]["evidence_ms_range"] == [49848, 50065]
+    assert conflict["cause_not_yet_proven"] is True
+    assert conflict["production_fix_implemented"] is False
