@@ -76,6 +76,7 @@ def propose(bundle, previous, manifest, archive_sha):
             or event.get("canonical_outcome") != "GOAL"
             or event.get("canonical_ms") != 49881
             or event.get("contact_ms") is not None
+            or event.get("contact_interval_ms") != [49881, 50648]
             or (event.get("proof") or {}).get("source_video_sha256") != source):
         raise ValueError("DISPUTED_ORMAN1000_EVENT_CHANGED")
     if not all(
@@ -89,6 +90,18 @@ def propose(bundle, previous, manifest, archive_sha):
     counted = Counter(e.get("canonical_event_type") for e in events)
     if counted["GOAL"] != 2 or counted["ASSIST"] != 2:
         raise ValueError("EXPORTED_COUNTS_DIFFER_FROM_REVIEW_BASELINE")
+    # The current model's broad 'own-shot' contact bracket overlaps TWO
+    # independently differentiated contacts in the earlier approved model:
+    # a pass by the selected player, then a separate white teammate's finish.
+    # Diagnose collapsed-role risk; source-local player IDs are never copied.
+    prior_release = approved[0]["contact_interval_ms"]
+    prior_finish = approved[0]["finishing_contact_interval_ms"]
+    current_bracket = event["contact_interval_ms"]
+    overlap = lambda a,b: max(0, min(a[1],b[1])-max(a[0],b[0]))
+    pass_overlap = overlap(current_bracket, prior_release)
+    finisher_overlap = overlap(current_bracket, prior_finish)
+    if pass_overlap <= 0 or finisher_overlap <= 0 or prior_release[1] >= prior_finish[0]:
+        raise ValueError("DISTINCT_PASS_AND_FINISH_SOURCE_INTERVALS_REQUIRED")
     new_goals = counted["GOAL"] - 1
     new_assists = counted["ASSIST"] + 1
     assert (new_goals, new_assists) == (1, 3)
@@ -108,6 +121,15 @@ def propose(bundle, previous, manifest, archive_sha):
         "same_footage_frame_matches": 13,
         "prior_approved_receipt_source": previous["source_video_sha256"],
         "prior_approved_action": "PASS_TO_DISTINCT_WHITE_TEAMMATE_THEN_TEAMMATE_GOAL",
+        "contact_role_conflict": {
+            "current_reported_own_shot_bracket_ms": current_bracket,
+            "prior_selected_player_pass_ms": prior_release,
+            "prior_separate_white_teammate_finish_ms": prior_finish,
+            "current_bracket_overlap_with_prior_pass_ms": pass_overlap,
+            "current_bracket_overlap_with_prior_teammate_finish_ms": finisher_overlap,
+            "two_distinct_prior_actor_roles_overlap_current_goal_bracket": True,
+            "automatic_cross_source_role_transfer": False,
+        },
         "previous_model_local_p3_role": "WHITE_TEAMMATE_FINISHER",
         "orman1000_model_local_p3_role": "BLUE_OPPONENT",
         "actor_ids_transferred_across_model_runs": False,
