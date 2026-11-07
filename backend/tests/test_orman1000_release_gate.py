@@ -110,6 +110,12 @@ def test_any_stale_field_foreign_source_or_unreviewed_white_finisher_blocks_rele
     bad["full_report"]["video_comments"][0]["match_room"]["action_type"] = "SHOT"
     candidates.append((bad, role, "MATCH_ROOM_STILL_SAYS_OWN_GOAL"))
     bad = deepcopy(perfect)
+    bad["canonical_events"]["events"][-1]["proof"]["cited_frames"]["s000050648"] = 50647
+    candidates.append((bad, role, "SOURCE_GOAL_OUTCOME_FRAMES_NOT_RETAINED"))
+    bad = deepcopy(perfect)
+    bad["canonical_events"]["events"][-1]["proof"]["source_video_sha256"] = "foreign"
+    candidates.append((bad, role, "DISPUTED_PROOF_VIDEO_SHA_CHANGED"))
+    bad = deepcopy(perfect)
     bad["canonical_events"]["source_video_sha256"] = "foreign"
     candidates.append((bad, role, "CANDIDATE_VIDEO_SHA_MISMATCH"))
     bad = deepcopy(perfect)
