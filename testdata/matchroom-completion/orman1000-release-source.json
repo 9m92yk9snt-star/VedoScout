@@ -60,7 +60,7 @@
     "Obtain user approval before merge or deploy"
   ],
   "production_cache_enabled": false,
-  "current_release_acceptance": "RELEASE_BLOCKED_PENDING_SOURCE_BOUND_PERSON_ROLE_RECONCILIATION_DESPITE_SAME_VIDEO_PLAY_CONFIRMED",
+  "current_release_acceptance": "BLOCKED_REAL_ORMAN1000_DISTINCT_WHITE_FINISHER_SOURCE_REVIEW_PENDING",
   "production_or_main_changes_allowed_without_user_approval": false,
   "actual_latest_zip_source_pts_audit": {
     "scope": "Raw source-bound mask samples at exact decoded original web-video PTS ±2ms; not a direct frontend acceptance or revised-model run",
@@ -396,5 +396,47 @@
     "no_new_model_calls": true,
     "product_release_ready": false,
     "blocker": "Current-source separate WHITE receiver/finisher still needs independent role verification on source frames. Do not map prior local p3 to current blue p3."
+  },
+  "source_local_selected_player_50s": {
+    "source_video_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2",
+    "source_observation_frame_id": "s000050648",
+    "source_observation_media_ms": 50648,
+    "original_selected_player_identity_status": "CONFIRMED",
+    "original_selected_player_box": [
+      0.177,
+      0.485,
+      0.103,
+      0.081
+    ],
+    "original_selected_ground": [
+      0.257,
+      0.564
+    ],
+    "observed_active_ball": [
+      0.363,
+      0.539
+    ],
+    "source_bgr_frame_sha256": "ba5d26a54b40fec01d29fa02a53d8ec51c5e5d246ff50c6ade8d33e8953be9f3",
+    "source_units": "FULL_FRAME_NORMALIZED",
+    "source_observation_authority": "Original Orman1000 match_room.samples entry for 50.648s",
+    "inference_limit": "The selected player's location does not independently establish the other white finisher or hidden contact."
+  },
+  "pending_role_signoff": {
+    "method": "SOURCE_FRAME_PERSON_SEPARATION",
+    "current_source_receiver_visual_id": null,
+    "current_source_finisher_visual_id": null,
+    "required_frame_ids": [
+      "s000050331",
+      "s000050648"
+    ],
+    "separate_white_body_boxes_verified": false,
+    "finishing_contact_interval_bracketed_not_exact": [
+      50331,
+      50648
+    ],
+    "model_local_prior_p3_transfer_allowed": false,
+    "executable_candidate_finalizer": "backend/scripts/finalize_orman1000_review_candidate.py",
+    "executable_release_gate": "backend/scripts/check_orman1000_release_readiness.py",
+    "finalizer_production_write_enabled": false
   }
 }
