@@ -145,6 +145,10 @@ def test_older_approved_assist_and_current_orman1000_are_same_video_play_not_sam
     assert linked["exact_decoded_pts_matches"] == 12
     assert linked["one_matched_pts_difference_ms"] == 16
     assert linked["same_underlying_play_supported"] is True
+    assert linked["original_human_anchor_sets_byte_identical"] is False
+    assert len(linked["older_source_tap_times_seconds"]) == 10
+    assert len(linked["latest_orman1000_tap_times_seconds"]) == 10
+    assert linked["older_source_tap_times_seconds"][7] != linked["latest_orman1000_tap_times_seconds"][7]
     assert linked["direct_receipt_transfer_approved"] is False
     assert linked["canonical_stats_mutated"] is False
     assert linked["provider_model_calls"] == 0
