@@ -79,6 +79,16 @@ test('a completed scheduler still discloses initial contour budget limits withou
  const ui=render(<MatchRoomPlayer proof={withBudget} videoUrl="/source.mp4" onClose={()=>{}}/>);
  expect(ui.getByTestId('match-room-contour-time-limit').textContent).toContain('initial tracking passes');
  expect(ui.queryByTestId('match-room-player-marker')).toBeNull();
+ // Historical Orman1000 data predates the new budget metadata. Read the
+ // original source tracker diagnostics, without a backend report rewrite.
+ const legacy={...proof,comment:{...proof.comment,match_room:{
+   ...raw,tracking_status:'COMPLETED',tracking:{
+     ...raw.tracking,contour_diagnostics:{windows:[{status:'TIME_BUDGET'}]}
+   }
+ }}};
+ ui.rerender(<MatchRoomPlayer proof={legacy} videoUrl="/source.mp4" onClose={()=>{}}/>);
+ expect(ui.getByTestId('match-room-contour-time-limit').textContent).toContain('processing limit');
+ expect(ui.queryByTestId('match-room-player-marker')).toBeNull();
  ui.rerender(<MatchRoomPlayer proof={proof} videoUrl="/source.mp4" onClose={()=>{}}/>);
  expect(ui.queryByTestId('match-room-contour-time-limit')).toBeNull();
 });
