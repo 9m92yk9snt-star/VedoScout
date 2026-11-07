@@ -7,6 +7,9 @@ class OnnxCpuNet:
     """Small adapter preserving the existing preprocessing and mask decoder."""
     def __init__(self, path):
         import onnxruntime as ort
+        # Disable runtime telemetry before creating any model session. Model
+        # inputs, weights, preprocessing and numerical options stay unchanged.
+        ort.disable_telemetry_events()
         options = ort.SessionOptions()
         options.intra_op_num_threads = 1
         options.inter_op_num_threads = 1
