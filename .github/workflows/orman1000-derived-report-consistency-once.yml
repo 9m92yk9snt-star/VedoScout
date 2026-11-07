@@ -1,0 +1,42 @@
+name: One source-bound Orman1000 derived-report consistency contract
+on:
+  pull_request:
+    types: [synchronize]
+    paths:
+      - '.github/workflows/orman1000-derived-report-consistency-once.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  fail_closed_or1000_derived_report:
+    if: >-
+      github.repository == '9m92yk9snt-star/VedoScout' &&
+      github.event.pull_request.number == 59 &&
+      github.event.pull_request.draft == true &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.head.ref == 'codex/matchroom-window-geometry-reuse' &&
+      github.event.before == 'ba16d2a3031cb0a9af3daf508606d7370d0ec64a' &&
+      github.run_attempt == 1
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      PYTHONPATH: backend
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install no-model contract dependencies
+        run: python -m pip install 'pytest==9.0.3' 'python-dotenv==1.2.2'
+      - name: Compile review-only code
+        run: |
+          python -m py_compile backend/orman1000_derived_consistency.py
+          python -m py_compile backend/scripts/check_orman1000_release_readiness.py
+      - name: Verify real-source event, shadow adjudication and atomic-report consistency
+        run: |
+          python -m pytest -q             backend/tests/test_orman1000_release_gate.py             backend/tests/test_orman1000_adjudication_preview.py             backend/tests/test_orman1000_release_source.py
