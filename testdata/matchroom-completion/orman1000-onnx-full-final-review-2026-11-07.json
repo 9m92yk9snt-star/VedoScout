@@ -1,0 +1,210 @@
+{
+  "date": "2026-11-07",
+  "tested_commit": "f5e8992e1b431f5f8e6b0814b1593f7278fe752c",
+  "verdict": "PASS_FULL_LOCAL_GRAPHICS_REGRESSION",
+  "source_video_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2",
+  "execution": {
+    "scope": {
+      "scope": "OFFLINE_ALL_EIGHT_ORIGINAL_REPORT_CARDS_RETAINED_RECEIPTS",
+      "source_video_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2",
+      "cache_enabled": false,
+      "new_provider_calls": 0,
+      "tracking_seconds": 491.59,
+      "tracking_status": "COMPLETED",
+      "runtime": {
+        "engine": "onnxruntime",
+        "opencv": "4.13.0"
+      },
+      "original_canonical_events_unchanged": true,
+      "production_published": false,
+      "primary_exact_request_reuse_verified": false,
+      "duel_supplemental_exact_request_reuse_verified": true,
+      "original_input_predates_accepted_50s_correction": true,
+      "visual_acceptance": false,
+      "production_onnx_runtime_executed": true
+    },
+    "calls": [
+      {
+        "event_id": "47ad617d2ba76a4683cd",
+        "phase": "initial",
+        "seconds": 15.778,
+        "status": "COMPLETED",
+        "segments": 7
+      },
+      {
+        "event_id": "d1a34d11944defe8c2ce",
+        "phase": "initial",
+        "seconds": 22.836,
+        "status": "COMPLETED",
+        "segments": 9
+      },
+      {
+        "event_id": "9a392fb19c052dfe6719",
+        "phase": "initial",
+        "seconds": 10.811,
+        "status": "COMPLETED",
+        "segments": 4
+      },
+      {
+        "event_id": "006dbd71ed71d464f19d",
+        "phase": "initial",
+        "seconds": 31.332,
+        "status": "COMPLETED",
+        "segments": 14
+      },
+      {
+        "event_id": "16b70d6326506d906e7d",
+        "phase": "initial",
+        "seconds": 18.792,
+        "status": "COMPLETED",
+        "segments": 4
+      },
+      {
+        "event_id": "0fc666670ff612a8af2f",
+        "phase": "initial",
+        "seconds": 19.797,
+        "status": "COMPLETED",
+        "segments": 9
+      },
+      {
+        "event_id": "e6cfdd0f01aedac57b43",
+        "phase": "initial",
+        "seconds": 13.608,
+        "status": "COMPLETED",
+        "segments": 2
+      },
+      {
+        "event_id": "966c91c7243829d6fab0",
+        "phase": "initial",
+        "seconds": 31.335,
+        "status": "COMPLETED",
+        "segments": 5
+      },
+      {
+        "event_id": "966c91c7243829d6fab0",
+        "phase": "small",
+        "seconds": 31.357,
+        "status": "COMPLETED",
+        "segments": 11
+      },
+      {
+        "event_id": "966c91c7243829d6fab0",
+        "phase": "medium",
+        "seconds": 281.333,
+        "status": "COMPLETED",
+        "segments": 28
+      },
+      {
+        "event_id": "9a392fb19c052dfe6719",
+        "phase": "ball",
+        "seconds": 3.031,
+        "status": "COMPLETED",
+        "segments": 0
+      },
+      {
+        "event_id": "966c91c7243829d6fab0",
+        "phase": "ball",
+        "seconds": 11.568,
+        "status": "COMPLETED",
+        "segments": 0
+      }
+    ]
+  },
+  "final_result_is_composite": false,
+  "additional_targeted_reruns": 0,
+  "telemetry_disabled_before_startup": true,
+  "network_available_by_user_authorization": true,
+  "network_egress_measured": false,
+  "validation": {
+    "timestamp_set_differences": [],
+    "clips": [
+      {
+        "timestamp": "00:50",
+        "total_pts": 129,
+        "ellipse_pts": 41,
+        "arrow_pts": 0,
+        "supported_but_unmarked_pts": 0
+      },
+      {
+        "timestamp": "00:31",
+        "total_pts": 83,
+        "ellipse_pts": 83,
+        "arrow_pts": 21,
+        "supported_but_unmarked_pts": 0
+      },
+      {
+        "timestamp": "00:24",
+        "total_pts": 93,
+        "ellipse_pts": 20,
+        "arrow_pts": 7,
+        "supported_but_unmarked_pts": 0
+      },
+      {
+        "timestamp": "00:44",
+        "total_pts": 136,
+        "ellipse_pts": 91,
+        "arrow_pts": 49,
+        "supported_but_unmarked_pts": 0
+      },
+      {
+        "timestamp": "00:56",
+        "total_pts": 69,
+        "ellipse_pts": 69,
+        "arrow_pts": 23,
+        "supported_but_unmarked_pts": 0
+      },
+      {
+        "timestamp": "00:13",
+        "total_pts": 84,
+        "ellipse_pts": 84,
+        "arrow_pts": 0,
+        "supported_but_unmarked_pts": 0
+      },
+      {
+        "timestamp": "00:04",
+        "total_pts": 207,
+        "ellipse_pts": 38,
+        "arrow_pts": 19,
+        "supported_but_unmarked_pts": 0
+      },
+      {
+        "timestamp": "00:08",
+        "total_pts": 279,
+        "ellipse_pts": 279,
+        "arrow_pts": 111,
+        "supported_but_unmarked_pts": 0
+      }
+    ]
+  },
+  "totals": {
+    "total_pts": 1080,
+    "ellipse_pts": 705,
+    "arrow_pts": 230,
+    "supported_but_unmarked_pts": 0
+  },
+  "accepted_report": {
+    "goals": 1,
+    "assists": 3,
+    "prior_third_assist_acceptance_preserved": true,
+    "consistency_and_publication_validation": "PASS",
+    "release_flag": false
+  },
+  "diagnostic_source_frames_visually_reviewed": 16,
+  "github_production_verification": {
+    "run_id": 42348627222,
+    "conclusion": "success"
+  },
+  "limitations": [
+    "Local production ONNX graphics engine with retained observations; not a new live end-to-end semantic analysis.",
+    "Third-assist pass arrow remains withheld: available original arrow describes disputed own shot.",
+    "Unbracketed identity gaps remain unmarked rather than guessed.",
+    "Diagnostic overlays and actual frontend selectors were checked; no browser rendering test.",
+    "No merge or deployment."
+  ],
+  "artifact_sha256": {
+    "onnx-full-reconciled-analysis.json": "31056d21dc144ead89805771f7820cdf13bf06287af691d93e3db5b54e6fbee1",
+    "onnx-full-reconciled-publication.json": "03eabbc991d4c9f8e13dd88d041ecb4e41bb374025a11b27a20116640046cc0d",
+    "onnx-full-reconciled-audit.json": "a7e4a1b929a753a62bc95f06d04831dc4e4458216efca346c48746e28eb63c2e",
+    "onnx-full-reconciled-audit.json.frames.json": "146910435d9f662bd9e33239d0326003819ba43faa3e19d0a6b1de3207a0538f"
+  }
+}

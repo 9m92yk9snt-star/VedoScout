@@ -1,7 +1,89 @@
 from copy import deepcopy
+import json
 import time
 import numpy as np
 import match_room_position_contours as localized
+
+
+def test_overlapping_intervals_reuse_only_exact_window_geometry(monkeypatch):
+    import match_room_contours as source
+    import match_room_tracking as tracking
+    mask = np.zeros((100, 100), np.uint8)
+    mask[20:80, 30:51] = 1
+    row = {'mask': mask, 'box': [30, 20, 21, 60], 'ground': [.4, .79],
+           'player_width': .2, 'confidence': .9}
+    obs = [{'frame_id': f'f{t}', 'media_ms': t, 'identity_status': 'CONFIRMED',
+            'ground': [.4, .79], 'player_box': [.3, .2, .21, .6]} for t in (0, 100, 200, 300)]
+    def stream(*args, **kwargs):
+        for t in range(0, 301, 25):
+            yield {'media_ms': t, 'gray': np.zeros((100, 100), np.uint8),
+                   'image': np.zeros((100, 100, 3), np.uint8)}
+    monkeypatch.setattr(source, 'read_clip', stream)
+    monkeypatch.setattr(source, 'detect_frame', lambda *a: [deepcopy(row)])
+    monkeypatch.setattr(localized, 'endpoint_pairs', lambda _: iter([(obs[0], obs[2]), (obs[1], obs[3])]))
+    def intervals(frames, detections, pair, **kwargs):
+        indices = [i for i, f in enumerate(frames) if pair[0]['media_ms'] <= f['media_ms'] <= pair[1]['media_ms']]
+        return [{'indices': indices, 'instances': [0]*len(indices)}]
+    monkeypatch.setattr(localized, 'agreed_intervals', intervals)
+    monkeypatch.setattr(localized, 'supporting_observations', lambda *a: True)
+    original_foreground, original_stance = tracking.foreground_polygons, localized.stance_bounds
+    calls = {'foreground': 0, 'stance': 0}
+    def foreground(*args):
+        calls['foreground'] += 1
+        return original_foreground(*args)
+    def stance(*args):
+        calls['stance'] += 1
+        return original_stance(*args)
+    monkeypatch.setattr(tracking, 'foreground_polygons', foreground)
+    monkeypatch.setattr(localized, 'stance_bounds', stance)
+    diagnostics = {}
+    def run_window():
+        return localized.contour_segments('unused', obs, 0, 300, deadline=time.monotonic()+5,
+                                          diagnostics=diagnostics, segmenter=object(), audit_pairs=True)
+    first = run_window()
+    assert len(first) == 2
+    assert sum(len(s['samples']) for s in first) == 18
+    assert calls == {'foreground': 13, 'stance': 13}
+    assert diagnostics['detector_frames'] == 13
+    assert 0 <= diagnostics['detector_seconds'] < 5
+    assert diagnostics['source_pairs_expected'] == 2
+    assert diagnostics['source_pairs_reached'] == 2
+    assert diagnostics['source_pairs_unreached'] == 0
+    assert diagnostics['source_segments_accepted'] == 2
+    assert diagnostics['source_pairs_no_agreement'] == 0
+    assert diagnostics['last_decoded_ms'] == 300
+    assert diagnostics['source_pair_results'] == [
+        {'start_ms': 0, 'end_ms': 200, 'accepted_segments': 1, 'rejection_codes': []},
+        {'start_ms': 100, 'end_ms': 300, 'accepted_segments': 1, 'rejection_codes': []},
+    ]
+    expected_polygons = original_foreground([{'class_id': 0, 'mask': mask}], 100, 100)
+    for segment in first:
+        for sample in segment['samples']:
+            assert sample['foreground']['polygons'] == expected_polygons
+            assert sample['stance_bounds'] == original_stance(row, 100)['stance_bounds']
+    # Another source/window never inherits geometry from this invocation.
+    second = run_window()
+    assert json.dumps(first, sort_keys=True) == json.dumps(second, sort_keys=True)
+    assert calls == {'foreground': 26, 'stance': 26}
+    assert diagnostics['detector_frames'] == 13  # reset for the new window
+    # An unresolved mask at the shared endpoint remains unresolved in both
+    # intervals; caching cannot turn a rejection into a drawable cutout.
+    calls['foreground'] = 0
+    def reject_shared_frame(*args):
+        calls['foreground'] += 1
+        return None if calls['foreground'] == 5 else original_foreground(*args)
+    monkeypatch.setattr(tracking, 'foreground_polygons', reject_shared_frame)
+    assert run_window() == []
+    assert calls['foreground'] == 5
+    assert diagnostics['source_pairs_missing_foreground'] >= 1
+    # A diagnosed source conflict must not turn into an accepted segment.
+    monkeypatch.setattr(localized, 'supporting_observations', lambda *a: False)
+    assert run_window() == []
+    assert diagnostics['source_pairs_source_conflict'] == 2
+    assert diagnostics['source_segments_accepted'] == 0
+    assert len(diagnostics['source_pair_results']) == 2
+    assert all(item['rejection_codes'] == ['SOURCE_CONFLICT'] for item in diagnostics['source_pair_results'])
+    assert all(item['accepted_segments'] == 0 for item in diagnostics['source_pair_results'])
 
 
 def fixture(monkeypatch):
@@ -12,7 +94,7 @@ def fixture(monkeypatch):
     frames = [{'media_ms': t, 'gray': np.zeros((100, 100), np.uint8)} for t in range(0, 201, 50)]
     detections = [[deepcopy(row)] for _ in frames]
     path = dict.fromkeys(range(len(frames)), 0)
-    monkeypatch.setattr(localized, 'follow_instance', lambda *a: path)
+    monkeypatch.setattr(localized, 'follow_instance', lambda *a, **k: path)
     obs = [{'frame_id': f'f{t}', 'media_ms': t, 'identity_status': 'CONFIRMED',
             'ground': [.4, .79], 'player_width': .2} for t in (0, 200)]
     return frames, detections, obs, path
@@ -83,10 +165,45 @@ def test_completed_interval_is_checkpointed_before_later_decode_timeout(monkeypa
     monkeypatch.setattr(tracking, 'foreground_polygons', lambda *args: [[[.3,.2],[.5,.2],[.5,.8]]])
     saved, diagnostic = [], {}
     result = localized.contour_segments('unused', obs, 0, 400, deadline=100,
-                                        diagnostics=diagnostic, on_segment=saved.append)
+                                        diagnostics=diagnostic, on_segment=saved.append, audit_pairs=True)
     assert len(saved) == len(result) == 1
     assert result[0]['samples'][-1]['media_ms'] == 200
     assert diagnostic['status'] == 'TIME_BUDGET'
+    assert diagnostic['source_pairs_expected'] == 2
+    assert diagnostic['source_pairs_reached'] == 1
+    assert diagnostic['source_pairs_unreached'] == 1
+    assert diagnostic['last_decoded_ms'] == 200
+    assert diagnostic['source_pair_results'][-1] == {
+        'start_ms': 200, 'end_ms': 400, 'accepted_segments': 0,
+        'rejection_codes': ['TIME_BUDGET_BEFORE_ENDPOINT']
+    }
+    # A normally finished decoder with no exact endpoint must not be
+    # misclassified as a deadline overrun or invented source coverage.
+    clock[0] = 0
+    def missing_endpoint(*args, **kwargs):
+        for t in (0, 50, 100, 150, 200):
+            yield {'media_ms': t, 'gray': np.zeros((100,100), np.uint8),
+                   'image': np.zeros((100,100,3), np.uint8)}
+    monkeypatch.setattr(source, 'read_clip', missing_endpoint)
+    diagnostic = {}
+    segments = localized.contour_segments('unused', obs, 0, 400, deadline=100,
+                                          diagnostics=diagnostic, audit_pairs=True)
+    assert len(segments) == 1
+    assert diagnostic['status'] == 'SUPPORTED_SOURCE_OBSERVATIONS'
+    assert diagnostic['source_pairs_unreached'] == 1
+    assert diagnostic['source_pair_results'][-1] == {
+        'start_ms': 200, 'end_ms': 400, 'accepted_segments': 0,
+        'rejection_codes': ['ENDPOINT_NOT_DECODED']
+    }
+    # Detailed audit is OFF for the real analysis path; enabling it is
+    # observational only and cannot change accepted source-bound segments.
+    default_diagnostics = {}
+    default_segments = localized.contour_segments(
+        'unused', obs, 0, 400, deadline=100, diagnostics=default_diagnostics
+    )
+    assert default_segments == segments
+    assert 'source_pair_results' not in default_diagnostics
+    assert default_diagnostics['source_pairs_unreached'] == 1
 
 
 def test_recovery_window_gets_budget_first_without_duplicate_intervals():
@@ -220,7 +337,7 @@ def test_automatic_flow_exports_endpoint_estimates_without_pixel_identity_claim(
     frames, rows, obs, _ = fixture(monkeypatch)
     for o in obs: o['player_box'] = [.3,.2,.21,.6]
     for frame in frames: frame['image'] = np.zeros((100,100,3), np.uint8)
-    monkeypatch.setattr(localized, 'follow_instance', lambda f,r,i,j: {i:j})
+    monkeypatch.setattr(localized, 'follow_instance', lambda f,r,i,j, **k: {i:j})
     monkeypatch.setattr(localized, 'feature_paths', lambda *a: ({},{}))
     monkeypatch.setattr(source, 'read_clip', lambda *a,**kw: (f for f in deepcopy(frames)))
     monkeypatch.setattr(source, 'detect_frame', lambda *a: deepcopy(rows[0]))
@@ -250,3 +367,132 @@ def test_middle_source_knot_is_shared_by_overlapping_curves_without_rewriting_me
     other = {'indices':list(range(5)), 'instances':[0]*5}
     localized.bind_source_display_knots(frames, rows, other, obs)
     assert other['source_endpoint_ground'] == {}
+
+
+
+def test_window_camera_cache_preserves_bridge_and_failed_estimates(monkeypatch):
+    import match_room_display_bridge as display
+    import motion_compensation
+    frames, rows, obs, path = fixture(monkeypatch)
+    rows[2][0]['ground'] = None
+    interval = localized.agreed_intervals(frames, rows, obs, deadline=time.monotonic()+5, allow_display_bridge=True)[0]
+    calls=[]
+    def estimate(*args):
+        calls.append(1)
+        return np.array([[1.,0,0],[0,1.,0]]),30
+    monkeypatch.setattr(motion_compensation, 'estimate_camera', estimate)
+    expected=display.tracked_display_positions(frames,rows,interval,deadline=time.monotonic()+5)
+    n=len(calls);cache={}
+    actual=display.tracked_display_positions(frames,rows,interval,deadline=time.monotonic()+5,camera_cache=cache)
+    assert actual==expected and len(calls)==2*n
+    assert display.tracked_display_positions(frames,rows,interval,deadline=time.monotonic()+5,camera_cache=cache)==expected
+    assert len(calls)==2*n
+    # A new window must calculate again; failed estimates are cached too.
+    failed=[]
+    monkeypatch.setattr(motion_compensation,'estimate_camera',lambda *args:(failed.append(1) or None,'unavailable'))
+    fresh={}
+    assert display.tracked_display_positions(frames,rows,interval,deadline=time.monotonic()+5,camera_cache=fresh) is None
+    assert display.tracked_display_positions(frames,rows,interval,deadline=time.monotonic()+5,camera_cache=fresh) is None
+    assert len(failed)==1
+
+
+def test_offline_profiler_accepts_only_source_bound_short_windows():
+    """Long event playback can be investigated without weakening source gates."""
+    import pytest
+    from scripts.profile_matchroom_contours import source_window
+    room = {'start_ms': 10000, 'end_ms': 12500}
+    assert source_window(room, 10000, 11500) == (10000, 11500)
+    assert source_window(room, 11000, 12500) == (11000, 12500)
+    assert source_window({'start_ms': 100, 'end_ms': 200}) == (100, 200)
+    for start, end in (
+        (None, None), (None, 11500), (10000, None),
+        (9999, 11000), (11000, 12501), (10000, 12000),
+        (11000, 11000), (11500, 11000),
+    ):
+        with pytest.raises(ValueError):
+            source_window(room, start, end)
+
+
+def test_orman1000_9433_source_endpoint_envelope_rejects_other_player_bridge():
+    """Exact original source observations: p1 x~.70, blue boot proposal x~.605.
+
+    These measured points come from the verified uploaded Orman1000 ZIP.
+    Synthetic candidate displays reproduce the two competing offline results,
+    without asserting new identity, video pixels or a corrected live overlay.
+    """
+    stamps = [9383, 9400, 9416, 9433, 9450, 9466, 9483, 9500]
+    frames = [{'media_ms':t} for t in stamps]
+    interval = {'indices':list(range(len(stamps))),
+                'instances':[0] + [None]*6 + [0],
+                'presentation_only':True}
+    observations = [
+        {'media_ms':9383, 'identity_status':'CONFIRMED',
+         'ground':[.696,.651], 'player_box':[.568,.508,.156,.144]},
+        {'media_ms':9500, 'identity_status':'CONFIRMED',
+         'ground':[.704,.651], 'player_box':[.552,.506,.181,.147]},
+    ]
+    blue_boot = {
+        3: {'display_ground':[.6049728789461906,.6480857618278189],
+            'display_estimated':True, 'source_ground_observation':False}
+    }
+    selected_player = {
+        3: {'display_ground':[.6994531939940165,.6510967806131802],
+            'display_estimated':True, 'source_ground_observation':False}
+    }
+    before = deepcopy((frames,interval,observations,blue_boot,selected_player))
+    assert localized.display_fits_source_bodies(frames,interval,blue_boot,observations) is False
+    assert localized.display_fits_source_bodies(frames,interval,selected_player,observations) is True
+    assert (frames,interval,observations,blue_boot,selected_player) == before
+
+
+def test_source_ground_switch_between_planted_feet_is_not_linear_motion():
+    frames=[{'media_ms':t} for t in [13266,13283,13299,13316,13333,13349,13366,13383]]
+    observations=[
+        {'media_ms':13266,'identity_status':'CONFIRMED','ground':[.226,.635],
+         'player_box':[.194,.441,.201,.196]},
+        {'media_ms':13383,'identity_status':'CONFIRMED','ground':[.385,.624],
+         'player_box':[.151,.435,.268,.199]}]
+    interval={'indices':list(range(8)), 'presentation_only':True}
+    display={i:{'display_ground':[.255,.628],'display_estimated':True} for i in range(1,7)}
+    assert localized.display_fits_source_bodies(frames,interval,display,observations)
+    display[6]['display_ground']=[.6,.628]
+    assert not localized.display_fits_source_bodies(frames,interval,display,observations)
+
+
+def test_hidden_foot_envelope_is_rejection_only_and_does_not_change_measured_track():
+    stamps = [9383, 9400, 9416, 9433, 9450, 9466, 9483, 9500]
+    frames = [{'media_ms':t} for t in stamps]
+    observations = [
+        {'media_ms':9383, 'identity_status':'CONFIRMED',
+         'ground':[.696,.651], 'player_box':[.568,.508,.156,.144]},
+        {'media_ms':9500, 'identity_status':'CONFIRMED',
+         'ground':[.704,.651], 'player_box':[.552,.506,.181,.147]},
+    ]
+    bridge = {'indices':list(range(len(frames))), 'presentation_only':True}
+    wrong = {3:{'display_ground':[.605,.648],'display_estimated':True}}
+    assert localized.display_fits_source_bodies(frames,bridge,wrong,observations) is False
+    # This tightened rule never changes acceptance of a verified dense
+    # bidirectional path; it applies only to presentation-only bridges.
+    dense = {**bridge, 'presentation_only':False}
+    assert localized.display_fits_source_bodies(frames,dense,wrong,observations) is True
+    assert wrong[3]['display_ground'] == [.605,.648]
+    # Existing source endpoints without an intermediate estimate cannot
+    # manufacture a replacement position.
+    assert localized.display_fits_source_bodies(frames,bridge,{},observations) is True
+
+
+def test_bridge_tolerance_tracks_source_body_size_without_arbitrary_global_foot():
+    stamps=[0,25,50,75,100]
+    frames=[{'media_ms':t} for t in stamps]
+    observations=[
+        {'media_ms':0,'identity_status':'CONFIRMED',
+         'ground':[.3,.7],'player_box':[.25,.5,.12,.2]},
+        {'media_ms':100,'identity_status':'CONFIRMED',
+         'ground':[.34,.7],'player_box':[.27,.5,.12,.2]},
+    ]
+    interval={'indices':list(range(5)), 'presentation_only':True}
+    # A position displaced by less than 42% of source body width is permitted.
+    plausible={2:{'display_ground':[.36,.72],'display_estimated':True}}
+    implausible={2:{'display_ground':[.41,.72],'display_estimated':True}}
+    assert localized.display_fits_source_bodies(frames,interval,plausible,observations)
+    assert not localized.display_fits_source_bodies(frames,interval,implausible,observations)

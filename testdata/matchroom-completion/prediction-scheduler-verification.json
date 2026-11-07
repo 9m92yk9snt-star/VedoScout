@@ -1,0 +1,110 @@
+{
+  "baselineSeconds": 122.69724919899454,
+  "cachedSeconds": 92.58058768400224,
+  "baselineStatus": "COMPLETED",
+  "cachedStatus": "COMPLETED",
+  "results": [
+    {
+      "clip": "00:31",
+      "frames": 83,
+      "baselineVisible": 83,
+      "cachedVisible": 83,
+      "lost": 0,
+      "gained": 0,
+      "markChanges": 0,
+      "arrowChanges": 0,
+      "depthChanges": 0,
+      "changed": [],
+      "observationsIdentical": true,
+      "ballPlaybackIdentical": true,
+      "segmentsIdentical": true
+    },
+    {
+      "clip": "00:44",
+      "frames": 136,
+      "baselineVisible": 91,
+      "cachedVisible": 91,
+      "lost": 0,
+      "gained": 0,
+      "markChanges": 0,
+      "arrowChanges": 0,
+      "depthChanges": 0,
+      "changed": [],
+      "observationsIdentical": true,
+      "ballPlaybackIdentical": true,
+      "segmentsIdentical": true
+    }
+  ],
+  "engine": "opencv",
+  "one_cpu": true,
+  "source_video_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2",
+  "scope": "Complete bounded graphics scheduler for the two clips with duplicate inputs; all initial and refinement child work included",
+  "baseline_attempts": [
+    {
+      "cached": false,
+      "clip": "00:31",
+      "kind": "initial",
+      "seconds": 31.47530278799968,
+      "status": "COMPLETED"
+    },
+    {
+      "cached": false,
+      "clip": "00:44",
+      "kind": "initial",
+      "seconds": 31.646231949001958,
+      "status": "COMPLETED"
+    },
+    {
+      "cached": false,
+      "clip": "00:44",
+      "kind": "small",
+      "seconds": 31.353897383000003,
+      "status": "COMPLETED"
+    },
+    {
+      "cached": false,
+      "clip": "00:31",
+      "kind": "small",
+      "seconds": 28.099636029997782,
+      "status": "COMPLETED"
+    }
+  ],
+  "cached_attempts": [
+    {
+      "cached": true,
+      "clip": "00:31",
+      "kind": "initial",
+      "seconds": 31.324920872000803,
+      "status": "COMPLETED"
+    },
+    {
+      "cached": true,
+      "clip": "00:44",
+      "kind": "initial",
+      "seconds": 31.340575698995963,
+      "status": "COMPLETED"
+    },
+    {
+      "cached": true,
+      "clip": "00:44",
+      "kind": "small",
+      "seconds": 17.616778351002722,
+      "status": "COMPLETED"
+    },
+    {
+      "cached": true,
+      "clip": "00:31",
+      "kind": "small",
+      "seconds": 12.288139833995956,
+      "status": "COMPLETED"
+    }
+  ],
+  "tests_passed": 98,
+  "production_enabled": false,
+  "live_verified": false,
+  "limitations": [
+    "Not full-report or LLM billing measurement",
+    "Live ONNX verification outstanding",
+    "00:44 still has 45 source-frame timestamps without an ellipse in both runs"
+  ]
+}

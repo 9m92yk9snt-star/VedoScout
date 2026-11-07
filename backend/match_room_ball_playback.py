@@ -47,7 +47,7 @@ def kick_anchor(segments, event, observations, release, arrival, initial, destin
     return np.array([origin[0]*w, origin[1]*h, 1.]), refs+[arrival['frame_id']]
 
 
-def build_ball_playback(video, event, observations, deadline):
+def build_ball_playback(video, event, observations, deadline, *, completed_segments=()):
     import cv2
     import numpy as np
     from match_room_tracking import finite, point, foreground_polygons
@@ -82,6 +82,17 @@ def build_ball_playback(video, event, observations, deadline):
                         or sum(s.get('ball_phase') == 'RECEIVED' and s.get('receiver') == receiver and point(s.get('ball')) for s in observations) != 1):
                     continue
             elif any(start < s['media_ms'] < end for s in observations):
+                continue
+            # Internal same-source continuation: keep complete measured rows,
+            # never reuse an unfinished segment or infer its missing pixels.
+            retained = [s for s in completed_segments
+                        if s.get('method') == METHOD and s.get('start_ms') == start
+                        and s.get('arrival_ms') == end
+                        and s.get('reference_frames') == [release['frame_id'], arrival['frame_id']]]
+            if retained:
+                if len(retained) != 1:
+                    raise ValueError('AMBIGUOUS_COMPLETED_BALL_SEGMENT')
+                segments.append(retained[0])
                 continue
             if len(segments) >= MAX_SEGMENTS or time.monotonic() >= deadline-1:
                 failures.append('BUDGET')
@@ -188,4 +199,4 @@ def build_ball_playback(video, event, observations, deadline):
                              'samples': rows})
     finally:
         cap.release()
-    return segments, {'status': 'COMPLETE' if segments else 'UNAVAILABLE', 'failures': failures}
+    return segments, {'status': ('PARTIAL' if failures else 'COMPLETE') if segments else 'UNAVAILABLE', 'failures': failures}

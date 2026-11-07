@@ -2,6 +2,7 @@ import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { deriveV2 } from './derive';
 import PublicationEvidence from './PublicationEvidence';
+import { EvidenceCoverageNotice } from './verification';
 import { DreamPathSection } from './dreampath';
 import { PremiumMobileCategories } from './categories';
 
@@ -128,4 +129,29 @@ test('legacy mobile reports keep their original IQ grouping and visible-skill av
   expect(screen.getByTestId('pm-cat-tech-toggle').textContent).toContain('7.5');
   expect(screen.getByTestId('pm-cat-iq-toggle').textContent).toContain('FOOTBALL IQ & MENTALITY');
   expect(screen.queryByTestId('pm-cat-tact-toggle')).toBeNull();
+});
+
+test('ready report with partial source observations is explicitly labelled incomplete',()=>{
+  const partial = {
+    full_report_status: 'ready',
+    canonical_events: {coverage_complete:false},
+    full_report: {verified_stats:{coverage_status:'PARTIAL'}},
+  };
+  const {rerender} = render(<EvidenceCoverageNotice report={partial}/>);
+  expect(screen.getByTestId('v2-partial-source-coverage').textContent).toContain('Partial video coverage');
+  expect(screen.getByTestId('v2-partial-source-coverage').textContent).toContain('not full-match totals');
+  expect(screen.getByTestId('v2-partial-source-coverage').textContent).toContain('may still require review');
+  rerender(<EvidenceCoverageNotice report={{
+    canonical_events: {coverage_complete:true},
+    full_report: {verified_stats: {coverage_status:'COMPLETE'}},
+  }}/>);
+  expect(screen.queryByTestId('v2-partial-source-coverage')).toBeNull();
+});
+
+test('incomplete canonical video status cannot be hidden by ready or missing verified stats',()=>{
+  render(<EvidenceCoverageNotice report={{
+    full_report_status:'ready',
+    canonical_events:{coverage_complete:false},
+  }}/>);
+  expect(screen.getByTestId('v2-partial-source-coverage')).toBeTruthy();
 });

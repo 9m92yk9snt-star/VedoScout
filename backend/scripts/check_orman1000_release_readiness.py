@@ -1,0 +1,239 @@
+"""Fail-closed, read-only Orman1000 release guard.
+
+Compares a candidate corrected report to the exact latest original Orman1000
+source ZIP. It never changes events, receipts, pixels, report statistics or a
+database and never uses a model. A regular green CI is not release approval.
+"""
+import argparse
+import hashlib
+import json
+from pathlib import Path
+import zipfile
+from collections import Counter
+
+from orman1000_derived_consistency import check_consistency, FOLLOWUP_RUN
+from orman1000_review_provenance import resolution_problems
+from orman1000_role_spatial_gate import (
+    review_role_geometry, SELECTED_BODY_BOX, SELECTED_GROUND,
+    SELECTED_FRAME_ID, SOURCE_BALL_AT_FINISH_MS,
+)
+
+TARGET = "47ad617d2ba76a4683cd"
+SOURCE = "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2"
+ARCHIVE = "3b27260511ed965952a497f97d1c6345a0f1b4bef1b89a60912a62e0f6530c0c"
+PRIOR_RECEIPT = "c1b78325895885002ccc58f036b0a29824406997108b12648f3805a46e0040ff"
+FINISHER_SOURCE_FRAME_HASHES = {
+    "s000050331": "4c1daa279d50b4a447c9406e1b25f6ff0f0f34dfbe4880372dfbdf983ddf92b1",
+    "s000050648": "ba5d26a54b40fec01d29fa02a53d8ec51c5e5d246ff50c6ade8d33e8953be9f3",
+}
+
+
+def stable(value):
+    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+
+
+def judge(original, candidate, role_review=None):
+    """Return (ready, blockers); never promote desired counts into evidence."""
+    errors = []
+    def check(ok, error):
+        if not ok:
+            errors.append(error)
+
+    prior_bundle = original.get("canonical_events") or {}
+    candidate_bundle = candidate.get("canonical_events") or {}
+    old, new = prior_bundle.get("events") or [], candidate_bundle.get("events") or []
+    check(prior_bundle.get("source_video_sha256") == SOURCE, "ORIGINAL_VIDEO_SHA_MISMATCH")
+    check(candidate_bundle.get("source_video_sha256") == SOURCE, "CANDIDATE_VIDEO_SHA_MISMATCH")
+    if len(old) != 21 or len(new) != 21:
+        errors.append("CANONICAL_21_EVENTS_REQUIRED")
+        return False, errors
+    old_ids, new_ids = [e.get("event_id") for e in old], [e.get("event_id") for e in new]
+    if (len(set(old_ids)) != 21 or len(set(new_ids)) != 21
+            or set(old_ids) != set(new_ids)):
+        errors.append("CANONICAL_EVENT_IDS_CHANGED")
+        return False, errors
+    original_by_id = {e["event_id"]: e for e in old}
+    candidate_by_id = {e["event_id"]: e for e in new}
+    for eid in old_ids:
+        if eid not in (TARGET, FOLLOWUP_RUN) and stable(original_by_id[eid]) != stable(candidate_by_id[eid]):
+            errors.append("OTHER_CANONICAL_EVENT_CHANGED:" + eid)
+    before = original_by_id[TARGET]
+    action = candidate_by_id[TARGET]
+    check(before.get("canonical_action_type") == "SHOT"
+          and before.get("canonical_outcome") == "GOAL", "ORIGINAL_DISPUTED_GOAL_CHANGED")
+    check(action.get("source_video_sha256") == SOURCE, "DISPUTED_ACTION_SOURCE_CHANGED")
+    original_proof = before.get("proof") or {}
+    revised_proof = action.get("proof") or {}
+    check(original_proof.get("source_video_sha256") == SOURCE
+          and revised_proof.get("source_video_sha256") == SOURCE,
+          "DISPUTED_PROOF_VIDEO_SHA_CHANGED")
+    check((original_proof.get("frame_id"), original_proof.get("frame_ms")) ==
+          (revised_proof.get("frame_id"), revised_proof.get("frame_ms")) ==
+          ("s000049881", 49881),
+          "DISPUTED_PROOF_ANCHOR_CHANGED")
+    required_pts = {"s000050648": 50648, "s000051131": 51131}
+    frames = revised_proof.get("cited_frames") or {}
+    check(all(frames.get(k) == v for k, v in required_pts.items()),
+          "SOURCE_GOAL_OUTCOME_FRAMES_NOT_RETAINED")
+    check((action.get("canonical_action_type"), action.get("canonical_event_type"),
+           action.get("canonical_outcome")) == ("PASS", "ASSIST", "TEAMMATE_GOAL"),
+          "DISPUTED_ACTION_NOT_RECLASSIFIED_AS_ASSIST")
+    counts = Counter(e.get("canonical_event_type") for e in new)
+    check((counts["GOAL"], counts["ASSIST"]) == (1, 3),
+          "CANONICAL_COUNTS_NOT_1_GOAL_3_ASSISTS")
+    stats = (candidate.get("full_report") or {}).get("match_stats") or {}
+    check((stats.get("observed_goals"), stats.get("observed_assists")) == (1, 3),
+          "PUBLISHED_STATS_NOT_1_GOAL_3_ASSISTS")
+    chain = action.get("causal_chain") or {}
+    finisher, receiver = chain.get("finisher_visual_id"), chain.get("receiver_visual_id")
+    selected_actor = before.get("actor_visual_id")
+    check((not selected_actor or action.get("actor_visual_id") == selected_actor)
+          and (not before.get("global_target_id") or
+               action.get("global_target_id") == before.get("global_target_id")),
+          "SELECTED_PLAYER_IDENTITY_CHANGED")
+    check(bool(receiver) and receiver == finisher
+          and receiver not in ("p1", "p3", "prior:p3", selected_actor),
+          "SOURCE_SCOPED_WHITE_FINISHER_NOT_BOUND")
+    cards = (candidate.get("full_report") or {}).get("video_comments") or []
+    affected = [c for c in cards if c.get("event_id") == TARGET]
+    check(len(affected) == 1, "SINGLE_REVIEWED_REPORT_CARD_REQUIRED")
+    if len(affected) == 1:
+        card = affected[0]
+        room = card.get("match_room") or {}
+        check(card.get("source_video_sha256") == SOURCE
+              and room.get("source_video_sha256") == SOURCE,
+              "REPORT_CARD_SOURCE_CHANGED")
+        check(room.get("action_type") == "PASS"
+              and room.get("action_outcome") == "TEAMMATE_GOAL",
+              "MATCH_ROOM_STILL_SAYS_OWN_GOAL")
+        check(bool(receiver) and room.get("receiver_visual_id") == receiver,
+              "MATCH_ROOM_RECIPIENT_NOT_SAME_VERIFIED_PERSON")
+        observation = room.get("observation") or ""
+        check(bool(observation)
+              and "this is a selected-player goal" not in observation.lower()
+              and "no teammate receives and shoots" not in observation.lower()
+              and "not a direct assist" not in observation.lower(),
+              "MATCH_ROOM_CAUSAL_NARRATIVE_STALE")
+        check(card.get("comment") == "Verified assist by the selected player.",
+              "REPORT_COMMENT_STILL_SAYS_OWN_GOAL")
+    # Verify the selected player's original position and active ball directly
+    # from the SAME Orman1000 report at the actual source frame. The role
+    # reviewer cannot replace this with a fabricated p1 box.
+    original_card = [c for c in ((original.get("full_report") or {}).get("video_comments") or [])
+                     if c.get("event_id") == TARGET]
+    original_samples = ((original_card[0].get("match_room") or {}).get("samples") or []
+                        if len(original_card) == 1 else [])
+    selected_rows = [sample for sample in original_samples
+                     if sample.get("frame_id") == SELECTED_FRAME_ID
+                     and sample.get("media_ms") == 50648]
+    check(len(selected_rows) == 1
+          and selected_rows[0].get("identity_status") == "CONFIRMED"
+          and selected_rows[0].get("player_box") == SELECTED_BODY_BOX
+          and selected_rows[0].get("ground") == SELECTED_GROUND
+          and selected_rows[0].get("ball") == SOURCE_BALL_AT_FINISH_MS,
+          "ORIGINAL_ORMAN1000_PLAYER_AND_BALL_EVIDENCE_NOT_BOUND")
+    # A real owner-selected anchor exists only 533 ms later. It pins p1
+    # independently of the newer model's local name at the end of the play.
+    raw_anchors = original.get("raw_marker_anchors")
+    try:
+        while isinstance(raw_anchors, str):
+            raw_anchors = json.loads(raw_anchors)
+    except (TypeError, ValueError, json.JSONDecodeError):
+        raw_anchors = None
+    anchors = raw_anchors if isinstance(raw_anchors, list) else []
+    owner_refs = [a for a in anchors if isinstance(a, dict)
+                  and type(a.get("t")) in (float, int)
+                  and round(a["t"] * 1000) == 51180]
+    same_source_pose = [s for s in original_samples
+                        if s.get("frame_id") == "s000051181"
+                        and s.get("media_ms") == 51181]
+    check(len(anchors) == 10 and len(owner_refs) == 1
+          and len(same_source_pose) == 1,
+          "POST_CONTACT_OWNER_TAP_NOT_SOURCE_BOUND")
+    if len(owner_refs) == len(same_source_pose) == 1:
+        anchor, pose = owner_refs[0], same_source_pose[0]
+        b, point = anchor.get("box"), anchor.get("target_point")
+        valid_boxes = isinstance(b, dict) and isinstance(point, dict)
+        rect = [b.get(k) for k in ("x", "y", "w", "h")] if valid_boxes else []
+        px, py = (point.get("x"), point.get("y")) if valid_boxes else (None, None)
+        check(valid_boxes and pose.get("identity_status") == "CONFIRMED"
+              and pose.get("player_box") == rect
+              and all(type(z) in (int, float) for z in rect + [px, py])
+              and b["x"] <= px <= b["x"] + b["w"]
+              and b["y"] <= py <= b["y"] + b["h"],
+              "POST_CONTACT_P1_IDENTITY_CONTRADICTS_OWNER_TAP")
+    review = role_review or {}
+    check(review.get("source_video_sha256") == SOURCE
+          and review.get("event_id") == TARGET,
+          "INDEPENDENT_ROLE_REVIEW_WRONG_SOURCE")
+    check(review.get("status") == "VERIFIED_DISTINCT_WHITE_FINISHER",
+          "INDEPENDENT_ROLE_REVIEW_PENDING")
+    check(review.get("prior_receipt_response_sha256") == PRIOR_RECEIPT,
+          "PREVIOUS_APPROVED_ASSIST_NOT_BOUND")
+    check(bool(finisher) and review.get("current_source_finisher_visual_id") == finisher,
+          "WHITE_FINISHER_ID_NOT_REVIEWED")
+    check(review.get("evidence_frames") == ["s000050331", "s000050648"],
+          "WHITE_FINISHER_SOURCE_PTS_NOT_REVIEWED")
+    check(review.get("source_decoded_bgr_frame_sha256") == FINISHER_SOURCE_FRAME_HASHES,
+          "WHITE_FINISHER_SOURCE_FRAME_BYTES_NOT_BOUND")
+    # The reviewed finisher must be a distinct current-video physical body,
+    # not just a new string ID with a copied source hash.
+    _, spatial_failures = review_role_geometry(review)
+    errors.extend(spatial_failures)
+    errors.extend(resolution_problems(before, action, review))
+    # An event-local corrected claim is not enough. The same immutable
+    # correction provenance must also be available to the report consumer.
+    history = (candidate.get("full_report") or {}).get("independent_action_review_trails")
+    check(isinstance(history, list) and len(history) == 1
+          and history[0] == action.get("review_resolution"),
+          "REPORT_INDEPENDENT_REVIEW_TRAIL_MISSING_OR_CHANGED")
+    errors.extend(check_consistency(original, candidate))
+    return not errors, errors
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--original-zip", type=Path, required=True)
+    parser.add_argument("--candidate", type=Path)
+    parser.add_argument("--role-review", type=Path)
+    parser.add_argument("--output", type=Path, required=True)
+    args = parser.parse_args()
+    if args.output.exists():
+        parser.error("Use a new output path")
+    digest = hashlib.sha256()
+    with args.original_zip.open("rb") as file:
+        for chunk in iter(lambda: file.read(1024 * 1024), b""):
+            digest.update(chunk)
+    if digest.hexdigest() != ARCHIVE:
+        raise ValueError("WRONG_ORIGINAL_ARCHIVE")
+    with zipfile.ZipFile(args.original_zip) as archive:
+        if archive.testzip():
+            raise ValueError("CORRUPT_ORIGINAL_ARCHIVE")
+        original = json.loads(archive.read("report.json"))
+    candidate = json.loads(args.candidate.read_text()) if args.candidate else original
+    review = json.loads(args.role_review.read_text()) if args.role_review else None
+    approved, reasons = judge(original, candidate, review)
+    if approved:
+        # No release based on a JSON declaration of WHITE alone. Decode the
+        # original source bytes and reject a box that points to grass/blue
+        # players while claiming a separately reviewed white finisher.
+        from orman1000_role_pixel_gate import validate_uploaded_archive_role
+        try:
+            validate_uploaded_archive_role(args.original_zip, review)
+        except ValueError as exc:
+            approved = False
+            reasons.append(str(exc).split(":")[0])
+    result = {
+        "source_video_sha256": SOURCE, "release_ready": approved,
+        "blockers": reasons, "original_canonical_events": 21,
+        "model_calls": 0, "original_archive_modified": False,
+        "candidate_modified": False, "production_deployed": False,
+        "manual_visual_role_review_still_required": not approved,
+    }
+    args.output.write_text(json.dumps(result, indent=2) + "\n")
+    print(json.dumps(result))
+    return 0 if approved else 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

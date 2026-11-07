@@ -1,0 +1,67 @@
+name: One source-bound full ONNX scheduler parity probe
+on:
+  pull_request:
+    types: [synchronize]
+    paths:
+      - '.github/workflows/matchroom-onnx-scheduler-parity-once.yml'
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  retained_onnx_scheduler:
+    if: >-
+      github.repository == '9m92yk9snt-star/VedoScout' &&
+      github.event.pull_request.number == 59 &&
+      github.event.pull_request.draft == true &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.head.ref == 'codex/matchroom-window-geometry-reuse' &&
+      github.event.before == '9ee5130f2b3bd7514a2dea72ec004cb6d45dd89b' &&
+      github.run_attempt == 1
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      PYTHONPATH: backend
+      PYTHONDONTWRITEBYTECODE: '1'
+      SCOUTMEPLAY_MATCHROOM_ENGINE: onnxruntime
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install pinned offline source video and CPU runtime dependencies
+        run: |
+          # No apt update/install: OpenCV reads the bundled MP4 directly.
+          # Prior run blocked in apt update for >22 minutes before any test.
+          python -m pip install 'numpy==2.4.6' 'opencv-python-headless==4.13.0.92' 'onnxruntime==1.31.1' 'Pillow==12.2.0' 'python-dotenv==1.2.2' 'pytest==9.0.3'
+      - name: Validate comparator and compile diagnostic script
+        run: |
+          python -m py_compile backend/scripts/verify_matchroom_onnx_scheduler_parity.py
+          python -m pytest -q backend/tests/test_match_room_tracking.py -k onnx_scheduler_diff_diagnostics_are_bounded_and_precise
+      - name: Restore earlier no-new-model paid receipts and all ten original taps
+        uses: actions/download-artifact@v4
+        with:
+          name: matchroom-single-tap-report-41772727152
+          run-id: 41772727152
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/retained
+      - name: Confirm artifact report is present
+        run: test -f "$RUNNER_TEMP/retained/single-tap-report/report-document.json"
+      - name: Compare full bounded ONNX tracking with and without exact prediction reuse
+        run: |
+          python -u backend/scripts/verify_matchroom_onnx_scheduler_parity.py \
+            --report "$RUNNER_TEMP/retained/single-tap-report/report-document.json" \
+            --work "$RUNNER_TEMP/onnx-scheduler-work" \
+            --output "$RUNNER_TEMP/onnx-scheduler-parity.json"
+      - name: Retain no-secret measurement only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: matchroom-onnx-scheduler-parity-${{ github.run_id }}
+          path: ${{ runner.temp }}/onnx-scheduler-parity.json
+          retention-days: 14
+          if-no-files-found: ignore

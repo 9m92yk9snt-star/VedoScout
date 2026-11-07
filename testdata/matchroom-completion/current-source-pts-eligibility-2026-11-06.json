@@ -1,0 +1,103 @@
+{
+  "scope": "Rebuilt current-branch ONNX Match Room contours for two events from one previously verified source",
+  "source_video_sha256": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+  "retained_report_original_taps": 10,
+  "source_analysis_reused": true,
+  "source_bound_localization_receipts_reused": true,
+  "new_provider_calls": 0,
+  "production_cache_enabled": false,
+  "current_graphics_run_id": 42302137595,
+  "current_graphics_run_url": "https://github.com/9m92yk9snt-star/VedoScout/actions/runs/42302137595",
+  "source_identity_review_run_id": 42302828613,
+  "source_identity_review_run_url": "https://github.com/9m92yk9snt-star/VedoScout/actions/runs/42302828613",
+  "tracking_seconds_for_two_events": 71.208,
+  "tracking_status": "COMPLETED",
+  "events": [
+    {
+      "event_id": "a512ae64e102f24b3383",
+      "action": "SHOT",
+      "window_ms": [
+        30765,
+        32015
+      ],
+      "original_report_accepted_pts": 8,
+      "current_accepted_pts": 76,
+      "decoded_source_pts": 76,
+      "unmarked_pts": 0,
+      "current_backend_segments": 6,
+      "current_frontend_accepted_segments": 6,
+      "source_observations": 17,
+      "confirmed_identity_rows": 17,
+      "confirmed_visible_ground_rows": 17,
+      "last_confirmed_visible_ground_ms": 32015,
+      "conclusion": "Complete current source PTS coverage for this event in technical playback-model acceptance"
+    },
+    {
+      "event_id": "ec74209ace700fa49d2e",
+      "action": "PASS",
+      "window_ms": [
+        43882,
+        46631
+      ],
+      "original_report_accepted_pts": 9,
+      "current_accepted_pts": 91,
+      "decoded_source_pts": 166,
+      "unmarked_pts": 75,
+      "current_backend_segments": 12,
+      "current_frontend_accepted_segments": 12,
+      "source_observations": 21,
+      "confirmed_identity_rows": 14,
+      "uncertain_or_absent_identity_rows": 7,
+      "confirmed_visible_ground_rows": 13,
+      "last_confirmed_visible_ground_ms": 45382,
+      "identity_observations_after_last_ground": [
+        {
+          "media_ms": 45515,
+          "identity_status": "CONFIRMED",
+          "ground_visible": false
+        },
+        {
+          "media_ms": 45632,
+          "identity_status": "ABSENT"
+        },
+        {
+          "media_ms": 45765,
+          "identity_status": "ABSENT"
+        },
+        {
+          "media_ms": 45881,
+          "identity_status": "ABSENT"
+        },
+        {
+          "media_ms": 46015,
+          "identity_status": "ABSENT"
+        },
+        {
+          "media_ms": 46131,
+          "identity_status": "ABSENT"
+        },
+        {
+          "media_ms": 46265,
+          "identity_status": "ABSENT"
+        },
+        {
+          "media_ms": 46381,
+          "identity_status": "ABSENT"
+        }
+      ],
+      "missing_visible_overlay_window_ms": [
+        45398,
+        46631
+      ],
+      "conclusion": "No approved ground contact after 45382ms. Withhold ellipse during hidden-feet/absent/unobserved tail; do not interpolate a player into view."
+    }
+  ],
+  "validation_limitations": [
+    "A production playback-model exact-source-PTS audit, NOT a visual browser playback approval.",
+    "Only two selected events in the b9e2ba... original source. No claims about all 8 cards on current code.",
+    "The older fa56f933... source with 45 missing ellipse frames is DIFFERENT and was not accessible for this replay.",
+    "Cache was OFF and still lacks a reproducible full-scheduler speed win.",
+    "No production deployment or PR merge performed."
+  ],
+  "release_recommendation": "Keep PR #59 draft until source-fa56 mismatch, full current-code report replay and manual visual acceptance are verified; do not increase mark coverage by guessing."
+}

@@ -63,10 +63,8 @@ async def run(args):
         print(json.dumps({'scope':'PREFLIGHT_ONLY','human_taps':len(pilot.original_taps(selection)),'requests':preflight}))
         return
     store=ReportStore(doc)
-    def bounded_jobs(jobs, *pos, **kwargs):
-        if len(jobs) > args.max_new_requests:
-            raise ValueError('NEW_GRAPHICS_REQUEST_LIMIT_EXCEEDED')
-        return localization.transport.run_jobs(jobs, *pos, **kwargs)
+    bounded_jobs = localization.bounded_request_runner(
+        localization.transport.run_jobs, args.max_new_requests)
     async def localize(video, document, *, checkpoint):
         return await localization.localize(video,document,checkpoint=checkpoint,event_ids=ids,run_jobs=bounded_jobs)
     async def publish(path,mime):return '/api/uploads/frames/'+path.name

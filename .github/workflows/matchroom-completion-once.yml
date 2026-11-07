@@ -1,0 +1,42 @@
+name: One source-bound Match Room completion probe
+on:
+  pull_request:
+    types: [synchronize]
+    paths: ['.github/workflows/matchroom-completion-once.yml']
+permissions:
+  contents: read
+jobs:
+  completion_probe:
+    if: >-
+      github.repository == '9m92yk9snt-star/VedoScout' &&
+      github.event.pull_request.number == 59 &&
+      github.event.pull_request.draft == true &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.head.ref == 'codex/matchroom-window-geometry-reuse' &&
+      github.event.before == '4e54f3833bd331cd8edb9ae99fb49c8d4abdfb80' &&
+      github.run_attempt == 1
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install existing source request dependencies
+        run: python -m pip install cryptography numpy==2.4.6 opencv-python-headless==4.13.0.92 pillow==12.2.0
+      - name: Read only the missing clip edge, at most one HTTP model request
+        env:
+          EMERGENT_LLM_KEY: ${{ secrets.EMERGENT_LLM_KEY }}
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: python backend/scripts/probe_matchroom_completion.py --packet testdata/matchroom-completion/encrypted --output "$RUNNER_TEMP/matchroom-completion-result.json" --run-model
+      - name: Preserve source-bound receipt without source images or secrets
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: matchroom-completion-result
+          path: ${{ runner.temp }}/matchroom-completion-result.json
+          retention-days: 7
+          if-no-files-found: warn

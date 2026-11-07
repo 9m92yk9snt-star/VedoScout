@@ -1,0 +1,662 @@
+{
+  "purpose": "Strict primary acceptance scope for ScoutMePlay/VedoScout PR #59",
+  "analysis_name": "Orman1000",
+  "primary_evidence_archive": {
+    "filename": "dd5a84b1-3dc9-40b0-80c4-89232903774f-evidence (2)(1).zip",
+    "library_record_size_bytes": 37556202,
+    "library_record_created_utc": "2026-11-06T01:53:34Z",
+    "archive_bytes_directly_verified_in_current_runtime": true,
+    "archive_sha256": "3b27260511ed965952a497f97d1c6345a0f1b4bef1b89a60912a62e0f6530c0c",
+    "original_source_video_sha256_from_latest_archive": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2",
+    "verified_payload_files": 118,
+    "checksum_mismatches": 0,
+    "zip_integrity_test": "PASS",
+    "export_manifest_complete": false,
+    "original_mov_available_in_archive": false,
+    "web_mp4_bytes": 31659779,
+    "web_mp4_frame_count": 4606,
+    "web_mp4_width": 1080,
+    "web_mp4_height": 1920,
+    "timebase": "Measured decoded source PTS via OpenCV CAP_PROP_POS_MSEC",
+    "source_report_status": "ready",
+    "canonical_event_coverage_complete": false,
+    "canonical_event_count": 21,
+    "match_room_card_count": 8,
+    "original_human_selections": 10,
+    "processing_seconds": 1567.662,
+    "assets_seconds": 1166.845,
+    "source_analysis_seconds": 245.088,
+    "original_selection_digest": "ca4bc63080b8de6b986c370f809c89ad1050b5d1c883fe7e748da0ab8400d016",
+    "source_archive_verification": "Passed locally on exact attached ZIP and embedded canonical web MP4"
+  },
+  "previous_zip_versions_not_primary": [
+    "dd5a84b1-3dc9-40b0-80c4-89232903774f-evidence.zip",
+    "dd5a84b1-3dc9-40b0-80c4-89232903774f-evidence (1).zip"
+  ],
+  "previous_source_bound_orman1000_diagnostics": {
+    "source_video_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2",
+    "diagnostic_source": "testdata/matchroom-completion/prediction-scheduler-verification.json",
+    "clip_0044_source_frame_count": 136,
+    "clip_0044_accepted_ellipse_frames": 91,
+    "clip_0044_unmarked_frames": 45,
+    "full_latest_zip_visual_acceptance": false,
+    "stored_diagnostic_source_matches_latest_zip_source": true,
+    "stored_diagnostic_is_a_separate_experiment": true
+  },
+  "excluded_release_evidence": {
+    "other_video_name": "Orman400",
+    "other_video_sha256": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+    "restriction": "Only isolated engineering regression input; NEVER evidence of Orman1000 production readiness"
+  },
+  "required_gates": [
+    "CRITICAL: User-established target in Orman1000 is ONE selected-player goal and THREE assists. The exported report labels two goals/two assists. Inspect 49.881s as candidate incorrectly classified SHOT_GOAL; confirm who touched and scored before changing event or report.",
+    "DONE: Verified 118 payload checksums, ZIP SHA and embedded canonical web-video SHA fa56f933... (original .mov is not in ZIP)",
+    "Bind all original selections, player identity, report clips, outcomes and score evidence to that exact source",
+    "Measure exact decoded source PTS and accepted Match Room overlays for Orman1000",
+    "Diagnose the 45 missing 00:44 frames: visible target versus occluded/absent/uncertain; do not invent marks",
+    "Preserve arrow source/bounds, existing analysis correctness and production confidence thresholds",
+    "Measure full Orman1000 processing time and validate CPU/memory/budget without new paid provider calls",
+    "Pass full six-job CI, source-video-specific acceptance and visual review",
+    "Obtain user approval before merge or deploy"
+  ],
+  "production_cache_enabled": false,
+  "current_release_acceptance": "RELEASE_BLOCKED_PENDING_SOURCE_BOUND_PERSON_ROLE_RECONCILIATION_DESPITE_SAME_VIDEO_PLAY_CONFIRMED",
+  "production_or_main_changes_allowed_without_user_approval": false,
+  "actual_latest_zip_source_pts_audit": {
+    "scope": "Raw source-bound mask samples at exact decoded original web-video PTS ±2ms; not a direct frontend acceptance or revised-model run",
+    "00:44": {
+      "frames": 136,
+      "stored_mask_covered": 69,
+      "independent_confirmed_ground_supported": 91,
+      "supported_but_unmasked": 22,
+      "no_confirmed_ground_support_and_unmasked": 45,
+      "last_confirmed_ground_ms": 45382,
+      "next_confirmed_no_ground_ms": [
+        45498,
+        45515
+      ],
+      "first_absent_ms": 45632
+    },
+    "00:31": {
+      "frames": 83,
+      "stored_mask_covered": 39,
+      "independent_confirmed_ground_supported": 83,
+      "supported_but_unmasked": 44
+    },
+    "00:08": {
+      "frames": 279,
+      "stored_mask_covered": 151,
+      "stored_localization_ends_ms": 10000,
+      "reported_clip_ends_ms": 12133,
+      "source_evidence_completion_receipt_available": true,
+      "source_evidence_completion_receipt_status": "OBSERVATIONS_RETURNED",
+      "source_evidence_completion_rows": 17
+    },
+    "00:56": {
+      "frames": 69,
+      "stored_mask_covered": 31,
+      "independent_confirmed_ground_supported": 48,
+      "supported_but_unmasked": 17
+    },
+    "caveat": "Ground support is a conservative candidate window between independent CONFIRMED ground+box observations <=250ms apart; it does NOT authorize per-frame identity, interpolation, or a continuous ellipse."
+  },
+  "user_reported_goal_assist_discrepancy": {
+    "user_reported_assists_in_video": 3,
+    "exported_report_observed_assists": 2,
+    "exported_report_observed_goals": 2,
+    "discrepancy_status": "UNRESOLVED_ORIGINAL_REPORT_2_GOALS_2_ASSISTS_VERSUS_USER_1_GOAL_3_ASSISTS",
+    "confirmed_export_assist_events": [
+      {
+        "event_id": "006dbd71ed71d464f19d",
+        "proof_ms": 44065,
+        "outcome": "PASS_TEAMMATE_GOAL"
+      },
+      {
+        "event_id": "16b70d6326506d906e7d",
+        "proof_ms": 56264,
+        "outcome": "PASS_TEAMMATE_GOAL"
+      }
+    ],
+    "candidate_for_misattribution_review": {
+      "event_id": "47ad617d2ba76a4683cd",
+      "proof_ms": 49881,
+      "currently_exported_as": "SHOT_GOAL",
+      "source_window_ms": [
+        49000,
+        51500
+      ],
+      "requires": "Verify whether the selected player assisted a teammate's goal near 49.881 s rather than scoring it; check the last deliberate touch, original target player, receiver, finisher and active ball. Confirm the other own goal is near 30.915 s. Do not change statistics before source-backed reclassification.",
+      "goal_scoring_actor_verified_by_independent_review": false
+    },
+    "prohibited_shortcuts": [
+      "Do not publish the report's 2 goals and 2 assists as verified counts.",
+      "Do not fabricate the third assist or claim that 49.881s is resolved before comparing original video evidence.",
+      "Do not alter source events, player identities, counts, scores or report wording without independently supported video evidence."
+    ],
+    "user_reported_goals_in_video": 1,
+    "user_expected_action_tally": {
+      "goals": 1,
+      "assists": 3
+    },
+    "exported_report_action_tally": {
+      "goals": 2,
+      "assists": 2
+    }
+  },
+  "previously_verified_model_findings": {
+    "earlier_analysis": "Orman500",
+    "prior_review_date": "2026-10-19",
+    "total_goals": 1,
+    "total_assists": 3,
+    "original_video_sha256": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+    "provenance": "Earlier user-approved model trial; this is a diagnostic regression reference, not a replacement Orman1000 video receipt",
+    "chronological_actions": [
+      {
+        "type": "GOAL",
+        "source_action_ms": 30915,
+        "earlier_trial_result": "VERIFIED_IN_ORMAN500"
+      },
+      {
+        "type": "ASSIST",
+        "source_action_ms": 44015,
+        "earlier_trial_result": "VERIFIED_IN_ORMAN500"
+      },
+      {
+        "type": "ASSIST",
+        "source_action_ms_window": [
+          49848,
+          50065
+        ],
+        "earlier_trial_result": "VERIFIED_IN_ORMAN500"
+      },
+      {
+        "type": "ASSIST",
+        "source_action_ms_window": [
+          56264,
+          56514
+        ],
+        "earlier_trial_result": "VERIFIED_IN_ORMAN500"
+      }
+    ],
+    "orman1000_regression_candidate": {
+      "timestamp_ms": 49881,
+      "current_orman1000_event_id": "47ad617d2ba76a4683cd",
+      "current_orman1000_action": "SHOT",
+      "current_orman1000_outcome": "GOAL",
+      "earlier_verified_action": "ASSIST",
+      "status": "SAME_UNDERLYING_PLAY_PROVEN_BY_13_PERCEPTUAL_FRAME_MATCHES_BUT_ACTOR_RECONCILIATION_NOT_APPLIED"
+    },
+    "required_reuse_policy": [
+      "Do not pay for another model call to rediscover already documented source actions.",
+      "Retrieve the prior Orman500 model/evidence receipt and compare source video hash, reference player and action-specific cited frames to the latest Orman1000 ZIP.",
+      "Reuse only when source/checksum/event/player identity/timeframe evidence permits; otherwise treat historical result as reference, not authority to overwrite current source.",
+      "Inspect the existing Orman1000 contact_review_006 receipt and event-to-causal-chain mapping at 49.881 sec; repair mapping/attribution only when evidence proves the pass and teammate finisher.",
+      "Do not change scores, counters, source event, or report prose by fiat; all three assists and one goal must be independently supportable from the Orman1000 source."
+    ],
+    "verified_previous_receipt_file": "docs/examples/native-third-assist-approval-receipt.json",
+    "verified_previous_receipt_response_sha256": "c1b78325895885002ccc58f036b0a29824406997108b12648f3805a46e0040ff",
+    "verified_previous_receipt_event_id": "369acbc54dce00fca4a7",
+    "verified_previous_receiver": "p3 (historical-model-local ID, white teammate; must NOT be conflated with Orman1000-local p3, a blue opponent)",
+    "verified_previous_finisher": "p3 (historical-model-local white teammate)",
+    "verified_previous_contact_interval_ms": [
+      49715,
+      50081
+    ],
+    "verified_previous_receiver_finish_interval_ms": [
+      50331,
+      50648
+    ],
+    "verified_previous_goal_outcome_ms": 51131
+  },
+  "prior_model_conflict_at_50_seconds": {
+    "scope": "Not a mere report formatting/aggregation bug: two separate Orman1000 model receipts assert SHOT/GOAL by selected p1, contradicting previously verified Orman500 ASSIST at the corresponding play.",
+    "orman1000_source_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2",
+    "event_id": "47ad617d2ba76a4683cd",
+    "stored_export_proof_ms": 49881,
+    "receipts": [
+      {
+        "packet_id": "sequence_006",
+        "status": "COMPLETED",
+        "model_decision": "SHOT",
+        "model_outcome": "GOAL",
+        "actor": "p1",
+        "finisher": "p1",
+        "receiver": null,
+        "response_sha256": "1515a8ae2285cb966cea66099cfcad0afd30c3b09de9f6e7e7ad15e253a065e6"
+      },
+      {
+        "packet_id": "contact_review_006",
+        "status": "COMPLETED",
+        "model_decision": "SHOT",
+        "model_outcome": "GOAL",
+        "actor": "p1",
+        "finisher": "p1",
+        "receiver": null,
+        "response_sha256": "7c3fd71f15b0b7736f9b879573c30c38e1426ddc4d6ea7d4daacb2182db06631"
+      }
+    ],
+    "historical_reference": {
+      "earlier_analysis": "Orman500",
+      "review_date": "2026-10-19",
+      "evidence_ms_range": [
+        49848,
+        50065
+      ],
+      "earlier_assistant_review": "Three assists including this second assist confirmed in previous model trial",
+      "earlier_trial_raw_video_sha256": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+      "authority": "Previously verified reference; must be compared at video/frame identity before transferring conclusions",
+      "earlier_verified_receipt_file": "docs/examples/native-third-assist-approval-receipt.json",
+      "earlier_verified_response_sha256": "c1b78325895885002ccc58f036b0a29824406997108b12648f3805a46e0040ff",
+      "same_underlying_play_verified_by_perceptual_frame_matching": true,
+      "visual_frame_matching_source_run": "https://github.com/9m92yk9snt-star/VedoScout/actions/runs/42315757175",
+      "visual_frame_matching_results": "13/13 visual near-matches; 12/13 exact matching decoded PTS; remainder +16ms; frame whole and pitch-region pHash difference 0–2 bits",
+      "actor_id_scope_warning": "Historical p3 is a white finishing teammate; current Orman1000 p3 is a blue opponent. Never equate local person identifiers across runs.",
+      "independent_player_role_reconciliation_automatically_applied": false
+    },
+    "regression_classification": "MODEL_TO_MODEL_ACTION_ATTRIBUTION_DISAGREEMENT",
+    "cause_not_yet_proven": true,
+    "next_safe_step": "Preserve proven 13-frame same-scene link and prior approved p1-to-white-teammate direct assist; verify explicit source-bound actor role mapping before any targeted canonical event overwrite.",
+    "production_fix_implemented": false
+  },
+  "cross_sha_perceptual_source_comparison": {
+    "source_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2",
+    "historical_source_sha256": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+    "action_window_ms": [
+      47765,
+      51515
+    ],
+    "match_count": 13,
+    "total_target_frames": 13,
+    "exact_decoded_pts_matches": 12,
+    "one_matched_pts_difference_ms": 16,
+    "visual_near_matches": 13,
+    "same_underlying_play_supported": true,
+    "run_id": 42315757175,
+    "details": "All 13 hashed action frames matched dynamically over exact source PTS; old and new video file hashes remain different. Previous model's p3 must not be assigned to new model's p3.",
+    "direct_receipt_transfer_approved": false,
+    "canonical_stats_mutated": false,
+    "provider_model_calls": 0,
+    "hash_manifest": "testdata/matchroom-completion/orman1000-vs-prior-verified-play-hashes.json",
+    "original_human_anchor_sets_byte_identical": false,
+    "older_source_tap_times_seconds": [
+      3.07,
+      41.91,
+      71.01,
+      15.35,
+      21.48,
+      27.63,
+      33.77,
+      56.05,
+      55.76,
+      64.3
+    ],
+    "latest_orman1000_tap_times_seconds": [
+      3.07,
+      41.42,
+      70.6,
+      15.35,
+      21.48,
+      27.63,
+      33.77,
+      51.18,
+      55.76,
+      63.91
+    ],
+    "selection_policy": "Same physical gameplay frames are established, but the independent human-selected tap points/boxes/time instants differ, so neither the old model's selection identities nor frame masks can be copied into Orman1000. The two independent models both described selected white #15 and this must still be source-vetted."
+  },
+  "current_50s_contact_role_bracket_conflict": {
+    "current_source_event_id": "47ad617d2ba76a4683cd",
+    "current_source_video_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2",
+    "current_model_goal_contact_bracket_ms": [
+      49881,
+      50648
+    ],
+    "prior_approved_selected_player_pass_ms": [
+      49715,
+      50081
+    ],
+    "prior_approved_separate_white_teammate_finishing_contact_ms": [
+      50331,
+      50648
+    ],
+    "current_contact_bracket_overlap_with_prior_selected_pass_ms": 200,
+    "current_contact_bracket_overlap_with_prior_distinct_finish_ms": 317,
+    "underlying_play_verified_13_of_13_frames": true,
+    "role_mapping_status": "BLOCKED_CURRENT_WHITE_FINISHER_ROLE_NOT_IN_NEW_MODEL_CENSUS",
+    "old_p3_role": "WHITE_TEAMMATE_FINISHER",
+    "orman1000_p3_role": "BLUE_OPPONENT",
+    "copied_actor_ids_across_runs": false,
+    "live_canonical_event_modified": false,
+    "immediate_next_step": "Verify distinct current-source white finisher using actual frames with two observed body roles; only then propose an atomic event-level edit with all dependent stats and clips."
+  },
+  "source_player_census_at_50s": {
+    "same_underlying_play_confirmed_by_13_visual_frame_fingerprints": true,
+    "orman1000_model_packets": [
+      {
+        "packet_id": "sequence_006",
+        "explicit_image_count": 67,
+        "people_in_play": 7,
+        "selected_local_person": "p1",
+        "separate_white_finisher_registered": false,
+        "local_p3_kit": "BLUE"
+      },
+      {
+        "packet_id": "contact_review_006",
+        "explicit_image_count": 189,
+        "people_in_play": 7,
+        "selected_local_person": "p1",
+        "separate_white_finisher_registered": false,
+        "local_p3_kit": "BLUE"
+      }
+    ],
+    "previously_approved_model": {
+      "approval_receipt": "docs/examples/native-third-assist-approval-receipt.json",
+      "explicit_image_count": 255,
+      "special_limb_comparison_panels_added": 5,
+      "people_in_approved_source_response": 9,
+      "distinct_white_finisher_recorded": true,
+      "role": "prior:p3 distinct white teammate, finishing action supported at 50.331–50.648s"
+    },
+    "evidenced_failure_mode": "The newer two source-model packets do not enumerate the white receiving/finishing teammate that the earlier approved model distinguished in matching same-play footage.",
+    "confirmed_systematic_cause": false,
+    "forbidden_inference": "More images alone cannot prove better attribution. Do not copy earlier model-local person IDs or claim individual pixel contact while the foot is occluded.",
+    "production_automatic_correction_enabled": false
+  },
+  "derived_report_reconciliation": {
+    "status": "REVIEW_ONLY_SHADOW_COMPLETE_NOT_PUBLISHED",
+    "exact_latest_zip_sha256": "3b27260511ed965952a497f97d1c6345a0f1b4bef1b89a60912a62e0f6530c0c",
+    "original_source_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2",
+    "full_unpublished_shadow_report_sha256": "7c13694fa996765cc813480f8fc5a78c1d2682867d744a64d844762a47c2af77",
+    "actual_verified_stats_implementation_sha256": "def5cce860ca41fe7215da26244433d8f94c8fa1bad6455154a3834bd83e55ff",
+    "derived_stats_after_hypothetical_same_play_assist_reclass": {
+      "observed_goals": 1,
+      "observed_assists": 3,
+      "shots": 2,
+      "shots_on_target": 2,
+      "passes_attempted": 5,
+      "passes_completed": 5,
+      "key_passes": 3
+    },
+    "disputed_event_id": "47ad617d2ba76a4683cd",
+    "dependent_run_id": "baa4a5cfb76333175f55",
+    "other_19_events_unchanged": true,
+    "original_model_receipts_preserved": true,
+    "original_source_video_unchanged": true,
+    "former_own_goal_ball_arrow_suppressed_in_shadow": true,
+    "registered_source_frame_pixel_hashes": "testdata/matchroom-completion/orman1000-50s-exact-decoded-pts-hashes.json",
+    "reviewed_source_frame_pts": [
+      49715,
+      49881,
+      50081,
+      50331,
+      50431,
+      50648,
+      51131
+    ],
+    "no_new_model_calls": true,
+    "product_release_ready": false,
+    "blocker": "Current-source separate WHITE receiver/finisher still needs independent role verification on source frames. Do not map prior local p3 to current blue p3."
+  },
+  "source_local_selected_player_50s": {
+    "source_video_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2",
+    "source_observation_frame_id": "s000050648",
+    "source_observation_media_ms": 50648,
+    "original_selected_player_identity_status": "CONFIRMED",
+    "original_selected_player_box": [
+      0.177,
+      0.485,
+      0.103,
+      0.081
+    ],
+    "original_selected_ground": [
+      0.257,
+      0.564
+    ],
+    "observed_active_ball": [
+      0.363,
+      0.539
+    ],
+    "source_bgr_frame_sha256": "ba5d26a54b40fec01d29fa02a53d8ec51c5e5d246ff50c6ade8d33e8953be9f3",
+    "source_units": "FULL_FRAME_NORMALIZED",
+    "source_observation_authority": "Original Orman1000 match_room.samples entry for 50.648s",
+    "inference_limit": "The selected player's location does not independently establish the other white finisher or hidden contact."
+  },
+  "pending_role_signoff": {
+    "method": "SOURCE_FRAME_PERSON_SEPARATION",
+    "current_source_receiver_visual_id": null,
+    "current_source_finisher_visual_id": null,
+    "required_frame_ids": [
+      "s000050331",
+      "s000050648"
+    ],
+    "separate_white_body_boxes_verified": false,
+    "finishing_contact_interval_bracketed_not_exact": [
+      50331,
+      50648
+    ],
+    "model_local_prior_p3_transfer_allowed": false,
+    "executable_candidate_finalizer": "backend/scripts/finalize_orman1000_review_candidate.py",
+    "executable_release_gate": "backend/scripts/check_orman1000_release_readiness.py",
+    "finalizer_production_write_enabled": false,
+    "detailed_blocker_code": "BLOCKED_REAL_ORMAN1000_DISTINCT_WHITE_FINISHER_SOURCE_REVIEW_PENDING"
+  },
+  "historical_selected_player_anchor_region_alignment": {
+    "prior_source_video_sha256": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+    "current_source_video_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2",
+    "prior_human_selection_count": 10,
+    "current_human_selection_count": 10,
+    "exact_shared_media_ms": [
+      3070,
+      15350,
+      21480,
+      27630,
+      33770,
+      55760
+    ],
+    "exact_shared_media_ms_count": 6,
+    "compatible_selection_regions": 6,
+    "minimum_prior_point_margin_inside_current_box": -0.004132,
+    "tolerance_for_minor_crop_margin": 0.01,
+    "source_region_compatibility_only": true,
+    "independent_same_person_identity_across_full_footage_verified": false,
+    "finisher_or_foot_contact_verified": false,
+    "previous_p3_reassignment_allowed": false,
+    "evidence": "testdata/sequence-pilot-orman400/anchors.json versus latest Orman1000 ZIP anchors.json (exact manually selected source PTS; no model predictions)",
+    "comparator": "backend/scripts/compare_orman500_orman1000_selected_anchors.py",
+    "model_calls": 0
+  },
+  "third_assist_provenance_guard": {
+    "status": "SOURCE_BOUND_REVIEW_PROVENANCE_CONTRACT_IMPLEMENTED_SHADOW_ONLY",
+    "original_source_video_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2",
+    "disputed_event_id": "47ad617d2ba76a4683cd",
+    "original_source_model_receipt_response_sha256": "7c3fd71f15b0b7736f9b879573c30c38e1426ddc4d6ea7d4daacb2182db06631",
+    "earlier_reviewed_assist_receipt_response_sha256": "c1b78325895885002ccc58f036b0a29824406997108b12648f3805a46e0040ff",
+    "original_receipt_must_remain_immutable": true,
+    "separate_review_provenance_required_for_publication": true,
+    "event_level_and_report_level_review_history_required": true,
+    "source_frame_50331_and_50648_hashes_required": true,
+    "selected_player_and_distinct_white_finisher_review_status": "STILL_UNVERIFIED",
+    "signed_human_finisher_role_review_present": false,
+    "source_event_reclassified_in_production": false,
+    "report_corrected_in_production": false,
+    "initial_44_targeted_tests_passed": true,
+    "initial_tests_run_id": 42330868248,
+    "note": "A prior approved assist, 13/13 near-matching visual frames and six aligned player taps support comparison but do not prove the exact hidden finishing contact or approve person role transfer. A separate role review is mandatory before any correction."
+  },
+  "owner_selection_near_third_assist": {
+    "original_video_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2",
+    "owner_selected_source_time_ms": 51180,
+    "owner_selected_box": [
+      0.1102,
+      0.4724,
+      0.0759,
+      0.0969
+    ],
+    "owner_tapped_point": [
+      0.16192537621109052,
+      0.5216450216450216
+    ],
+    "source_observation_frame_id": "s000051181",
+    "source_observation_time_ms": 51181,
+    "source_observation_box": [
+      0.1102,
+      0.4724,
+      0.0759,
+      0.0969
+    ],
+    "source_observation_identity_status": "CONFIRMED",
+    "source_observation_foot_point": [
+      0.17,
+      0.567
+    ],
+    "original_owner_anchor_count": 10,
+    "same_source_owner_box_exactly_matches_source_observation_box": true,
+    "time_difference_ms": 1,
+    "historical_model_person_ids_transferred": false,
+    "source_player_identity_connection_supported_at_51181": true,
+    "does_not_independently_prove_50648_finish_or_recipient": true,
+    "proof_scope": "A human-selected identity reference at 51.18 and a matching saved source observation one millisecond later. Continuity through occlusion and a separate white finisher remain unproven."
+  },
+  "duc_recoup_00_08": {
+    "status": "READY_FOR_SOURCE_REVALIDATED_REPLAY_STAGING_NOT_RENDERED",
+    "source_video_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2",
+    "event_id": "966c91c7243829d6fab0",
+    "prior_primary_window_ms": [
+      7500,
+      10000
+    ],
+    "completed_tail_window_ms": [
+      10125,
+      12133
+    ],
+    "completed_response_snapshot": "testdata/matchroom-completion/result.json",
+    "returned_source_position_samples": 17,
+    "published_graphics_updated": false,
+    "model_calls_for_staging": 0,
+    "source_matching_checks": [
+      "exact source SHA and original 10 human selection digest",
+      "same canonical event and primary model window",
+      "source request payload SHA, response hash, provider/model and packet ID",
+      "17 approved source samples and exact recorded media PTS",
+      "no conflicting preexisting completion receipt"
+    ],
+    "recovery_tool": "backend/scripts/stage_orman1000_duel_tail.py",
+    "present_analysis_scores_modified": false,
+    "current_state": "Requires exact source pixel replay through normal localizer before display, not a finished ellipse"
+  },
+  "technical_contracts_verified": {
+    "source_provenance_and_assist_shadow_focused_run": 42331951232,
+    "focused_regressions_passed": 54,
+    "latest_complete_full_ci_run": null,
+    "details": "Source-role review and no-paid-model 00:08 completion checkpoint staging are isolated DRAFT-only controls. Full current-branch six-job CI still pending.",
+    "production_write_allowed": false
+  },
+  "latest_uploaded_orman1000_matchroom_contour_budget": {
+    "scope": "READ_ONLY status facts from original latest ZIP match_room.tracking.contour_diagnostics.windows, not current PR replay",
+    "source_video_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2",
+    "report_tracking_status_all_eight": "COMPLETED",
+    "initial_time_budget_windows_in_six_cards": true,
+    "cards": [
+      {
+        "timestamp": "00:50",
+        "segments": 6,
+        "initial_windows": [
+          "TIME_BUDGET"
+        ]
+      },
+      {
+        "timestamp": "00:31",
+        "segments": 7,
+        "initial_windows": [
+          "TIME_BUDGET"
+        ]
+      },
+      {
+        "timestamp": "00:24",
+        "segments": 4,
+        "initial_windows": [
+          "SUPPORTED_SOURCE_OBSERVATIONS"
+        ]
+      },
+      {
+        "timestamp": "00:44",
+        "segments": 10,
+        "initial_windows": [
+          "TIME_BUDGET"
+        ]
+      },
+      {
+        "timestamp": "00:56",
+        "segments": 3,
+        "initial_windows": [
+          "TIME_BUDGET"
+        ]
+      },
+      {
+        "timestamp": "00:13",
+        "segments": 6,
+        "initial_windows": [
+          "TIME_BUDGET"
+        ]
+      },
+      {
+        "timestamp": "00:04",
+        "segments": 2,
+        "initial_windows": [
+          "SUPPORTED_SOURCE_OBSERVATIONS"
+        ]
+      },
+      {
+        "timestamp": "00:08",
+        "segments": 19,
+        "initial_windows": [
+          "TIME_BUDGET"
+        ]
+      }
+    ],
+    "interpretation": "Completed scheduler is NOT proof of full source mask coverage; TIME_BUDGET records an initial window limit even if later refinement recovered some pixels.",
+    "policy": "Expose only historical budget diagnostics. Never auto extend masks or infer absent player positions from status."
+  },
+  "publication_vs_analysis_key_pass_definition": {
+    "source": "Actual latest ZIP and unchanged backend verified_stats.py vs report_publication.py",
+    "observed_assists_after_review_only_projection": 3,
+    "internal_verified_stats_key_passes_including_assists": 3,
+    "publication_key_passes_excluding_assists": 0,
+    "publication_user_visible_label": "Key Passes (excluding assists)",
+    "interpretation": "These are distinct measurement definitions; source product intentionally excludes assists from published key passes. Do not mislabel zero other key passes as missing three assists.",
+    "publication_preview_verified_without_new_model_calls": true,
+    "production_changed": false
+  },
+  "exact_original_video_white_finisher_claim_rejection": {
+    "context": "Exact latest Orman1000 source MP4, original BGR frame hashes verified at PTS 50331 and 50648; blue/green pixels cannot be relabelled white from a text field.",
+    "source_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2",
+    "source_frame_pixel_hashes": {
+      "s000050331": "4c1daa279d50b4a447c9406e1b25f6ff0f0f34dfbe4880372dfbdf983ddf92b1",
+      "s000050648": "ba5d26a54b40fec01d29fa02a53d8ec51c5e5d246ff50c6ade8d33e8953be9f3"
+    },
+    "synthetic_source_early_box": [
+      0.32,
+      0.46,
+      0.09,
+      0.1
+    ],
+    "synthetic_source_late_box": [
+      0.335,
+      0.47,
+      0.08,
+      0.095
+    ],
+    "light_kit_pixel_fraction_50331": 0.215582,
+    "light_kit_pixel_fraction_50648": 0.047338,
+    "required_fraction": 0.1,
+    "fake_kit_label_rejected_on_original_video": true,
+    "human_white_finisher_identity_confirmed": false,
+    "source_foot_contact_measured": false,
+    "model_calls": 0,
+    "release_gate_paths": [
+      "backend/orman1000_role_pixel_gate.py",
+      "backend/scripts/check_orman1000_release_readiness.py",
+      "backend/scripts/finalize_orman1000_review_candidate.py"
+    ]
+  }
+}

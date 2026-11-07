@@ -1,0 +1,89 @@
+{
+  "scope": "Eight-clip OpenCV source replay plus targeted stride correction rerun",
+  "source_video_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2",
+  "before_stride_fix_full_graphics_seconds": 530.321,
+  "stride_targeted_rerun_seconds": 24.466,
+  "final_full_runtime_not_remeasured": true,
+  "earlier_full_graphics_seconds": 414.132,
+  "speedup_not_claimed": true,
+  "source_frames_checked": 1080,
+  "ellipse_frames": 705,
+  "arrow_frames": 230,
+  "clips": [
+    {
+      "timestamp": "00:50",
+      "total_pts": 129,
+      "ellipse_pts": 41,
+      "arrow_pts": 0,
+      "supported_but_unmarked_pts": 0
+    },
+    {
+      "timestamp": "00:31",
+      "total_pts": 83,
+      "ellipse_pts": 83,
+      "arrow_pts": 21,
+      "supported_but_unmarked_pts": 0
+    },
+    {
+      "timestamp": "00:24",
+      "total_pts": 93,
+      "ellipse_pts": 20,
+      "arrow_pts": 7,
+      "supported_but_unmarked_pts": 0
+    },
+    {
+      "timestamp": "00:44",
+      "total_pts": 136,
+      "ellipse_pts": 91,
+      "arrow_pts": 49,
+      "supported_but_unmarked_pts": 0
+    },
+    {
+      "timestamp": "00:56",
+      "total_pts": 69,
+      "ellipse_pts": 69,
+      "arrow_pts": 23,
+      "supported_but_unmarked_pts": 0
+    },
+    {
+      "timestamp": "00:13",
+      "total_pts": 84,
+      "ellipse_pts": 84,
+      "arrow_pts": 0,
+      "supported_but_unmarked_pts": 0
+    },
+    {
+      "timestamp": "00:04",
+      "total_pts": 207,
+      "ellipse_pts": 38,
+      "arrow_pts": 19,
+      "supported_but_unmarked_pts": 0
+    },
+    {
+      "timestamp": "00:08",
+      "total_pts": 279,
+      "ellipse_pts": 279,
+      "arrow_pts": 111,
+      "supported_but_unmarked_pts": 0
+    }
+  ],
+  "previous_ellipse_frames_lost": 0,
+  "previous_arrow_frames_lost_outside_corrected_assist": 0,
+  "assist_50s_arrow": "Withheld: original own-shot direction is not evidence of an assist arrow",
+  "accepted_goals": 1,
+  "accepted_assists": 3,
+  "canonical_other_19_events_unchanged": true,
+  "derived_publication_validation": "PASSED",
+  "local_backend_tests": 218,
+  "local_frontend_tests": 2,
+  "prior_code_ci_jobs_passed": 6,
+  "prior_code_ci_commit": "3de0a68c8357b6e2902c7d27626fbe6ecb462309",
+  "visual_diagnostic_frames_inspected": 16,
+  "new_paid_model_calls": 0,
+  "model_observations_reused": true,
+  "production_onnx_verified": false,
+  "browser_visual_test": false,
+  "full_release_approved": false,
+  "merged": false,
+  "deployed": false
+}

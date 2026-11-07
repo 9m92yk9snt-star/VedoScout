@@ -302,6 +302,9 @@ def compute(video, anchors, events, checkpoint=None):
     cv2.setNumThreads(2)
     deadline = time.monotonic() + (SOURCE_TIMEOUT_S if any(e.get('localization_method') == 'EXPLICIT_SOURCE_POSITIONS' for e in events) else TIMEOUT_S) - 3
     output = {}
+    # Owned by this sequential worker only. Reuse immutable weights across
+    # source windows; every frame still receives a fresh prediction.
+    position_model = None
     def save():
         if checkpoint is not None:
             temporary = Path(str(checkpoint)+'.tmp')
@@ -365,9 +368,17 @@ def compute(video, anchors, events, checkpoint=None):
                 for lo, stop in observation_windows(observations, lo, hi):
                     if time.monotonic() >= deadline-1:
                         break
+                    if position_model is None:
+                        from native_player_segmentation import PersonSegmenter
+                        position_model = PersonSegmenter()
+                        if event.get('_contour_prediction_cache'):
+                            from match_room_prediction_cache import CachedSegmenter
+                            position_model = CachedSegmenter(position_model, event['_contour_prediction_cache'],
+                                                             event['source_video_sha256'])
                     part = {'start_ms': lo, 'end_ms': stop}
                     contours.extend(position_contours(video, observations, lo, stop,
-                                                      deadline=deadline, diagnostics=part, on_segment=preserve))
+                                                      deadline=deadline, diagnostics=part, on_segment=preserve,
+                                                      segmenter=position_model))
                     diagnostic.setdefault('windows', []).append(part)
                 diagnostic.update(method=position_method, status='SUPPORTED_SOURCE_OBSERVATIONS' if contours else 'NO_AGREED_INTERVAL')
             else:
@@ -423,13 +434,30 @@ def compute_refinement(video, anchors, events, checkpoint=None, segmenter_kind='
     from match_room import presentation_window
     from match_room_position_contours import contour_segments, observation_windows, refinement_model, METHOD
     cv2.setNumThreads(2)
-    deadline = time.monotonic() + (_refinement_budget(events) if segmenter_kind == 'medium' else TIMEOUT_S) - 3
+    deadline = time.monotonic() + _refinement_timeout(events, segmenter_kind) - 3
     output = {}
     def save():
         if checkpoint is not None:
             temporary = Path(str(checkpoint)+'.tmp')
             temporary.write_text(json.dumps(output))
             temporary.replace(checkpoint)
+    if segmenter_kind == 'ball':
+        from match_room_ball_playback import build_ball_playback
+        for event in events[:1]:
+            previous = event.get('_ball_completion') or {}
+            if (previous.get('event_id') != event.get('event_id')
+                    or not event.get('source_video_sha256')
+                    or previous.get('source_video_sha256') != event['source_video_sha256']
+                    or event.get('localization_method') != 'EXPLICIT_SOURCE_POSITIONS'):
+                raise ValueError('BALL_COMPLETION_SOURCE_MISMATCH')
+            segments, diagnostic = build_ball_playback(
+                video, event, previous['observed_samples'], deadline,
+                completed_segments=previous.get('ball_playback') or [])
+            output[event['event_id']] = {
+                'event_id': event['event_id'], 'source_video_sha256': event['source_video_sha256'],
+                'ball_playback': segments, 'ball_playback_diagnostics': diagnostic}
+            save()
+        return output
     for event in events[:1]:
         if event.get('localization_method') != 'EXPLICIT_SOURCE_POSITIONS':
             continue
@@ -445,12 +473,15 @@ def compute_refinement(video, anchors, events, checkpoint=None, segmenter_kind='
         if segmenter_kind == 'small':
             from native_player_segmentation import PersonSegmenter
             model = PersonSegmenter()
+            if event.get('_contour_prediction_cache'):
+                from match_room_prediction_cache import CachedSegmenter
+                model = CachedSegmenter(model, event['_contour_prediction_cache'], event['source_video_sha256'])
         elif segmenter_kind == 'medium':
             model = refinement_model()
         else:
             raise ValueError('UNSUPPORTED_REFINEMENT_MODEL')
         result['refinement_diagnostics']['segmenter_kind'] = segmenter_kind
-        result['refinement_diagnostics']['budget_seconds'] = _refinement_budget(events) if segmenter_kind == 'medium' else TIMEOUT_S
+        result['refinement_diagnostics']['budget_seconds'] = _refinement_timeout(events, segmenter_kind)
         def preserve(segment):
             result['segments'].append(segment)
             save()
@@ -470,11 +501,32 @@ def _refinement_budget(events):
     return max(4., min(float(value), MAX_REFINEMENT_EVENTS*MEDIUM_TIMEOUT_S)) if finite(value) else MEDIUM_TIMEOUT_S
 
 
+def _refinement_timeout(events, kind):
+    if kind == 'medium':
+        return _refinement_budget(events)
+    if kind in ('small', 'ball'):
+        value = events[0].get('_refinement_budget_seconds', TIMEOUT_S) if events else TIMEOUT_S
+        return max(4., min(float(value), SOURCE_TIMEOUT_S)) if finite(value) else TIMEOUT_S
+    raise ValueError('UNSUPPORTED_REFINEMENT_MODEL')
+
+
 def _refinement_context(event, windows):
     """Include source context without crossing identity barriers or 1.5s bounds."""
     observations = event.get('visual_samples') or []
     result = []
     for lo, hi in windows:
+        # A detector can need the next confirmed pose to separate overlapping
+        # bodies at the right edge. Retain short forward context as well as
+        # backward context, without crossing uncertainty or the 1.5s bound.
+        original_end, previous_end = hi, hi
+        for row in [r for r in observations if r.get('media_ms', hi) > hi]:
+            stamp = row['media_ms']
+            if (stamp-original_end > 250 or stamp-previous_end > 250
+                    or stamp-lo > 1500 or row.get('identity_status') != 'CONFIRMED'):
+                break
+            if row.get('ground'):
+                hi = stamp
+            previous_end = stamp
         lower, start, previous = max(lo-800, hi-1500), lo, lo
         for row in reversed([r for r in observations if r.get('media_ms', lo+1) <= lo]):
             stamp = row['media_ms']
@@ -497,7 +549,7 @@ def _bounded_event(video, anchors, events, *, refinement=False):
                                        'refinement': refinement}))
         try:
             subprocess.run([sys.executable, str(Path(__file__).resolve()), str(request), str(result)],
-                           timeout=_refinement_budget(events) if refinement == 'medium' else TIMEOUT_S if refinement else SOURCE_TIMEOUT_S if any(e.get('localization_method') == 'EXPLICIT_SOURCE_POSITIONS' for e in events) else TIMEOUT_S,
+                           timeout=_refinement_timeout(events, refinement) if refinement else SOURCE_TIMEOUT_S if any(e.get('localization_method') == 'EXPLICIT_SOURCE_POSITIONS' for e in events) else TIMEOUT_S,
                            check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                            env={**os.environ, 'SCOUTMEPLAY_MATCHROOM_ENGINE': 'onnxruntime'})
             return json.loads(result.read_text()), 'COMPLETED'
@@ -541,12 +593,21 @@ def missing_display_windows(event, previous):
     return list(reversed(missing))
 
 
-def bounded_tracks(video, anchors, events):
+def bounded_tracks(video, anchors, events, *, reuse_predictions=False):
+    # Opt-in until full graphics parity and live-engine replay are verified.
+    if not reuse_predictions:
+        return _bounded_tracks(video, anchors, events)
+    with tempfile.TemporaryDirectory(prefix='matchroom-predictions-') as directory:
+        scoped = [{**event, '_contour_prediction_cache': directory} for event in events]
+        return _bounded_tracks(video, anchors, scoped)
+
+
+def _bounded_tracks(video, anchors, events):
     """One bounded child per distinct clip; repeated report cards share results.
 
-    At most MAX_EVENTS initial children plus MAX_REFINEMENT_EVENTS optional
-    retries. Source-position passes allow 35s; legacy/small passes allow 25s;
-    medium refinements share 630s (at most 910s total). Every initial result is complete
+    At most MAX_EVENTS initial children plus two children per refinement.
+    Source-position passes allow 35s; legacy passes allow 25s. Small completion
+    and medium refinements share 630s (at most 910s total). Every initial result is complete
     before retries begin; no retry can spend another clip's original budget.
     A difficult earlier clip cannot consume a later clip's inference budget.
     """
@@ -585,6 +646,17 @@ def bounded_tracks(video, anchors, events):
         if len(pending) >= MAX_REFINEMENT_EVENTS:
             break
     refinement_deadline = time.monotonic()+MAX_REFINEMENT_EVENTS*MEDIUM_TIMEOUT_S
+    def merge(event, previous, retried, kind):
+        result = retried.get(event['event_id']) or {}
+        if (result.get('event_id') != event['event_id'] or result.get('method') != previous.get('method')
+                or result.get('source_video_sha256') != event.get('source_video_sha256')):
+            return False
+        key = 'small_completion_diagnostics' if kind == 'small' else 'refinement_diagnostics'
+        previous[key] = result.get('refinement_diagnostics', {})
+        merged = {s['id']: s for s in previous.get('segments', [])}
+        merged.update({s['id']: s for s in result.get('segments', [])})
+        previous['segments'] = list(merged.values())
+        return True
     for index, (event, previous, missing) in enumerate(pending):
         remaining = refinement_deadline-time.monotonic()
         if remaining <= 4:
@@ -594,20 +666,58 @@ def bounded_tracks(video, anchors, events):
         allowance = remaining-others*reserve
         if allowance <= 4:
             break
+        if interrupted(event) and missing:
+            # A timed-out small pass is not a failed recognition. Finish its
+            # missing source windows before paying for a larger model. Use the
+            # same identity/mask gates and charge this against the same budget.
+            request_event = {**event, '_refinement_budget_seconds': min(SOURCE_TIMEOUT_S, allowance),
+                             '_display_refinement_windows': _refinement_context(event, missing)}
+            retried, status = _bounded_event(video, anchors, [request_event], refinement='small')
+            statuses.append(status)
+            if merge(event, previous, retried, 'small'):
+                missing = missing_display_windows(event, previous)
+                if previous.get('segments') and not missing:
+                    continue
+            remaining = refinement_deadline-time.monotonic()
+            # Keep the reservation made before this clip's completion attempt.
+            # Its extra work must not reduce a later clip's reserved time.
+            allowance = remaining-others*reserve
+            if allowance <= 4:
+                break
         request_event = {**event, '_refinement_budget_seconds': allowance}
         if missing:
             request_event['_display_refinement_windows'] = _refinement_context(event, missing)
         retried, status = _bounded_event(video, anchors, [request_event],
                                          refinement='medium')
-        result = retried.get(event['event_id']) or {}
-        if (result.get('event_id') == event['event_id'] and result.get('method') == previous.get('method')
-                and result.get('source_video_sha256') == event.get('source_video_sha256')):
-            # Preserve original observations, moving arrows and completed paths.
-            previous['refinement_diagnostics'] = result.get('refinement_diagnostics', {})
-            merged = {s['id']: s for s in previous.get('segments', [])}
-            merged.update({s['id']: s for s in result.get('segments', [])})
-            previous['segments'] = list(merged.values())
+        merge(event, previous, retried, 'medium')
         statuses.append(status)
+    # Finish only budget-interrupted ball masks using time left in the SAME
+    # refinement allowance. No new allowance and no repeated complete arrows.
+    for event in unique:
+        previous = output.get(event.get('event_id')) or {}
+        failures = (previous.get('ball_playback_diagnostics') or {}).get('failures') or []
+        if not any('BUDGET' in f for f in failures):
+            continue
+        remaining = refinement_deadline-time.monotonic()
+        if remaining <= 4:
+            break
+        if (event.get('localization_method') != 'EXPLICIT_SOURCE_POSITIONS'
+                or previous.get('source_video_sha256') != event.get('source_video_sha256')
+                or not previous.get('observed_samples')):
+            continue
+        request = {**event, '_refinement_budget_seconds': min(SOURCE_TIMEOUT_S, remaining),
+                   '_ball_completion': {k: previous.get(k) for k in
+                       ('event_id', 'source_video_sha256', 'observed_samples', 'ball_playback')}}
+        retried, status = _bounded_event(video, anchors, [request], refinement='ball')
+        statuses.append(status)
+        result = retried.get(event['event_id']) or {}
+        if (result.get('event_id') == event['event_id']
+                and result.get('source_video_sha256') == event['source_video_sha256']
+                and isinstance(result.get('ball_playback'), list)):
+            old = previous.get('ball_playback') or []
+            if all(s in result['ball_playback'] for s in old):
+                previous['ball_playback'] = result['ball_playback']
+                previous['ball_playback_diagnostics'] = result['ball_playback_diagnostics']
     if all(s == 'COMPLETED' for s in statuses):
         return output,'COMPLETED'
     if len(statuses) == 1:
