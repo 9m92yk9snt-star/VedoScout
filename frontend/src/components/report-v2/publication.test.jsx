@@ -139,7 +139,8 @@ test('ready report with partial source observations is explicitly labelled incom
   };
   const {rerender} = render(<EvidenceCoverageNotice report={partial}/>);
   expect(screen.getByTestId('v2-partial-source-coverage').textContent).toContain('Partial video coverage');
-  expect(screen.getByTestId('v2-partial-source-coverage').textContent).toContain('not establish complete-match totals');
+  expect(screen.getByTestId('v2-partial-source-coverage').textContent).toContain('not full-match totals');
+  expect(screen.getByTestId('v2-partial-source-coverage').textContent).toContain('may still require review');
   rerender(<EvidenceCoverageNotice report={{
     canonical_events: {coverage_complete:true},
     full_report: {verified_stats: {coverage_status:'COMPLETE'}},
