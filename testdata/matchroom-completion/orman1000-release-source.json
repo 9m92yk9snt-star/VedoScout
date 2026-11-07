@@ -303,5 +303,30 @@
       63.91
     ],
     "selection_policy": "Same physical gameplay frames are established, but the independent human-selected tap points/boxes/time instants differ, so neither the old model's selection identities nor frame masks can be copied into Orman1000. The two independent models both described selected white #15 and this must still be source-vetted."
+  },
+  "current_50s_contact_role_bracket_conflict": {
+    "current_source_event_id": "47ad617d2ba76a4683cd",
+    "current_source_video_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2",
+    "current_model_goal_contact_bracket_ms": [
+      49881,
+      50648
+    ],
+    "prior_approved_selected_player_pass_ms": [
+      49715,
+      50081
+    ],
+    "prior_approved_separate_white_teammate_finishing_contact_ms": [
+      50331,
+      50648
+    ],
+    "current_contact_bracket_overlap_with_prior_selected_pass_ms": 200,
+    "current_contact_bracket_overlap_with_prior_distinct_finish_ms": 317,
+    "underlying_play_verified_13_of_13_frames": true,
+    "role_mapping_status": "BLOCKED_CURRENT_WHITE_FINISHER_ROLE_NOT_IN_NEW_MODEL_CENSUS",
+    "old_p3_role": "WHITE_TEAMMATE_FINISHER",
+    "orman1000_p3_role": "BLUE_OPPONENT",
+    "copied_actor_ids_across_runs": false,
+    "live_canonical_event_modified": false,
+    "immediate_next_step": "Verify distinct current-source white finisher using actual frames with two observed body roles; only then propose an atomic event-level edit with all dependent stats and clips."
   }
 }
