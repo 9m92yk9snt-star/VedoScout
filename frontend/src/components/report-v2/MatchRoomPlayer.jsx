@@ -34,6 +34,11 @@ export function MatchRoomPlayer({
   const clip = !!proof.clip && Number.isFinite(proof.clipStart) && !failed;
   const offset = clip ? proof.clipStart : 0;
   const raw = proof.comment;
+  const originalContourWindows = raw?.match_room?.tracking?.contour_diagnostics?.windows;
+  const initialContourBudgetReached =
+    raw?.match_room?.contour_processing_budget?.status === "INITIAL_WINDOW_TIME_BUDGET_REACHED" ||
+    (Array.isArray(originalContourWindows) &&
+      originalContourWindows.some(w => w?.status === "TIME_BUDGET"));
   const fallback = finiteSeconds(proof.ts);
   const room = useMemo(() => roomFor(raw, fallback), [raw, fallback]);
   const from = Math.max(room.start, clip ? offset * 1000 : 0),
@@ -214,7 +219,7 @@ export function MatchRoomPlayer({
         if (video.current) video.current.playbackRate = next ? .5 : 1;
       }}>{slow ? '0.5×' : '1×'}</button></div>
     {room.tracks.some(rows => rows.some(row => row.display_estimated === true)) && <p className="mr-position-note">Player position between observations is estimated.</p>}
-    {raw?.match_room?.contour_processing_budget?.status === "INITIAL_WINDOW_TIME_BUDGET_REACHED" && (
+    {initialContourBudgetReached && (
       <p className="mr-position-note" data-testid="match-room-contour-time-limit">
         Some initial tracking passes reached their processing limit. Markings are shown only where supported by the video.
       </p>
