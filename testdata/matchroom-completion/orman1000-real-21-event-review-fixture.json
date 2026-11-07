@@ -140,7 +140,9 @@
           "response_sha256": "7c3fd71f15b0b7736f9b879573c30c38e1426ddc4d6ea7d4daacb2182db06631"
         }
       ]
-    }
+    },
+    "actor_visual_id": "contact_review_006:0:p1",
+    "global_target_id": "GLOBAL_TARGET"
   },
   "current_exported_counts": {
     "goals": 2,
