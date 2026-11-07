@@ -68,7 +68,7 @@ def test_approved_same_source_completion_is_staged_without_mutating_video_facts(
     ("primary_window","PRIMARY_DUEL_PROOF_WINDOW_CHANGED"),
     ("completion_source","COMPLETION_EVIDENCE_CROSS_SOURCE"),
     ("receipt_hash","PAID_COMPLETION_RECEIPT_NOT_IDENTICAL"),
-    ("wrong_rows","COMPLETION_SOURCE_OBSERVATIONS_CHANGED"),
+    ("wrong_rows","COMPLETION_SOURCE_PTS_CHANGED"),
     ("overlap","COMPLETION_CHECKPOINT_CONFLICT"),
 ])
 def test_wrong_video_receipt_or_cross_event_staging_fails_closed(monkeypatch,break_it,reason):
