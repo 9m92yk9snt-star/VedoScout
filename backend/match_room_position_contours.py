@@ -243,7 +243,15 @@ def supporting_observations(frames, detections, interval, observations):
 
 
 def display_fits_source_bodies(frames, interval, display, observations):
-    """Reject a curve that leaves an independently observed player's lower body."""
+    """Reject presentation curves contradicted by actual source-body evidence.
+
+    Sparse endpoint bridges do NOT measure identity in hidden frames. A
+    camera-derived intermediate position must stay within a conservative,
+    source-body-size envelope of the TWO confirmed surrounding foot positions.
+    This never creates, smooths or replaces a ground point; an implausible
+    display estimate is only rejected. Bidirectional measured tracks retain
+    their previous acceptance rules unchanged.
+    """
     times = {frames[i]['media_ms']:i for i in interval['indices']}
     for observed in observations:
         i = times[observed['media_ms']]
@@ -253,6 +261,33 @@ def display_fits_source_bodies(frames, interval, display, observations):
         bx,by,bw,bh = observed['player_box']
         if not (bx-bw*.3 <= x <= bx+bw*1.3 and by+bh*.55 <= y <= by+bh*1.3):
             return False
+    if not interval.get('presentation_only'):
+        return True
+    grounded = [(times[o['media_ms']], o) for o in observations
+                if o.get('identity_status') == 'CONFIRMED'
+                and o.get('ground') and o.get('player_box')]
+    for (ai, a), (bi, b) in zip(grounded, grounded[1:]):
+        if ai >= bi:
+            return False
+        start, stop = frames[ai]['media_ms'], frames[bi]['media_ms']
+        if stop <= start:
+            return False
+        # Tolerance is relative to the actual person's independently
+        # observed body width/height, not the nearest competing detection.
+        ax, ay = a['ground']
+        bx, by = b['ground']
+        tolerance_x = max(.02, .42 * min(a['player_box'][2], b['player_box'][2]))
+        tolerance_y = max(.015, .42 * min(a['player_box'][3], b['player_box'][3]))
+        for i in interval['indices']:
+            if not ai < i < bi or i not in display:
+                continue
+            point = display[i]
+            if point.get('display_estimated') is not True:
+                continue
+            t = (frames[i]['media_ms']-start)/(stop-start)
+            x, y = point['display_ground']
+            if abs(x - (ax + t*(bx-ax))) > tolerance_x or abs(y - (ay + t*(by-ay))) > tolerance_y:
+                return False
     return True
 
 
