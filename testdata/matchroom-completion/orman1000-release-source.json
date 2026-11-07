@@ -482,5 +482,39 @@
     "initial_44_targeted_tests_passed": true,
     "initial_tests_run_id": 42330868248,
     "note": "A prior approved assist, 13/13 near-matching visual frames and six aligned player taps support comparison but do not prove the exact hidden finishing contact or approve person role transfer. A separate role review is mandatory before any correction."
+  },
+  "owner_selection_near_third_assist": {
+    "original_video_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2",
+    "owner_selected_source_time_ms": 51180,
+    "owner_selected_box": [
+      0.1102,
+      0.4724,
+      0.0759,
+      0.0969
+    ],
+    "owner_tapped_point": [
+      0.16192537621109052,
+      0.5216450216450216
+    ],
+    "source_observation_frame_id": "s000051181",
+    "source_observation_time_ms": 51181,
+    "source_observation_box": [
+      0.1102,
+      0.4724,
+      0.0759,
+      0.0969
+    ],
+    "source_observation_identity_status": "CONFIRMED",
+    "source_observation_foot_point": [
+      0.17,
+      0.567
+    ],
+    "original_owner_anchor_count": 10,
+    "same_source_owner_box_exactly_matches_source_observation_box": true,
+    "time_difference_ms": 1,
+    "historical_model_person_ids_transferred": false,
+    "source_player_identity_connection_supported_at_51181": true,
+    "does_not_independently_prove_50648_finish_or_recipient": true,
+    "proof_scope": "A human-selected identity reference at 51.18 and a matching saved source observation one millisecond later. Continuity through occlusion and a separate white finisher remain unproven."
   }
 }
