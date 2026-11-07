@@ -626,5 +626,37 @@
     "interpretation": "These are distinct measurement definitions; source product intentionally excludes assists from published key passes. Do not mislabel zero other key passes as missing three assists.",
     "publication_preview_verified_without_new_model_calls": true,
     "production_changed": false
+  },
+  "exact_original_video_white_finisher_claim_rejection": {
+    "context": "Exact latest Orman1000 source MP4, original BGR frame hashes verified at PTS 50331 and 50648; blue/green pixels cannot be relabelled white from a text field.",
+    "source_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2",
+    "source_frame_pixel_hashes": {
+      "s000050331": "4c1daa279d50b4a447c9406e1b25f6ff0f0f34dfbe4880372dfbdf983ddf92b1",
+      "s000050648": "ba5d26a54b40fec01d29fa02a53d8ec51c5e5d246ff50c6ade8d33e8953be9f3"
+    },
+    "synthetic_source_early_box": [
+      0.32,
+      0.46,
+      0.09,
+      0.1
+    ],
+    "synthetic_source_late_box": [
+      0.335,
+      0.47,
+      0.08,
+      0.095
+    ],
+    "light_kit_pixel_fraction_50331": 0.215582,
+    "light_kit_pixel_fraction_50648": 0.047338,
+    "required_fraction": 0.1,
+    "fake_kit_label_rejected_on_original_video": true,
+    "human_white_finisher_identity_confirmed": false,
+    "source_foot_contact_measured": false,
+    "model_calls": 0,
+    "release_gate_paths": [
+      "backend/orman1000_role_pixel_gate.py",
+      "backend/scripts/check_orman1000_release_readiness.py",
+      "backend/scripts/finalize_orman1000_review_candidate.py"
+    ]
   }
 }
