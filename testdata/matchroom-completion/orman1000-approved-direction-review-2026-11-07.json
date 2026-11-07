@@ -1,0 +1,47 @@
+{
+  "review_id": "owner-approved-direction-20261107",
+  "status": "OWNER_APPROVED_DIRECTION",
+  "event_id": "47ad617d2ba76a4683cd",
+  "source_video_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2",
+  "reference_ms": 49665,
+  "start_ms": 49881,
+  "end_ms": 50315,
+  "direction": [
+    [
+      0.4444444444444444,
+      0.575
+    ],
+    [
+      0.5111111111111111,
+      0.5625
+    ]
+  ],
+  "approval_scope": "USER_CONFIRMED_ILLUSTRATED_PASS_DIRECTION_AND_PLAYER_CONTINUITY",
+  "timing_basis": "WITHIN_ACCEPTED_RELEASE_SEQUENCE_STOP_BEFORE_FINISHING_CONTACT",
+  "reference_points_are": "ILLUSTRATIVE_DIRECTION_NOT_MEASURED_BALL_ENDPOINTS",
+  "method": "REVIEWED_DIRECTION_BACKGROUND_AFFINE",
+  "is_measured_ball_trajectory": false,
+  "validation": {
+    "verdict": "PASS_OWNER_APPROVED_DIRECTION_PLAYBACK",
+    "source_frames": 27,
+    "source_window_ms": [
+      49881,
+      50315
+    ],
+    "regression_pts": 1080,
+    "existing_graphics_unchanged": true,
+    "backend_tests_passed": 229,
+    "node_tests_passed": 5,
+    "diagnostic_video_visually_reviewed": true,
+    "full_browser_render_test": false,
+    "output_sha256": "5b92559f253c663d393de8000010dd7705ad1c6653c89f5838ea14e478c953dc",
+    "measured_ball_path_approved": false,
+    "new_semantic_model_calls": 0
+  },
+  "notes": [
+    "Owner approved the illustrated direction and selected-player continuity, not measured per-frame ball endpoints.",
+    "Actual source frames, background camera transforms and fresh person masks bind the approved illustration to playback.",
+    "Ends before the accepted finishing-contact interval.",
+    "No change to event approval, source observations or report release flag. No merge or deployment."
+  ]
+}

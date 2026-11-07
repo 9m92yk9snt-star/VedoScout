@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState, useId } from 'react';
 import { flushSync } from 'react-dom';
 import { Play, Pause, X, RotateCcw } from 'lucide-react';
-import { roomFor, graphicsAt, depthAt, ballAt, clipArrowToFrame } from './matchRoomModel';
+import { roomFor, graphicsAt, depthAt, ballAt, reviewedDirectionAt, clipArrowToFrame } from './matchRoomModel';
 import './matchroom.css';
 const clock = ms => `${String(Math.floor(ms / 60000)).padStart(2, '0')}:${String(Math.floor(ms / 1000) % 60).padStart(2, '0')}`;
 export function MatchRoomPlayer({
@@ -48,7 +48,7 @@ export function MatchRoomPlayer({
   const mark = candidate?.sourceFrameContour && !sourceAligned ? null : candidate;
   const id = useId().replace(/:/g, '');
   const depth = depthAt(mark, frameAt ?? at, !playing || (frameAt != null && mark?.sourceFrameContour));
-  const movingArrow = sourceAligned ? ballAt(room, frameAt) : null;
+  const movingArrow = sourceAligned ? (reviewedDirectionAt(room, frameAt) || ballAt(room, frameAt)) : null;
   const ellipsePolygons = depth ? [...depth.polygons,
     ...(movingArrow?.foreground?.media_ms === depth.media_ms ? movingArrow.foreground.polygons : [])] : [];
   const arrowSource = movingArrow || (depth && mark?.ballTrail ? {...mark, foreground: depth, opacity: 1} : null);
@@ -196,10 +196,11 @@ export function MatchRoomPlayer({
             <ellipse cx={(mark.ellipseGround || mark.ground)[0] * 1000} cy={Math.min(1, mark.ground[1]) * yScale} rx={(mark.ellipseRadius ?? mark.player_width * .7) * 1000} ry={mark.player_width * 135} fill="#62ed7b" fillOpacity=".18" stroke="#91ffa3" strokeOpacity=".92" strokeWidth="2" vectorEffect="non-scaling-stroke" />
           </g>}
         </g>
-        {arrow && <g data-testid="match-room-ball-arrow" data-source-ms={arrow.media_ms} mask={`url(#ball-people-${id})`} opacity={arrow.opacity}>
-          <line x1={arrow.ballTrail[0][0] * 1000} y1={arrow.ballTrail[0][1] * yScale} x2={arrow.ballTrail[1][0] * 1000} y2={arrow.ballTrail[1][1] * yScale} stroke={`url(#pass-${id})`} strokeWidth="2" strokeLinecap="round" vectorEffect="non-scaling-stroke" markerEnd={`url(#arrow-${id})`} />
+        {arrow && <g data-testid="match-room-ball-arrow" data-source-ms={arrow.media_ms} data-reviewed-direction={arrow.reviewedDirection ? "true" : undefined} mask={`url(#ball-people-${id})`} opacity={arrow.opacity}>
+          <line x1={arrow.ballTrail[0][0] * 1000} y1={arrow.ballTrail[0][1] * yScale} x2={arrow.ballTrail[1][0] * 1000} y2={arrow.ballTrail[1][1] * yScale} stroke={`url(#pass-${id})`} strokeWidth="2" strokeDasharray={arrow.reviewedDirection ? "5 5" : undefined} strokeLinecap="round" vectorEffect="non-scaling-stroke" markerEnd={`url(#arrow-${id})`} />
         </g>}
       </svg>}
+      {arrow?.reviewedDirection && <div className="mr-kicker" style={{position:"absolute",top:12,left:12,background:"#111c",padding:"6px 10px",borderRadius:8}}>Reviewed pass direction</div>}
       {stop && !done && <div className="mr-caption"><span className="mr-kicker">{skill?.label || stop.label} · {stop.phase === 'result' ? 'THE RESULT' : 'YOUR QUALITY'}</span><strong>{(stop.caption || observation).length > 170 ? (stop.caption || observation).slice(0, 167) + '…' : stop.caption || observation}</strong></div>}
     </div>
     <div className="mr-controls"><button type="button" onClick={() => {
