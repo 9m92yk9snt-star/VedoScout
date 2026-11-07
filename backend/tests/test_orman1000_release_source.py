@@ -234,3 +234,20 @@ def test_two_new_model_player_censuses_omit_old_approved_white_finisher():
     assert prior["people_in_approved_source_response"] == 9
     assert census["confirmed_systematic_cause"] is False
     assert census["production_automatic_correction_enabled"] is False
+
+
+def test_history_and_current_manual_anchor_regions_are_compatible_but_not_identity_proof():
+    evidence = load("orman1000-release-source.json")
+    align = evidence["historical_selected_player_anchor_region_alignment"]
+    assert align["prior_source_video_sha256"] != align["current_source_video_sha256"]
+    assert align["current_source_video_sha256"] == SOURCE
+    assert align["prior_human_selection_count"] == 10
+    assert align["current_human_selection_count"] == 10
+    assert align["exact_shared_media_ms"] == [3070, 15350, 21480, 27630, 33770, 55760]
+    assert align["exact_shared_media_ms_count"] == align["compatible_selection_regions"] == 6
+    assert -.01 < align["minimum_prior_point_margin_inside_current_box"] < 0
+    assert align["source_region_compatibility_only"] is True
+    assert align["independent_same_person_identity_across_full_footage_verified"] is False
+    assert align["finisher_or_foot_contact_verified"] is False
+    assert align["previous_p3_reassignment_allowed"] is False
+    assert align["model_calls"] == 0
