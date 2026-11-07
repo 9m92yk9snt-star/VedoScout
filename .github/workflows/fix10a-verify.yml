@@ -278,6 +278,8 @@ jobs:
         run: |
           npm install --global yarn@1.22.22
           yarn install --non-interactive
+      - name: Verify reviewed directions and exact-frame ellipse display
+        run: node --test frontend/tests/matchRoomEllipse.test.cjs frontend/tests/matchRoomReviewedDirection.test.cjs
       - name: Verify analysis polling and incomplete evidence display
         run: |
           node frontend/scripts/audit-analysis-poll.cjs
