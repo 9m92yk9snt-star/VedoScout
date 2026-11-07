@@ -267,3 +267,28 @@ def test_owner_51s_tap_is_not_a_proof_of_distinct_50s_finisher():
     assert owner["historical_model_person_ids_transferred"] is False
     assert owner["does_not_independently_prove_50648_finish_or_recipient"] is True
     assert evidence["pending_role_signoff"]["separate_white_body_boxes_verified"] is False
+
+
+
+def test_eight_orman1000_matchrooms_do_not_conflate_completed_with_full_source_masks():
+    from match_room_coverage_audit import contour_budget_observation
+    evidence = load("orman1000-release-source.json")
+    data = evidence["latest_uploaded_orman1000_matchroom_contour_budget"]
+    assert data["source_video_sha256"] == SOURCE
+    assert data["report_tracking_status_all_eight"] == "COMPLETED"
+    assert len(data["cards"]) == 8
+    time_budget_count = 0
+    for card in data["cards"]:
+        audit = contour_budget_observation({
+            "contour_diagnostics": {
+                "windows": [{"status":status} for status in card["initial_windows"]]
+            },
+            "segments": [{"id":i} for i in range(card["segments"])],
+        })
+        assert audit["total_accepted_segments"] == card["segments"]
+        assert audit["source_frame_coverage_complete"] is None
+        if "TIME_BUDGET" in card["initial_windows"]:
+            time_budget_count += 1
+            assert audit["status"] == "INITIAL_WINDOW_TIME_BUDGET_REACHED"
+    assert time_budget_count == 6
+    assert data["initial_time_budget_windows_in_six_cards"] is True
