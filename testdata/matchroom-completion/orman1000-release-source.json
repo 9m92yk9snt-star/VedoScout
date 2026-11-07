@@ -60,7 +60,7 @@
     "Obtain user approval before merge or deploy"
   ],
   "production_cache_enabled": false,
-  "current_release_acceptance": "BLOCKED_REAL_ORMAN1000_DISTINCT_WHITE_FINISHER_SOURCE_REVIEW_PENDING",
+  "current_release_acceptance": "RELEASE_BLOCKED_PENDING_SOURCE_BOUND_PERSON_ROLE_RECONCILIATION_DESPITE_SAME_VIDEO_PLAY_CONFIRMED",
   "production_or_main_changes_allowed_without_user_approval": false,
   "actual_latest_zip_source_pts_audit": {
     "scope": "Raw source-bound mask samples at exact decoded original web-video PTS ±2ms; not a direct frontend acceptance or revised-model run",
@@ -437,6 +437,7 @@
     "model_local_prior_p3_transfer_allowed": false,
     "executable_candidate_finalizer": "backend/scripts/finalize_orman1000_review_candidate.py",
     "executable_release_gate": "backend/scripts/check_orman1000_release_readiness.py",
-    "finalizer_production_write_enabled": false
+    "finalizer_production_write_enabled": false,
+    "detailed_blocker_code": "BLOCKED_REAL_ORMAN1000_DISTINCT_WHITE_FINISHER_SOURCE_REVIEW_PENDING"
   }
 }
