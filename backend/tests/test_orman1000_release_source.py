@@ -108,7 +108,7 @@ def test_third_assist_is_explicit_release_block_not_unverified_score_rewrite():
     assert candidate["proof_ms"] == 49881
     assert candidate["currently_exported_as"] == "SHOT_GOAL"
     assert candidate["goal_scoring_actor_verified_by_independent_review"] is False
-    assert evidence["current_release_acceptance"] == "BLOCKED_USER_CONFIRMED_1_GOAL_3_ASSISTS_NOT_RECONCILED_WITH_EXPORT_2_GOALS_2_ASSISTS"
+    assert evidence["current_release_acceptance"] == "RELEASE_BLOCKED_PENDING_SOURCE_BOUND_PERSON_ROLE_RECONCILIATION_DESPITE_SAME_VIDEO_PLAY_CONFIRMED"
     assert evidence["production_cache_enabled"] is False
 
 
@@ -158,7 +158,7 @@ def test_older_approved_assist_and_current_orman1000_are_same_video_play_not_sam
     conflict = evidence["prior_model_conflict_at_50_seconds"]
     assert conflict["historical_reference"]["same_underlying_play_verified_by_perceptual_frame_matching"] is True
     assert conflict["historical_reference"]["independent_player_role_reconciliation_automatically_applied"] is False
-    assert "new model's p3" not in historical["verified_previous_receiver"]
+    assert "Orman1000-local p3, a blue opponent" in historical["verified_previous_receiver"]
     assert evidence["current_release_acceptance"].startswith("RELEASE_BLOCKED_")
 
 
