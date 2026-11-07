@@ -20,7 +20,7 @@ import {
 import { SnapshotsSection } from "./snapshots";
 import { MovementMapCard } from "./movement";
 import { PaceCard } from "./pace";
-import { VerifiedIdentityStrip } from "./verification";
+import { VerifiedIdentityStrip, EvidenceCoverageNotice } from "./verification";
 import { ParentValueMetricsCard } from "./parentmetrics";
 import { ParentsPackageSection } from "./parents";
 import { GrowYourGameSection } from "./growyourgame";
@@ -372,6 +372,8 @@ export default function PremiumReportV2({ report, assetBase, onDownloadPdf, down
         demo={!!report.demo}
         onClose={() => setProof(null)}
       />
+
+      <EvidenceCoverageNotice report={report} />
 
       {isMobile ? (
         <PremiumMobileCategories
