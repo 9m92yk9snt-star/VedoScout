@@ -132,6 +132,35 @@ def judge(original, candidate, role_review=None):
           and selected_rows[0].get("ground") == SELECTED_GROUND
           and selected_rows[0].get("ball") == SOURCE_BALL_AT_FINISH_MS,
           "ORIGINAL_ORMAN1000_PLAYER_AND_BALL_EVIDENCE_NOT_BOUND")
+    # A real owner-selected anchor exists only 533 ms later. It pins p1
+    # independently of the newer model's local name at the end of the play.
+    raw_anchors = original.get("raw_marker_anchors")
+    try:
+        while isinstance(raw_anchors, str):
+            raw_anchors = json.loads(raw_anchors)
+    except (TypeError, ValueError, json.JSONDecodeError):
+        raw_anchors = None
+    anchors = raw_anchors if isinstance(raw_anchors, list) else []
+    owner_refs = [a for a in anchors if isinstance(a, dict)
+                  and type(a.get("t")) in (float, int)
+                  and round(a["t"] * 1000) == 51180]
+    same_source_pose = [s for s in original_samples
+                        if s.get("frame_id") == "s000051181"
+                        and s.get("media_ms") == 51181]
+    check(len(anchors) == 10 and len(owner_refs) == 1
+          and len(same_source_pose) == 1,
+          "POST_CONTACT_OWNER_TAP_NOT_SOURCE_BOUND")
+    if len(owner_refs) == len(same_source_pose) == 1:
+        anchor, pose = owner_refs[0], same_source_pose[0]
+        b, point = anchor.get("box") or {}, anchor.get("target_point") or {}
+        rect = [b.get(k) for k in ("x", "y", "w", "h")]
+        px, py = point.get("x"), point.get("y")
+        check(pose.get("identity_status") == "CONFIRMED"
+              and pose.get("player_box") == rect
+              and all(type(z) in (int, float) for z in rect + [px, py])
+              and b["x"] <= px <= b["x"] + b["w"]
+              and b["y"] <= py <= b["y"] + b["h"],
+              "POST_CONTACT_P1_IDENTITY_CONTRADICTS_OWNER_TAP")
     review = role_review or {}
     check(review.get("source_video_sha256") == SOURCE
           and review.get("event_id") == TARGET,
