@@ -12,7 +12,10 @@ import zipfile
 from collections import Counter
 
 from orman1000_derived_consistency import check_consistency, FOLLOWUP_RUN
-from orman1000_role_spatial_gate import review_role_geometry
+from orman1000_role_spatial_gate import (
+    review_role_geometry, SELECTED_BODY_BOX, SELECTED_GROUND,
+    SELECTED_FRAME_ID, SOURCE_BALL_AT_FINISH_MS,
+)
 
 TARGET = "47ad617d2ba76a4683cd"
 SOURCE = "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2"
@@ -112,6 +115,22 @@ def judge(original, candidate, role_review=None):
               "MATCH_ROOM_CAUSAL_NARRATIVE_STALE")
         check(card.get("comment") == "Verified assist by the selected player.",
               "REPORT_COMMENT_STILL_SAYS_OWN_GOAL")
+    # Verify the selected player's original position and active ball directly
+    # from the SAME Orman1000 report at the actual source frame. The role
+    # reviewer cannot replace this with a fabricated p1 box.
+    original_card = [c for c in ((original.get("full_report") or {}).get("video_comments") or [])
+                     if c.get("event_id") == TARGET]
+    original_samples = ((original_card[0].get("match_room") or {}).get("samples") or []
+                        if len(original_card) == 1 else [])
+    selected_rows = [sample for sample in original_samples
+                     if sample.get("frame_id") == SELECTED_FRAME_ID
+                     and sample.get("media_ms") == 50648]
+    check(len(selected_rows) == 1
+          and selected_rows[0].get("identity_status") == "CONFIRMED"
+          and selected_rows[0].get("player_box") == SELECTED_BODY_BOX
+          and selected_rows[0].get("ground") == SELECTED_GROUND
+          and selected_rows[0].get("ball") == SOURCE_BALL_AT_FINISH_MS,
+          "ORIGINAL_ORMAN1000_PLAYER_AND_BALL_EVIDENCE_NOT_BOUND")
     review = role_review or {}
     check(review.get("source_video_sha256") == SOURCE
           and review.get("event_id") == TARGET,
