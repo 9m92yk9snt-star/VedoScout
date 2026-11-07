@@ -12,6 +12,7 @@ import zipfile
 from collections import Counter
 
 from orman1000_derived_consistency import check_consistency, FOLLOWUP_RUN
+from orman1000_role_spatial_gate import review_role_geometry
 
 TARGET = "47ad617d2ba76a4683cd"
 SOURCE = "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2"
@@ -125,6 +126,10 @@ def judge(original, candidate, role_review=None):
           "WHITE_FINISHER_SOURCE_PTS_NOT_REVIEWED")
     check(review.get("source_decoded_bgr_frame_sha256") == FINISHER_SOURCE_FRAME_HASHES,
           "WHITE_FINISHER_SOURCE_FRAME_BYTES_NOT_BOUND")
+    # The reviewed finisher must be a distinct current-video physical body,
+    # not just a new string ID with a copied source hash.
+    _, spatial_failures = review_role_geometry(review)
+    errors.extend(spatial_failures)
     errors.extend(check_consistency(original, candidate))
     return not errors, errors
 
