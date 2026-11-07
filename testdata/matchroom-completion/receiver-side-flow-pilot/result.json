@@ -1,0 +1,117 @@
+{
+  "source_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2",
+  "llm_calls": 0,
+  "arrow_approved": false,
+  "method": "Local pyramidal LK, nine points, forward-backward error under 1.5 px for at least five points; fixed seed 19px patch NCC >= .6. Exploratory thresholds, not calibrated ball verification. Lossless decoded frames.",
+  "forward": [
+    {
+      "ms": 49665,
+      "xy": [
+        479.5,
+        1103.0
+      ],
+      "status": "MANUAL_VISIBLE_SEED"
+    },
+    {
+      "ms": 49681,
+      "xy": [
+        474.0255126953125,
+        1101.356689453125
+      ],
+      "seed_patch_ncc": 0.9452834129333496,
+      "fb_error": 0.09343304485082626,
+      "status": "FLOW_CANDIDATE_NOT_BALL_PROOF"
+    },
+    {
+      "ms": 49698,
+      "xy": [
+        468.20751953125,
+        1098.473876953125
+      ],
+      "seed_patch_ncc": 0.890557050704956,
+      "fb_error": 0.1206875592470169,
+      "status": "FLOW_CANDIDATE_NOT_BALL_PROOF"
+    },
+    {
+      "ms": 49715,
+      "xy": [
+        462.13299560546875,
+        1095.10498046875
+      ],
+      "seed_patch_ncc": 0.8493316769599915,
+      "fb_error": 0.30036410689353943,
+      "status": "FLOW_CANDIDATE_NOT_BALL_PROOF"
+    },
+    {
+      "ms": 49731,
+      "xy": [
+        455.46380615234375,
+        1092.11865234375
+      ],
+      "seed_patch_ncc": 0.7678605318069458,
+      "fb_error": 0.3086208999156952,
+      "status": "FLOW_CANDIDATE_NOT_BALL_PROOF"
+    },
+    {
+      "ms": 49748,
+      "status": "STOP_FLOW_INCONSISTENT",
+      "valid_points": 2
+    }
+  ],
+  "backward": [
+    {
+      "ms": 50431,
+      "xy": [
+        371.0,
+        1060.0
+      ],
+      "status": "MANUAL_VISIBLE_SEED"
+    },
+    {
+      "ms": 50415,
+      "xy": [
+        374.85552978515625,
+        1061.4716796875
+      ],
+      "seed_patch_ncc": 0.9484988451004028,
+      "fb_error": 0.1666163206100464,
+      "status": "FLOW_CANDIDATE_NOT_BALL_PROOF"
+    },
+    {
+      "ms": 50398,
+      "xy": [
+        378.5477294921875,
+        1063.5047607421875
+      ],
+      "seed_patch_ncc": 0.9272679686546326,
+      "fb_error": 0.6886746883392334,
+      "status": "FLOW_CANDIDATE_NOT_BALL_PROOF"
+    },
+    {
+      "ms": 50381,
+      "xy": [
+        381.35833740234375,
+        1065.0509033203125
+      ],
+      "seed_patch_ncc": 0.6927741169929504,
+      "fb_error": 0.38377493619918823,
+      "status": "FLOW_CANDIDATE_NOT_BALL_PROOF"
+    },
+    {
+      "ms": 50365,
+      "xy": [
+        381.36444091796875,
+        1063.78466796875
+      ],
+      "seed_patch_ncc": 0.6396036744117737,
+      "fb_error": 0.4713751971721649,
+      "status": "FLOW_CANDIDATE_NOT_BALL_PROOF"
+    },
+    {
+      "ms": 50348,
+      "status": "STOP_FLOW_INCONSISTENT",
+      "valid_points": 3
+    }
+  ],
+  "backward_seed_scope": "User-directed pre-shot candidate visually localized at 50.431 s. Exact first receiving contact and player association not automatically verified."
+}
