@@ -276,6 +276,32 @@
     "direct_receipt_transfer_approved": false,
     "canonical_stats_mutated": false,
     "provider_model_calls": 0,
-    "hash_manifest": "testdata/matchroom-completion/orman1000-vs-prior-verified-play-hashes.json"
+    "hash_manifest": "testdata/matchroom-completion/orman1000-vs-prior-verified-play-hashes.json",
+    "original_human_anchor_sets_byte_identical": false,
+    "older_source_tap_times_seconds": [
+      3.07,
+      41.91,
+      71.01,
+      15.35,
+      21.48,
+      27.63,
+      33.77,
+      56.05,
+      55.76,
+      64.3
+    ],
+    "latest_orman1000_tap_times_seconds": [
+      3.07,
+      41.42,
+      70.6,
+      15.35,
+      21.48,
+      27.63,
+      33.77,
+      51.18,
+      55.76,
+      63.91
+    ],
+    "selection_policy": "Same physical gameplay frames are established, but the independent human-selected tap points/boxes/time instants differ, so neither the old model's selection identities nor frame masks can be copied into Orman1000. The two independent models both described selected white #15 and this must still be source-vetted."
   }
 }
