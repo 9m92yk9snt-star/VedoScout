@@ -13,6 +13,7 @@ from scripts.check_orman1000_release_readiness import (
 from orman1000_derived_consistency import (
     FOLLOWUP_RUN, NEUTRAL_RUN, STAT_DELTAS, REMOVE_IDS, ADD_IDS
 )
+from orman1000_review_provenance import make_resolution
 
 FIXTURE = (Path(__file__).resolve().parents[2] /
            "testdata/matchroom-completion/orman1000-real-21-event-review-fixture.json")
@@ -157,6 +158,13 @@ def hypothetical_review_only():
             "s000050648": [0.335, 0.47, 0.08, 0.095],
         },
     }
+    source_disputed = next(e for e in original["canonical_events"]["events"]
+                           if e["event_id"] == TARGET)
+    correction_provenance=make_resolution(source_disputed, review)
+    action["review_resolution"] = deepcopy(correction_provenance)
+    candidate["full_report"]["independent_action_review_trails"] = [
+        deepcopy(correction_provenance)
+    ]
     return original, candidate, review
 
 
@@ -222,6 +230,15 @@ def test_any_stale_field_foreign_source_or_unreviewed_white_finisher_blocks_rele
     bad = deepcopy(perfect)
     bad["full_report"]["action_timeline"][-1]["canonical_result"] = "SCORED"
     candidates.append((bad, role, "ACTION_TIMELINE_STILL_SHOWS_GOAL"))
+    bad = deepcopy(perfect)
+    bad["canonical_events"]["events"][-1]["review_resolution"]["source_model_original_action"] = "PASS"
+    candidates.append((bad, role, "INDEPENDENT_REVIEW_PROVENANCE_DOES_NOT_MATCH_SOURCE"))
+    bad = deepcopy(perfect)
+    bad["full_report"]["independent_action_review_trails"] = []
+    candidates.append((bad, role, "REPORT_INDEPENDENT_REVIEW_TRAIL_MISSING_OR_CHANGED"))
+    bad = deepcopy(perfect)
+    bad["canonical_events"]["events"][-1]["proof"]["receipts"] = []
+    candidates.append((bad, role, "ORIGINAL_CONTRADICTORY_MODEL_RECEIPTS_REWRITTEN"))
     bad = deepcopy(perfect)
     bad["full_report"]["video_comments"][0]["match_room"]["receiver_visual_id"] = "p1"
     candidates.append((bad, role, "MATCH_ROOM_RECIPIENT_NOT_SAME_VERIFIED_PERSON"))
