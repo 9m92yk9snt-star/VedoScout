@@ -550,5 +550,71 @@
     "latest_complete_full_ci_run": null,
     "details": "Source-role review and no-paid-model 00:08 completion checkpoint staging are isolated DRAFT-only controls. Full current-branch six-job CI still pending.",
     "production_write_allowed": false
+  },
+  "latest_uploaded_orman1000_matchroom_contour_budget": {
+    "scope": "READ_ONLY status facts from original latest ZIP match_room.tracking.contour_diagnostics.windows, not current PR replay",
+    "source_video_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2",
+    "report_tracking_status_all_eight": "COMPLETED",
+    "initial_time_budget_windows_in_six_cards": true,
+    "cards": [
+      {
+        "timestamp": "00:50",
+        "segments": 6,
+        "initial_windows": [
+          "TIME_BUDGET"
+        ]
+      },
+      {
+        "timestamp": "00:31",
+        "segments": 7,
+        "initial_windows": [
+          "TIME_BUDGET"
+        ]
+      },
+      {
+        "timestamp": "00:24",
+        "segments": 4,
+        "initial_windows": [
+          "SUPPORTED_SOURCE_OBSERVATIONS"
+        ]
+      },
+      {
+        "timestamp": "00:44",
+        "segments": 10,
+        "initial_windows": [
+          "TIME_BUDGET"
+        ]
+      },
+      {
+        "timestamp": "00:56",
+        "segments": 3,
+        "initial_windows": [
+          "TIME_BUDGET"
+        ]
+      },
+      {
+        "timestamp": "00:13",
+        "segments": 6,
+        "initial_windows": [
+          "TIME_BUDGET"
+        ]
+      },
+      {
+        "timestamp": "00:04",
+        "segments": 2,
+        "initial_windows": [
+          "SUPPORTED_SOURCE_OBSERVATIONS"
+        ]
+      },
+      {
+        "timestamp": "00:08",
+        "segments": 19,
+        "initial_windows": [
+          "TIME_BUDGET"
+        ]
+      }
+    ],
+    "interpretation": "Completed scheduler is NOT proof of full source mask coverage; TIME_BUDGET records an initial window limit even if later refinement recovered some pixels.",
+    "policy": "Expose only historical budget diagnostics. Never auto extend masks or infer absent player positions from status."
   }
 }
