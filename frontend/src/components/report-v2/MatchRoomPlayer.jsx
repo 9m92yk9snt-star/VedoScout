@@ -214,6 +214,11 @@ export function MatchRoomPlayer({
         if (video.current) video.current.playbackRate = next ? .5 : 1;
       }}>{slow ? '0.5×' : '1×'}</button></div>
     {room.tracks.some(rows => rows.some(row => row.display_estimated === true)) && <p className="mr-position-note">Player position between observations is estimated.</p>}
+    {raw?.match_room?.contour_processing_budget?.status === "INITIAL_WINDOW_TIME_BUDGET_REACHED" && (
+      <p className="mr-position-note" data-testid="match-room-contour-time-limit">
+        Some initial tracking passes reached their processing limit. Markings are shown only where supported by the video.
+      </p>
+    )}
     {error && <p role="alert">Video could not play. <button type="button" onClick={play}>Try again</button></p>}
     {done && <div className="mr-explanation" aria-live="polite"><span className="mr-kicker">WHAT TO TAKE FROM THIS</span><p>{observation}</p>{typeof skill?.next_level === 'string' && <p>{skill.next_level}</p>}<button type="button" onClick={restart}><RotateCcw size={16} /> Watch again</button></div>}
   </section>;
