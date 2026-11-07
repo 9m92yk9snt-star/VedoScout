@@ -48,7 +48,9 @@ def validate_projection(original_published,candidate,published):
         for source in original_rows:
             eid=source["event_id"]
             if eid!=TARGET:
-                check(indexed[eid].get("title")==source.get("title"),
+                # A missing/unexpected source action is an explicit
+                # release blocker, never an unhandled KeyError.
+                check(indexed.get(eid,{}).get("title")==source.get("title"),
                       "UNRELATED_PUBLICATION_ACTION_CHANGED:"+eid)
     view=pub.get("view") or {}
     by_label={x.get("label"):x.get("value") for x in (view.get("matchStats") or []) if isinstance(x,dict)}
