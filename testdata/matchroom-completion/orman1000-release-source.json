@@ -439,5 +439,30 @@
     "executable_release_gate": "backend/scripts/check_orman1000_release_readiness.py",
     "finalizer_production_write_enabled": false,
     "detailed_blocker_code": "BLOCKED_REAL_ORMAN1000_DISTINCT_WHITE_FINISHER_SOURCE_REVIEW_PENDING"
+  },
+  "historical_selected_player_anchor_region_alignment": {
+    "prior_source_video_sha256": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+    "current_source_video_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2",
+    "prior_human_selection_count": 10,
+    "current_human_selection_count": 10,
+    "exact_shared_media_ms": [
+      3070,
+      15350,
+      21480,
+      27630,
+      33770,
+      55760
+    ],
+    "exact_shared_media_ms_count": 6,
+    "compatible_selection_regions": 6,
+    "minimum_prior_point_margin_inside_current_box": -0.004132,
+    "tolerance_for_minor_crop_margin": 0.01,
+    "source_region_compatibility_only": true,
+    "independent_same_person_identity_across_full_footage_verified": false,
+    "finisher_or_foot_contact_verified": false,
+    "previous_p3_reassignment_allowed": false,
+    "evidence": "testdata/sequence-pilot-orman400/anchors.json versus latest Orman1000 ZIP anchors.json (exact manually selected source PTS; no model predictions)",
+    "comparator": "backend/scripts/compare_orman500_orman1000_selected_anchors.py",
+    "model_calls": 0
   }
 }
