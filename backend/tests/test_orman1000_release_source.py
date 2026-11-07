@@ -251,3 +251,19 @@ def test_history_and_current_manual_anchor_regions_are_compatible_but_not_identi
     assert align["finisher_or_foot_contact_verified"] is False
     assert align["previous_p3_reassignment_allowed"] is False
     assert align["model_calls"] == 0
+
+def test_owner_51s_tap_is_not_a_proof_of_distinct_50s_finisher():
+    evidence = load("orman1000-release-source.json")
+    owner = evidence["owner_selection_near_third_assist"]
+    assert owner["original_video_sha256"] == SOURCE
+    assert owner["owner_selected_source_time_ms"] == 51180
+    assert owner["source_observation_time_ms"] == 51181
+    assert owner["time_difference_ms"] == 1
+    assert owner["source_observation_frame_id"] == "s000051181"
+    assert owner["owner_selected_box"] == owner["source_observation_box"]
+    assert owner["owner_tapped_point"] == [0.16192537621109052,0.5216450216450216]
+    assert owner["original_owner_anchor_count"] == 10
+    assert owner["same_source_owner_box_exactly_matches_source_observation_box"] is True
+    assert owner["historical_model_person_ids_transferred"] is False
+    assert owner["does_not_independently_prove_50648_finish_or_recipient"] is True
+    assert evidence["pending_role_signoff"]["separate_white_body_boxes_verified"] is False
