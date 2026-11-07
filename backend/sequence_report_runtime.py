@@ -447,6 +447,11 @@ def render_assets(video, full, bundle, directory, anchors=None):
             row["match_room"]["tracking_status"] = tracking_status if event['event_id'] in tracks else 'NO_TRACK_INPUT'
             row["match_room"]["tracking"] = tracks.get(event["event_id"])
             tracked = tracks.get(event["event_id"]) or {}
+            # Scheduler completion records task termination, not full visual
+            # source-frame coverage. Preserve the distinction as read-only
+            # report metadata; never loosen contour or identity gates.
+            from match_room_coverage_audit import contour_budget_observation
+            row["match_room"]["contour_processing_budget"] = contour_budget_observation(tracked)
             observed = tracked.get("observed_samples")
             if isinstance(observed, list):
                 row["match_room"]["samples"] = observed
