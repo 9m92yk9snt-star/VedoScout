@@ -1,0 +1,205 @@
+{
+  "model_sha256": "8f9f94c258890ce739a6c2bbf9787827c571ce26796dd600d9c3e4cfb552f0d4",
+  "model": {
+    "repository": "https://huggingface.co/Dura-S/reco-yolo26s-football",
+    "revision": "d20231484951d4ebf3f9f2a7437aa922a4c1b395"
+  },
+  "llm_calls": 0,
+  "arrow_approved": false,
+  "frames": [
+    {
+      "media_ms": 49615,
+      "full_seconds": 1.5273102319997633,
+      "full": [
+        {
+          "xyxy": [
+            483.1363525390625,
+            1095.55615234375,
+            505.651123046875,
+            1118.814697265625
+          ],
+          "score": 0.59903484582901
+        }
+      ],
+      "roi_seconds": 1.5115900970004077,
+      "roi": []
+    },
+    {
+      "media_ms": 49665,
+      "full_seconds": 1.3272100590002083,
+      "full": [
+        {
+          "xyxy": [
+            468.4725341796875,
+            1091.2398681640625,
+            490.5836181640625,
+            1115.015625
+          ],
+          "score": 0.3207821249961853
+        }
+      ],
+      "roi_seconds": 1.3568538460003765,
+      "roi": []
+    },
+    {
+      "media_ms": 49715,
+      "full_seconds": 1.314412448999974,
+      "full": [],
+      "roi_seconds": 1.366510984999877,
+      "roi": []
+    },
+    {
+      "media_ms": 49765,
+      "full_seconds": 1.3597806890002175,
+      "full": [],
+      "roi_seconds": 1.4219747299994197,
+      "roi": []
+    },
+    {
+      "media_ms": 49815,
+      "full_seconds": 1.455590134999511,
+      "full": [],
+      "roi_seconds": 1.4190050600000177,
+      "roi": []
+    },
+    {
+      "media_ms": 49865,
+      "full_seconds": 1.3357652989998314,
+      "full": [],
+      "roi_seconds": 1.3133917859995563,
+      "roi": []
+    },
+    {
+      "media_ms": 49915,
+      "full_seconds": 1.2646406269996078,
+      "full": [],
+      "roi_seconds": 1.2787091419995704,
+      "roi": []
+    },
+    {
+      "media_ms": 49965,
+      "full_seconds": 1.3136292990002403,
+      "full": [],
+      "roi_seconds": 1.4149388529995122,
+      "roi": []
+    },
+    {
+      "media_ms": 50015,
+      "full_seconds": 1.371924840000247,
+      "full": [],
+      "roi_seconds": 1.9047725229993375,
+      "roi": []
+    },
+    {
+      "media_ms": 50065,
+      "full_seconds": 1.8910720720004974,
+      "full": [],
+      "roi_seconds": 1.6393792039998516,
+      "roi": []
+    },
+    {
+      "media_ms": 50115,
+      "full_seconds": 1.4205374650000522,
+      "full": [],
+      "roi_seconds": 1.9132819989999916,
+      "roi": []
+    },
+    {
+      "media_ms": 50165,
+      "full_seconds": 1.8665300770007889,
+      "full": [],
+      "roi_seconds": 1.6628902749998815,
+      "roi": []
+    },
+    {
+      "media_ms": 50215,
+      "full_seconds": 2.0440261190005913,
+      "full": [],
+      "roi_seconds": 1.4805944090003322,
+      "roi": []
+    },
+    {
+      "media_ms": 50265,
+      "full_seconds": 1.2796647080003822,
+      "full": [
+        {
+          "xyxy": [
+            219.95745849609375,
+            1080.7486572265625,
+            231.611083984375,
+            1095.33203125
+          ],
+          "score": 0.5300233960151672
+        }
+      ],
+      "roi_seconds": 1.2736014549991523,
+      "roi": []
+    },
+    {
+      "media_ms": 50315,
+      "full_seconds": 1.312835947000167,
+      "full": [],
+      "roi_seconds": 1.3161614539994844,
+      "roi": []
+    },
+    {
+      "media_ms": 50365,
+      "full_seconds": 1.4782499990005817,
+      "full": [],
+      "roi_seconds": 1.4004222579997077,
+      "roi": []
+    },
+    {
+      "media_ms": 50415,
+      "full_seconds": 1.3341833219992623,
+      "full": [],
+      "roi_seconds": 1.271615959999508,
+      "roi": []
+    },
+    {
+      "media_ms": 50465,
+      "full_seconds": 1.3224285020005482,
+      "full": [],
+      "roi_seconds": 1.6020392480004375,
+      "roi": []
+    },
+    {
+      "media_ms": 50515,
+      "full_seconds": 1.652119555000354,
+      "full": [],
+      "roi_seconds": 1.8733952109996608,
+      "roi": []
+    },
+    {
+      "media_ms": 50565,
+      "full_seconds": 1.7389895539999998,
+      "full": [],
+      "roi_seconds": 1.8490792869997676,
+      "roi": []
+    },
+    {
+      "media_ms": 50615,
+      "full_seconds": 1.5426129830002537,
+      "full": [],
+      "roi_seconds": 1.8521276350002154,
+      "roi": []
+    }
+  ],
+  "elapsed_seconds": 65.23282250000011,
+  "source_video_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2",
+  "input_note": "Decoded source frames saved as JPEG by cv2.imwrite; exploratory test, not lossless evaluation.",
+  "visual_review": [
+    {
+      "media_ms": 49615,
+      "classification": "MATCH_BALL_VISIBLE"
+    },
+    {
+      "media_ms": 49665,
+      "classification": "MATCH_BALL_VISIBLE"
+    },
+    {
+      "media_ms": 50265,
+      "classification": "REJECTED_NOT_ESTABLISHED_MATCH_BALL_NEAR_BLUE_PLAYER_BOOT"
+    }
+  ]
+}
