@@ -1,0 +1,87 @@
+{
+  "source_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2",
+  "llm_calls": 0,
+  "arrow_approved": false,
+  "method": "Local pyramidal LK, nine points, forward-backward error under 1.5 px for at least five points; fixed seed 19px patch NCC >= .6. Exploratory thresholds, not calibrated ball verification. Lossless decoded frames.",
+  "forward": [
+    {
+      "ms": 49665,
+      "xy": [
+        479.5,
+        1103.0
+      ],
+      "status": "MANUAL_VISIBLE_SEED"
+    },
+    {
+      "ms": 49681,
+      "xy": [
+        474.0255126953125,
+        1101.356689453125
+      ],
+      "seed_patch_ncc": 0.9452834129333496,
+      "fb_error": 0.09343304485082626,
+      "status": "FLOW_CANDIDATE_NOT_BALL_PROOF"
+    },
+    {
+      "ms": 49698,
+      "xy": [
+        468.20751953125,
+        1098.473876953125
+      ],
+      "seed_patch_ncc": 0.890557050704956,
+      "fb_error": 0.1206875592470169,
+      "status": "FLOW_CANDIDATE_NOT_BALL_PROOF"
+    },
+    {
+      "ms": 49715,
+      "xy": [
+        462.13299560546875,
+        1095.10498046875
+      ],
+      "seed_patch_ncc": 0.8493316769599915,
+      "fb_error": 0.30036410689353943,
+      "status": "FLOW_CANDIDATE_NOT_BALL_PROOF"
+    },
+    {
+      "ms": 49731,
+      "xy": [
+        455.46380615234375,
+        1092.11865234375
+      ],
+      "seed_patch_ncc": 0.7678605318069458,
+      "fb_error": 0.3086208999156952,
+      "status": "FLOW_CANDIDATE_NOT_BALL_PROOF"
+    },
+    {
+      "ms": 49748,
+      "status": "STOP_FLOW_INCONSISTENT",
+      "valid_points": 2
+    }
+  ],
+  "backward": [
+    {
+      "ms": 50648,
+      "xy": [
+        392.0,
+        1036.0
+      ],
+      "status": "MANUAL_VISIBLE_SEED"
+    },
+    {
+      "ms": 50631,
+      "xy": [
+        374.0361328125,
+        1039.778564453125
+      ],
+      "seed_patch_ncc": 0.900006890296936,
+      "fb_error": 0.2896903455257416,
+      "status": "FLOW_CANDIDATE_NOT_BALL_PROOF"
+    },
+    {
+      "ms": 50615,
+      "status": "STOP_FLOW_INCONSISTENT",
+      "valid_points": 0
+    }
+  ],
+  "backward_seed_scope": "Visible ball during finishing phase, NOT a verified reception contact."
+}
