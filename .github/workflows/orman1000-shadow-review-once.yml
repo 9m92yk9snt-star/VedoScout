@@ -1,0 +1,38 @@
+name: Source-bound Orman1000 shadow review projection and proof parity
+on:
+  pull_request:
+    types: [synchronize]
+    paths:
+      - '.github/workflows/orman1000-shadow-review-once.yml'
+permissions:
+  contents: read
+jobs:
+  run_shadow_only:
+    if: >-
+      github.repository == '9m92yk9snt-star/VedoScout' &&
+      github.event.pull_request.number == 59 &&
+      github.event.pull_request.draft == true &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.head.ref == 'codex/matchroom-window-geometry-reuse' &&
+      github.event.before == 'e92bf7909bf2ceb3238819d2584ca9fa1f90ec37' &&
+      github.run_attempt == 1
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      PYTHONPATH: backend
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install only offline pytest dependencies
+        run: |
+          python -m pip install 'pytest==9.0.3' 'python-dotenv==1.2.2'
+      - name: Assert no-model deterministic report projection and source-gate contracts
+        run: |
+          python -m py_compile backend/orman1000_derived_consistency.py backend/scripts/build_orman1000_review_shadow.py
+          python -m pytest -q backend/tests/test_orman1000_release_gate.py backend/tests/test_orman1000_review_shadow.py backend/tests/test_orman1000_adjudication_preview.py backend/tests/test_orman1000_release_source.py
