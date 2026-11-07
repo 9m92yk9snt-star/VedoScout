@@ -1,0 +1,21 @@
+{
+  "scope": "Exact BGR decoded pixel SHA-256 hashes of seven actual source media PTS, no model/identity inference",
+  "source_zip_sha256": "3b27260511ed965952a497f97d1c6345a0f1b4bef1b89a60912a62e0f6530c0c",
+  "source_video_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2",
+  "source_video_pixels": "1920 rows x 1080 columns x 3 BGR channels",
+  "frame_time_authority": "OpenCV CAP_PROP_POS_MSEC after grab",
+  "decode_method": "OpenCV 4.x, source video MP4 raw frame.tobytes(), no reencode, colorspace BGR",
+  "pts_frame_sha256": {
+    "49715": "7bfd5ad0f2a94aa5816da583cf8fdec27001a2e91f2aaa4b609413641e477ebe",
+    "49881": "b531a5643c5e511a29048b49df639735888caf6c23be4738e896e8bdaf4d117b",
+    "50081": "c7e0064e0717b49bbc144d7a9585b4d824892613b46a317f8b97ffe9101debb1",
+    "50331": "4c1daa279d50b4a447c9406e1b25f6ff0f0f34dfbe4880372dfbdf983ddf92b1",
+    "50431": "88535063c088444081e8ebcc3942e0fb289625e0f5b1f5f612436b07271ddb62",
+    "50648": "ba5d26a54b40fec01d29fa02a53d8ec51c5e5d246ff50c6ade8d33e8953be9f3",
+    "51131": "623a4b21e6c853b3a9af61e7f75b9066c63c1bfa8c94bca62609d467834a65e9"
+  },
+  "role_evidence_status": "NOT_YET_VERIFIED",
+  "usage": "Bind any human finisher-role annotation to the exact frames; hash match is source integrity, not proof of who touched the ball",
+  "original_image_bytes_unmodified": true,
+  "model_calls": 0
+}
