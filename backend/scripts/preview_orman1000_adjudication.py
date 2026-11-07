@@ -37,7 +37,8 @@ def propose(bundle, previous, manifest, archive_sha):
     if (match.get("run_id") != 42315757175
             or match.get("source_sha256") != source
             or match.get("historical_source_sha256") != previous["source_video_sha256"]
-            or match.get("visual_near_matches") != match.get("total_target_frames") != 13):
+            or match.get("visual_near_matches") != 13
+            or match.get("total_target_frames") != 13):
         raise ValueError("SAME_SCENE_EVIDENCE_NOT_VERIFIED")
     # Do not confuse "same scene" with an exact source receipt: both remain
     # distinct and the older p3 cannot be the current model's blue p3.
