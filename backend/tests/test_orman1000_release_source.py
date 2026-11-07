@@ -187,3 +187,23 @@ def test_prior_approved_assist_receipt_actor_and_finisher_are_two_distinct_peopl
     # Previous local p3 is a white finisher. New model local p3 is BLUE.
     assert "white-kit teammate" in next(p["appearance"] for p in
             prior["result"]["raw_observations"]["players"] if p["person_id"] == "p3")
+
+
+def test_current_50s_goal_bracket_cannot_prove_single_player_contact():
+    evidence = load("orman1000-release-source.json")
+    conflict = evidence["current_50s_contact_role_bracket_conflict"]
+    assert conflict["current_source_video_sha256"] == SOURCE
+    assert conflict["current_source_event_id"] == "47ad617d2ba76a4683cd"
+    a = conflict["current_model_goal_contact_bracket_ms"]
+    b = conflict["prior_approved_selected_player_pass_ms"]
+    c = conflict["prior_approved_separate_white_teammate_finishing_contact_ms"]
+    assert (a, b, c) == ([49881, 50648], [49715, 50081], [50331, 50648])
+    overlap = lambda x, y: max(0, min(x[1],y[1]) - max(x[0],y[0]))
+    assert overlap(a, b) == conflict["current_contact_bracket_overlap_with_prior_selected_pass_ms"] == 200
+    assert overlap(a, c) == conflict["current_contact_bracket_overlap_with_prior_distinct_finish_ms"] == 317
+    assert conflict["underlying_play_verified_13_of_13_frames"] is True
+    assert conflict["old_p3_role"] == "WHITE_TEAMMATE_FINISHER"
+    assert conflict["orman1000_p3_role"] == "BLUE_OPPONENT"
+    assert conflict["copied_actor_ids_across_runs"] is False
+    assert conflict["live_canonical_event_modified"] is False
+    assert conflict["role_mapping_status"].startswith("BLOCKED_")
