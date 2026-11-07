@@ -54,7 +54,16 @@ def real_source_derived_baseline():
         if event["event_id"] == FOLLOWUP_RUN:
             row["football_details"] = deepcopy(event["details"])
         timeline.append(row)
+    # Only a synthetic test document; the real ZIP has exactly ten manually
+    # selected source anchors, including the physical p1 box at 51.180 s.
+    owner_refs=[{"t":float(i+1), "box":{"x":.1,"y":.5,"w":.1,"h":.1},
+                 "target_point":{"x":.15,"y":.55}} for i in range(9)]
+    owner_refs.append({"t":51.18,
+                       "box":{"x":.1102,"y":.4724,"w":.0759,"h":.0969},
+                       "target_point":{"x":.16192537621109052,
+                                       "y":.5216450216450216}})
     report = {
+        "raw_marker_anchors":owner_refs,
         "canonical_events": {"source_video_sha256": SOURCE, "events": actions},
         "full_report": {
             "match_stats": {"observed_goals": 2, "observed_assists": 2,
@@ -85,6 +94,12 @@ def real_source_derived_baseline():
                         "ground": [0.257, 0.564],
                         "player_box": [0.177, 0.485, 0.103, 0.081],
                         "ball": [0.363, 0.539],
+                    }, {
+                        "frame_id": "s000051181", "media_ms": 51181,
+                        "identity_status": "CONFIRMED",
+                        "player_box": [0.1102, 0.4724, 0.0759, 0.0969],
+                        "ground": [0.17, 0.567],
+                        "ball": [0.964, 0.541],
                     }],
                 },
             }],
@@ -275,6 +290,18 @@ def test_any_stale_field_foreign_source_or_unreviewed_white_finisher_blocks_rele
     review = deepcopy(role)
     review["source_finisher_boxes"]["s000050648"] = [0.86, 0.88, 0.12, 0.12]
     candidates.append((deepcopy(perfect), review, "FINISHER_BODY_NOT_TEMPORALLY_LINKED"))
+    bad = deepcopy(original)
+    bad["raw_marker_anchors"] = bad["raw_marker_anchors"][:-1]
+    ok, reasons = judge(bad, perfect, role)
+    assert ok is False and "POST_CONTACT_OWNER_TAP_NOT_SOURCE_BOUND" in reasons
+    bad = deepcopy(original)
+    bad["raw_marker_anchors"][-1]["box"]["x"] = 0.2
+    ok, reasons = judge(bad, perfect, role)
+    assert ok is False and "POST_CONTACT_P1_IDENTITY_CONTRADICTS_OWNER_TAP" in reasons
+    bad = deepcopy(original)
+    bad["full_report"]["video_comments"][0]["match_room"]["samples"][1]["player_box"] = [0.2,0.47,0.08,0.1]
+    ok, reasons = judge(bad, perfect, role)
+    assert ok is False and "POST_CONTACT_P1_IDENTITY_CONTRADICTS_OWNER_TAP" in reasons
     bad = deepcopy(original)
     bad["full_report"]["video_comments"][0]["match_room"]["samples"][0]["ball"] = [0.1, 0.1]
     ok, reasons = judge(bad, perfect, role)
