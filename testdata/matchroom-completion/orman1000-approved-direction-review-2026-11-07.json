@@ -21,7 +21,13 @@
   "reference_points_are": "ILLUSTRATIVE_DIRECTION_NOT_MEASURED_BALL_ENDPOINTS",
   "method": "REVIEWED_DIRECTION_BACKGROUND_AFFINE",
   "is_measured_ball_trajectory": false,
-  "validation": {
+  "notes": [
+    "Owner approved the illustrated direction and selected-player continuity, not measured per-frame ball endpoints.",
+    "Actual source frames, background camera transforms and fresh person masks bind the approved illustration to playback.",
+    "Ends before the accepted finishing-contact interval.",
+    "No change to event approval, source observations or report release flag. No merge or deployment."
+  ],
+  "historical_validation": {
     "verdict": "PASS_OWNER_APPROVED_DIRECTION_PLAYBACK",
     "source_frames": 27,
     "source_window_ms": [
@@ -38,10 +44,16 @@
     "measured_ball_path_approved": false,
     "new_semantic_model_calls": 0
   },
-  "notes": [
-    "Owner approved the illustrated direction and selected-player continuity, not measured per-frame ball endpoints.",
-    "Actual source frames, background camera transforms and fresh person masks bind the approved illustration to playback.",
-    "Ends before the accepted finishing-contact interval.",
-    "No change to event approval, source observations or report release flag. No merge or deployment."
-  ]
+  "validation": {
+    "verdict": "REJECTED_PLAYBACK_AFTER_USER_VISUAL_REVIEW",
+    "reason": [
+      "Arrow crossed legs",
+      "Arrow tip did not follow ball to white receiver"
+    ],
+    "direction_and_assist_approval_unchanged": true,
+    "frontend_blocks_rejected_or_unverified_playback": true,
+    "backend_tests_passed": 229,
+    "node_tests_passed": 5
+  },
+  "playback_status": "REJECTED"
 }

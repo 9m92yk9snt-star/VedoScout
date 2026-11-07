@@ -1,0 +1,24 @@
+{
+  "scope": "UNAPPROVED_MOVING_TIP_VISUAL_EXPERIMENT",
+  "source_video_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2",
+  "event_id": "47ad617d2ba76a4683cd",
+  "status": "NOT_APPROVED",
+  "source_frames": 26,
+  "visible_arrow_frames": 13,
+  "hidden_arrow_frames": 13,
+  "segmentation": "local medium model plus conservative non-grass protection in the leg band",
+  "motion": "Camera-compensated endpoint interpolation; NOT observed per-frame ball tracking",
+  "start_ms": 50015,
+  "end_ms": 50431,
+  "blockers": [
+    "Initial endpoint remains a detector candidate",
+    "Receiving role at final endpoint not independently localized",
+    "Interpolated tip cannot be certified as observed ball path"
+  ],
+  "production_integration": false,
+  "prior_static_direction_playback_rejected": true,
+  "source_observations_changed": false,
+  "assist_approval_changed": false,
+  "merge_or_deploy": false,
+  "trial_sha256": "bbefc1363117556573cd0b1d7265229b3116eef154dd8267fd97d4e04f9f05fa"
+}

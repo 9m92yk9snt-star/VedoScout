@@ -78,6 +78,6 @@ def build_reviewed_direction(video, event_id, source_sha256, review, deadline):
         if not rows or abs(rows[0]['media_ms']-start) > 2 or abs(rows[-1]['media_ms']-end) > 2:
             raise ValueError('REVIEWED_DIRECTION_INCOMPLETE')
         return {**review, 'method': 'REVIEWED_DIRECTION_BACKGROUND_AFFINE',
-                'is_measured_ball_trajectory': False, 'samples': rows}
+                'is_measured_ball_trajectory': False, 'playback_status': 'PENDING', 'samples': rows}
     finally:
         cap.release()
