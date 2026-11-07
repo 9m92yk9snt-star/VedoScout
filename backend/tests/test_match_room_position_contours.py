@@ -445,6 +445,20 @@ def test_orman1000_9433_source_endpoint_envelope_rejects_other_player_bridge():
     assert (frames,interval,observations,blue_boot,selected_player) == before
 
 
+def test_source_ground_switch_between_planted_feet_is_not_linear_motion():
+    frames=[{'media_ms':t} for t in [13266,13283,13299,13316,13333,13349,13366,13383]]
+    observations=[
+        {'media_ms':13266,'identity_status':'CONFIRMED','ground':[.226,.635],
+         'player_box':[.194,.441,.201,.196]},
+        {'media_ms':13383,'identity_status':'CONFIRMED','ground':[.385,.624],
+         'player_box':[.151,.435,.268,.199]}]
+    interval={'indices':list(range(8)), 'presentation_only':True}
+    display={i:{'display_ground':[.255,.628],'display_estimated':True} for i in range(1,7)}
+    assert localized.display_fits_source_bodies(frames,interval,display,observations)
+    display[6]['display_ground']=[.6,.628]
+    assert not localized.display_fits_source_bodies(frames,interval,display,observations)
+
+
 def test_hidden_foot_envelope_is_rejection_only_and_does_not_change_measured_track():
     stamps = [9383, 9400, 9416, 9433, 9450, 9466, 9483, 9500]
     frames = [{'media_ms':t} for t in stamps]

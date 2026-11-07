@@ -284,9 +284,12 @@ def display_fits_source_bodies(frames, interval, display, observations):
             point = display[i]
             if point.get('display_estimated') is not True:
                 continue
-            t = (frames[i]['media_ms']-start)/(stop-start)
             x, y = point['display_ground']
-            if abs(x - (ax + t*(bx-ax))) > tolerance_x or abs(y - (ay + t*(by-ay))) > tolerance_y:
+            # The two observations can select opposite planted feet during
+            # a stride. They bound a stance region, not a linearly moving
+            # single foot. Keep the estimate inside that source-bound region.
+            if (not min(ax,bx)-tolerance_x <= x <= max(ax,bx)+tolerance_x
+                    or not min(ay,by)-tolerance_y <= y <= max(ay,by)+tolerance_y):
                 return False
     return True
 
