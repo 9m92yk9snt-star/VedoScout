@@ -16,6 +16,7 @@ import zipfile
 from scripts.build_orman1000_review_shadow import review_only, SOURCE, ARCHIVE
 from scripts.check_orman1000_release_readiness import judge
 from orman1000_derived_consistency import TARGET
+from orman1000_review_provenance import make_resolution
 
 def reviewed_candidate(original, verified_role_review):
     # The role review is external evidence of a current-video separate white
@@ -32,6 +33,11 @@ def reviewed_candidate(original, verified_role_review):
     candidate=review_only(original)
     actions=candidate["canonical_events"]["events"]
     revised=next(e for e in actions if e["event_id"]==TARGET)
+    original_disputed=next(e for e in original["canonical_events"]["events"]
+                           if e["event_id"]==TARGET)
+    # Do NOT replace a contradictory source-model receipt. Append a separate,
+    # source-scoped adjudication trail identifying exactly what overrode it.
+    revised["review_resolution"]=make_resolution(original_disputed, role)
     revised["causal_chain"].update(
         receiver_visual_id=finisher, finisher_visual_id=finisher,
         target_contact_ms=None, goal_outcome_ms=51131,
@@ -68,6 +74,11 @@ def reviewed_candidate(original, verified_role_review):
     for row in parent.get("top_minutes") or []:
         if isinstance(row,dict) and "review proposal" in str(row.get("why","")).lower():
             row["why"]="The selected player contributed one goal and a source-reviewed direct assist."
+    # Separate review provenance from raw model receipts, preserving the
+    # difference between original model assertion and independent adjudication.
+    candidate["full_report"]["independent_action_review_trails"] = [
+        deepcopy(revised["review_resolution"])
+    ]
     ready, blockers=judge(original,candidate,role)
     if not ready:
         raise ValueError("UNPUBLISHED_ORMAN1000_CANDIDATE_NOT_READY:"+",".join(blockers))
