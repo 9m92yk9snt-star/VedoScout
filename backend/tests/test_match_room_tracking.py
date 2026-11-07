@@ -5,6 +5,67 @@ import tempfile
 import match_room_tracking as tracking
 
 
+def test_ball_completion_rejects_other_source_before_inference(monkeypatch):
+    import pytest
+    import match_room_ball_playback as ball
+    monkeypatch.setattr(ball, 'build_ball_playback', lambda *a, **kw: pytest.fail('foreign source reached inference'))
+    event = {'event_id':'e', 'source_video_sha256':'source',
+             'localization_method':'EXPLICIT_SOURCE_POSITIONS',
+             '_ball_completion':{'event_id':'e', 'source_video_sha256':'other'}}
+    with pytest.raises(ValueError, match='BALL_COMPLETION_SOURCE_MISMATCH'):
+        tracking.compute_refinement('video', [], [event], segmenter_kind='ball')
+
+
+def test_ball_completion_keeps_existing_bound_and_skips_person_refinement(monkeypatch):
+    import match_room_ball_playback as ball
+    import match_room_position_contours as contours
+    import pytest
+    seen = []
+    monkeypatch.setattr(contours, 'refinement_model', lambda: pytest.fail('unnecessary model loaded'))
+    def complete(video, event, rows, deadline, *, completed_segments):
+        seen.append((rows, completed_segments))
+        return completed_segments + [{'new':'measured'}], {'status':'COMPLETE', 'failures':[]}
+    monkeypatch.setattr(ball, 'build_ball_playback', complete)
+    event = {'event_id':'e', 'source_video_sha256':'source',
+             'localization_method':'EXPLICIT_SOURCE_POSITIONS',
+             '_refinement_budget_seconds':1000,
+             '_ball_completion':{'event_id':'e', 'source_video_sha256':'source',
+                                  'observed_samples':[{'source':'observed'}],
+                                  'ball_playback':[{'old':'measured'}]}}
+    before = deepcopy(event)
+    result = tracking.compute_refinement('video', [], [event], segmenter_kind='ball')
+    assert event == before
+    assert tracking._refinement_timeout([event], 'ball') == tracking.SOURCE_TIMEOUT_S
+    assert seen == [([{'source':'observed'}], [{'old':'measured'}])]
+    assert result['e']['ball_playback'] == [{'old':'measured'}, {'new':'measured'}]
+
+
+def test_scheduler_finishes_ball_only_without_replacing_complete_contours(monkeypatch):
+    event = {'event_id':'e','source_video_sha256':'source',
+             'localization_method':'EXPLICIT_SOURCE_POSITIONS','visual_samples':[{'media_ms':1}]}
+    previous = {'event_id':'e','source_video_sha256':'source',
+                'method':'SOURCE_OBSERVATION_INSTANCE_CONTOUR','segments':[{'id':'complete'}],
+                'observed_samples':[{'media_ms':1}], 'ball_playback':[{'old':'measured'}],
+                'ball_playback_diagnostics':{'status':'PARTIAL','failures':['BUDGET']}}
+    before=deepcopy(previous); calls=[]
+    monkeypatch.setattr(tracking,'missing_display_windows',lambda *a: [])
+    def worker(video, anchors, events, *, refinement=False):
+        calls.append(refinement)
+        if not refinement:return {'e':deepcopy(previous)},'COMPLETED'
+        assert refinement == 'ball'
+        assert 4 < events[0]['_refinement_budget_seconds'] <= tracking.SOURCE_TIMEOUT_S
+        return {'e':{'event_id':'e','source_video_sha256':'source',
+                     'ball_playback':[{'old':'measured'},{'new':'measured'}],
+                     'ball_playback_diagnostics':{'status':'COMPLETE','failures':[]}}},'COMPLETED'
+    monkeypatch.setattr(tracking,'_bounded_event',worker)
+    result,status=tracking.bounded_tracks('video',[],[event],reuse_predictions=False)
+    assert calls == [False,'ball']
+    assert result['e']['segments'] == previous['segments']
+    assert result['e']['ball_playback'] == [{'old':'measured'},{'new':'measured'}]
+    assert previous == before
+    assert status == 'COMPLETED'
+
+
 def test_initial_contours_reuse_weights_but_keep_every_window_and_reset_per_run(monkeypatch):
     import native_player_segmentation as native
     import match_room_position_contours as contours

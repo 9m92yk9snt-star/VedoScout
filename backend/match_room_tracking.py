@@ -441,6 +441,23 @@ def compute_refinement(video, anchors, events, checkpoint=None, segmenter_kind='
             temporary = Path(str(checkpoint)+'.tmp')
             temporary.write_text(json.dumps(output))
             temporary.replace(checkpoint)
+    if segmenter_kind == 'ball':
+        from match_room_ball_playback import build_ball_playback
+        for event in events[:1]:
+            previous = event.get('_ball_completion') or {}
+            if (previous.get('event_id') != event.get('event_id')
+                    or not event.get('source_video_sha256')
+                    or previous.get('source_video_sha256') != event['source_video_sha256']
+                    or event.get('localization_method') != 'EXPLICIT_SOURCE_POSITIONS'):
+                raise ValueError('BALL_COMPLETION_SOURCE_MISMATCH')
+            segments, diagnostic = build_ball_playback(
+                video, event, previous['observed_samples'], deadline,
+                completed_segments=previous.get('ball_playback') or [])
+            output[event['event_id']] = {
+                'event_id': event['event_id'], 'source_video_sha256': event['source_video_sha256'],
+                'ball_playback': segments, 'ball_playback_diagnostics': diagnostic}
+            save()
+        return output
     for event in events[:1]:
         if event.get('localization_method') != 'EXPLICIT_SOURCE_POSITIONS':
             continue
@@ -487,7 +504,7 @@ def _refinement_budget(events):
 def _refinement_timeout(events, kind):
     if kind == 'medium':
         return _refinement_budget(events)
-    if kind == 'small':
+    if kind in ('small', 'ball'):
         value = events[0].get('_refinement_budget_seconds', TIMEOUT_S) if events else TIMEOUT_S
         return max(4., min(float(value), SOURCE_TIMEOUT_S)) if finite(value) else TIMEOUT_S
     raise ValueError('UNSUPPORTED_REFINEMENT_MODEL')
@@ -662,6 +679,33 @@ def _bounded_tracks(video, anchors, events):
                                          refinement='medium')
         merge(event, previous, retried, 'medium')
         statuses.append(status)
+    # Finish only budget-interrupted ball masks using time left in the SAME
+    # refinement allowance. No new allowance and no repeated complete arrows.
+    for event in unique:
+        previous = output.get(event.get('event_id')) or {}
+        failures = (previous.get('ball_playback_diagnostics') or {}).get('failures') or []
+        if not any('BUDGET' in f for f in failures):
+            continue
+        remaining = refinement_deadline-time.monotonic()
+        if remaining <= 4:
+            break
+        if (event.get('localization_method') != 'EXPLICIT_SOURCE_POSITIONS'
+                or previous.get('source_video_sha256') != event.get('source_video_sha256')
+                or not previous.get('observed_samples')):
+            continue
+        request = {**event, '_refinement_budget_seconds': min(SOURCE_TIMEOUT_S, remaining),
+                   '_ball_completion': {k: previous.get(k) for k in
+                       ('event_id', 'source_video_sha256', 'observed_samples', 'ball_playback')}}
+        retried, status = _bounded_event(video, anchors, [request], refinement='ball')
+        statuses.append(status)
+        result = retried.get(event['event_id']) or {}
+        if (result.get('event_id') == event['event_id']
+                and result.get('source_video_sha256') == event['source_video_sha256']
+                and isinstance(result.get('ball_playback'), list)):
+            old = previous.get('ball_playback') or []
+            if all(s in result['ball_playback'] for s in old):
+                previous['ball_playback'] = result['ball_playback']
+                previous['ball_playback_diagnostics'] = result['ball_playback_diagnostics']
     if all(s == 'COMPLETED' for s in statuses):
         return output,'COMPLETED'
     if len(statuses) == 1:

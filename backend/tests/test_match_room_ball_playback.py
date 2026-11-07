@@ -132,3 +132,26 @@ def test_source_cache_limit_preserves_original_streaming_fallback(monkeypatch):
     assert calls == [0, 1, 2]
     assert len(sequences[0]['samples']) == 3
     assert not diagnostic['failures']
+
+
+def test_completed_segment_is_retained_without_repeating_inference(monkeypatch):
+    event, observations, calls = fixture(monkeypatch)
+    first, _ = playback.build_ball_playback('video', event, observations, time.monotonic()+10)
+    before = deepcopy(first)
+    calls.clear()
+    second, diagnostic = playback.build_ball_playback(
+        'video', event, observations, time.monotonic()+10, completed_segments=first)
+    assert second == first == before
+    assert calls == []
+    assert diagnostic == {'status': 'COMPLETE', 'failures': []}
+
+
+def test_other_reference_segment_does_not_suppress_real_source_work(monkeypatch):
+    event, observations, calls = fixture(monkeypatch)
+    first, _ = playback.build_ball_playback('video', event, observations, time.monotonic()+10)
+    first[0]['reference_frames'] = ['foreign', 'receive']
+    calls.clear()
+    second, _ = playback.build_ball_playback(
+        'video', event, observations, time.monotonic()+10, completed_segments=first)
+    assert calls == [0, 1, 2]
+    assert second[0]['reference_frames'] == ['release', 'receive']
