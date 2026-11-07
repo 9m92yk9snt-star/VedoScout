@@ -81,9 +81,8 @@ def test_unpublished_shadow_changes_only_disputed_event_and_followup_description
     assert result["full_report_status"] == "REVIEW_ONLY_NOT_PUBLISHED"
     meta = result["adjudication_preview"]
     assert meta["source_video_sha256"] == SOURCE
-    assert meta["current_source_finisher_verified"] is False if "current_source_finisher_verified" in meta else (
-        meta["source_local_receiver_visual_id"] is None
-    )
+    assert meta["source_local_receiver_visual_id"] is None
+    assert meta["published"] is False
     assert meta["new_provider_model_calls"] == 0
     events = result["canonical_events"]["events"]
     assert len(events) == 21
