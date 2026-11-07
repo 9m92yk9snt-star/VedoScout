@@ -51,6 +51,19 @@ def judge(original, candidate, role_review=None):
     check(before.get("canonical_action_type") == "SHOT"
           and before.get("canonical_outcome") == "GOAL", "ORIGINAL_DISPUTED_GOAL_CHANGED")
     check(action.get("source_video_sha256") == SOURCE, "DISPUTED_ACTION_SOURCE_CHANGED")
+    original_proof = before.get("proof") or {}
+    revised_proof = action.get("proof") or {}
+    check(original_proof.get("source_video_sha256") == SOURCE
+          and revised_proof.get("source_video_sha256") == SOURCE,
+          "DISPUTED_PROOF_VIDEO_SHA_CHANGED")
+    check((original_proof.get("frame_id"), original_proof.get("frame_ms")) ==
+          (revised_proof.get("frame_id"), revised_proof.get("frame_ms")) ==
+          ("s000049881", 49881),
+          "DISPUTED_PROOF_ANCHOR_CHANGED")
+    required_pts = {"s000050648": 50648, "s000051131": 51131}
+    frames = revised_proof.get("cited_frames") or {}
+    check(all(frames.get(k) == v for k, v in required_pts.items()),
+          "SOURCE_GOAL_OUTCOME_FRAMES_NOT_RETAINED")
     check((action.get("canonical_action_type"), action.get("canonical_event_type"),
            action.get("canonical_outcome")) == ("PASS", "ASSIST", "TEAMMATE_GOAL"),
           "DISPUTED_ACTION_NOT_RECLASSIFIED_AS_ASSIST")
