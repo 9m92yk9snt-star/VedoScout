@@ -78,6 +78,13 @@ def real_source_derived_baseline():
                 "match_room": {
                     "source_video_sha256": SOURCE,
                     "action_type": "SHOT", "action_outcome": "GOAL",
+                    "samples": [{
+                        "frame_id": "s000050648", "media_ms": 50648,
+                        "identity_status": "CONFIRMED",
+                        "ground": [0.257, 0.564],
+                        "player_box": [0.177, 0.485, 0.103, 0.081],
+                        "ball": [0.363, 0.539],
+                    }],
                 },
             }],
         },
@@ -251,6 +258,10 @@ def test_any_stale_field_foreign_source_or_unreviewed_white_finisher_blocks_rele
     review = deepcopy(role)
     review["source_finisher_boxes"]["s000050648"] = [0.86, 0.88, 0.12, 0.12]
     candidates.append((deepcopy(perfect), review, "FINISHER_BODY_NOT_TEMPORALLY_LINKED"))
+    bad = deepcopy(original)
+    bad["full_report"]["video_comments"][0]["match_room"]["samples"][0]["ball"] = [0.1, 0.1]
+    ok, reasons = judge(bad, perfect, role)
+    assert ok is False and "ORIGINAL_ORMAN1000_PLAYER_AND_BALL_EVIDENCE_NOT_BOUND" in reasons
     review = deepcopy(role)
     review["finisher_kit_observed"] = "BLUE"
     candidates.append((deepcopy(perfect), review, "FINISHER_WHITE_KIT_NOT_OBSERVED"))
