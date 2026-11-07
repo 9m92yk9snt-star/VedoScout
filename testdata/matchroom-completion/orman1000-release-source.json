@@ -60,7 +60,7 @@
     "Obtain user approval before merge or deploy"
   ],
   "production_cache_enabled": false,
-  "current_release_acceptance": "BLOCKED_USER_CONFIRMED_1_GOAL_3_ASSISTS_NOT_RECONCILED_WITH_EXPORT_2_GOALS_2_ASSISTS",
+  "current_release_acceptance": "RELEASE_BLOCKED_PENDING_SOURCE_BOUND_PERSON_ROLE_RECONCILIATION_DESPITE_SAME_VIDEO_PLAY_CONFIRMED",
   "production_or_main_changes_allowed_without_user_approval": false,
   "actual_latest_zip_source_pts_audit": {
     "scope": "Raw source-bound mask samples at exact decoded original web-video PTS ±2ms; not a direct frontend acceptance or revised-model run",
@@ -148,7 +148,7 @@
     "prior_review_date": "2026-10-19",
     "total_goals": 1,
     "total_assists": 3,
-    "original_video_sha256": "NOT_YET_RETRIEVED_FROM_ORIGINAL_ORMAN500_EVIDENCE",
+    "original_video_sha256": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
     "provenance": "Earlier user-approved model trial; this is a diagnostic regression reference, not a replacement Orman1000 video receipt",
     "chronological_actions": [
       {
@@ -184,7 +184,7 @@
       "current_orman1000_action": "SHOT",
       "current_orman1000_outcome": "GOAL",
       "earlier_verified_action": "ASSIST",
-      "status": "RECLASSIFICATION_REGRESSION_SUSPECTED_NOT_YET_SOURCE_RECONCILED"
+      "status": "SAME_UNDERLYING_PLAY_PROVEN_BY_13_PERCEPTUAL_FRAME_MATCHES_BUT_ACTOR_RECONCILIATION_NOT_APPLIED"
     },
     "required_reuse_policy": [
       "Do not pay for another model call to rediscover already documented source actions.",
@@ -192,7 +192,21 @@
       "Reuse only when source/checksum/event/player identity/timeframe evidence permits; otherwise treat historical result as reference, not authority to overwrite current source.",
       "Inspect the existing Orman1000 contact_review_006 receipt and event-to-causal-chain mapping at 49.881 sec; repair mapping/attribution only when evidence proves the pass and teammate finisher.",
       "Do not change scores, counters, source event, or report prose by fiat; all three assists and one goal must be independently supportable from the Orman1000 source."
-    ]
+    ],
+    "verified_previous_receipt_file": "docs/examples/native-third-assist-approval-receipt.json",
+    "verified_previous_receipt_response_sha256": "c1b78325895885002ccc58f036b0a29824406997108b12648f3805a46e0040ff",
+    "verified_previous_receipt_event_id": "369acbc54dce00fca4a7",
+    "verified_previous_receiver": "p3 (historical-model-local ID, white teammate; must NOT be conflated with Orman1000-local p3, a blue opponent)",
+    "verified_previous_finisher": "p3 (historical-model-local white teammate)",
+    "verified_previous_contact_interval_ms": [
+      49715,
+      50081
+    ],
+    "verified_previous_receiver_finish_interval_ms": [
+      50331,
+      50648
+    ],
+    "verified_previous_goal_outcome_ms": 51131
   },
   "prior_model_conflict_at_50_seconds": {
     "scope": "Not a mere report formatting/aggregation bug: two separate Orman1000 model receipts assert SHOT/GOAL by selected p1, contradicting previously verified Orman500 ASSIST at the corresponding play.",
@@ -229,12 +243,39 @@
         50065
       ],
       "earlier_assistant_review": "Three assists including this second assist confirmed in previous model trial",
-      "earlier_trial_raw_video_sha256": "NOT_RETRIEVED_YET",
-      "authority": "Previously verified reference; must be compared at video/frame identity before transferring conclusions"
+      "earlier_trial_raw_video_sha256": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+      "authority": "Previously verified reference; must be compared at video/frame identity before transferring conclusions",
+      "earlier_verified_receipt_file": "docs/examples/native-third-assist-approval-receipt.json",
+      "earlier_verified_response_sha256": "c1b78325895885002ccc58f036b0a29824406997108b12648f3805a46e0040ff",
+      "same_underlying_play_verified_by_perceptual_frame_matching": true,
+      "visual_frame_matching_source_run": "https://github.com/9m92yk9snt-star/VedoScout/actions/runs/42315757175",
+      "visual_frame_matching_results": "13/13 visual near-matches; 12/13 exact matching decoded PTS; remainder +16ms; frame whole and pitch-region pHash difference 0–2 bits",
+      "actor_id_scope_warning": "Historical p3 is a white finishing teammate; current Orman1000 p3 is a blue opponent. Never equate local person identifiers across runs.",
+      "independent_player_role_reconciliation_automatically_applied": false
     },
     "regression_classification": "MODEL_TO_MODEL_ACTION_ATTRIBUTION_DISAGREEMENT",
     "cause_not_yet_proven": true,
-    "next_safe_step": "Reconcile source-frame images, contact and selected-person/receiver/finisher identity from retained Orman500 evidence against latest Orman1000 ZIP. No new paid model inference or blind canonical score changes.",
+    "next_safe_step": "Preserve proven 13-frame same-scene link and prior approved p1-to-white-teammate direct assist; verify explicit source-bound actor role mapping before any targeted canonical event overwrite.",
     "production_fix_implemented": false
+  },
+  "cross_sha_perceptual_source_comparison": {
+    "source_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2",
+    "historical_source_sha256": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+    "action_window_ms": [
+      47765,
+      51515
+    ],
+    "match_count": 13,
+    "total_target_frames": 13,
+    "exact_decoded_pts_matches": 12,
+    "one_matched_pts_difference_ms": 16,
+    "visual_near_matches": 13,
+    "same_underlying_play_supported": true,
+    "run_id": 42315757175,
+    "details": "All 13 hashed action frames matched dynamically over exact source PTS; old and new video file hashes remain different. Previous model's p3 must not be assigned to new model's p3.",
+    "direct_receipt_transfer_approved": false,
+    "canonical_stats_mutated": false,
+    "provider_model_calls": 0,
+    "hash_manifest": "testdata/matchroom-completion/orman1000-vs-prior-verified-play-hashes.json"
   }
 }
