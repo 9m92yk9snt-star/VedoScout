@@ -137,6 +137,18 @@ def hypothetical_review_only():
         "current_source_finisher_visual_id": tested_role,
         "evidence_frames": ["s000050331", "s000050648"],
         "source_decoded_bgr_frame_sha256": deepcopy(FINISHER_SOURCE_FRAME_HASHES),
+        # SYNTHETIC boxes exercise only the geometry gate, not identification
+        # of a real white player in the uploaded match video.
+        "identity_review_method": "SOURCE_FRAME_PERSON_SEPARATION",
+        "finisher_kit_observed": "WHITE",
+        "finishing_contact_evidence": "OCCLUDED_BRACKETED",
+        "source_selected_player_frame_id": "s000050648",
+        "source_selected_player_box": [0.177, 0.485, 0.103, 0.081],
+        "source_selected_player_ground": [0.257, 0.564],
+        "source_finisher_boxes": {
+            "s000050331": [0.32, 0.46, 0.09, 0.10],
+            "s000050648": [0.335, 0.47, 0.08, 0.095],
+        },
     }
     return original, candidate, review
 
@@ -233,6 +245,18 @@ def test_any_stale_field_foreign_source_or_unreviewed_white_finisher_blocks_rele
     bad = deepcopy(perfect)
     bad["canonical_events"]["events"][-1]["causal_chain"]["finisher_visual_id"] = "p3"
     candidates.append((bad, role, "SOURCE_SCOPED_WHITE_FINISHER_NOT_BOUND"))
+    review = deepcopy(role)
+    review["source_finisher_boxes"]["s000050648"] = [0.18, 0.485, 0.103, 0.081]
+    candidates.append((deepcopy(perfect), review, "FINISHER_OVERLAPS_SELECTED_PLAYER"))
+    review = deepcopy(role)
+    review["source_finisher_boxes"]["s000050648"] = [0.86, 0.88, 0.12, 0.12]
+    candidates.append((deepcopy(perfect), review, "FINISHER_BODY_NOT_TEMPORALLY_LINKED"))
+    review = deepcopy(role)
+    review["finisher_kit_observed"] = "BLUE"
+    candidates.append((deepcopy(perfect), review, "FINISHER_WHITE_KIT_NOT_OBSERVED"))
+    review = deepcopy(role)
+    review["source_finisher_boxes"].pop("s000050648")
+    candidates.append((deepcopy(perfect), review, "FINISHER_TWO_SOURCE_FRAMES_REQUIRED"))
     review = deepcopy(role)
     review["source_decoded_bgr_frame_sha256"]["s000050331"] = "forged-frame"
     candidates.append((deepcopy(perfect), review, "WHITE_FINISHER_SOURCE_FRAME_BYTES_NOT_BOUND"))
