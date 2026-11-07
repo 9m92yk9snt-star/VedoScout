@@ -78,3 +78,55 @@ def test_ambiguous_forged_or_modified_source_evidence_blocks_adjudication(mutato
 def test_unverified_archive_digest_fails_closed():
     with pytest.raises(ValueError, match="UNBOUND_SOURCE_OR_PREVIOUS_RECEIPT"):
         propose(synthetic_source_bundle(), PRIOR, MANIFEST, "unknown-archive")
+
+
+def test_actual_orman1000_21_event_zip_fixture_only_previews_unpublished_1_goal_3_assists():
+    """Prove the preview contract using source-derived real event IDs, not fake IDs."""
+    import hashlib
+
+    path = MANIFEST_PATH.parent / "orman1000-real-21-event-review-fixture.json"
+    actual = json.loads(path.read_text())
+    source = MANIFEST["primary_evidence_archive"]["original_source_video_sha256_from_latest_archive"]
+    assert actual["video_source_sha256"] == source
+    assert actual["archive_sha256"] == MANIFEST["primary_evidence_archive"]["archive_sha256"]
+    assert actual["full_original_canonical_events_sha256"] == (
+        "94d6c73af3277d0d1036a0442ee8d002db27771a27b725e028c2966af205ec5a"
+    )
+    others = actual["other_20_events"]
+    assert len(others) == 20
+    assert all(e["source_video_sha256"] == source for e in others)
+    digest = hashlib.sha256(
+        json.dumps(others, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+    assert digest == actual["retained_other_20_identity_type_hash"]
+    current = deepcopy(actual["disputed_original"])
+    assert (current["canonical_ms"], current["canonical_event_type"],
+            current["causal_chain"]["finisher_visual_id"]) == (49881, "GOAL", "p1")
+    assert current["proof"]["cited_frames"]["s000051131"] == 51131
+    bundle = {"source_video_sha256": source, "events": [*deepcopy(others), current]}
+    original = deepcopy(bundle)
+    result = propose(bundle, PRIOR, MANIFEST, actual["archive_sha256"])
+    assert result["status"] == "REVIEW_PROPOSAL_NOT_PUBLISHED"
+    assert result["disputed_event_id"] == actual["disputed_original"]["event_id"]
+    assert result["exported_observed_counts"] == actual["current_exported_counts"]
+    assert result["proposed_observed_counts_if_approved"] == {"goals": 1, "assists": 3}
+    assert result["all_other_20_events_sha256"] == digest
+    assert result["previous_model_local_p3_role"] == "WHITE_TEAMMATE_FINISHER"
+    assert result["orman1000_model_local_p3_role"] == "BLUE_OPPONENT"
+    assert result["suggested_action"]["current_source_finisher_visual_id"] is None
+    assert result["suggested_action"]["current_source_receiver_visual_id"] is None
+    assert result["suggested_action"]["proposed_change_auto_approved"] is False
+    assert not result["canonical_event_overwritten"]
+    assert not result["report_or_database_written"]
+    assert result["new_paid_model_calls"] == 0
+    assert bundle == original
+
+    # A cross-video blue model-local ID is never proof of a white finisher.
+    wrong_person = deepcopy(bundle)
+    wrong_person["events"][-1]["proof"]["source_video_sha256"] = PRIOR["source_video_sha256"]
+    with pytest.raises(ValueError, match="DISPUTED_ORMAN1000_EVENT_CHANGED"):
+        propose(wrong_person, PRIOR, MANIFEST, actual["archive_sha256"])
+    wrong_receipt = deepcopy(bundle)
+    wrong_receipt["events"][-1]["proof"]["receipts"][0]["response_sha256"] = "not-validated"
+    with pytest.raises(ValueError, match="CURRENT_CONTRADICTORY_RECEIPT_CHANGED"):
+        propose(wrong_receipt, PRIOR, MANIFEST, actual["archive_sha256"])
