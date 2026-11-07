@@ -63,8 +63,8 @@ export function EvidenceCoverageNotice({ report }) {
     <div role="status" data-testid="v2-partial-source-coverage"
       className="mb-4 rounded-lg border border-[#CBD8C7] bg-[#F5F8F2] px-4 py-3 text-xs font-semibold text-[#26432E]">
       <span className="font-extrabold">Partial video coverage.</span>{" "}
-      This report summarizes observed actions in the analyzed footage.
-      It does not establish complete-match totals. Unresolved actions are not counted as verified.
+      This report covers only analyzed footage, not full-match totals.
+      Individual event classifications may still require review.
     </div>
   );
 }
