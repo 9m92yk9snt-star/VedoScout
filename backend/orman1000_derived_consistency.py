@@ -147,13 +147,16 @@ def check_consistency(original, candidate):
                 affected.get("football_action_type"),
                 affected.get("football_event_type"),
                 affected.get("football_outcome"),
+                affected.get("canonical_result"),
                 affected.get("title"),
                 affected.get("action_type")) != (
                 "PASS", "ASSIST", "PASS", "ASSIST",
-                "TEAMMATE_GOAL", "Assist", "pass"):
+                "TEAMMATE_GOAL", "TEAMMATE_SCORED", "Assist", "pass"):
             errors.append("ACTION_TIMELINE_STILL_SHOWS_GOAL")
         if affected.get("causal_chain") != (new_by_id.get(TARGET) or {}).get("causal_chain"):
             errors.append("ACTION_TIMELINE_CAUSAL_CHAIN_STALE")
+        if not isinstance(affected.get("football_details"), list) or not affected["football_details"]:
+            errors.append("ACTION_TIMELINE_ASSIST_EVIDENCE_TEXT_MISSING")
         if any(word in _stable(affected).lower() for word in (
                 "not a direct assist", "no teammate receives and shoots",
                 "this is a selected-player goal")):
