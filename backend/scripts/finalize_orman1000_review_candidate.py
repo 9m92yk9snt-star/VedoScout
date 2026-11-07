@@ -117,6 +117,11 @@ def main():
             raise ValueError("CORRUPTED_SOURCE_ARCHIVE")
         original=json.loads(archive.read("report.json"))
     verified=json.loads(args.verified_finisher_role.read_text())
+    # The input JSON alone is NOT source proof of white kit. Before creating a
+    # candidate, test both current-video physical person boxes on decoded
+    # original frames; this is offline verification only.
+    from orman1000_role_pixel_gate import validate_uploaded_archive_role
+    validate_uploaded_archive_role(args.original_zip, verified)
     output=reviewed_candidate(original,verified)
     args.new_output.parent.mkdir(parents=True,exist_ok=True)
     args.new_output.write_text(json.dumps(output,ensure_ascii=False,separators=(",",":")))
