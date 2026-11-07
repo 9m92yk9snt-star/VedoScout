@@ -53,7 +53,14 @@ def minimum_original():
                 canonical_event_type="GOAL",canonical_result="SCORED",
                 football_action_type="SHOT",football_event_type="GOAL",
                 football_outcome="GOAL",title="Goal")
+    owner_taps=[{"t":float(i+1),"box":{"x":.1,"y":.5,"w":.1,"h":.1},
+                 "target_point":{"x":.15,"y":.55}} for i in range(9)]
+    owner_taps.append({"t":51.18,
+                       "box":{"x":0.1102,"y":0.4724,"w":0.0759,"h":0.0969},
+                       "target_point":{"x":0.16192537621109052,
+                                       "y":0.5216450216450216}})
     baseline = {
+        "raw_marker_anchors":owner_taps,
         "canonical_events":{"source_video_sha256":SOURCE,"events":events},
         "full_report":{
             "action_timeline":timelines,
@@ -71,6 +78,12 @@ def minimum_original():
                                   "ground":[0.257,0.564],
                                   "player_box":[0.177,0.485,0.103,0.081],
                                   "ball":[0.363,0.539],
+                              },{
+                                  "frame_id":"s000051181","media_ms":51181,
+                                  "identity_status":"CONFIRMED",
+                                  "player_box":[0.1102,0.4724,0.0759,0.0969],
+                                  "ground":[0.17,0.567],
+                                  "ball":[0.964,0.541],
                               }]},
             }],
             "parent_value_metrics":{"top_minutes":[{
