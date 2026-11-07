@@ -17,6 +17,10 @@ TARGET = "47ad617d2ba76a4683cd"
 SOURCE = "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2"
 ARCHIVE = "3b27260511ed965952a497f97d1c6345a0f1b4bef1b89a60912a62e0f6530c0c"
 PRIOR_RECEIPT = "c1b78325895885002ccc58f036b0a29824406997108b12648f3805a46e0040ff"
+FINISHER_SOURCE_FRAME_HASHES = {
+    "s000050331": "4c1daa279d50b4a447c9406e1b25f6ff0f0f34dfbe4880372dfbdf983ddf92b1",
+    "s000050648": "ba5d26a54b40fec01d29fa02a53d8ec51c5e5d246ff50c6ade8d33e8953be9f3",
+}
 
 
 def stable(value):
@@ -119,6 +123,8 @@ def judge(original, candidate, role_review=None):
           "WHITE_FINISHER_ID_NOT_REVIEWED")
     check(review.get("evidence_frames") == ["s000050331", "s000050648"],
           "WHITE_FINISHER_SOURCE_PTS_NOT_REVIEWED")
+    check(review.get("source_decoded_bgr_frame_sha256") == FINISHER_SOURCE_FRAME_HASHES,
+          "WHITE_FINISHER_SOURCE_FRAME_BYTES_NOT_BOUND")
     errors.extend(check_consistency(original, candidate))
     return not errors, errors
 
