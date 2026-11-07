@@ -1,0 +1,1179 @@
+{
+  "source_video_sha256": "db97b9dc0e2cda68f6c4619405270006e7ab31eeb44e73bd7ed432b1a8d0de38",
+  "source_start_ms": 15400,
+  "source_end_ms": 17000,
+  "source_frames": [
+    {
+      "frame_id": "n000015400",
+      "media_ms": 15400,
+      "sha256": "2d3abb00e955ab4b5d2b77f1831edf15e9a5cfe5063a94f2d8277139bcb58783",
+      "source_crop_box": [
+        0,
+        750,
+        1080,
+        1290
+      ]
+    },
+    {
+      "frame_id": "n000015433",
+      "media_ms": 15433,
+      "sha256": "04ed9d90d641a4c8fab98b30925b20ab615ecdc8152a4fd2a9b2e77c2b578e24",
+      "source_crop_box": [
+        0,
+        750,
+        1080,
+        1290
+      ]
+    },
+    {
+      "frame_id": "n000015467",
+      "media_ms": 15467,
+      "sha256": "acbed5f58099f20b4fb0a32fb34edfabb81111d130158d906094c7924fe92548",
+      "source_crop_box": [
+        0,
+        750,
+        1080,
+        1290
+      ]
+    },
+    {
+      "frame_id": "n000015500",
+      "media_ms": 15500,
+      "sha256": "55779b25761207c5d1a8fdd57386b01693cd57b317e15416c360106fd0d66fd5",
+      "source_crop_box": [
+        0,
+        750,
+        1080,
+        1290
+      ]
+    },
+    {
+      "frame_id": "n000015533",
+      "media_ms": 15533,
+      "sha256": "e35d789c8e712a26735d0e16baf7793ad59f56cb1cfe1b088021fc0ebcb1a9f6",
+      "source_crop_box": [
+        0,
+        750,
+        1080,
+        1290
+      ]
+    },
+    {
+      "frame_id": "n000015567",
+      "media_ms": 15567,
+      "sha256": "2df2568874adf91454d5412a68214f4db689e77ef08cbf33904b9d8154c65975",
+      "source_crop_box": [
+        0,
+        750,
+        1080,
+        1290
+      ]
+    },
+    {
+      "frame_id": "n000015600",
+      "media_ms": 15600,
+      "sha256": "4497c00740e98179c8da974b9b1d53bb1f8b7f8b28c39d7f4fff1e7a912029c9",
+      "source_crop_box": [
+        0,
+        750,
+        1080,
+        1290
+      ]
+    },
+    {
+      "frame_id": "n000015633",
+      "media_ms": 15633,
+      "sha256": "2409f7e7e63dc4017bf9b76ef8b1e337667e1876b24dd17a623ce08ab5418100",
+      "source_crop_box": [
+        0,
+        750,
+        1080,
+        1290
+      ]
+    },
+    {
+      "frame_id": "n000015667",
+      "media_ms": 15667,
+      "sha256": "5d00f5d95d11ccf8b87df2701bde1d70cd820c879a41349e9b0e29e6ea7cf795",
+      "source_crop_box": [
+        0,
+        750,
+        1080,
+        1290
+      ]
+    },
+    {
+      "frame_id": "n000015700",
+      "media_ms": 15700,
+      "sha256": "3078dc77bcfc20b0180ddab01e67cfbee49d541baebd5c500c4fd787e1d0b255",
+      "source_crop_box": [
+        0,
+        750,
+        1080,
+        1290
+      ]
+    },
+    {
+      "frame_id": "n000015733",
+      "media_ms": 15733,
+      "sha256": "43ec579743234f0a9f189b843efddb533ef0e78b6ab9e52dcb749a2e43a30d98",
+      "source_crop_box": [
+        0,
+        750,
+        1080,
+        1290
+      ]
+    },
+    {
+      "frame_id": "n000015767",
+      "media_ms": 15767,
+      "sha256": "ee3a6b089fc337f0e84b978d0ff4c6245ec707a9416a9de2a5b3805f27823a89",
+      "source_crop_box": [
+        0,
+        750,
+        1080,
+        1290
+      ]
+    },
+    {
+      "frame_id": "n000015800",
+      "media_ms": 15800,
+      "sha256": "4003b6af0446beca6e5dfa26ea1302e5e14302c6c505c6f839ebf03ea2f4c298",
+      "source_crop_box": [
+        0,
+        750,
+        1080,
+        1290
+      ]
+    },
+    {
+      "frame_id": "n000015833",
+      "media_ms": 15833,
+      "sha256": "5ab537bde6eafdcb98d0686f9d61ef9dcb77eb6059ec3dfd5301664d9680049c",
+      "source_crop_box": [
+        0,
+        750,
+        1080,
+        1290
+      ]
+    },
+    {
+      "frame_id": "n000015867",
+      "media_ms": 15867,
+      "sha256": "e6d1f07d848ec6df1c5c49d4bf9f608a872d148ee264e08ff5f0271f7039a05c",
+      "source_crop_box": [
+        0,
+        750,
+        1080,
+        1290
+      ]
+    },
+    {
+      "frame_id": "n000015900",
+      "media_ms": 15900,
+      "sha256": "c22cf3b3ead37425357f4191833d4f3bc7f3f2baf8feaedfcced295830abaa02",
+      "source_crop_box": [
+        0,
+        750,
+        1080,
+        1290
+      ]
+    },
+    {
+      "frame_id": "n000015933",
+      "media_ms": 15933,
+      "sha256": "0137504e4c3d32293d7767757c954b45707ea5c622c3125a3a14a2e7a4d74793",
+      "source_crop_box": [
+        0,
+        750,
+        1080,
+        1290
+      ]
+    },
+    {
+      "frame_id": "n000015967",
+      "media_ms": 15967,
+      "sha256": "e73bae4592cf667e48542415628076ab4fac5d6876e3960a3ad995e0427ef0e6",
+      "source_crop_box": [
+        0,
+        750,
+        1080,
+        1290
+      ]
+    },
+    {
+      "frame_id": "n000016000",
+      "media_ms": 16000,
+      "sha256": "f3eda2eb0eef8e76aa1d06ded9ac1e08ae266a2ca4c90bcd0c738ca9b7142a95",
+      "source_crop_box": [
+        0,
+        750,
+        1080,
+        1290
+      ]
+    },
+    {
+      "frame_id": "n000016033",
+      "media_ms": 16033,
+      "sha256": "74ac2bdec9762e194a3e43e8f2561bf861d118a434181270b17bc7fa3a16a9c2",
+      "source_crop_box": [
+        0,
+        750,
+        1080,
+        1290
+      ]
+    },
+    {
+      "frame_id": "n000016067",
+      "media_ms": 16067,
+      "sha256": "8c466aac401c295c0983ab5de42fde05483e364f046689c9409d44a0ef7450b4",
+      "source_crop_box": [
+        0,
+        750,
+        1080,
+        1290
+      ]
+    },
+    {
+      "frame_id": "n000016100",
+      "media_ms": 16100,
+      "sha256": "2c5f36dd20b61e1e3832e68479bcacd21c24913c0e25691972c6901b14d7c225",
+      "source_crop_box": [
+        0,
+        750,
+        1080,
+        1290
+      ]
+    },
+    {
+      "frame_id": "n000016133",
+      "media_ms": 16133,
+      "sha256": "a25a09e078b361f35dcfa82455afae872031493fbbe10bf7c1c20db7327766ae",
+      "source_crop_box": [
+        0,
+        750,
+        1080,
+        1290
+      ]
+    },
+    {
+      "frame_id": "n000016167",
+      "media_ms": 16167,
+      "sha256": "1fa4ba2238275b416db3a7077b33bb420807e92855b9367a4d3c0339e883ef87",
+      "source_crop_box": [
+        0,
+        750,
+        1080,
+        1290
+      ]
+    },
+    {
+      "frame_id": "n000016200",
+      "media_ms": 16200,
+      "sha256": "b951a7d0fbb57cfacc50d3e543efeb87b3bf3f70a80461159180786432f546e3",
+      "source_crop_box": [
+        0,
+        750,
+        1080,
+        1290
+      ]
+    },
+    {
+      "frame_id": "n000016233",
+      "media_ms": 16233,
+      "sha256": "fda6334228a58c605406f2734d4949d6b20118eea446df99440d8985c2110aec",
+      "source_crop_box": [
+        0,
+        750,
+        1080,
+        1290
+      ]
+    },
+    {
+      "frame_id": "n000016267",
+      "media_ms": 16267,
+      "sha256": "7865cbe5e6367cf64b4576a7cdab0219dc026da735b74c6e49e3f710322bdd1b",
+      "source_crop_box": [
+        0,
+        750,
+        1080,
+        1290
+      ]
+    },
+    {
+      "frame_id": "n000016300",
+      "media_ms": 16300,
+      "sha256": "ae7475d0cd27107bc26c8e47348102dbe9ba916c57824eb29f4a64899e2d2960",
+      "source_crop_box": [
+        0,
+        750,
+        1080,
+        1290
+      ]
+    },
+    {
+      "frame_id": "n000016333",
+      "media_ms": 16333,
+      "sha256": "694208b41032b11b111767fec09a937b9fe57df8411552430de74faf4fe324aa",
+      "source_crop_box": [
+        0,
+        750,
+        1080,
+        1290
+      ]
+    },
+    {
+      "frame_id": "n000016367",
+      "media_ms": 16367,
+      "sha256": "418f6d66a90eebebfa0a347f87162b94f420e4d31d6ed85a8cd32c466c97013c",
+      "source_crop_box": [
+        0,
+        750,
+        1080,
+        1290
+      ]
+    },
+    {
+      "frame_id": "n000016400",
+      "media_ms": 16400,
+      "sha256": "cac1e3b6e53dc60356b1b7dd8ec128efd12a69b3edff0eeb366b679550596388",
+      "source_crop_box": [
+        0,
+        750,
+        1080,
+        1290
+      ]
+    },
+    {
+      "frame_id": "n000016433",
+      "media_ms": 16433,
+      "sha256": "4f0ae3e2b61b15c951e6c5605d8de6c54f5a089a61b4e6dff934ef8447543362",
+      "source_crop_box": [
+        0,
+        750,
+        1080,
+        1290
+      ]
+    },
+    {
+      "frame_id": "n000016467",
+      "media_ms": 16467,
+      "sha256": "62b1a267c0701d68431ced3b27e3ffab32982f7c76fd041e1bf0debad13fcdee",
+      "source_crop_box": [
+        0,
+        750,
+        1080,
+        1290
+      ]
+    },
+    {
+      "frame_id": "n000016500",
+      "media_ms": 16500,
+      "sha256": "b79ba17bcc3913427962d291953e3f3e44e3adefb3a6e52fd55ad03e291df67e",
+      "source_crop_box": [
+        0,
+        750,
+        1080,
+        1290
+      ]
+    },
+    {
+      "frame_id": "n000016533",
+      "media_ms": 16533,
+      "sha256": "7cf9d6166304ffa2f54f5134d9808fb886a915e500f7ac3a35c1df00973fd79a",
+      "source_crop_box": [
+        0,
+        750,
+        1080,
+        1290
+      ]
+    },
+    {
+      "frame_id": "n000016567",
+      "media_ms": 16567,
+      "sha256": "bb0ac4040dfcdf8c4167e5592dbaabdcaafa47aa085dccbdc36f86c0a6a69cd5",
+      "source_crop_box": [
+        0,
+        750,
+        1080,
+        1290
+      ]
+    },
+    {
+      "frame_id": "n000016600",
+      "media_ms": 16600,
+      "sha256": "55fffd2d0db7bb4c7964f4307f70c93e77bafb1d3abbe63b5f490fe8883372af",
+      "source_crop_box": [
+        0,
+        750,
+        1080,
+        1290
+      ]
+    },
+    {
+      "frame_id": "n000016633",
+      "media_ms": 16633,
+      "sha256": "57a01d155a682aa96b8114368cc2159f4778cd98701be4472ad5baf8e0e87ae3",
+      "source_crop_box": [
+        0,
+        750,
+        1080,
+        1290
+      ]
+    },
+    {
+      "frame_id": "n000016667",
+      "media_ms": 16667,
+      "sha256": "42b87f2ca91d9ea06c7983b58a9b67fefcaca7b8f9a0f535b1926d2b68259594",
+      "source_crop_box": [
+        0,
+        750,
+        1080,
+        1290
+      ]
+    },
+    {
+      "frame_id": "n000016700",
+      "media_ms": 16700,
+      "sha256": "798285989f9c18562cefbf699235943788d999b6bf7c89f63901d82e46a678bb",
+      "source_crop_box": [
+        0,
+        750,
+        1080,
+        1290
+      ]
+    },
+    {
+      "frame_id": "n000016733",
+      "media_ms": 16733,
+      "sha256": "18e49d7e7981b0c68c5c400e4f39bd4b0f8fcd0f009379d28f8811b8611dc449",
+      "source_crop_box": [
+        0,
+        750,
+        1080,
+        1290
+      ]
+    },
+    {
+      "frame_id": "n000016767",
+      "media_ms": 16767,
+      "sha256": "0203a51cd84cd343fb08d20389bd558eb27bea922e5c2e693afa77bbe6c4ac6f",
+      "source_crop_box": [
+        0,
+        750,
+        1080,
+        1290
+      ]
+    },
+    {
+      "frame_id": "n000016800",
+      "media_ms": 16800,
+      "sha256": "518765446306dc47ff78ae342e6e11f126d630ad550d51fb0757de78ddb1b46e",
+      "source_crop_box": [
+        0,
+        750,
+        1080,
+        1290
+      ]
+    },
+    {
+      "frame_id": "n000016833",
+      "media_ms": 16833,
+      "sha256": "f7fe28f25b4fce3dbbbcae6612abd68cd93388b93bf18d0c54c5d8a16530f7b0",
+      "source_crop_box": [
+        0,
+        750,
+        1080,
+        1290
+      ]
+    },
+    {
+      "frame_id": "n000016867",
+      "media_ms": 16867,
+      "sha256": "69bb1b61895a0cafe5d15a8adad68570cde37b1a02cacf690c3472587c85e169",
+      "source_crop_box": [
+        0,
+        750,
+        1080,
+        1290
+      ]
+    },
+    {
+      "frame_id": "n000016900",
+      "media_ms": 16900,
+      "sha256": "14a5adb1a047add2a08b19b61e84df2a5fb177e130d7d60554a17d17b7646abc",
+      "source_crop_box": [
+        0,
+        750,
+        1080,
+        1290
+      ]
+    },
+    {
+      "frame_id": "n000016933",
+      "media_ms": 16933,
+      "sha256": "0d66f01116b96fd311ec3fdf4b5d7dd0d7e7dc16a48f500346ded7bcdd314c8d",
+      "source_crop_box": [
+        0,
+        750,
+        1080,
+        1290
+      ]
+    },
+    {
+      "frame_id": "n000016967",
+      "media_ms": 16967,
+      "sha256": "27deb5269d7b44dadfdd768b0f79cd329cb40c33bbc9c2c72503761399ed7e1e",
+      "source_crop_box": [
+        0,
+        750,
+        1080,
+        1290
+      ]
+    },
+    {
+      "frame_id": "n000017000",
+      "media_ms": 17000,
+      "sha256": "0e9786de4166bd828066a6eb1ed11f42409e8d44d0779ff478e553806310149b",
+      "source_crop_box": [
+        0,
+        750,
+        1080,
+        1290
+      ]
+    }
+  ],
+  "previous_anatomical_conclusion_supplied": false,
+  "expected_foot_supplied": false,
+  "user_located_window": true,
+  "novel_evidence": "Native full-body frames at source cadence before 16.500s; earlier trial used sparse downscaled overview here.",
+  "bundle_sha256": "186aa35944fb121fa1b3bbc670c2677d517d7f75f6beeed5b1715426bb35523e",
+  "request_audit": {
+    "payload_sha256": "e910872c727434d905205c108e610468d16453c90cd13d2193b6c5c40b1bd9e5",
+    "payload_bytes": 7700117,
+    "explicit_image_count": 59,
+    "images": [
+      {
+        "sha256": "776a1baa0545acc7497568897f834dfa683e77ab6ea6bcba2242370e31add0aa",
+        "bytes": 7887
+      },
+      {
+        "sha256": "6c0ec3cc386f0c1a14ed3e4f41dd1ee1669d57e33addef764e9d81cd7e84d11e",
+        "bytes": 2407
+      },
+      {
+        "sha256": "00e70919666d8b657e857dd0bfda6b400d0e03807a6363c062c9145b7da0fce4",
+        "bytes": 4365
+      },
+      {
+        "sha256": "74700ca4ab5a0a79cf56feb4ab766c8144c1ac05fda6e768faa3f5c8fc0123f6",
+        "bytes": 12188
+      },
+      {
+        "sha256": "7d39647aa27adebfd433f615bdb847f3bdfc942334ab1d25de5a3e106120bf6e",
+        "bytes": 7899
+      },
+      {
+        "sha256": "bf05205b4eeb4fe7c0546ade6b6380afdfc78b1da633d8bcc7c22bd6a054f54e",
+        "bytes": 5434
+      },
+      {
+        "sha256": "4ddfc381d539955518bfd4a2faba47b02569845a78349a48a9f9e0076ba32e85",
+        "bytes": 5080
+      },
+      {
+        "sha256": "56d4467f3dcb19b897fbf3e7e07661636855f0aa73a101fb2d552f7ff7357ab8",
+        "bytes": 2661
+      },
+      {
+        "sha256": "fe99ab78da123acd79507171c970079c70ad052f3f4154575e7f3d05dbb13895",
+        "bytes": 10118
+      },
+      {
+        "sha256": "16e55d02246cc15c4b1a13e7831c568ce649f38480692c8e110c9ea359de99b7",
+        "bytes": 5796
+      },
+      {
+        "sha256": "2d3abb00e955ab4b5d2b77f1831edf15e9a5cfe5063a94f2d8277139bcb58783",
+        "bytes": 111442
+      },
+      {
+        "sha256": "04ed9d90d641a4c8fab98b30925b20ab615ecdc8152a4fd2a9b2e77c2b578e24",
+        "bytes": 109733
+      },
+      {
+        "sha256": "acbed5f58099f20b4fb0a32fb34edfabb81111d130158d906094c7924fe92548",
+        "bytes": 107646
+      },
+      {
+        "sha256": "55779b25761207c5d1a8fdd57386b01693cd57b317e15416c360106fd0d66fd5",
+        "bytes": 107299
+      },
+      {
+        "sha256": "e35d789c8e712a26735d0e16baf7793ad59f56cb1cfe1b088021fc0ebcb1a9f6",
+        "bytes": 95595
+      },
+      {
+        "sha256": "2df2568874adf91454d5412a68214f4db689e77ef08cbf33904b9d8154c65975",
+        "bytes": 97560
+      },
+      {
+        "sha256": "4497c00740e98179c8da974b9b1d53bb1f8b7f8b28c39d7f4fff1e7a912029c9",
+        "bytes": 94795
+      },
+      {
+        "sha256": "2409f7e7e63dc4017bf9b76ef8b1e337667e1876b24dd17a623ce08ab5418100",
+        "bytes": 97535
+      },
+      {
+        "sha256": "5d00f5d95d11ccf8b87df2701bde1d70cd820c879a41349e9b0e29e6ea7cf795",
+        "bytes": 99119
+      },
+      {
+        "sha256": "3078dc77bcfc20b0180ddab01e67cfbee49d541baebd5c500c4fd787e1d0b255",
+        "bytes": 101515
+      },
+      {
+        "sha256": "43ec579743234f0a9f189b843efddb533ef0e78b6ab9e52dcb749a2e43a30d98",
+        "bytes": 102823
+      },
+      {
+        "sha256": "ee3a6b089fc337f0e84b978d0ff4c6245ec707a9416a9de2a5b3805f27823a89",
+        "bytes": 102614
+      },
+      {
+        "sha256": "4003b6af0446beca6e5dfa26ea1302e5e14302c6c505c6f839ebf03ea2f4c298",
+        "bytes": 102659
+      },
+      {
+        "sha256": "5ab537bde6eafdcb98d0686f9d61ef9dcb77eb6059ec3dfd5301664d9680049c",
+        "bytes": 103926
+      },
+      {
+        "sha256": "e6d1f07d848ec6df1c5c49d4bf9f608a872d148ee264e08ff5f0271f7039a05c",
+        "bytes": 104243
+      },
+      {
+        "sha256": "c22cf3b3ead37425357f4191833d4f3bc7f3f2baf8feaedfcced295830abaa02",
+        "bytes": 106997
+      },
+      {
+        "sha256": "0137504e4c3d32293d7767757c954b45707ea5c622c3125a3a14a2e7a4d74793",
+        "bytes": 107353
+      },
+      {
+        "sha256": "e73bae4592cf667e48542415628076ab4fac5d6876e3960a3ad995e0427ef0e6",
+        "bytes": 108903
+      },
+      {
+        "sha256": "f3eda2eb0eef8e76aa1d06ded9ac1e08ae266a2ca4c90bcd0c738ca9b7142a95",
+        "bytes": 110348
+      },
+      {
+        "sha256": "74ac2bdec9762e194a3e43e8f2561bf861d118a434181270b17bc7fa3a16a9c2",
+        "bytes": 113691
+      },
+      {
+        "sha256": "8c466aac401c295c0983ab5de42fde05483e364f046689c9409d44a0ef7450b4",
+        "bytes": 114678
+      },
+      {
+        "sha256": "2c5f36dd20b61e1e3832e68479bcacd21c24913c0e25691972c6901b14d7c225",
+        "bytes": 118971
+      },
+      {
+        "sha256": "a25a09e078b361f35dcfa82455afae872031493fbbe10bf7c1c20db7327766ae",
+        "bytes": 119802
+      },
+      {
+        "sha256": "1fa4ba2238275b416db3a7077b33bb420807e92855b9367a4d3c0339e883ef87",
+        "bytes": 120935
+      },
+      {
+        "sha256": "b951a7d0fbb57cfacc50d3e543efeb87b3bf3f70a80461159180786432f546e3",
+        "bytes": 120780
+      },
+      {
+        "sha256": "fda6334228a58c605406f2734d4949d6b20118eea446df99440d8985c2110aec",
+        "bytes": 121878
+      },
+      {
+        "sha256": "7865cbe5e6367cf64b4576a7cdab0219dc026da735b74c6e49e3f710322bdd1b",
+        "bytes": 121737
+      },
+      {
+        "sha256": "ae7475d0cd27107bc26c8e47348102dbe9ba916c57824eb29f4a64899e2d2960",
+        "bytes": 122012
+      },
+      {
+        "sha256": "694208b41032b11b111767fec09a937b9fe57df8411552430de74faf4fe324aa",
+        "bytes": 122025
+      },
+      {
+        "sha256": "418f6d66a90eebebfa0a347f87162b94f420e4d31d6ed85a8cd32c466c97013c",
+        "bytes": 123062
+      },
+      {
+        "sha256": "cac1e3b6e53dc60356b1b7dd8ec128efd12a69b3edff0eeb366b679550596388",
+        "bytes": 123678
+      },
+      {
+        "sha256": "4f0ae3e2b61b15c951e6c5605d8de6c54f5a089a61b4e6dff934ef8447543362",
+        "bytes": 124304
+      },
+      {
+        "sha256": "62b1a267c0701d68431ced3b27e3ffab32982f7c76fd041e1bf0debad13fcdee",
+        "bytes": 125218
+      },
+      {
+        "sha256": "b79ba17bcc3913427962d291953e3f3e44e3adefb3a6e52fd55ad03e291df67e",
+        "bytes": 124568
+      },
+      {
+        "sha256": "7cf9d6166304ffa2f54f5134d9808fb886a915e500f7ac3a35c1df00973fd79a",
+        "bytes": 125455
+      },
+      {
+        "sha256": "bb0ac4040dfcdf8c4167e5592dbaabdcaafa47aa085dccbdc36f86c0a6a69cd5",
+        "bytes": 125097
+      },
+      {
+        "sha256": "55fffd2d0db7bb4c7964f4307f70c93e77bafb1d3abbe63b5f490fe8883372af",
+        "bytes": 125390
+      },
+      {
+        "sha256": "57a01d155a682aa96b8114368cc2159f4778cd98701be4472ad5baf8e0e87ae3",
+        "bytes": 126043
+      },
+      {
+        "sha256": "42b87f2ca91d9ea06c7983b58a9b67fefcaca7b8f9a0f535b1926d2b68259594",
+        "bytes": 126883
+      },
+      {
+        "sha256": "798285989f9c18562cefbf699235943788d999b6bf7c89f63901d82e46a678bb",
+        "bytes": 127609
+      },
+      {
+        "sha256": "18e49d7e7981b0c68c5c400e4f39bd4b0f8fcd0f009379d28f8811b8611dc449",
+        "bytes": 128265
+      },
+      {
+        "sha256": "0203a51cd84cd343fb08d20389bd558eb27bea922e5c2e693afa77bbe6c4ac6f",
+        "bytes": 127377
+      },
+      {
+        "sha256": "518765446306dc47ff78ae342e6e11f126d630ad550d51fb0757de78ddb1b46e",
+        "bytes": 128025
+      },
+      {
+        "sha256": "f7fe28f25b4fce3dbbbcae6612abd68cd93388b93bf18d0c54c5d8a16530f7b0",
+        "bytes": 127491
+      },
+      {
+        "sha256": "69bb1b61895a0cafe5d15a8adad68570cde37b1a02cacf690c3472587c85e169",
+        "bytes": 128384
+      },
+      {
+        "sha256": "14a5adb1a047add2a08b19b61e84df2a5fb177e130d7d60554a17d17b7646abc",
+        "bytes": 127840
+      },
+      {
+        "sha256": "0d66f01116b96fd311ec3fdf4b5d7dd0d7e7dc16a48f500346ded7bcdd314c8d",
+        "bytes": 128378
+      },
+      {
+        "sha256": "27deb5269d7b44dadfdd768b0f79cd329cb40c33bbc9c2c72503761399ed7e1e",
+        "bytes": 128072
+      },
+      {
+        "sha256": "0e9786de4166bd828066a6eb1ed11f42409e8d44d0779ff478e553806310149b",
+        "bytes": 128824
+      }
+    ],
+    "frame_sampling_in_provider_metadata": false,
+    "videos": [],
+    "requested_image_detail": "high"
+  },
+  "status": "COMPLETED",
+  "model_calls": 1,
+  "production_changed": false,
+  "independently_verified": false,
+  "receipt": {
+    "packet_id": "orman600_goal_review",
+    "provider": "emergent",
+    "requested_model": "gpt-6-astra",
+    "origin": "LIVE_MODEL_REQUEST",
+    "status": "COMPLETED",
+    "requested_reasoning_effort": "medium",
+    "payload_sha256": "e910872c727434d905205c108e610468d16453c90cd13d2193b6c5c40b1bd9e5",
+    "payload_bytes": 7700117,
+    "explicit_image_count": 59,
+    "images": [
+      {
+        "sha256": "776a1baa0545acc7497568897f834dfa683e77ab6ea6bcba2242370e31add0aa",
+        "bytes": 7887
+      },
+      {
+        "sha256": "6c0ec3cc386f0c1a14ed3e4f41dd1ee1669d57e33addef764e9d81cd7e84d11e",
+        "bytes": 2407
+      },
+      {
+        "sha256": "00e70919666d8b657e857dd0bfda6b400d0e03807a6363c062c9145b7da0fce4",
+        "bytes": 4365
+      },
+      {
+        "sha256": "74700ca4ab5a0a79cf56feb4ab766c8144c1ac05fda6e768faa3f5c8fc0123f6",
+        "bytes": 12188
+      },
+      {
+        "sha256": "7d39647aa27adebfd433f615bdb847f3bdfc942334ab1d25de5a3e106120bf6e",
+        "bytes": 7899
+      },
+      {
+        "sha256": "bf05205b4eeb4fe7c0546ade6b6380afdfc78b1da633d8bcc7c22bd6a054f54e",
+        "bytes": 5434
+      },
+      {
+        "sha256": "4ddfc381d539955518bfd4a2faba47b02569845a78349a48a9f9e0076ba32e85",
+        "bytes": 5080
+      },
+      {
+        "sha256": "56d4467f3dcb19b897fbf3e7e07661636855f0aa73a101fb2d552f7ff7357ab8",
+        "bytes": 2661
+      },
+      {
+        "sha256": "fe99ab78da123acd79507171c970079c70ad052f3f4154575e7f3d05dbb13895",
+        "bytes": 10118
+      },
+      {
+        "sha256": "16e55d02246cc15c4b1a13e7831c568ce649f38480692c8e110c9ea359de99b7",
+        "bytes": 5796
+      },
+      {
+        "sha256": "2d3abb00e955ab4b5d2b77f1831edf15e9a5cfe5063a94f2d8277139bcb58783",
+        "bytes": 111442
+      },
+      {
+        "sha256": "04ed9d90d641a4c8fab98b30925b20ab615ecdc8152a4fd2a9b2e77c2b578e24",
+        "bytes": 109733
+      },
+      {
+        "sha256": "acbed5f58099f20b4fb0a32fb34edfabb81111d130158d906094c7924fe92548",
+        "bytes": 107646
+      },
+      {
+        "sha256": "55779b25761207c5d1a8fdd57386b01693cd57b317e15416c360106fd0d66fd5",
+        "bytes": 107299
+      },
+      {
+        "sha256": "e35d789c8e712a26735d0e16baf7793ad59f56cb1cfe1b088021fc0ebcb1a9f6",
+        "bytes": 95595
+      },
+      {
+        "sha256": "2df2568874adf91454d5412a68214f4db689e77ef08cbf33904b9d8154c65975",
+        "bytes": 97560
+      },
+      {
+        "sha256": "4497c00740e98179c8da974b9b1d53bb1f8b7f8b28c39d7f4fff1e7a912029c9",
+        "bytes": 94795
+      },
+      {
+        "sha256": "2409f7e7e63dc4017bf9b76ef8b1e337667e1876b24dd17a623ce08ab5418100",
+        "bytes": 97535
+      },
+      {
+        "sha256": "5d00f5d95d11ccf8b87df2701bde1d70cd820c879a41349e9b0e29e6ea7cf795",
+        "bytes": 99119
+      },
+      {
+        "sha256": "3078dc77bcfc20b0180ddab01e67cfbee49d541baebd5c500c4fd787e1d0b255",
+        "bytes": 101515
+      },
+      {
+        "sha256": "43ec579743234f0a9f189b843efddb533ef0e78b6ab9e52dcb749a2e43a30d98",
+        "bytes": 102823
+      },
+      {
+        "sha256": "ee3a6b089fc337f0e84b978d0ff4c6245ec707a9416a9de2a5b3805f27823a89",
+        "bytes": 102614
+      },
+      {
+        "sha256": "4003b6af0446beca6e5dfa26ea1302e5e14302c6c505c6f839ebf03ea2f4c298",
+        "bytes": 102659
+      },
+      {
+        "sha256": "5ab537bde6eafdcb98d0686f9d61ef9dcb77eb6059ec3dfd5301664d9680049c",
+        "bytes": 103926
+      },
+      {
+        "sha256": "e6d1f07d848ec6df1c5c49d4bf9f608a872d148ee264e08ff5f0271f7039a05c",
+        "bytes": 104243
+      },
+      {
+        "sha256": "c22cf3b3ead37425357f4191833d4f3bc7f3f2baf8feaedfcced295830abaa02",
+        "bytes": 106997
+      },
+      {
+        "sha256": "0137504e4c3d32293d7767757c954b45707ea5c622c3125a3a14a2e7a4d74793",
+        "bytes": 107353
+      },
+      {
+        "sha256": "e73bae4592cf667e48542415628076ab4fac5d6876e3960a3ad995e0427ef0e6",
+        "bytes": 108903
+      },
+      {
+        "sha256": "f3eda2eb0eef8e76aa1d06ded9ac1e08ae266a2ca4c90bcd0c738ca9b7142a95",
+        "bytes": 110348
+      },
+      {
+        "sha256": "74ac2bdec9762e194a3e43e8f2561bf861d118a434181270b17bc7fa3a16a9c2",
+        "bytes": 113691
+      },
+      {
+        "sha256": "8c466aac401c295c0983ab5de42fde05483e364f046689c9409d44a0ef7450b4",
+        "bytes": 114678
+      },
+      {
+        "sha256": "2c5f36dd20b61e1e3832e68479bcacd21c24913c0e25691972c6901b14d7c225",
+        "bytes": 118971
+      },
+      {
+        "sha256": "a25a09e078b361f35dcfa82455afae872031493fbbe10bf7c1c20db7327766ae",
+        "bytes": 119802
+      },
+      {
+        "sha256": "1fa4ba2238275b416db3a7077b33bb420807e92855b9367a4d3c0339e883ef87",
+        "bytes": 120935
+      },
+      {
+        "sha256": "b951a7d0fbb57cfacc50d3e543efeb87b3bf3f70a80461159180786432f546e3",
+        "bytes": 120780
+      },
+      {
+        "sha256": "fda6334228a58c605406f2734d4949d6b20118eea446df99440d8985c2110aec",
+        "bytes": 121878
+      },
+      {
+        "sha256": "7865cbe5e6367cf64b4576a7cdab0219dc026da735b74c6e49e3f710322bdd1b",
+        "bytes": 121737
+      },
+      {
+        "sha256": "ae7475d0cd27107bc26c8e47348102dbe9ba916c57824eb29f4a64899e2d2960",
+        "bytes": 122012
+      },
+      {
+        "sha256": "694208b41032b11b111767fec09a937b9fe57df8411552430de74faf4fe324aa",
+        "bytes": 122025
+      },
+      {
+        "sha256": "418f6d66a90eebebfa0a347f87162b94f420e4d31d6ed85a8cd32c466c97013c",
+        "bytes": 123062
+      },
+      {
+        "sha256": "cac1e3b6e53dc60356b1b7dd8ec128efd12a69b3edff0eeb366b679550596388",
+        "bytes": 123678
+      },
+      {
+        "sha256": "4f0ae3e2b61b15c951e6c5605d8de6c54f5a089a61b4e6dff934ef8447543362",
+        "bytes": 124304
+      },
+      {
+        "sha256": "62b1a267c0701d68431ced3b27e3ffab32982f7c76fd041e1bf0debad13fcdee",
+        "bytes": 125218
+      },
+      {
+        "sha256": "b79ba17bcc3913427962d291953e3f3e44e3adefb3a6e52fd55ad03e291df67e",
+        "bytes": 124568
+      },
+      {
+        "sha256": "7cf9d6166304ffa2f54f5134d9808fb886a915e500f7ac3a35c1df00973fd79a",
+        "bytes": 125455
+      },
+      {
+        "sha256": "bb0ac4040dfcdf8c4167e5592dbaabdcaafa47aa085dccbdc36f86c0a6a69cd5",
+        "bytes": 125097
+      },
+      {
+        "sha256": "55fffd2d0db7bb4c7964f4307f70c93e77bafb1d3abbe63b5f490fe8883372af",
+        "bytes": 125390
+      },
+      {
+        "sha256": "57a01d155a682aa96b8114368cc2159f4778cd98701be4472ad5baf8e0e87ae3",
+        "bytes": 126043
+      },
+      {
+        "sha256": "42b87f2ca91d9ea06c7983b58a9b67fefcaca7b8f9a0f535b1926d2b68259594",
+        "bytes": 126883
+      },
+      {
+        "sha256": "798285989f9c18562cefbf699235943788d999b6bf7c89f63901d82e46a678bb",
+        "bytes": 127609
+      },
+      {
+        "sha256": "18e49d7e7981b0c68c5c400e4f39bd4b0f8fcd0f009379d28f8811b8611dc449",
+        "bytes": 128265
+      },
+      {
+        "sha256": "0203a51cd84cd343fb08d20389bd558eb27bea922e5c2e693afa77bbe6c4ac6f",
+        "bytes": 127377
+      },
+      {
+        "sha256": "518765446306dc47ff78ae342e6e11f126d630ad550d51fb0757de78ddb1b46e",
+        "bytes": 128025
+      },
+      {
+        "sha256": "f7fe28f25b4fce3dbbbcae6612abd68cd93388b93bf18d0c54c5d8a16530f7b0",
+        "bytes": 127491
+      },
+      {
+        "sha256": "69bb1b61895a0cafe5d15a8adad68570cde37b1a02cacf690c3472587c85e169",
+        "bytes": 128384
+      },
+      {
+        "sha256": "14a5adb1a047add2a08b19b61e84df2a5fb177e130d7d60554a17d17b7646abc",
+        "bytes": 127840
+      },
+      {
+        "sha256": "0d66f01116b96fd311ec3fdf4b5d7dd0d7e7dc16a48f500346ded7bcdd314c8d",
+        "bytes": 128378
+      },
+      {
+        "sha256": "27deb5269d7b44dadfdd768b0f79cd329cb40c33bbc9c2c72503761399ed7e1e",
+        "bytes": 128072
+      },
+      {
+        "sha256": "0e9786de4166bd828066a6eb1ed11f42409e8d44d0779ff478e553806310149b",
+        "bytes": 128824
+      }
+    ],
+    "frame_sampling_in_provider_metadata": false,
+    "videos": [],
+    "requested_image_detail": "high",
+    "model_version": "gpt-6-astra",
+    "response_id": "chatcmpl-Ebap6seKbvGEO9UgmbHmSU6JUQ1yx",
+    "usage": {
+      "completion_tokens": 2532,
+      "prompt_tokens": 37380,
+      "total_tokens": 39912,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": 0,
+        "audio_tokens": 0,
+        "reasoning_tokens": 962,
+        "rejected_prediction_tokens": 0
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": 0,
+        "cached_tokens": 37248
+      }
+    },
+    "raw_response": "{\n  \"plays\": [],\n  \"contact_review\": {\n    \"striking_foot\": \"LEFT\",\n    \"assessment\": \"probable\",\n    \"body_orientation_evidence\": [\n      {\n        \"frame_id\": \"n000015433\",\n        \"observation\": \"The selected white-shirted player runs toward image-left and slightly away from the camera, behind red number 7. This is an oblique view, not a frontal view; the legs are separated in a running stride.\"\n      },\n      {\n        \"frame_id\": \"n000015767\",\n        \"observation\": \"The selected player's numbered back is visible. His torso faces diagonally away toward the ball, with one leg beneath him and the other flexed behind toward image-right. This rear-oblique orientation provides the anatomical-side anchor.\"\n      },\n      {\n        \"frame_id\": \"n000016267\",\n        \"observation\": \"Number 10 is clearly visible on the selected player's back. He remains facing away and somewhat toward image-left beside red number 7; there has not been a half-turn that would reverse the leg mapping.\"\n      },\n      {\n        \"frame_id\": \"n000016600\",\n        \"observation\": \"The selected player leans and begins collapsing behind red number 7. His torso and pelvis become substantially occluded, limiting direct identification of the ball-side limb.\"\n      },\n      {\n        \"frame_id\": \"n000016933\",\n        \"observation\": \"The selected player's numbered back is visible low on the ground to the left of red number 7. The fall introduces additional rotation, so this position alone cannot identify the contacting foot.\"\n      }\n    ],\n    \"right_leg_evidence\": [\n      {\n        \"frame_id\": \"n000015767\",\n        \"observation\": \"In the rear-oblique view, the anatomical right thigh trails from the right side of the pelvis, with the knee flexed and the lower leg extending backward toward image-right. The opposite leg is beneath the body.\"\n      },\n      {\n        \"frame_id\": \"n000015933\",\n        \"observation\": \"The right leg extends backward toward image-right while the opposite leg reaches forward toward red number 7 and the ball. The two legs are visibly separated rather than crossed.\"\n      },\n      {\n        \"frame_id\": \"n000016100\",\n        \"observation\": \"The same right leg remains extended behind and to image-right, with its boot away from the ball-side cluster; the forward white leg is beside the defender.\"\n      },\n      {\n        \"frame_id\": \"n000016267\",\n        \"observation\": \"With the back still visible, the right lower leg comes beneath and to the right of the pelvis. Its foot is on the outside of the challenge, while the other leg occupies the ball-side space.\"\n      },\n      {\n        \"frame_id\": \"n000016633\",\n        \"observation\": \"A white-socked lower leg and bright boot remain down on the image-right side of the selected player's collapsing body. Continuity favors identification as the right, bracing leg, although its upper connection is partly hidden by the defender.\"\n      }\n    ],\n    \"left_leg_evidence\": [\n      {\n        \"frame_id\": \"n000015767\",\n        \"observation\": \"The anatomical left leg descends beneath the left side of the rear-facing pelvis to the grounded foot; the right leg is flexed behind.\"\n      },\n      {\n        \"frame_id\": \"n000015933\",\n        \"observation\": \"The left thigh and knee advance toward image-left, and the lower leg reaches toward the ball behind red number 7. The right leg remains stretched behind.\"\n      },\n      {\n        \"frame_id\": \"n000016100\",\n        \"observation\": \"The advancing left foot reaches the turf immediately beside the defender's legs. The ball-side ankle is partly obscured, so this establishes the reaching limb more securely than an actual touch.\"\n      },\n      {\n        \"frame_id\": \"n000016333\",\n        \"observation\": \"The left leg occupies the narrow space between number 10's pelvis and red number 7, close to the ball. The other white leg extends down toward image-right. The defender obscures part of the left knee-to-ankle chain.\"\n      },\n      {\n        \"frame_id\": \"n000016600\",\n        \"observation\": \"The left, ball-side leg becomes hidden in the defender-goalkeeper cluster as the selected player loses balance. Its exact ankle position is not independently visible at this instant.\"\n      }\n    ],\n    \"contact_evidence\": [\n      {\n        \"frame_id\": \"n000015933\",\n        \"observation\": \"The ball is beside red number 7's feet, ahead of the selected player's reaching left foot. This is approach evidence, not a resolved selected-player contact.\"\n      },\n      {\n        \"frame_id\": \"n000016167\",\n        \"observation\": \"The ball is visible between the defender and the selected player's forward white-socked leg. Their feet are close enough that a touch cannot be assigned from this frame alone.\"\n      },\n      {\n        \"frame_id\": \"n000016333\",\n        \"observation\": \"The ball remains in the crowded space at the defender's feet, adjacent to the selected player's left-leg reach. No clean boot-ball separation establishes a strike here.\"\n      },\n      {\n        \"frame_id\": \"n000016600\",\n        \"observation\": \"The ball and ball-side feet are substantially obscured. The selected player's outside boot remains down while his body drops; the goalkeeper also has a foot close to the contested area.\"\n      },\n      {\n        \"frame_id\": \"n000016700\",\n        \"observation\": \"The ball becomes visible toward the goalkeeper's feet, to image-right of the defender and falling selected player. The selected player's outside boot remains farther left and lower in the image.\"\n      },\n      {\n        \"frame_id\": \"n000016800\",\n        \"observation\": \"The ball has separated clearly toward image-right while the selected player is falling behind the defender. This establishes departure from the cluster, but not an isolated last-touch foot.\"\n      }\n    ],\n    \"contact_interval_ms\": [16567, 16700],\n    \"competing_explanation\": \"The strongest alternative is a touch or deflection by red number 7 or the goalkeeper during the obscured challenge, rather than a clean selected-player strike. Both have feet in the ball's vicinity before its rightward departure. A selected-player right-foot touch is less consistent with the outside leg's bracing trajectory, but cannot be completely excluded because the hips and ankles overlap late in the sequence.\",\n    \"reasoning\": \"LEFT is the most likely anatomical side of the selected player's ball-directed action. The rear-oblique approach establishes the two legs, and the left leg can be followed advancing into the challenge while the right stays outside and subsequently braces. There is no visible leg crossing or body reversal that clearly exchanges those identities. That support-leg constraint is meaningful, but is not proof that the hidden left boot touched the ball: the decisive contact region is shared with the defender and goalkeeper. The interval given is a tentative window for the late contact associated with the ball's emergence, not a directly resolved boot-ball instant. Earlier left-leg reaches are visible but do not establish separate definite touches. Accordingly, the side is probable rather than supported. Reference crops were used only to identify the selected player; neither boot colour nor image-left alone determines anatomical side.\"\n  }\n}",
+    "response_sha256": "8d8c6715803903ab26d66a7467162421ea760fb941e0e908b267d07cd9205a98",
+    "elapsed_seconds": 81.87
+  },
+  "observations": {
+    "plays": [],
+    "contact_review": {
+      "striking_foot": "LEFT",
+      "assessment": "probable",
+      "body_orientation_evidence": [
+        {
+          "frame_id": "n000015433",
+          "observation": "The selected white-shirted player runs toward image-left and slightly away from the camera, behind red number 7. This is an oblique view, not a frontal view; the legs are separated in a running stride."
+        },
+        {
+          "frame_id": "n000015767",
+          "observation": "The selected player's numbered back is visible. His torso faces diagonally away toward the ball, with one leg beneath him and the other flexed behind toward image-right. This rear-oblique orientation provides the anatomical-side anchor."
+        },
+        {
+          "frame_id": "n000016267",
+          "observation": "Number 10 is clearly visible on the selected player's back. He remains facing away and somewhat toward image-left beside red number 7; there has not been a half-turn that would reverse the leg mapping."
+        },
+        {
+          "frame_id": "n000016600",
+          "observation": "The selected player leans and begins collapsing behind red number 7. His torso and pelvis become substantially occluded, limiting direct identification of the ball-side limb."
+        },
+        {
+          "frame_id": "n000016933",
+          "observation": "The selected player's numbered back is visible low on the ground to the left of red number 7. The fall introduces additional rotation, so this position alone cannot identify the contacting foot."
+        }
+      ],
+      "right_leg_evidence": [
+        {
+          "frame_id": "n000015767",
+          "observation": "In the rear-oblique view, the anatomical right thigh trails from the right side of the pelvis, with the knee flexed and the lower leg extending backward toward image-right. The opposite leg is beneath the body."
+        },
+        {
+          "frame_id": "n000015933",
+          "observation": "The right leg extends backward toward image-right while the opposite leg reaches forward toward red number 7 and the ball. The two legs are visibly separated rather than crossed."
+        },
+        {
+          "frame_id": "n000016100",
+          "observation": "The same right leg remains extended behind and to image-right, with its boot away from the ball-side cluster; the forward white leg is beside the defender."
+        },
+        {
+          "frame_id": "n000016267",
+          "observation": "With the back still visible, the right lower leg comes beneath and to the right of the pelvis. Its foot is on the outside of the challenge, while the other leg occupies the ball-side space."
+        },
+        {
+          "frame_id": "n000016633",
+          "observation": "A white-socked lower leg and bright boot remain down on the image-right side of the selected player's collapsing body. Continuity favors identification as the right, bracing leg, although its upper connection is partly hidden by the defender."
+        }
+      ],
+      "left_leg_evidence": [
+        {
+          "frame_id": "n000015767",
+          "observation": "The anatomical left leg descends beneath the left side of the rear-facing pelvis to the grounded foot; the right leg is flexed behind."
+        },
+        {
+          "frame_id": "n000015933",
+          "observation": "The left thigh and knee advance toward image-left, and the lower leg reaches toward the ball behind red number 7. The right leg remains stretched behind."
+        },
+        {
+          "frame_id": "n000016100",
+          "observation": "The advancing left foot reaches the turf immediately beside the defender's legs. The ball-side ankle is partly obscured, so this establishes the reaching limb more securely than an actual touch."
+        },
+        {
+          "frame_id": "n000016333",
+          "observation": "The left leg occupies the narrow space between number 10's pelvis and red number 7, close to the ball. The other white leg extends down toward image-right. The defender obscures part of the left knee-to-ankle chain."
+        },
+        {
+          "frame_id": "n000016600",
+          "observation": "The left, ball-side leg becomes hidden in the defender-goalkeeper cluster as the selected player loses balance. Its exact ankle position is not independently visible at this instant."
+        }
+      ],
+      "contact_evidence": [
+        {
+          "frame_id": "n000015933",
+          "observation": "The ball is beside red number 7's feet, ahead of the selected player's reaching left foot. This is approach evidence, not a resolved selected-player contact."
+        },
+        {
+          "frame_id": "n000016167",
+          "observation": "The ball is visible between the defender and the selected player's forward white-socked leg. Their feet are close enough that a touch cannot be assigned from this frame alone."
+        },
+        {
+          "frame_id": "n000016333",
+          "observation": "The ball remains in the crowded space at the defender's feet, adjacent to the selected player's left-leg reach. No clean boot-ball separation establishes a strike here."
+        },
+        {
+          "frame_id": "n000016600",
+          "observation": "The ball and ball-side feet are substantially obscured. The selected player's outside boot remains down while his body drops; the goalkeeper also has a foot close to the contested area."
+        },
+        {
+          "frame_id": "n000016700",
+          "observation": "The ball becomes visible toward the goalkeeper's feet, to image-right of the defender and falling selected player. The selected player's outside boot remains farther left and lower in the image."
+        },
+        {
+          "frame_id": "n000016800",
+          "observation": "The ball has separated clearly toward image-right while the selected player is falling behind the defender. This establishes departure from the cluster, but not an isolated last-touch foot."
+        }
+      ],
+      "contact_interval_ms": [
+        16567,
+        16700
+      ],
+      "competing_explanation": "The strongest alternative is a touch or deflection by red number 7 or the goalkeeper during the obscured challenge, rather than a clean selected-player strike. Both have feet in the ball's vicinity before its rightward departure. A selected-player right-foot touch is less consistent with the outside leg's bracing trajectory, but cannot be completely excluded because the hips and ankles overlap late in the sequence.",
+      "reasoning": "LEFT is the most likely anatomical side of the selected player's ball-directed action. The rear-oblique approach establishes the two legs, and the left leg can be followed advancing into the challenge while the right stays outside and subsequently braces. There is no visible leg crossing or body reversal that clearly exchanges those identities. That support-leg constraint is meaningful, but is not proof that the hidden left boot touched the ball: the decisive contact region is shared with the defender and goalkeeper. The interval given is a tentative window for the late contact associated with the ball's emergence, not a directly resolved boot-ball instant. Earlier left-leg reaches are visible but do not establish separate definite touches. Accordingly, the side is probable rather than supported. Reference crops were used only to identify the selected player; neither boot colour nor image-left alone determines anatomical side."
+    }
+  },
+  "validation_error": "OBSERVATION_CONTRACT_FAILED"
+}
