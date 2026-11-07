@@ -515,6 +515,18 @@ def _refinement_context(event, windows):
     observations = event.get('visual_samples') or []
     result = []
     for lo, hi in windows:
+        # A detector can need the next confirmed pose to separate overlapping
+        # bodies at the right edge. Retain short forward context as well as
+        # backward context, without crossing uncertainty or the 1.5s bound.
+        original_end, previous_end = hi, hi
+        for row in [r for r in observations if r.get('media_ms', hi) > hi]:
+            stamp = row['media_ms']
+            if (stamp-original_end > 250 or stamp-previous_end > 250
+                    or stamp-lo > 1500 or row.get('identity_status') != 'CONFIRMED'):
+                break
+            if row.get('ground'):
+                hi = stamp
+            previous_end = stamp
         lower, start, previous = max(lo-800, hi-1500), lo, lo
         for row in reversed([r for r in observations if r.get('media_ms', lo+1) <= lo]):
             stamp = row['media_ms']

@@ -460,7 +460,7 @@ def test_partial_ellipse_triggers_targeted_refinement_without_erasing_existing(m
     def run(video, anchors, events, *, refinement=False):
         if not refinement: return {'e':deepcopy(original)}, 'COMPLETED'
         assert refinement == 'medium'
-        assert events[0]['_display_refinement_windows'] == [[0,375]]
+        assert events[0]['_display_refinement_windows'] == [[0,500]]
         return {'e':{**original,'segments':[{'id':'bridge','samples':[{'media_ms':0},{'media_ms':375}]}]}}, 'COMPLETED'
     monkeypatch.setattr(tracking, '_bounded_event', run)
     result, status = tracking.bounded_tracks('video', [], [event])
@@ -487,10 +487,19 @@ def test_source_graphics_have_a_bounded_budget_that_does_not_truncate_valid_tail
 def test_refinement_context_keeps_earlier_source_support_without_crossing_barrier():
     rows=[{'media_ms':t,'identity_status':'CONFIRMED','ground':[.4,.6]} for t in range(10000,13001,125)]
     event={'visual_samples':rows}
-    assert tracking._refinement_context(event, [[11000,11750]]) == [[10250,11750]]
+    assert tracking._refinement_context(event, [[11000,11750]]) == [[10500,12000]]
     rows[6]['identity_status']='UNCERTAIN'  # 10750 is an explicit barrier
-    assert tracking._refinement_context(event, [[11000,11750]]) == [[10875,11750]]
+    assert tracking._refinement_context(event, [[11000,11750]]) == [[10875,12000]]
     assert tracking._refinement_context(event, [[11500,13000]]) == [[11500,13000]]
+
+
+def test_forward_refinement_context_stops_at_uncertain_identity():
+    rows=[{'media_ms':t,'identity_status':'CONFIRMED','ground':[.4,.6]}
+          for t in [9250,9383,9500,9633,9750]]
+    event={'visual_samples':rows}
+    assert tracking._refinement_context(event,[[9383,9500]]) == [[9250,9750]]
+    rows[3]['identity_status']='UNCERTAIN'
+    assert tracking._refinement_context(event,[[9383,9500]]) == [[9250,9500]]
 
 
 def test_refinements_share_only_existing_total_budget(monkeypatch):
