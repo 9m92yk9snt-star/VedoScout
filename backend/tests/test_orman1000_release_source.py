@@ -207,3 +207,25 @@ def test_current_50s_goal_bracket_cannot_prove_single_player_contact():
     assert conflict["copied_actor_ids_across_runs"] is False
     assert conflict["live_canonical_event_modified"] is False
     assert conflict["role_mapping_status"].startswith("BLOCKED_")
+
+
+def test_two_new_model_player_censuses_omit_old_approved_white_finisher():
+    evidence = load("orman1000-release-source.json")
+    census = evidence["source_player_census_at_50s"]
+    assert census["same_underlying_play_confirmed_by_13_visual_frame_fingerprints"] is True
+    assert [p["packet_id"] for p in census["orman1000_model_packets"]] == [
+        "sequence_006", "contact_review_006"
+    ]
+    assert [p["explicit_image_count"] for p in census["orman1000_model_packets"]] == [67,189]
+    assert all(p["people_in_play"] == 7
+               and p["selected_local_person"] == "p1"
+               and p["separate_white_finisher_registered"] is False
+               and p["local_p3_kit"] == "BLUE"
+               for p in census["orman1000_model_packets"])
+    prior = census["previously_approved_model"]
+    assert prior["explicit_image_count"] == 255
+    assert prior["special_limb_comparison_panels_added"] == 5
+    assert prior["distinct_white_finisher_recorded"] is True
+    assert prior["people_in_approved_source_response"] == 9
+    assert census["confirmed_systematic_cause"] is False
+    assert census["production_automatic_correction_enabled"] is False
