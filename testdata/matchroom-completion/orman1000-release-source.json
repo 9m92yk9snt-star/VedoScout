@@ -516,5 +516,39 @@
     "source_player_identity_connection_supported_at_51181": true,
     "does_not_independently_prove_50648_finish_or_recipient": true,
     "proof_scope": "A human-selected identity reference at 51.18 and a matching saved source observation one millisecond later. Continuity through occlusion and a separate white finisher remain unproven."
+  },
+  "duc_recoup_00_08": {
+    "status": "READY_FOR_SOURCE_REVALIDATED_REPLAY_STAGING_NOT_RENDERED",
+    "source_video_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2",
+    "event_id": "966c91c7243829d6fab0",
+    "prior_primary_window_ms": [
+      7500,
+      10000
+    ],
+    "completed_tail_window_ms": [
+      10125,
+      12133
+    ],
+    "completed_response_snapshot": "testdata/matchroom-completion/result.json",
+    "returned_source_position_samples": 17,
+    "published_graphics_updated": false,
+    "model_calls_for_staging": 0,
+    "source_matching_checks": [
+      "exact source SHA and original 10 human selection digest",
+      "same canonical event and primary model window",
+      "source request payload SHA, response hash, provider/model and packet ID",
+      "17 approved source samples and exact recorded media PTS",
+      "no conflicting preexisting completion receipt"
+    ],
+    "recovery_tool": "backend/scripts/stage_orman1000_duel_tail.py",
+    "present_analysis_scores_modified": false,
+    "current_state": "Requires exact source pixel replay through normal localizer before display, not a finished ellipse"
+  },
+  "technical_contracts_verified": {
+    "source_provenance_and_assist_shadow_focused_run": 42331951232,
+    "focused_regressions_passed": 54,
+    "latest_complete_full_ci_run": null,
+    "details": "Source-role review and no-paid-model 00:08 completion checkpoint staging are isolated DRAFT-only controls. Full current-branch six-job CI still pending.",
+    "production_write_allowed": false
   }
 }
