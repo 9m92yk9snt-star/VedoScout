@@ -213,6 +213,16 @@ def main():
     candidate = json.loads(args.candidate.read_text()) if args.candidate else original
     review = json.loads(args.role_review.read_text()) if args.role_review else None
     approved, reasons = judge(original, candidate, review)
+    if approved:
+        # No release based on a JSON declaration of WHITE alone. Decode the
+        # original source bytes and reject a box that points to grass/blue
+        # players while claiming a separately reviewed white finisher.
+        from orman1000_role_pixel_gate import validate_uploaded_archive_role
+        try:
+            validate_uploaded_archive_role(args.original_zip, review)
+        except ValueError as exc:
+            approved = False
+            reasons.append(str(exc).split(":")[0])
     result = {
         "source_video_sha256": SOURCE, "release_ready": approved,
         "blockers": reasons, "original_canonical_events": 21,
