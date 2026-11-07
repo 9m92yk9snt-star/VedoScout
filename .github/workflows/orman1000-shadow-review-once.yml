@@ -14,7 +14,7 @@ jobs:
       github.event.pull_request.draft == true &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.event.pull_request.head.ref == 'codex/matchroom-window-geometry-reuse' &&
-      github.event.before == 'e8f8bc713f612a0553619f239dff5109b3761a25' &&
+      github.event.before == '946b45d171ed94a05b5ddf061d9d3b2179fb02b7' &&
       github.run_attempt == 1
     runs-on: ubuntu-latest
     timeout-minutes: 8
@@ -34,5 +34,5 @@ jobs:
           python -m pip install 'pytest==9.0.3' 'python-dotenv==1.2.2' 'numpy==2.4.6' 'opencv-python-headless==4.13.0.92'
       - name: Assert no-model deterministic report projection and source-gate contracts
         run: |
-          python -m py_compile backend/orman1000_derived_consistency.py backend/orman1000_role_spatial_gate.py backend/orman1000_review_provenance.py backend/scripts/build_orman1000_review_shadow.py backend/scripts/finalize_orman1000_review_candidate.py
-          python -m pytest -q backend/tests/test_orman1000_release_gate.py backend/tests/test_orman1000_review_shadow.py backend/tests/test_orman1000_role_spatial_gate.py backend/tests/test_orman1000_source_frame_hashes.py backend/tests/test_orman1000_adjudication_preview.py backend/tests/test_orman1000_release_source.py
+          python -m py_compile backend/orman1000_derived_consistency.py backend/orman1000_role_spatial_gate.py backend/orman1000_review_provenance.py backend/scripts/stage_orman1000_duel_tail.py backend/scripts/build_orman1000_review_shadow.py backend/scripts/finalize_orman1000_review_candidate.py
+          python -m pytest -q backend/tests/test_orman1000_release_gate.py backend/tests/test_orman1000_duel_completion_staging.py backend/tests/test_orman1000_review_shadow.py backend/tests/test_orman1000_role_spatial_gate.py backend/tests/test_orman1000_source_frame_hashes.py backend/tests/test_orman1000_adjudication_preview.py backend/tests/test_orman1000_release_source.py
