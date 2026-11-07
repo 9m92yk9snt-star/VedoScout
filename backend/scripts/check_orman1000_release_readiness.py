@@ -152,10 +152,11 @@ def judge(original, candidate, role_review=None):
           "POST_CONTACT_OWNER_TAP_NOT_SOURCE_BOUND")
     if len(owner_refs) == len(same_source_pose) == 1:
         anchor, pose = owner_refs[0], same_source_pose[0]
-        b, point = anchor.get("box") or {}, anchor.get("target_point") or {}
-        rect = [b.get(k) for k in ("x", "y", "w", "h")]
-        px, py = point.get("x"), point.get("y")
-        check(pose.get("identity_status") == "CONFIRMED"
+        b, point = anchor.get("box"), anchor.get("target_point")
+        valid_boxes = isinstance(b, dict) and isinstance(point, dict)
+        rect = [b.get(k) for k in ("x", "y", "w", "h")] if valid_boxes else []
+        px, py = (point.get("x"), point.get("y")) if valid_boxes else (None, None)
+        check(valid_boxes and pose.get("identity_status") == "CONFIRMED"
               and pose.get("player_box") == rect
               and all(type(z) in (int, float) for z in rect + [px, py])
               and b["x"] <= px <= b["x"] + b["w"]
