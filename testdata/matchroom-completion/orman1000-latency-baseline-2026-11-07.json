@@ -1,0 +1,53 @@
+{
+  "scope": "SOURCE_EXACT_ORMAN1000_LATENCY_ACCOUNTING_AND_SEPARATE_LOCAL_CLIP_ENCODER_BENCHMARK",
+  "archive_sha256": "3b27260511ed965952a497f97d1c6345a0f1b4bef1b89a60912a62e0f6530c0c",
+  "video_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2",
+  "measured_production_seconds": {
+    "source_analysis": 245.088,
+    "report_writer": 155.729,
+    "before_assets": 400.817,
+    "assets_total": 1166.845,
+    "matchroom_localization_inside_assets": 259.352,
+    "asset_tail_after_localization_unpartitioned": 907.493,
+    "full_report": 1567.662
+  },
+  "source_asset_tail_pct_of_full_report": 57.89,
+  "medium_refinement_budget_seconds_allocated_not_measured": {
+    "00:31": 106.795,
+    "00:44": 160.702,
+    "00:08": 420,
+    "total": 687.497
+  },
+  "initial_contour_time_budget_reached_card_count": 6,
+  "local_encoder_benchmark": {
+    "scope": "DIFFERENT_HOST_NOT_LIVE_RUNTIME",
+    "method": "Same eight original source clip start/end and source FFmpeg scale=720:1280, libx264 ultrafast CRF24 threads1 vsync0 +faststart",
+    "results_by_clip_seconds": {
+      "00:50": 1.15,
+      "00:31": 0.737,
+      "00:24": 1.037,
+      "00:44": 0.848,
+      "00:56": 0.844,
+      "00:13": 0.75,
+      "00:04": 1.035,
+      "00:08": 1.434
+    },
+    "sum_encoded_seconds": 7.835,
+    "all_8_encodes_succeeded": true,
+    "not_a_production_clip_encode_timing": true,
+    "not_evidence_that_encoder_is_fast_on_live_host": true
+  },
+  "remaining_open_work": {
+    "offline_only_instrumentation_in_live_target_needed": [
+      "source_contour_actual_elapsed",
+      "medium_refinement_actual_elapsed",
+      "per_clip_encoder_actual_elapsed",
+      "per_clip_upload_actual_elapsed"
+    ],
+    "claim_about_bottleneck": "The unpartitioned 907.493 seconds may include several processes; medium refinement allocations cannot prove runtime.",
+    "improvement_not_yet_verified": true
+  },
+  "quality_contract": "No reduced source sampling, changed identity thresholds, missing evidence, shortened deadline, disabled refinement or approximate source PTS are authorized by this profiling.",
+  "paid_model_calls": 0,
+  "production_code_changed": false
+}
