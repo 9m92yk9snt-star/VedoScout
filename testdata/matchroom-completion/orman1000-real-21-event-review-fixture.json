@@ -7,83 +7,103 @@
   "other_20_events": [
     {
       "event_id": "4a31aac887cfe9928ed7",
-      "canonical_event_type": "DRIBBLE"
+      "canonical_event_type": "DRIBBLE",
+      "source_video_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2"
     },
     {
       "event_id": "e6cfdd0f01aedac57b43",
-      "canonical_event_type": "DUEL"
+      "canonical_event_type": "DUEL",
+      "source_video_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2"
     },
     {
       "event_id": "966c91c7243829d6fab0",
-      "canonical_event_type": "DRIBBLE"
+      "canonical_event_type": "DRIBBLE",
+      "source_video_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2"
     },
     {
       "event_id": "0fc666670ff612a8af2f",
-      "canonical_event_type": "RUN"
+      "canonical_event_type": "RUN",
+      "source_video_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2"
     },
     {
       "event_id": "4a0ef5b0bd50f4680772",
-      "canonical_event_type": "DUEL"
+      "canonical_event_type": "DUEL",
+      "source_video_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2"
     },
     {
       "event_id": "c8f5d1241d129673c48f",
-      "canonical_event_type": "DRIBBLE"
+      "canonical_event_type": "DRIBBLE",
+      "source_video_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2"
     },
     {
       "event_id": "9a392fb19c052dfe6719",
-      "canonical_event_type": "SHOT"
+      "canonical_event_type": "SHOT",
+      "source_video_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2"
     },
     {
       "event_id": "1349b8676c1e07e88c00",
-      "canonical_event_type": "RUN"
+      "canonical_event_type": "RUN",
+      "source_video_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2"
     },
     {
       "event_id": "a512ae64e102f24b3383",
-      "canonical_event_type": "DRIBBLE"
+      "canonical_event_type": "DRIBBLE",
+      "source_video_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2"
     },
     {
       "event_id": "d1a34d11944defe8c2ce",
-      "canonical_event_type": "GOAL"
+      "canonical_event_type": "GOAL",
+      "source_video_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2"
     },
     {
       "event_id": "80d5f358028a706401fa",
-      "canonical_event_type": "DRIBBLE"
+      "canonical_event_type": "DRIBBLE",
+      "source_video_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2"
     },
     {
       "event_id": "3662fe46e2175be7f823",
-      "canonical_event_type": "PASS"
+      "canonical_event_type": "PASS",
+      "source_video_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2"
     },
     {
       "event_id": "832177ba357fc1358bc0",
-      "canonical_event_type": "DRIBBLE"
+      "canonical_event_type": "DRIBBLE",
+      "source_video_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2"
     },
     {
       "event_id": "006dbd71ed71d464f19d",
-      "canonical_event_type": "ASSIST"
+      "canonical_event_type": "ASSIST",
+      "source_video_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2"
     },
     {
       "event_id": "39103409d27adf8172e2",
-      "canonical_event_type": "RUN"
+      "canonical_event_type": "RUN",
+      "source_video_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2"
     },
     {
       "event_id": "a9a96b3425e98f0fdf0c",
-      "canonical_event_type": "DRIBBLE"
+      "canonical_event_type": "DRIBBLE",
+      "source_video_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2"
     },
     {
       "event_id": "baa4a5cfb76333175f55",
-      "canonical_event_type": "RUN"
+      "canonical_event_type": "RUN",
+      "source_video_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2"
     },
     {
       "event_id": "5f5692328ea383dd5b7f",
-      "canonical_event_type": "CARRY"
+      "canonical_event_type": "CARRY",
+      "source_video_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2"
     },
     {
       "event_id": "16b70d6326506d906e7d",
-      "canonical_event_type": "ASSIST"
+      "canonical_event_type": "ASSIST",
+      "source_video_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2"
     },
     {
       "event_id": "aa72fc7d4774da486be7",
-      "canonical_event_type": "PASS"
+      "canonical_event_type": "PASS",
+      "source_video_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2"
     }
   ],
   "disputed_original": {
