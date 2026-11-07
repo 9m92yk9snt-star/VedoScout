@@ -82,3 +82,23 @@ def validate_source_role_pixels(source_video, role):
         "white_person_identity_automatically_approved":False,
         "model_calls":0,
     }
+
+
+def validate_uploaded_archive_role(archive_path, role):
+    """Use the exact source MP4 INSIDE the previously SHA-verified ZIP."""
+    import shutil
+    import tempfile
+    import zipfile
+    from pathlib import Path
+    with zipfile.ZipFile(archive_path) as archive:
+        expected = [
+            name for name in archive.namelist()
+            if name.startswith("video/canonical_web-") and name.endswith(".web.mp4")
+        ]
+        if len(expected)!=1 or archive.testzip() is not None:
+            raise ValueError("EXACT_SOURCE_WEB_VIDEO_ARCHIVE_REQUIRED")
+        with tempfile.TemporaryDirectory(prefix="orman1000-role-source-") as temporary:
+            filename=Path(temporary)/"canonical.web.mp4"
+            with archive.open(expected[0]) as src, filename.open("wb") as dst:
+                shutil.copyfileobj(src,dst,1024*1024)
+            return validate_source_role_pixels(filename,role)
