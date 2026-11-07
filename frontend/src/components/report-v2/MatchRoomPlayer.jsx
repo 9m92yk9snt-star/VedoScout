@@ -197,7 +197,7 @@ export function MatchRoomPlayer({
           </g>}
         </g>
         {arrow && <g data-testid="match-room-ball-arrow" data-source-ms={arrow.media_ms} data-reviewed-direction={arrow.reviewedDirection ? "true" : undefined} mask={`url(#ball-people-${id})`} opacity={arrow.opacity}>
-          <line x1={arrow.ballTrail[0][0] * 1000} y1={arrow.ballTrail[0][1] * yScale} x2={arrow.ballTrail[1][0] * 1000} y2={arrow.ballTrail[1][1] * yScale} stroke={`url(#pass-${id})`} strokeWidth="2" strokeDasharray={arrow.reviewedDirection ? "5 5" : undefined} strokeLinecap="round" vectorEffect="non-scaling-stroke" markerEnd={`url(#arrow-${id})`} />
+          <line x1={arrow.ballTrail[0][0] * 1000} y1={arrow.ballTrail[0][1] * yScale} x2={arrow.ballTrail[1][0] * 1000} y2={arrow.ballTrail[1][1] * yScale} stroke={`url(#pass-${id})`} strokeWidth="2" strokeLinecap="round" vectorEffect="non-scaling-stroke" markerEnd={`url(#arrow-${id})`} />
         </g>}
       </svg>}
       {arrow?.reviewedDirection && <div className="mr-kicker" style={{position:"absolute",top:12,left:12,background:"#111c",padding:"6px 10px",borderRadius:8}}>Reviewed pass direction</div>}
