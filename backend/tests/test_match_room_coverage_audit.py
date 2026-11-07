@@ -135,3 +135,38 @@ def test_retained_report_audit_enforces_source_event_before_any_coverage_claim()
     bad["full_report"]["video_comments"][0]["match_room"]["tracking"]["event_id"] = "other"
     with pytest.raises(ValueError, match="TRACK_EVENT_BINDING_CHANGED"):
         audit_report(bad)
+
+
+
+def test_contour_timeout_does_not_claim_missing_source_frames_or_silent_completion():
+    from match_room_coverage_audit import contour_budget_observation
+    result = contour_budget_observation({
+        "contour_diagnostics": {"windows": [
+            {"status": "TIME_BUDGET"},
+            {"status": "SUPPORTED_SOURCE_OBSERVATIONS"},
+            {"status": "TIME_BUDGET"},
+        ]},
+        "segments": [{"id": "source-first"}, {"id": "source-second"}],
+        "refinement_diagnostics": {"status": "SUPPORTED_SOURCE_OBSERVATIONS"},
+    })
+    assert result == {
+        "kind": "INITIAL_CONTOUR_PROCESSING",
+        "initial_windows_examined": 3,
+        "initial_windows_time_budget_reached": 2,
+        "initial_windows_with_supported_observations": 1,
+        "total_accepted_segments": 2,
+        "source_frame_coverage_complete": None,
+        "status": "INITIAL_WINDOW_TIME_BUDGET_REACHED",
+    }
+    # A later refinement might recover all missing frames; initial timeout
+    # is a historical observation, not proof that the final clip is incomplete.
+    assert result["source_frame_coverage_complete"] is None
+
+
+def test_no_source_tracking_is_not_claimed_complete():
+    from match_room_coverage_audit import contour_budget_observation
+    empty = contour_budget_observation(None)
+    assert empty["total_accepted_segments"] == 0
+    assert empty["initial_windows_time_budget_reached"] == 0
+    assert empty["source_frame_coverage_complete"] is None
+    assert empty["status"] == "NO_INITIAL_TIME_BUDGET_RECORDED"
