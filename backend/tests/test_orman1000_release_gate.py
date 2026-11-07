@@ -119,6 +119,15 @@ def test_any_stale_field_foreign_source_or_unreviewed_white_finisher_blocks_rele
     bad["canonical_events"]["source_video_sha256"] = "foreign"
     candidates.append((bad, role, "CANDIDATE_VIDEO_SHA_MISMATCH"))
     bad = deepcopy(perfect)
+    selected = bad["canonical_events"]["events"][-1]["actor_visual_id"]
+    bad["canonical_events"]["events"][-1]["causal_chain"].update(
+        receiver_visual_id=selected, finisher_visual_id=selected
+    )
+    candidates.append((bad, role, "SOURCE_SCOPED_WHITE_FINISHER_NOT_BOUND"))
+    bad = deepcopy(perfect)
+    bad["canonical_events"]["events"][-1]["actor_visual_id"] = "foreign:selected:p2"
+    candidates.append((bad, role, "SELECTED_PLAYER_IDENTITY_CHANGED"))
+    bad = deepcopy(perfect)
     bad["canonical_events"]["events"][-1]["causal_chain"]["finisher_visual_id"] = "p3"
     candidates.append((bad, role, "SOURCE_SCOPED_WHITE_FINISHER_NOT_BOUND"))
     review = deepcopy(role)
