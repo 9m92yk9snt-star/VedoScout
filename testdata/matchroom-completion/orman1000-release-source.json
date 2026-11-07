@@ -464,5 +464,23 @@
     "evidence": "testdata/sequence-pilot-orman400/anchors.json versus latest Orman1000 ZIP anchors.json (exact manually selected source PTS; no model predictions)",
     "comparator": "backend/scripts/compare_orman500_orman1000_selected_anchors.py",
     "model_calls": 0
+  },
+  "third_assist_provenance_guard": {
+    "status": "SOURCE_BOUND_REVIEW_PROVENANCE_CONTRACT_IMPLEMENTED_SHADOW_ONLY",
+    "original_source_video_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2",
+    "disputed_event_id": "47ad617d2ba76a4683cd",
+    "original_source_model_receipt_response_sha256": "7c3fd71f15b0b7736f9b879573c30c38e1426ddc4d6ea7d4daacb2182db06631",
+    "earlier_reviewed_assist_receipt_response_sha256": "c1b78325895885002ccc58f036b0a29824406997108b12648f3805a46e0040ff",
+    "original_receipt_must_remain_immutable": true,
+    "separate_review_provenance_required_for_publication": true,
+    "event_level_and_report_level_review_history_required": true,
+    "source_frame_50331_and_50648_hashes_required": true,
+    "selected_player_and_distinct_white_finisher_review_status": "STILL_UNVERIFIED",
+    "signed_human_finisher_role_review_present": false,
+    "source_event_reclassified_in_production": false,
+    "report_corrected_in_production": false,
+    "initial_44_targeted_tests_passed": true,
+    "initial_tests_run_id": 42330868248,
+    "note": "A prior approved assist, 13/13 near-matching visual frames and six aligned player taps support comparison but do not prove the exact hidden finishing contact or approve person role transfer. A separate role review is mandatory before any correction."
   }
 }
