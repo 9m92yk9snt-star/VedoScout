@@ -361,5 +361,40 @@
     "confirmed_systematic_cause": false,
     "forbidden_inference": "More images alone cannot prove better attribution. Do not copy earlier model-local person IDs or claim individual pixel contact while the foot is occluded.",
     "production_automatic_correction_enabled": false
+  },
+  "derived_report_reconciliation": {
+    "status": "REVIEW_ONLY_SHADOW_COMPLETE_NOT_PUBLISHED",
+    "exact_latest_zip_sha256": "3b27260511ed965952a497f97d1c6345a0f1b4bef1b89a60912a62e0f6530c0c",
+    "original_source_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2",
+    "full_unpublished_shadow_report_sha256": "7c13694fa996765cc813480f8fc5a78c1d2682867d744a64d844762a47c2af77",
+    "actual_verified_stats_implementation_sha256": "def5cce860ca41fe7215da26244433d8f94c8fa1bad6455154a3834bd83e55ff",
+    "derived_stats_after_hypothetical_same_play_assist_reclass": {
+      "observed_goals": 1,
+      "observed_assists": 3,
+      "shots": 2,
+      "shots_on_target": 2,
+      "passes_attempted": 5,
+      "passes_completed": 5,
+      "key_passes": 3
+    },
+    "disputed_event_id": "47ad617d2ba76a4683cd",
+    "dependent_run_id": "baa4a5cfb76333175f55",
+    "other_19_events_unchanged": true,
+    "original_model_receipts_preserved": true,
+    "original_source_video_unchanged": true,
+    "former_own_goal_ball_arrow_suppressed_in_shadow": true,
+    "registered_source_frame_pixel_hashes": "testdata/matchroom-completion/orman1000-50s-exact-decoded-pts-hashes.json",
+    "reviewed_source_frame_pts": [
+      49715,
+      49881,
+      50081,
+      50331,
+      50431,
+      50648,
+      51131
+    ],
+    "no_new_model_calls": true,
+    "product_release_ready": false,
+    "blocker": "Current-source separate WHITE receiver/finisher still needs independent role verification on source frames. Do not map prior local p3 to current blue p3."
   }
 }
