@@ -137,7 +137,9 @@
       "receipts": [
         {
           "packet_id": "contact_review_006",
-          "response_sha256": "7c3fd71f15b0b7736f9b879573c30c38e1426ddc4d6ea7d4daacb2182db06631"
+          "response_sha256": "7c3fd71f15b0b7736f9b879573c30c38e1426ddc4d6ea7d4daacb2182db06631",
+          "origin": "LIVE_MODEL_REQUEST",
+          "payload_sha256": "f27b805a846d6f1681d33e31e7e6e3e4a4825dcd866981a02088b36cf295f669"
         }
       ]
     },
