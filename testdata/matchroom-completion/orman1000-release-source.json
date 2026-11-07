@@ -616,5 +616,15 @@
     ],
     "interpretation": "Completed scheduler is NOT proof of full source mask coverage; TIME_BUDGET records an initial window limit even if later refinement recovered some pixels.",
     "policy": "Expose only historical budget diagnostics. Never auto extend masks or infer absent player positions from status."
+  },
+  "publication_vs_analysis_key_pass_definition": {
+    "source": "Actual latest ZIP and unchanged backend verified_stats.py vs report_publication.py",
+    "observed_assists_after_review_only_projection": 3,
+    "internal_verified_stats_key_passes_including_assists": 3,
+    "publication_key_passes_excluding_assists": 0,
+    "publication_user_visible_label": "Key Passes (excluding assists)",
+    "interpretation": "These are distinct measurement definitions; source product intentionally excludes assists from published key passes. Do not mislabel zero other key passes as missing three assists.",
+    "publication_preview_verified_without_new_model_calls": true,
+    "production_changed": false
   }
 }
