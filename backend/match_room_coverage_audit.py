@@ -116,3 +116,27 @@ def source_gap_audit(event, previous):
                       "reason": "DECLARED_SEGMENT_SPAN_HAS_UNPROVEN_SOURCE_FRAMES"})
     return {"status": "AUDITED", "holes": holes[:32], "count": len(holes),
             "declared_spans": len(declared), "supported_source_runs": len(actual)}
+
+
+def contour_budget_observation(track):
+    """Metadata only: scheduler COMPLETED != every source contour completed.
+
+    A TIME_BUDGET result says a processing window was interrupted, even if
+    subsequent refinement recovered some or all frames. This flag does not
+    claim uncovered frames or authorize interpolation / further model calls.
+    """
+    diagnostics = (track.get("contour_diagnostics") or {}) if isinstance(track, dict) else {}
+    windows = diagnostics.get("windows") or []
+    if not isinstance(windows, list):
+        windows = []
+    statuses = [w.get("status") for w in windows if isinstance(w, dict)]
+    return {
+        "kind": "INITIAL_CONTOUR_PROCESSING",
+        "initial_windows_examined": len(statuses),
+        "initial_windows_time_budget_reached": statuses.count("TIME_BUDGET"),
+        "initial_windows_with_supported_observations": statuses.count("SUPPORTED_SOURCE_OBSERVATIONS"),
+        "total_accepted_segments": len(track.get("segments") or []) if isinstance(track, dict) else 0,
+        "source_frame_coverage_complete": None,
+        "status": "INITIAL_WINDOW_TIME_BUDGET_REACHED"
+                  if "TIME_BUDGET" in statuses else "NO_INITIAL_TIME_BUDGET_RECORDED",
+    }
