@@ -328,5 +328,38 @@
     "copied_actor_ids_across_runs": false,
     "live_canonical_event_modified": false,
     "immediate_next_step": "Verify distinct current-source white finisher using actual frames with two observed body roles; only then propose an atomic event-level edit with all dependent stats and clips."
+  },
+  "source_player_census_at_50s": {
+    "same_underlying_play_confirmed_by_13_visual_frame_fingerprints": true,
+    "orman1000_model_packets": [
+      {
+        "packet_id": "sequence_006",
+        "explicit_image_count": 67,
+        "people_in_play": 7,
+        "selected_local_person": "p1",
+        "separate_white_finisher_registered": false,
+        "local_p3_kit": "BLUE"
+      },
+      {
+        "packet_id": "contact_review_006",
+        "explicit_image_count": 189,
+        "people_in_play": 7,
+        "selected_local_person": "p1",
+        "separate_white_finisher_registered": false,
+        "local_p3_kit": "BLUE"
+      }
+    ],
+    "previously_approved_model": {
+      "approval_receipt": "docs/examples/native-third-assist-approval-receipt.json",
+      "explicit_image_count": 255,
+      "special_limb_comparison_panels_added": 5,
+      "people_in_approved_source_response": 9,
+      "distinct_white_finisher_recorded": true,
+      "role": "prior:p3 distinct white teammate, finishing action supported at 50.331–50.648s"
+    },
+    "evidenced_failure_mode": "The newer two source-model packets do not enumerate the white receiving/finishing teammate that the earlier approved model distinguished in matching same-play footage.",
+    "confirmed_systematic_cause": false,
+    "forbidden_inference": "More images alone cannot prove better attribution. Do not copy earlier model-local person IDs or claim individual pixel contact while the foot is occluded.",
+    "production_automatic_correction_enabled": false
   }
 }
