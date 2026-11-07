@@ -27,7 +27,7 @@ def synthetic_source_bundle():
         "event_id": TARGET_EVENT, "source_video_sha256": SOURCE,
         "canonical_event_type": "GOAL", "canonical_action_type": "SHOT",
         "canonical_outcome": "GOAL", "canonical_ms": 49881,
-        "contact_ms": None,
+        "contact_ms": None, "contact_interval_ms": [49881, 50648],
         "proof": {"source_video_sha256": SOURCE, "receipts": [
             {"packet_id": "contact_review_006",
              "response_sha256": "7c3fd71f15b0b7736f9b879573c30c38e1426ddc4d6ea7d4daacb2182db06631"}
@@ -43,6 +43,15 @@ def test_approved_distinct_white_finisher_yields_only_unpublished_counterfactual
                      manifest["primary_evidence_archive"]["archive_sha256"])
     assert result["status"] == "REVIEW_PROPOSAL_NOT_PUBLISHED"
     assert result["same_footage_frame_matches"] == 13
+    assert result["contact_role_conflict"] == {
+        "current_reported_own_shot_bracket_ms": [49881, 50648],
+        "prior_selected_player_pass_ms": [49715, 50081],
+        "prior_separate_white_teammate_finish_ms": [50331, 50648],
+        "current_bracket_overlap_with_prior_pass_ms": 200,
+        "current_bracket_overlap_with_prior_teammate_finish_ms": 317,
+        "two_distinct_prior_actor_roles_overlap_current_goal_bracket": True,
+        "automatic_cross_source_role_transfer": False,
+    }
     assert result["exported_observed_counts"] == {"goals": 2, "assists": 2}
     assert result["proposed_observed_counts_if_approved"] == {"goals": 1, "assists": 3}
     assert result["actor_ids_transferred_across_model_runs"] is False
@@ -61,6 +70,7 @@ def test_approved_distinct_white_finisher_yields_only_unpublished_counterfactual
     lambda b,o,m: m["cross_sha_perceptual_source_comparison"].update(visual_near_matches=12),
     lambda b,o,m: m["primary_evidence_archive"].update(archive_sha256="other-zip"),
     lambda b,o,m: b["events"][-1].update(contact_ms=49881),
+    lambda b,o,m: b["events"][-1].update(contact_interval_ms=[49881, 50631]),
     lambda b,o,m: b["events"][-1].update(canonical_event_type="ASSIST"),
     lambda b,o,m: b["events"].append(deepcopy(b["events"][-1])),
     lambda b,o,m: o["result"]["target_events"][0].update(receiver="p1"),
@@ -108,6 +118,9 @@ def test_actual_orman1000_21_event_zip_fixture_only_previews_unpublished_1_goal_
     result = propose(bundle, PRIOR, MANIFEST, actual["archive_sha256"])
     assert result["status"] == "REVIEW_PROPOSAL_NOT_PUBLISHED"
     assert result["disputed_event_id"] == actual["disputed_original"]["event_id"]
+    assert result["contact_role_conflict"]["two_distinct_prior_actor_roles_overlap_current_goal_bracket"]
+    assert result["contact_role_conflict"]["current_bracket_overlap_with_prior_pass_ms"] == 200
+    assert result["contact_role_conflict"]["current_bracket_overlap_with_prior_teammate_finish_ms"] == 317
     assert result["exported_observed_counts"] == actual["current_exported_counts"]
     assert result["proposed_observed_counts_if_approved"] == {"goals": 1, "assists": 3}
     assert result["all_other_20_events_sha256"] == digest
