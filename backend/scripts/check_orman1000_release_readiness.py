@@ -11,6 +11,8 @@ from pathlib import Path
 import zipfile
 from collections import Counter
 
+from orman1000_derived_consistency import check_consistency
+
 TARGET = "47ad617d2ba76a4683cd"
 SOURCE = "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2"
 ARCHIVE = "3b27260511ed965952a497f97d1c6345a0f1b4bef1b89a60912a62e0f6530c0c"
@@ -109,6 +111,7 @@ def judge(original, candidate, role_review=None):
           "WHITE_FINISHER_ID_NOT_REVIEWED")
     check(review.get("evidence_frames") == ["s000050331", "s000050648"],
           "WHITE_FINISHER_SOURCE_PTS_NOT_REVIEWED")
+    errors.extend(check_consistency(original, candidate))
     return not errors, errors
 
 
