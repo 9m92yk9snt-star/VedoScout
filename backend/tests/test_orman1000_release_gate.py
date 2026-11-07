@@ -295,6 +295,10 @@ def test_any_stale_field_foreign_source_or_unreviewed_white_finisher_blocks_rele
     ok, reasons = judge(bad, perfect, role)
     assert ok is False and "POST_CONTACT_OWNER_TAP_NOT_SOURCE_BOUND" in reasons
     bad = deepcopy(original)
+    bad["raw_marker_anchors"][-1]["box"] = "not-a-source-box"
+    ok, reasons = judge(bad, perfect, role)
+    assert ok is False and "POST_CONTACT_P1_IDENTITY_CONTRADICTS_OWNER_TAP" in reasons
+    bad = deepcopy(original)
     bad["raw_marker_anchors"][-1]["box"]["x"] = 0.2
     ok, reasons = judge(bad, perfect, role)
     assert ok is False and "POST_CONTACT_P1_IDENTITY_CONTRADICTS_OWNER_TAP" in reasons
