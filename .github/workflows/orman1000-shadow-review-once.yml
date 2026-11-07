@@ -14,7 +14,7 @@ jobs:
       github.event.pull_request.draft == true &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.event.pull_request.head.ref == 'codex/matchroom-window-geometry-reuse' &&
-      github.event.before == '946b45d171ed94a05b5ddf061d9d3b2179fb02b7' &&
+      github.event.before == 'f5162421894e5bd3822067c220f86f1f54f436b0' &&
       github.run_attempt == 1
     runs-on: ubuntu-latest
     timeout-minutes: 8
