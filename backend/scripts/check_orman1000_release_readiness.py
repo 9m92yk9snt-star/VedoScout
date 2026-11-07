@@ -12,6 +12,7 @@ import zipfile
 from collections import Counter
 
 from orman1000_derived_consistency import check_consistency, FOLLOWUP_RUN
+from orman1000_review_provenance import resolution_problems
 from orman1000_role_spatial_gate import (
     review_role_geometry, SELECTED_BODY_BOX, SELECTED_GROUND,
     SELECTED_FRAME_ID, SOURCE_BALL_AT_FINISH_MS,
@@ -149,6 +150,13 @@ def judge(original, candidate, role_review=None):
     # not just a new string ID with a copied source hash.
     _, spatial_failures = review_role_geometry(review)
     errors.extend(spatial_failures)
+    errors.extend(resolution_problems(before, action, review))
+    # An event-local corrected claim is not enough. The same immutable
+    # correction provenance must also be available to the report consumer.
+    history = (candidate.get("full_report") or {}).get("independent_action_review_trails")
+    check(isinstance(history, list) and len(history) == 1
+          and history[0] == action.get("review_resolution"),
+          "REPORT_INDEPENDENT_REVIEW_TRAIL_MISSING_OR_CHANGED")
     errors.extend(check_consistency(original, candidate))
     return not errors, errors
 
