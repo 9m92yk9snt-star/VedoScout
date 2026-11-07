@@ -115,6 +115,7 @@ def hypothetical_review_only():
             row.update(action_type="pass", canonical_action_type="PASS",
                        canonical_event_type="ASSIST", football_action_type="PASS",
                        football_event_type="ASSIST", football_outcome="TEAMMATE_GOAL",
+                       canonical_result="TEAMMATE_SCORED",
                        title="Assist", causal_chain=deepcopy(action["causal_chain"]),
                        football_details=["Synthetic reviewed assist to a distinct player."])
         elif row["event_id"] == FOLLOWUP_RUN:
@@ -123,8 +124,12 @@ def hypothetical_review_only():
         "He delivered a dribble, a goal and a direct assist."
     )
     card = candidate["full_report"]["video_comments"][0]
-    card["comment"] = "Synthetic reviewed assist, not a live report."
-    card["match_room"].update(action_type="PASS", action_outcome="TEAMMATE_GOAL")
+    card["comment"] = "Verified assist by the selected player."
+    card["match_room"].update(
+        action_type="PASS", action_outcome="TEAMMATE_GOAL",
+        receiver_visual_id=tested_role,
+        observation="Synthetic distinct white teammate receives and finishes; source review not real.",
+    )
     review = {
         "source_video_sha256": SOURCE, "event_id": TARGET,
         "prior_receipt_response_sha256": PRIOR_RECEIPT,
@@ -194,6 +199,15 @@ def test_any_stale_field_foreign_source_or_unreviewed_white_finisher_blocks_rele
     bad = deepcopy(perfect)
     bad["full_report"]["match_stats"]["observed_assists"] = 2
     candidates.append((bad, role, "PUBLISHED_STATS_NOT_1_GOAL_3_ASSISTS"))
+    bad = deepcopy(perfect)
+    bad["full_report"]["action_timeline"][-1]["canonical_result"] = "SCORED"
+    candidates.append((bad, role, "ACTION_TIMELINE_STILL_SHOWS_GOAL"))
+    bad = deepcopy(perfect)
+    bad["full_report"]["video_comments"][0]["match_room"]["receiver_visual_id"] = "p1"
+    candidates.append((bad, role, "MATCH_ROOM_RECIPIENT_NOT_SAME_VERIFIED_PERSON"))
+    bad = deepcopy(perfect)
+    bad["full_report"]["video_comments"][0]["match_room"]["observation"] = "This is a selected-player goal"
+    candidates.append((bad, role, "MATCH_ROOM_CAUSAL_NARRATIVE_STALE"))
     bad = deepcopy(perfect)
     bad["full_report"]["video_comments"][0]["match_room"]["action_type"] = "SHOT"
     candidates.append((bad, role, "MATCH_ROOM_STILL_SAYS_OWN_GOAL"))
