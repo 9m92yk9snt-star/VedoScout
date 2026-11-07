@@ -97,7 +97,15 @@ def judge(original, candidate, role_review=None):
         check(room.get("action_type") == "PASS"
               and room.get("action_outcome") == "TEAMMATE_GOAL",
               "MATCH_ROOM_STILL_SAYS_OWN_GOAL")
-        check("Verified goal by the selected player" not in (card.get("comment") or ""),
+        check(bool(receiver) and room.get("receiver_visual_id") == receiver,
+              "MATCH_ROOM_RECIPIENT_NOT_SAME_VERIFIED_PERSON")
+        observation = room.get("observation") or ""
+        check(bool(observation)
+              and "this is a selected-player goal" not in observation.lower()
+              and "no teammate receives and shoots" not in observation.lower()
+              and "not a direct assist" not in observation.lower(),
+              "MATCH_ROOM_CAUSAL_NARRATIVE_STALE")
+        check(card.get("comment") == "Verified assist by the selected player.",
               "REPORT_COMMENT_STILL_SAYS_OWN_GOAL")
     review = role_review or {}
     check(review.get("source_video_sha256") == SOURCE
