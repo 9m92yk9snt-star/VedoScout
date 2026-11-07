@@ -109,6 +109,11 @@ def test_third_assist_is_explicit_release_block_not_unverified_score_rewrite():
     assert candidate["currently_exported_as"] == "SHOT_GOAL"
     assert candidate["goal_scoring_actor_verified_by_independent_review"] is False
     assert evidence["current_release_acceptance"] == "RELEASE_BLOCKED_PENDING_SOURCE_BOUND_PERSON_ROLE_RECONCILIATION_DESPITE_SAME_VIDEO_PLAY_CONFIRMED"
+    assert evidence["pending_role_signoff"]["detailed_blocker_code"] == (
+        "BLOCKED_REAL_ORMAN1000_DISTINCT_WHITE_FINISHER_SOURCE_REVIEW_PENDING"
+    )
+    assert evidence["pending_role_signoff"]["separate_white_body_boxes_verified"] is False
+    assert evidence["pending_role_signoff"]["current_source_finisher_visual_id"] is None
     assert evidence["production_cache_enabled"] is False
 
 
