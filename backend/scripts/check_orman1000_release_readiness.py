@@ -75,8 +75,13 @@ def judge(original, candidate, role_review=None):
           "PUBLISHED_STATS_NOT_1_GOAL_3_ASSISTS")
     chain = action.get("causal_chain") or {}
     finisher, receiver = chain.get("finisher_visual_id"), chain.get("receiver_visual_id")
+    selected_actor = before.get("actor_visual_id")
+    check((not selected_actor or action.get("actor_visual_id") == selected_actor)
+          and (not before.get("global_target_id") or
+               action.get("global_target_id") == before.get("global_target_id")),
+          "SELECTED_PLAYER_IDENTITY_CHANGED")
     check(bool(receiver) and receiver == finisher
-          and receiver not in ("p1", "p3", "prior:p3"),
+          and receiver not in ("p1", "p3", "prior:p3", selected_actor),
           "SOURCE_SCOPED_WHITE_FINISHER_NOT_BOUND")
     cards = (candidate.get("full_report") or {}).get("video_comments") or []
     affected = [c for c in cards if c.get("event_id") == TARGET]
