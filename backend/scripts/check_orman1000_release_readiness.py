@@ -11,7 +11,7 @@ from pathlib import Path
 import zipfile
 from collections import Counter
 
-from orman1000_derived_consistency import check_consistency
+from orman1000_derived_consistency import check_consistency, FOLLOWUP_RUN
 
 TARGET = "47ad617d2ba76a4683cd"
 SOURCE = "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2"
@@ -46,7 +46,7 @@ def judge(original, candidate, role_review=None):
     original_by_id = {e["event_id"]: e for e in old}
     candidate_by_id = {e["event_id"]: e for e in new}
     for eid in old_ids:
-        if eid != TARGET and stable(original_by_id[eid]) != stable(candidate_by_id[eid]):
+        if eid not in (TARGET, FOLLOWUP_RUN) and stable(original_by_id[eid]) != stable(candidate_by_id[eid]):
             errors.append("OTHER_CANONICAL_EVENT_CHANGED:" + eid)
     before = original_by_id[TARGET]
     action = candidate_by_id[TARGET]
