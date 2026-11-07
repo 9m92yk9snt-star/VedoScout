@@ -117,7 +117,7 @@ def test_latest_source_receipts_explicitly_conflict_with_previously_verified_ass
     previous = evidence["previously_verified_model_findings"]
     assert previous["total_goals"] == 1
     assert previous["total_assists"] == 3
-    assert previous["original_video_sha256"].startswith("NOT_YET_")
+    assert previous["original_video_sha256"] == "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999"
     assert [row["type"] for row in previous["chronological_actions"]] == [
         "GOAL", "ASSIST", "ASSIST", "ASSIST"
     ]
@@ -133,3 +133,53 @@ def test_latest_source_receipts_explicitly_conflict_with_previously_verified_ass
     assert conflict["historical_reference"]["evidence_ms_range"] == [49848, 50065]
     assert conflict["cause_not_yet_proven"] is True
     assert conflict["production_fix_implemented"] is False
+
+
+def test_older_approved_assist_and_current_orman1000_are_same_video_play_not_same_local_ids():
+    evidence = load("orman1000-release-source.json")
+    linked = evidence["cross_sha_perceptual_source_comparison"]
+    assert linked["source_sha256"] == SOURCE
+    assert linked["historical_source_sha256"] != SOURCE
+    assert linked["run_id"] == 42315757175
+    assert linked["total_target_frames"] == linked["match_count"] == 13
+    assert linked["exact_decoded_pts_matches"] == 12
+    assert linked["one_matched_pts_difference_ms"] == 16
+    assert linked["same_underlying_play_supported"] is True
+    assert linked["direct_receipt_transfer_approved"] is False
+    assert linked["canonical_stats_mutated"] is False
+    assert linked["provider_model_calls"] == 0
+    historical = evidence["previously_verified_model_findings"]
+    assert historical["verified_previous_receipt_response_sha256"] == (
+        "c1b78325895885002ccc58f036b0a29824406997108b12648f3805a46e0040ff"
+    )
+    assert historical["verified_previous_contact_interval_ms"] == [49715,50081]
+    assert historical["verified_previous_receiver_finish_interval_ms"] == [50331,50648]
+    assert "white teammate" in historical["verified_previous_receiver"]
+    conflict = evidence["prior_model_conflict_at_50_seconds"]
+    assert conflict["historical_reference"]["same_underlying_play_verified_by_perceptual_frame_matching"] is True
+    assert conflict["historical_reference"]["independent_player_role_reconciliation_automatically_applied"] is False
+    assert "new model's p3" not in historical["verified_previous_receiver"]
+    assert evidence["current_release_acceptance"].startswith("RELEASE_BLOCKED_")
+
+
+def test_prior_approved_assist_receipt_actor_and_finisher_are_two_distinct_people():
+    evidence = load("orman1000-release-source.json")
+    previous = evidence["previously_verified_model_findings"]
+    prior = json.loads((BASE.parents[1] / "docs/examples/native-third-assist-approval-receipt.json").read_text())
+    assert prior["source_video_sha256"] == previous["original_video_sha256"]
+    assert prior["response_sha256"] == previous["verified_previous_receipt_response_sha256"]
+    approved = prior["result"]["target_events"]
+    matches = [e for e in approved if e.get("event_type") == "ASSIST"
+               and e.get("approval_status") == "APPROVED"]
+    assert len(matches) == 1
+    row = matches[0]
+    assert row["actor"] == "p1"
+    assert row["receiver"] == row["finisher"] == "p3"
+    assert row["actor"] != row["finisher"]
+    assert row["contact_interval_ms"] == [49715,50081]
+    assert row["receiver_interval_ms"] == [50331,50648]
+    assert row["finishing_contact_interval_ms"] == [50331,50648]
+    assert row["outcome_ms"] == 51131
+    # Previous local p3 is a white finisher. New model local p3 is BLUE.
+    assert "white-kit teammate" in next(p["appearance"] for p in
+            prior["result"]["raw_observations"]["players"] if p["person_id"] == "p3")
