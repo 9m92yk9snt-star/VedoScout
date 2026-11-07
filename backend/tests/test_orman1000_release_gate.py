@@ -8,7 +8,7 @@ import json
 from pathlib import Path
 
 from scripts.check_orman1000_release_readiness import (
-    SOURCE, TARGET, PRIOR_RECEIPT, judge
+    SOURCE, TARGET, PRIOR_RECEIPT, FINISHER_SOURCE_FRAME_HASHES, judge
 )
 from orman1000_derived_consistency import (
     FOLLOWUP_RUN, NEUTRAL_RUN, STAT_DELTAS, REMOVE_IDS, ADD_IDS
@@ -136,6 +136,7 @@ def hypothetical_review_only():
         "status": "VERIFIED_DISTINCT_WHITE_FINISHER",
         "current_source_finisher_visual_id": tested_role,
         "evidence_frames": ["s000050331", "s000050648"],
+        "source_decoded_bgr_frame_sha256": deepcopy(FINISHER_SOURCE_FRAME_HASHES),
     }
     return original, candidate, review
 
@@ -232,6 +233,9 @@ def test_any_stale_field_foreign_source_or_unreviewed_white_finisher_blocks_rele
     bad = deepcopy(perfect)
     bad["canonical_events"]["events"][-1]["causal_chain"]["finisher_visual_id"] = "p3"
     candidates.append((bad, role, "SOURCE_SCOPED_WHITE_FINISHER_NOT_BOUND"))
+    review = deepcopy(role)
+    review["source_decoded_bgr_frame_sha256"]["s000050331"] = "forged-frame"
+    candidates.append((deepcopy(perfect), review, "WHITE_FINISHER_SOURCE_FRAME_BYTES_NOT_BOUND"))
     review = deepcopy(role)
     review["status"] = "PENDING"
     candidates.append((deepcopy(perfect), review, "INDEPENDENT_ROLE_REVIEW_PENDING"))
