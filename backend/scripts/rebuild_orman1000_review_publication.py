@@ -56,7 +56,18 @@ def validate_projection(original_published,candidate,published):
     by_label={x.get("label"):x.get("value") for x in (view.get("matchStats") or []) if isinstance(x,dict)}
     check(by_label.get("Goals")==1 and by_label.get("Assists")==3,
           "PUBLISHED_VIEW_STATS_STALE")
+    # Presentation contract intentionally EXCLUDES assists from key passes.
+    # The pre-publication verified_stats engine uses an inclusive measure.
+    # Never mistake a zero "other key passes" count for lost assists.
+    candidate_events=(candidate.get("canonical_events") or {}).get("events") or []
+    other_key_passes=sum(e.get("canonical_event_type")=="PASS"
+                         and e.get("canonical_outcome")=="TEAMMATE_SHOT"
+                         for e in candidate_events)
+    check(by_label.get("Key Passes (excluding assists)")==other_key_passes,
+          "PUBLISHED_KEY_PASS_EXCLUSION_SEMANTICS_CHANGED")
     stats=published.get("full_report",{}).get("match_stats") or {}
+    check(stats.get("key_passes")==other_key_passes,
+          "PUBLISHED_KEY_PASS_EXCLUSION_STAT_STALE")
     verified=published.get("full_report",{}).get("verified_stats") or {}
     check(stats.get("observed_goals")==1 and stats.get("observed_assists")==3,
           "PUBLISHED_REPORT_OBSERVED_STATS_STALE")
