@@ -411,3 +411,74 @@ def test_offline_profiler_accepts_only_source_bound_short_windows():
     ):
         with pytest.raises(ValueError):
             source_window(room, start, end)
+
+
+def test_orman1000_9433_source_endpoint_envelope_rejects_other_player_bridge():
+    """Exact original source observations: p1 x~.70, blue boot proposal x~.605.
+
+    These measured points come from the verified uploaded Orman1000 ZIP.
+    Synthetic candidate displays reproduce the two competing offline results,
+    without asserting new identity, video pixels or a corrected live overlay.
+    """
+    stamps = [9383, 9400, 9416, 9433, 9450, 9466, 9483, 9500]
+    frames = [{'media_ms':t} for t in stamps]
+    interval = {'indices':list(range(len(stamps))),
+                'instances':[0] + [None]*6 + [0],
+                'presentation_only':True}
+    observations = [
+        {'media_ms':9383, 'identity_status':'CONFIRMED',
+         'ground':[.696,.651], 'player_box':[.568,.508,.156,.144]},
+        {'media_ms':9500, 'identity_status':'CONFIRMED',
+         'ground':[.704,.651], 'player_box':[.552,.506,.181,.147]},
+    ]
+    blue_boot = {
+        3: {'display_ground':[.6049728789461906,.6480857618278189],
+            'display_estimated':True, 'source_ground_observation':False}
+    }
+    selected_player = {
+        3: {'display_ground':[.6994531939940165,.6510967806131802],
+            'display_estimated':True, 'source_ground_observation':False}
+    }
+    before = deepcopy((frames,interval,observations,blue_boot,selected_player))
+    assert localized.display_fits_source_bodies(frames,interval,blue_boot,observations) is False
+    assert localized.display_fits_source_bodies(frames,interval,selected_player,observations) is True
+    assert (frames,interval,observations,blue_boot,selected_player) == before
+
+
+def test_hidden_foot_envelope_is_rejection_only_and_does_not_change_measured_track():
+    stamps = [9383, 9400, 9416, 9433, 9450, 9466, 9483, 9500]
+    frames = [{'media_ms':t} for t in stamps]
+    observations = [
+        {'media_ms':9383, 'identity_status':'CONFIRMED',
+         'ground':[.696,.651], 'player_box':[.568,.508,.156,.144]},
+        {'media_ms':9500, 'identity_status':'CONFIRMED',
+         'ground':[.704,.651], 'player_box':[.552,.506,.181,.147]},
+    ]
+    bridge = {'indices':list(range(len(frames))), 'presentation_only':True}
+    wrong = {3:{'display_ground':[.605,.648],'display_estimated':True}}
+    assert localized.display_fits_source_bodies(frames,bridge,wrong,observations) is False
+    # This tightened rule never changes acceptance of a verified dense
+    # bidirectional path; it applies only to presentation-only bridges.
+    dense = {**bridge, 'presentation_only':False}
+    assert localized.display_fits_source_bodies(frames,dense,wrong,observations) is True
+    assert wrong[3]['display_ground'] == [.605,.648]
+    # Existing source endpoints without an intermediate estimate cannot
+    # manufacture a replacement position.
+    assert localized.display_fits_source_bodies(frames,bridge,{},observations) is True
+
+
+def test_bridge_tolerance_tracks_source_body_size_without_arbitrary_global_foot():
+    stamps=[0,25,50,75,100]
+    frames=[{'media_ms':t} for t in stamps]
+    observations=[
+        {'media_ms':0,'identity_status':'CONFIRMED',
+         'ground':[.3,.7],'player_box':[.25,.5,.12,.2]},
+        {'media_ms':100,'identity_status':'CONFIRMED',
+         'ground':[.34,.7],'player_box':[.27,.5,.12,.2]},
+    ]
+    interval={'indices':list(range(5)), 'presentation_only':True}
+    # A position displaced by less than 42% of source body width is permitted.
+    plausible={2:{'display_ground':[.36,.72],'display_estimated':True}}
+    implausible={2:{'display_ground':[.41,.72],'display_estimated':True}}
+    assert localized.display_fits_source_bodies(frames,interval,plausible,observations)
+    assert not localized.display_fits_source_bodies(frames,interval,implausible,observations)
