@@ -23,6 +23,13 @@ def build_reviewed_direction(video, event_id, source_sha256, review, deadline):
     if (any(type(t) is not int for t in (ref, start, end))
             or not 0 <= ref <= start < end or end-ref > 1500):
         raise ValueError('REVIEWED_DIRECTION_WINDOW_INVALID')
+    animation = review.get('animation')
+    if animation is not None and (
+            not isinstance(animation, dict)
+            or animation.get('kind') != 'RECONSTRUCTED_PASS'
+            or type(animation.get('arrival_ms')) is not int
+            or not start < animation['arrival_ms'] <= end):
+        raise ValueError('REVIEWED_DIRECTION_ANIMATION_INVALID')
     digest = hashlib.sha256()
     with open(video, 'rb') as stream:
         for chunk in iter(lambda: stream.read(1024*1024), b''):
@@ -60,6 +67,11 @@ def build_reviewed_direction(video, event_id, source_sha256, review, deadline):
                     raise ValueError('REVIEWED_DIRECTION_CAMERA_UNAVAILABLE')
                 camera = np.vstack([matrix, [0, 0, 1]]) @ camera
             trail = [((camera @ p)[:2]/[gw, gh]).tolist() for p in anchors]
+            if animation is not None:
+                # Display geometry only: never promote interpolated tips to
+                # ball observations, contacts, or event evidence.
+                progress = min(1., max(0., (ms-start)/(animation['arrival_ms']-start)))
+                trail[1] = (np.asarray(trail[0]) + progress*(np.asarray(trail[1])-trail[0])).tolist()
             if not all(point(p) for p in trail):
                 raise ValueError('REVIEWED_DIRECTION_OUT_OF_FRAME')
             if start-2 <= ms <= end+2:
