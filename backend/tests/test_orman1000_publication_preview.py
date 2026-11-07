@@ -58,10 +58,12 @@ def fake_publisher(report):
         "view":{"matchStats":[
             {"label":"Goals","value":doc["full_report"]["match_stats"]["observed_goals"]},
             {"label":"Assists","value":doc["full_report"]["match_stats"]["observed_assists"]},
+            {"label":"Key Passes (excluding assists)","value":0},
         ]},
         "content_sha256":"corrected" if corrected else "original",
         "review":{"human_status":"Scout review awaiting delivery"},
     }
+    doc["full_report"]["match_stats"]["key_passes"] = 0
     doc["score_meaning"]={"assessment":"partial evidence"}
     return doc
 
@@ -112,6 +114,10 @@ def test_stale_publication_stats_and_50s_card_are_rejected(monkeypatch):
             title="Assist")),
         ("PUBLISHED_VIEW_STATS_STALE",lambda _,c,p:p["report_publication"]["view"]["matchStats"][1].update(
             value=2)),
+        ("PUBLISHED_KEY_PASS_EXCLUSION_SEMANTICS_CHANGED",lambda _,c,p:p["report_publication"]["view"]["matchStats"][2].update(
+            value=3)),
+        ("PUBLISHED_KEY_PASS_EXCLUSION_STAT_STALE",lambda _,c,p:p["full_report"]["match_stats"].update(
+            key_passes=3)),
         ("PUBLISHED_REPORT_OBSERVED_STATS_STALE",lambda _,c,p:p["full_report"]["match_stats"].update(
             observed_assists=2)),
         ("PUBLICATION_MUST_PRESERVE_PARTIAL_COVERAGE",lambda _,c,p:p["full_report"]["verified_stats"].update(
