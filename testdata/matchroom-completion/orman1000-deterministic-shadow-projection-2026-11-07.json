@@ -1,0 +1,48 @@
+{
+  "scope": "UNPUBLISHED_SHADOW_REPORT_PROJECTION_ORIGINAL_ORMAN1000_ZIP",
+  "input_zip_sha256": "3b27260511ed965952a497f97d1c6345a0f1b4bef1b89a60912a62e0f6530c0c",
+  "video_source_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2",
+  "original_report_json_sha256": "9f5e317443e098ff4282ebf1149ad2ea9ddde63dd262ecd925fe2668d618e5b0",
+  "original_report_derived_stats_engine_sha256": "def5cce860ca41fe7215da26244433d8f94c8fa1bad6455154a3834bd83e55ff",
+  "local_unpublished_review_copy_sha256": "7c13694fa996765cc813480f8fc5a78c1d2682867d744a64d844762a47c2af77",
+  "processor": "Unmodified exported verified_stats.build_verified_stats + rebuild_match_stats",
+  "current_source_independent_finisher_role_verified": false,
+  "new_model_requests": 0,
+  "published": false,
+  "production_cache_enabled": false,
+  "original_canonical_events": 21,
+  "disputed_event_id": "47ad617d2ba76a4683cd",
+  "dependent_followup_run_id": "baa4a5cfb76333175f55",
+  "all_other_19_original_canonical_events_unchanged": true,
+  "note": "Observed counts below are HYPOTHETICAL and only valid if source-role adjudication verifies the disputed pass/teammate finisher; source proof receipts remain untouched.",
+  "observed_stats_before": {
+    "goals": 2,
+    "assists": 2,
+    "shots": 3,
+    "shots_on_target": 3,
+    "passes_attempted": 4,
+    "passes_completed": 4,
+    "key_passes": 2
+  },
+  "observed_stats_after_shadow": {
+    "goals": 1,
+    "assists": 3,
+    "shots": 2,
+    "shots_on_target": 2,
+    "passes_attempted": 5,
+    "passes_completed": 5,
+    "key_passes": 3
+  },
+  "verified_goal_event_ids_after_shadow": [
+    "d1a34d11944defe8c2ce"
+  ],
+  "verified_assist_event_ids_after_shadow": [
+    "006dbd71ed71d464f19d",
+    "47ad617d2ba76a4683cd",
+    "16b70d6326506d906e7d"
+  ],
+  "coverage_status_preserved": "PARTIAL",
+  "goals_assists_total_availability_preserved": false,
+  "original_uploaded_zip_was_not_edited": true,
+  "release_gate_still_pending": "Current-source finisher role review and full product rewrite/visual acceptance"
+}
