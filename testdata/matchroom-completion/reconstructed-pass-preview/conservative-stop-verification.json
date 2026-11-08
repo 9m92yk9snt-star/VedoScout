@@ -1,0 +1,23 @@
+{
+  "scope": "CONSERVATIVE_PREVIEW_END_CORRECTION",
+  "source_video_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2",
+  "stop_before_ms": 50331,
+  "last_overlay_ms": 50315,
+  "removed_overlay_pts": [
+    50331,
+    50348,
+    50365,
+    50381,
+    50398
+  ],
+  "remaining_overlay_frames": 25,
+  "visible_overlay_frames": 16,
+  "retained_samples_exactly_unchanged": true,
+  "trajectory_accelerated_to_force_arrival": false,
+  "timing_overlap_with_accepted_finish_bracket": false,
+  "arrival_at_receiver_verified": false,
+  "complete_arrow_approved": false,
+  "production_changed": false,
+  "new_model_calls": 0,
+  "reproduce": "python VedoScout/testdata/matchroom-completion/reconstructed-pass-preview/render.py --stop-before-ms 50331 --output-dir arrow_preview_corrected"
+}

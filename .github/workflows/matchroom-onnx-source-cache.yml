@@ -1,0 +1,45 @@
+name: Real-source ONNX cache parity (offline, one scoped trial)
+on:
+  pull_request:
+    types: [synchronize]
+    paths:
+      - '.github/workflows/matchroom-onnx-source-cache.yml'
+      - 'backend/scripts/verify_matchroom_onnx_source_cache.py'
+
+permissions:
+  contents: read
+
+jobs:
+  source_bound_onnx_cache:
+    if: >-
+      github.repository == '9m92yk9snt-star/VedoScout' &&
+      github.event.pull_request.number == 59 &&
+      github.event.pull_request.head.ref == 'codex/matchroom-window-geometry-reuse' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.head.sha == 'fc9caadc3765de6f2d902e58d0ecc3fcb9b94051' &&
+      github.run_attempt == 1
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      PYTHONPATH: backend
+      PYTHONDONTWRITEBYTECODE: '1'
+      SCOUTMEPLAY_MATCHROOM_ENGINE: onnxruntime
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install source-bound CPU inference dependencies
+        run: python -m pip install 'numpy==2.4.6' 'opencv-python-headless==4.13.0.92' 'onnxruntime>=1.20,<2' 'Pillow==12.2.0' 'python-dotenv==1.2.2'
+      - name: Verify exact bundled source video and raw ONNX model parity
+        run: python -u backend/scripts/verify_matchroom_onnx_source_cache.py
+      - name: Retain non-sensitive measurements
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: real-source-onnx-cache-${{ github.run_id }}
+          path: matchroom-onnx-audit.json
+          retention-days: 14
+          if-no-files-found: ignore

@@ -1,0 +1,469 @@
+{
+  "source_video_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2",
+  "verdict": "NOT_VERIFIED_AS_PRECISE_BALL_MOVEMENT",
+  "render_geometry_reproduction": "PASS",
+  "source_frame_count": 27,
+  "max_reproduction_error_px": 0.0,
+  "first_ms": 49881,
+  "last_ms": 50315,
+  "assumed_endpoint_ms": 50381,
+  "ends_before_assumed_endpoint_ms": 66,
+  "last_progress_fraction": 0.872093023255814,
+  "tip_center_masked_frames": 25,
+  "tip_center_in_person_mask_frames": 23,
+  "decoded_output_frames": 263,
+  "output_dimensions": [
+    1080,
+    1920
+  ],
+  "original_frame_preserved": true,
+  "model_observations_in_display_interval": 9,
+  "model_nonnull_ball_positions_in_display_interval": 0,
+  "release_time_measured": false,
+  "reception_time_measured": false,
+  "independent_ball_position_error_px": null,
+  "assist_acceptance_changed": false,
+  "production_playback_approval_changed": false,
+  "new_model_calls": 0,
+  "limitations": [
+    "Numerical reproduction validates rendering only; it is not independent ball evidence.",
+    "Manual start anchor and assumed endpoint are not measured contacts.",
+    "Hidden ball positions cannot be filled from constant-speed interpolation and called verified.",
+    "Masked-tip count refers to rounded tip center, not entire arrowhead.",
+    "Final preview runs at half speed."
+  ],
+  "samples": [
+    {
+      "ms": 49881,
+      "interpolation_fraction": 0.031007751937984496,
+      "start": [
+        430.1053292357993,
+        1094.5039106360634
+      ],
+      "tip": [
+        434.4493772817458,
+        1094.0592670515293
+      ],
+      "geometry_reproduction_error_px": 0.0,
+      "tip_center_masked": false,
+      "tip_center_in_person_mask": false,
+      "fade_multiplier": 0.15194538006372327
+    },
+    {
+      "ms": 49898,
+      "interpolation_fraction": 0.06395348837209303,
+      "start": [
+        425.58134869411805,
+        1094.1022068627728
+      ],
+      "tip": [
+        434.5267109904516,
+        1093.1840554773141
+      ],
+      "geometry_reproduction_error_px": 0.0,
+      "tip_center_masked": false,
+      "tip_center_in_person_mask": false,
+      "fade_multiplier": 0.5115375512061903
+    },
+    {
+      "ms": 49915,
+      "interpolation_fraction": 0.09689922480620156,
+      "start": [
+        420.73478737826053,
+        1093.7262668427124
+      ],
+      "tip": [
+        434.26658035855513,
+        1092.337215572085
+      ],
+      "geometry_reproduction_error_px": 0.0,
+      "tip_center_masked": true,
+      "tip_center_in_person_mask": true,
+      "fade_multiplier": 0.864815657715066
+    },
+    {
+      "ms": 49931,
+      "interpolation_fraction": 0.12790697674418605,
+      "start": [
+        415.80134718227265,
+        1092.9926227011313
+      ],
+      "tip": [
+        433.6389287166655,
+        1091.1628726174538
+      ],
+      "geometry_reproduction_error_px": 0.0,
+      "tip_center_masked": true,
+      "tip_center_in_person_mask": true,
+      "fade_multiplier": 1.0
+    },
+    {
+      "ms": 49948,
+      "interpolation_fraction": 0.16085271317829458,
+      "start": [
+        405.92546956422916,
+        1092.082790905885
+      ],
+      "tip": [
+        428.29319894628475,
+        1089.7782669436356
+      ],
+      "geometry_reproduction_error_px": 0.0,
+      "tip_center_masked": true,
+      "tip_center_in_person_mask": true,
+      "fade_multiplier": 1.0
+    },
+    {
+      "ms": 49965,
+      "interpolation_fraction": 0.1937984496124031,
+      "start": [
+        400.8407222040128,
+        1091.552305455245
+      ],
+      "tip": [
+        427.74329387989883,
+        1088.7813820793665
+      ],
+      "geometry_reproduction_error_px": 0.0,
+      "tip_center_masked": true,
+      "tip_center_in_person_mask": true,
+      "fade_multiplier": 1.0
+    },
+    {
+      "ms": 49981,
+      "interpolation_fraction": 0.2248062015503876,
+      "start": [
+        395.7857849074572,
+        1091.2701372504348
+      ],
+      "tip": [
+        426.9411305915834,
+        1088.0587635457023
+      ],
+      "geometry_reproduction_error_px": 0.0,
+      "tip_center_masked": true,
+      "tip_center_in_person_mask": true,
+      "fade_multiplier": 1.0
+    },
+    {
+      "ms": 49998,
+      "interpolation_fraction": 0.25775193798449614,
+      "start": [
+        390.3698412477194,
+        1090.6537321718772
+      ],
+      "tip": [
+        426.0417145613152,
+        1086.9695389936414
+      ],
+      "geometry_reproduction_error_px": 0.0,
+      "tip_center_masked": true,
+      "tip_center_in_person_mask": true,
+      "fade_multiplier": 1.0
+    },
+    {
+      "ms": 50015,
+      "interpolation_fraction": 0.29069767441860467,
+      "start": [
+        385.2302641935094,
+        1090.3122695560262
+      ],
+      "tip": [
+        425.4050901296482,
+        1086.1560413777333
+      ],
+      "geometry_reproduction_error_px": 0.0,
+      "tip_center_masked": true,
+      "tip_center_in_person_mask": true,
+      "fade_multiplier": 1.0
+    },
+    {
+      "ms": 50031,
+      "interpolation_fraction": 0.32170542635658916,
+      "start": [
+        379.92615098227316,
+        1089.9764543610354
+      ],
+      "tip": [
+        424.30968030337834,
+        1085.3758703170445
+      ],
+      "geometry_reproduction_error_px": 0.0,
+      "tip_center_masked": true,
+      "tip_center_in_person_mask": true,
+      "fade_multiplier": 1.0
+    },
+    {
+      "ms": 50048,
+      "interpolation_fraction": 0.3546511627906977,
+      "start": [
+        374.63730673080136,
+        1089.4980007720887
+      ],
+      "tip": [
+        423.48348641094987,
+        1084.4259150552712
+      ],
+      "geometry_reproduction_error_px": 0.0,
+      "tip_center_masked": true,
+      "tip_center_in_person_mask": true,
+      "fade_multiplier": 1.0
+    },
+    {
+      "ms": 50065,
+      "interpolation_fraction": 0.3875968992248062,
+      "start": [
+        369.62252699311694,
+        1089.0710529053815
+      ],
+      "tip": [
+        422.9318954850048,
+        1083.5218001461492
+      ],
+      "geometry_reproduction_error_px": 0.0,
+      "tip_center_masked": true,
+      "tip_center_in_person_mask": true,
+      "fade_multiplier": 1.0
+    },
+    {
+      "ms": 50081,
+      "interpolation_fraction": 0.4186046511627907,
+      "start": [
+        363.9837111172791,
+        1088.5507607846673
+      ],
+      "tip": [
+        421.45184764411374,
+        1082.5574728876531
+      ],
+      "geometry_reproduction_error_px": 0.0,
+      "tip_center_masked": true,
+      "tip_center_in_person_mask": false,
+      "fade_multiplier": 1.0
+    },
+    {
+      "ms": 50098,
+      "interpolation_fraction": 0.45155038759689925,
+      "start": [
+        358.6377060122359,
+        1087.8219996342705
+      ],
+      "tip": [
+        420.52509463376526,
+        1081.350588494311
+      ],
+      "geometry_reproduction_error_px": 0.0,
+      "tip_center_masked": true,
+      "tip_center_in_person_mask": false,
+      "fade_multiplier": 1.0
+    },
+    {
+      "ms": 50115,
+      "interpolation_fraction": 0.4844961240310077,
+      "start": [
+        347.8032103785754,
+        1087.0437652096466
+      ],
+      "tip": [
+        413.9900285757743,
+        1080.094800697152
+      ],
+      "geometry_reproduction_error_px": 0.0,
+      "tip_center_masked": true,
+      "tip_center_in_person_mask": true,
+      "fade_multiplier": 1.0
+    },
+    {
+      "ms": 50131,
+      "interpolation_fraction": 0.5155038759689923,
+      "start": [
+        342.3944083488623,
+        1086.3879214220171
+      ],
+      "tip": [
+        412.6941764166475,
+        1078.994942075883
+      ],
+      "geometry_reproduction_error_px": 0.0,
+      "tip_center_masked": true,
+      "tip_center_in_person_mask": true,
+      "fade_multiplier": 1.0
+    },
+    {
+      "ms": 50148,
+      "interpolation_fraction": 0.5484496124031008,
+      "start": [
+        336.88519396873585,
+        1085.7928348018233
+      ],
+      "tip": [
+        411.5723559165824,
+        1077.9347942179538
+      ],
+      "geometry_reproduction_error_px": 0.0,
+      "tip_center_masked": true,
+      "tip_center_in_person_mask": true,
+      "fade_multiplier": 1.0
+    },
+    {
+      "ms": 50165,
+      "interpolation_fraction": 0.5813953488372093,
+      "start": [
+        330.9721882974228,
+        1085.3479486930655
+      ],
+      "tip": [
+        410.05562250106857,
+        1077.008496731193
+      ],
+      "geometry_reproduction_error_px": 0.0,
+      "tip_center_masked": true,
+      "tip_center_in_person_mask": true,
+      "fade_multiplier": 1.0
+    },
+    {
+      "ms": 50181,
+      "interpolation_fraction": 0.6124031007751938,
+      "start": [
+        325.3641505762797,
+        1084.9809875097546
+      ],
+      "tip": [
+        408.53927349736705,
+        1076.194309149115
+      ],
+      "geometry_reproduction_error_px": 0.0,
+      "tip_center_masked": true,
+      "tip_center_in_person_mask": true,
+      "fade_multiplier": 1.0
+    },
+    {
+      "ms": 50198,
+      "interpolation_fraction": 0.6453488372093024,
+      "start": [
+        319.586598199112,
+        1084.5955220574363
+      ],
+      "tip": [
+        407.11847980638237,
+        1075.347260273631
+      ],
+      "geometry_reproduction_error_px": 0.0,
+      "tip_center_masked": true,
+      "tip_center_in_person_mask": true,
+      "fade_multiplier": 1.0
+    },
+    {
+      "ms": 50215,
+      "interpolation_fraction": 0.6782945736434108,
+      "start": [
+        313.9922432325443,
+        1084.5410741639253
+      ],
+      "tip": [
+        405.84814864716554,
+        1074.7993435128683
+      ],
+      "geometry_reproduction_error_px": 0.0,
+      "tip_center_masked": true,
+      "tip_center_in_person_mask": true,
+      "fade_multiplier": 1.0
+    },
+    {
+      "ms": 50231,
+      "interpolation_fraction": 0.7093023255813954,
+      "start": [
+        308.25788808318623,
+        1084.4009397672048
+      ],
+      "tip": [
+        404.1616053929649,
+        1074.2066643950193
+      ],
+      "geometry_reproduction_error_px": 0.0,
+      "tip_center_masked": true,
+      "tip_center_in_person_mask": true,
+      "fade_multiplier": 1.0
+    },
+    {
+      "ms": 50248,
+      "interpolation_fraction": 0.7422480620155039,
+      "start": [
+        302.408414758423,
+        1083.6015274175322
+      ],
+      "tip": [
+        402.63748454246195,
+        1072.955433765541
+      ],
+      "geometry_reproduction_error_px": 0.0,
+      "tip_center_masked": true,
+      "tip_center_in_person_mask": true,
+      "fade_multiplier": 1.0
+    },
+    {
+      "ms": 50265,
+      "interpolation_fraction": 0.7751937984496124,
+      "start": [
+        296.6690987480058,
+        1083.2352693918679
+      ],
+      "tip": [
+        401.2161824150361,
+        1072.124394867103
+      ],
+      "geometry_reproduction_error_px": 0.0,
+      "tip_center_masked": true,
+      "tip_center_in_person_mask": true,
+      "fade_multiplier": 1.0
+    },
+    {
+      "ms": 50281,
+      "interpolation_fraction": 0.8062015503875969,
+      "start": [
+        284.6415729158874,
+        1082.3246990492275
+      ],
+      "tip": [
+        393.0423049428179,
+        1070.7938039724818
+      ],
+      "geometry_reproduction_error_px": 0.0,
+      "tip_center_masked": true,
+      "tip_center_in_person_mask": true,
+      "fade_multiplier": 0.976709241172051
+    },
+    {
+      "ms": 50298,
+      "interpolation_fraction": 0.8391472868217055,
+      "start": [
+        278.5687620246924,
+        1081.8641006465866
+      ],
+      "tip": [
+        391.2376972318521,
+        1069.8867826836806
+      ],
+      "geometry_reproduction_error_px": 0.0,
+      "tip_center_masked": true,
+      "tip_center_in_person_mask": true,
+      "fade_multiplier": 0.648
+    },
+    {
+      "ms": 50315,
+      "interpolation_fraction": 0.872093023255814,
+      "start": [
+        272.66760427426277,
+        1081.4036227818053
+      ],
+      "tip": [
+        389.5955197298586,
+        1068.9847145319925
+      ],
+      "geometry_reproduction_error_px": 0.0,
+      "tip_center_masked": true,
+      "tip_center_in_person_mask": true,
+      "fade_multiplier": 0.20464613072877533
+    }
+  ]
+}

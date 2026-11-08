@@ -1,0 +1,158 @@
+{
+  "scope": "LATEST_UPLOADED_ORMAN1000_ZIP_CANONICAL_EVENT_IDENTITY_REVIEW_FIXTURE",
+  "archive_sha256": "3b27260511ed965952a497f97d1c6345a0f1b4bef1b89a60912a62e0f6530c0c",
+  "video_source_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2",
+  "full_original_canonical_events_sha256": "94d6c73af3277d0d1036a0442ee8d002db27771a27b725e028c2966af205ec5a",
+  "retained_other_20_identity_type_hash": "c10302e6a106e2721eb1601332d46a55ff5aa229e1872f914578878fb4908969",
+  "other_20_events": [
+    {
+      "event_id": "4a31aac887cfe9928ed7",
+      "canonical_event_type": "DRIBBLE",
+      "source_video_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2"
+    },
+    {
+      "event_id": "e6cfdd0f01aedac57b43",
+      "canonical_event_type": "DUEL",
+      "source_video_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2"
+    },
+    {
+      "event_id": "966c91c7243829d6fab0",
+      "canonical_event_type": "DRIBBLE",
+      "source_video_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2"
+    },
+    {
+      "event_id": "0fc666670ff612a8af2f",
+      "canonical_event_type": "RUN",
+      "source_video_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2"
+    },
+    {
+      "event_id": "4a0ef5b0bd50f4680772",
+      "canonical_event_type": "DUEL",
+      "source_video_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2"
+    },
+    {
+      "event_id": "c8f5d1241d129673c48f",
+      "canonical_event_type": "DRIBBLE",
+      "source_video_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2"
+    },
+    {
+      "event_id": "9a392fb19c052dfe6719",
+      "canonical_event_type": "SHOT",
+      "source_video_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2"
+    },
+    {
+      "event_id": "1349b8676c1e07e88c00",
+      "canonical_event_type": "RUN",
+      "source_video_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2"
+    },
+    {
+      "event_id": "a512ae64e102f24b3383",
+      "canonical_event_type": "DRIBBLE",
+      "source_video_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2"
+    },
+    {
+      "event_id": "d1a34d11944defe8c2ce",
+      "canonical_event_type": "GOAL",
+      "source_video_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2"
+    },
+    {
+      "event_id": "80d5f358028a706401fa",
+      "canonical_event_type": "DRIBBLE",
+      "source_video_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2"
+    },
+    {
+      "event_id": "3662fe46e2175be7f823",
+      "canonical_event_type": "PASS",
+      "source_video_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2"
+    },
+    {
+      "event_id": "832177ba357fc1358bc0",
+      "canonical_event_type": "DRIBBLE",
+      "source_video_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2"
+    },
+    {
+      "event_id": "006dbd71ed71d464f19d",
+      "canonical_event_type": "ASSIST",
+      "source_video_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2"
+    },
+    {
+      "event_id": "39103409d27adf8172e2",
+      "canonical_event_type": "RUN",
+      "source_video_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2"
+    },
+    {
+      "event_id": "a9a96b3425e98f0fdf0c",
+      "canonical_event_type": "DRIBBLE",
+      "source_video_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2"
+    },
+    {
+      "event_id": "baa4a5cfb76333175f55",
+      "canonical_event_type": "RUN",
+      "source_video_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2"
+    },
+    {
+      "event_id": "5f5692328ea383dd5b7f",
+      "canonical_event_type": "CARRY",
+      "source_video_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2"
+    },
+    {
+      "event_id": "16b70d6326506d906e7d",
+      "canonical_event_type": "ASSIST",
+      "source_video_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2"
+    },
+    {
+      "event_id": "aa72fc7d4774da486be7",
+      "canonical_event_type": "PASS",
+      "source_video_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2"
+    }
+  ],
+  "disputed_original": {
+    "event_id": "47ad617d2ba76a4683cd",
+    "source_video_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2",
+    "canonical_ms": 49881,
+    "canonical_event_type": "GOAL",
+    "canonical_action_type": "SHOT",
+    "canonical_outcome": "GOAL",
+    "contact_ms": null,
+    "contact_interval_ms": [
+      49881,
+      50648
+    ],
+    "causal_chain": {
+      "finisher_visual_id": "p1",
+      "goal_outcome_ms": 51131,
+      "receiver_visual_id": null,
+      "target_contact_ms": null
+    },
+    "proof": {
+      "frame_id": "s000049881",
+      "frame_ms": 49881,
+      "source_video_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2",
+      "cited_frames": {
+        "s000049881": 49881,
+        "s000050431": 50431,
+        "s000050648": 50648,
+        "s000051131": 51131
+      },
+      "receipts": [
+        {
+          "packet_id": "contact_review_006",
+          "response_sha256": "7c3fd71f15b0b7736f9b879573c30c38e1426ddc4d6ea7d4daacb2182db06631",
+          "origin": "LIVE_MODEL_REQUEST",
+          "payload_sha256": "f27b805a846d6f1681d33e31e7e6e3e4a4825dcd866981a02088b36cf295f669"
+        }
+      ]
+    },
+    "actor_visual_id": "contact_review_006:0:p1",
+    "global_target_id": "GLOBAL_TARGET"
+  },
+  "current_exported_counts": {
+    "goals": 2,
+    "assists": 2
+  },
+  "prior_approved_receipt_source_sha256": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+  "prior_approved_receipt_response_sha256": "c1b78325895885002ccc58f036b0a29824406997108b12648f3805a46e0040ff",
+  "same_underlying_footage_comparison_run": 42315757175,
+  "source_role_bridge_status": "NOT_YET_VERIFIED",
+  "approved_output_policy": "Only an unpublished reconciliation proposal. Never overwrite the current 21 canonical events or reuse the old local p3 ID."
+}

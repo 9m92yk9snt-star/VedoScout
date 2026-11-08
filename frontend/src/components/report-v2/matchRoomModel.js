@@ -117,6 +117,7 @@ export function roomFor(comment, fallbackSeconds) {
     }) : [];
   return {
     sourcePositionsOnly: bound && Array.isArray(raw.samples) && raw.samples.some(s => typeof s?.identity_status === 'string'),
+    reviewedDirection: bound ? reviewedDirectionFor(raw, start, end) : null,
     movingBall,
     tracks,
     start,
@@ -334,4 +335,20 @@ export function graphicsAt(room, mediaMs) {
   const time=[...map.keys()].find(t=>Math.abs(t-mediaMs)<=2);
   // The source observation and its exact foreground mask remain untouched.
   return time===undefined ? current : {...current,...map.get(time)};
+}
+
+
+// Explicitly approved coaching direction, separate from measured ball evidence.
+function reviewedDirectionFor(raw, start, end) {
+  const d = raw.reviewed_direction;
+  if (!d || d.playback_status !== 'VERIFIED' || d.status !== 'OWNER_APPROVED_DIRECTION' || d.method !== 'REVIEWED_DIRECTION_BACKGROUND_AFFINE' || d.is_measured_ball_trajectory !== false || typeof d.review_id !== 'string' || !d.review_id || d.event_id !== raw.event_id || d.source_video_sha256 !== raw.source_video_sha256 || !finite(d.reference_ms) || !finite(d.start_ms) || !finite(d.end_ms) || d.reference_ms > d.start_ms || d.start_ms < start || d.end_ms > end || d.end_ms <= d.start_ms || d.end_ms-d.reference_ms > 1500 || !Array.isArray(d.samples) || d.samples.length < 2 || d.samples.length > 150) return null;
+  if (Math.abs(d.samples[0].media_ms-d.start_ms)>2 || Math.abs(d.samples.at(-1).media_ms-d.end_ms)>2 || d.samples.some((s,i) => !finite(s.media_ms) || !foregroundFor(s) || !Array.isArray(s.directionTrail) || s.directionTrail.length !== 2 || !s.directionTrail.every(point) || s.media_ms < d.start_ms-2 || s.media_ms > d.end_ms+2 || (i>0 && (s.media_ms <= d.samples[i-1].media_ms || s.media_ms-d.samples[i-1].media_ms>75)))) return null;
+  return d;
+}
+export function reviewedDirectionAt(room, mediaMs) {
+  if (!finite(mediaMs)) return null;
+  const d=room.reviewedDirection;
+  if (!d || mediaMs<d.start_ms-2 || mediaMs>d.end_ms+2) return null;
+  const row=d.samples.find(s=>Math.abs(s.media_ms-mediaMs)<=2);
+  return row ? {...row, ballTrail:row.directionTrail, opacity:1, reviewedDirection:true} : null;
 }

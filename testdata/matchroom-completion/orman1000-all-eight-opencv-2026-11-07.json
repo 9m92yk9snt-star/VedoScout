@@ -1,0 +1,239 @@
+{
+  "scope": "ALL_EIGHT_ORMAN1000_CARDS_RETAINED_RECEIPTS_OFFLINE_OPENCV",
+  "date": "2026-11-07",
+  "release_acceptance": false,
+  "source_archive_sha256": "3b27260511ed965952a497f97d1c6345a0f1b4bef1b89a60912a62e0f6530c0c",
+  "source_video_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2",
+  "archive_payload_hashes_verified": 118,
+  "exact_source_frame_hashes_verified": 7,
+  "tested_graphics_source_commit": "c47885554c3b8a1815594f1c3d8738c999423228",
+  "tested_module_sha256": {
+    "backend/match_room_tracking.py": "e2563ebc366833d1cd69e256e2c5881a44517674b23f583f3278708afdd892f3",
+    "backend/match_room_position_contours.py": "da161246913d4dd14cab040b11f4537812c28774ec3a4d457e955d60c769ea98",
+    "backend/match_room_display_bridge.py": "cd6b8093c74f387db6dc50cd04a3581d55a531c08b9fbc506d4b02bf7388ae8b",
+    "backend/match_room_contours.py": "66c2994a1d20ce02b44e789e51427d60796a5ecb77a6f259b15f68af499710bc",
+    "backend/match_room_localization.py": "868bee69027921931b8bcc57a9a3a4e73493f3c47553dcb5b3d1b481b5097620",
+    "backend/match_room_position_evidence.py": "4b3a8a6705bdfc953c10c0a6c007dba91228627198b5b01d445d4a1a56116f1f",
+    "backend/match_room_ball_playback.py": "f0511cb46995696aecc16d57e5b4cae370cbb20c54c7f0e8d3c8da5eb5788f35",
+    "backend/native_player_segmentation.py": "bca4651517a1d6992c0f5e56b6d0076372749ccefd503d56cb3deca06a97bf5f",
+    "backend/match_room_inference.py": "3caf82ee42baedc353d9eaf0d006dc08dd4935ba35648c9364f3033124e190d3",
+    "frontend/src/components/report-v2/matchRoomModel.js": "b40f843937677e9557f1c95501bf25c2ba26af10d9d4388893235c4371418ac0"
+  },
+  "runtime": {
+    "engine": "OpenCV",
+    "opencv_version": "4.13.0",
+    "numpy_version": "2.4.6",
+    "opencv_threads": 2,
+    "cpu_quota_equivalent": 8,
+    "affinity_cpus": 9,
+    "source_decoding": "original post-grab media PTS, no FPS arithmetic",
+    "worker_network": "socket connections disabled; ONNX Runtime not imported"
+  },
+  "tracking_seconds": 414.132,
+  "tracking_status": "COMPLETED",
+  "production_engine_verified": false,
+  "live_latency_improvement_established": false,
+  "primary_requests_exactly_reused": 0,
+  "primary_requests_rebuilt_but_not_sent": 8,
+  "supplemental_request_exact_reuse": {
+    "scope": "exact_rebuilt_supplemental_request",
+    "same_request": true,
+    "reuse_allowed": true,
+    "seconds": 2.8132616009997946,
+    "new_sha": "93a98d389ea61f6d6a583283c6fdccd4b0ceea930bd1841c1eb09482e9ccf726",
+    "old_sha": "93a98d389ea61f6d6a583283c6fdccd4b0ceea930bd1841c1eb09482e9ccf726",
+    "new_provider_calls": 0
+  },
+  "new_provider_calls": 0,
+  "prediction_cache_enabled": false,
+  "canonical_21_events_unchanged": true,
+  "original_taps_unchanged": true,
+  "original_raw_source_receipts_unchanged": true,
+  "clips": [
+    {
+      "event_id": "47ad617d2ba76a4683cd",
+      "timestamp": "00:50",
+      "source_pts": 129,
+      "original_ellipse_pts": 36,
+      "replayed_ellipse_pts": 41,
+      "gained_ellipse_pts": 5,
+      "lost_ellipse_pts": [],
+      "remaining_unmarked_pts": 88,
+      "original_arrow_pts": 15,
+      "replayed_arrow_pts": 15,
+      "ball_playback_data_identical": false
+    },
+    {
+      "event_id": "d1a34d11944defe8c2ce",
+      "timestamp": "00:31",
+      "source_pts": 83,
+      "original_ellipse_pts": 39,
+      "replayed_ellipse_pts": 83,
+      "gained_ellipse_pts": 44,
+      "lost_ellipse_pts": [],
+      "remaining_unmarked_pts": 0,
+      "original_arrow_pts": 21,
+      "replayed_arrow_pts": 21,
+      "ball_playback_data_identical": false
+    },
+    {
+      "event_id": "9a392fb19c052dfe6719",
+      "timestamp": "00:24",
+      "source_pts": 93,
+      "original_ellipse_pts": 20,
+      "replayed_ellipse_pts": 20,
+      "gained_ellipse_pts": 0,
+      "lost_ellipse_pts": [],
+      "remaining_unmarked_pts": 73,
+      "original_arrow_pts": 7,
+      "replayed_arrow_pts": 7,
+      "ball_playback_data_identical": false
+    },
+    {
+      "event_id": "006dbd71ed71d464f19d",
+      "timestamp": "00:44",
+      "source_pts": 136,
+      "original_ellipse_pts": 69,
+      "replayed_ellipse_pts": 91,
+      "gained_ellipse_pts": 22,
+      "lost_ellipse_pts": [],
+      "remaining_unmarked_pts": 45,
+      "original_arrow_pts": 23,
+      "replayed_arrow_pts": 49,
+      "ball_playback_data_identical": false
+    },
+    {
+      "event_id": "16b70d6326506d906e7d",
+      "timestamp": "00:56",
+      "source_pts": 69,
+      "original_ellipse_pts": 31,
+      "replayed_ellipse_pts": 69,
+      "gained_ellipse_pts": 38,
+      "lost_ellipse_pts": [],
+      "remaining_unmarked_pts": 0,
+      "original_arrow_pts": 23,
+      "replayed_arrow_pts": 23,
+      "ball_playback_data_identical": false
+    },
+    {
+      "event_id": "0fc666670ff612a8af2f",
+      "timestamp": "00:13",
+      "source_pts": 84,
+      "original_ellipse_pts": 54,
+      "replayed_ellipse_pts": 84,
+      "gained_ellipse_pts": 30,
+      "lost_ellipse_pts": [],
+      "remaining_unmarked_pts": 0,
+      "original_arrow_pts": 0,
+      "replayed_arrow_pts": 0,
+      "ball_playback_data_identical": true
+    },
+    {
+      "event_id": "e6cfdd0f01aedac57b43",
+      "timestamp": "00:04",
+      "source_pts": 207,
+      "original_ellipse_pts": 38,
+      "replayed_ellipse_pts": 38,
+      "gained_ellipse_pts": 0,
+      "lost_ellipse_pts": [],
+      "remaining_unmarked_pts": 169,
+      "original_arrow_pts": 19,
+      "replayed_arrow_pts": 19,
+      "ball_playback_data_identical": false
+    },
+    {
+      "event_id": "966c91c7243829d6fab0",
+      "timestamp": "00:08",
+      "source_pts": 279,
+      "original_ellipse_pts": 151,
+      "replayed_ellipse_pts": 273,
+      "gained_ellipse_pts": 128,
+      "lost_ellipse_pts": [
+        9400,
+        9416,
+        9433,
+        9450,
+        9466,
+        9483
+      ],
+      "remaining_unmarked_pts": 6,
+      "original_arrow_pts": 25,
+      "replayed_arrow_pts": 56,
+      "ball_playback_data_identical": false
+    }
+  ],
+  "total_source_pts": 1080,
+  "original_ellipse_pts": 438,
+  "replayed_ellipse_pts": 699,
+  "source_conflict": {
+    "event_id": "966c91c7243829d6fab0",
+    "lost_pts": [
+      9400,
+      9416,
+      9433,
+      9450,
+      9466,
+      9483
+    ],
+    "source_ground_9383": [
+      0.696,
+      0.651
+    ],
+    "source_ground_9500": [
+      0.704,
+      0.651
+    ],
+    "competing_candidates_at_9433": [
+      {
+        "segment_id": "position-contour:9383:9500",
+        "identity_method": "SOURCE_CONFIRMED_ENDPOINT_BRIDGE",
+        "segmenter_sha256": "015043fb9cc94830ad7065dd3e28d6f8e5758fe03071451675120f6a6b6e44e9",
+        "ground": null,
+        "display_ground": [
+          0.6049728789461906,
+          0.6480857618278189
+        ],
+        "confidence": 0.7504491209983826,
+        "display_estimated": true
+      },
+      {
+        "segment_id": "position-contour:9383:9750",
+        "identity_method": "SOURCE_CONFIRMED_ENDPOINT_BRIDGE",
+        "segmenter_sha256": "20877569fcfc4744855b1d6d05b0cd7031987ae31894af5c7e1e74328d18e653",
+        "ground": null,
+        "display_ground": [
+          0.6994531939940165,
+          0.6510967806131802
+        ],
+        "confidence": 0.6197811365127563,
+        "display_estimated": true
+      }
+    ],
+    "visual_review": "The small-model bridge is near the blue opponent's boot; the medium-model/source-observation bridge is near the selected white player's boot. Do not force frontend acceptance of the conflicting candidates.",
+    "root_cause_candidate": "Presentation-only endpoint bridges inherit an available detector ground even when source localization places the selected foot elsewhere; broad body-box agreement can include an occluding opponent. This needs a source-bound correction, not suppression of the frontend conflict gate."
+  },
+  "visual_check": {
+    "diagnostic_frames_inspected": 16,
+    "separate_conflict_frame_inspected_ms": 9433,
+    "actual_react_browser_verified": false,
+    "all_frames_visually_verified": false
+  },
+  "known_blockers": [
+    "Six previously marked duel frames are suppressed by conflicting geometry.",
+    "Current-source white finisher at ~50s remains unverified.",
+    "Ball overlays changed and require full source visual acceptance.",
+    "Production ONNX run was blocked by automatic approval review for unexpected Microsoft telemetry."
+  ],
+  "limitations": [
+    "Graphics-only regeneration from retained observations is not fresh source analysis or exact retry recovery.",
+    "The older exported graphics and this OpenCV run use different processing conditions; timing ratios are not valid speed claims.",
+    "All 128 previously missing duel-tail frames were recovered, but six earlier duel frames were lost.",
+    "The 45 remaining unmarked frames at 00:44 are beyond grounded observations and must not be blindly filled.",
+    "No merge, deployment, report publication, cache enablement or paid model call."
+  ],
+  "export_fix": {
+    "commit": "22da1db15a752d6de04e3d0122354391685651ed",
+    "local_export_tests_passed": 38,
+    "github_export_job_passed_in_run": 42334975411
+  }
+}

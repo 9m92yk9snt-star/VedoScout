@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState, useId } from 'react';
 import { flushSync } from 'react-dom';
 import { Play, Pause, X, RotateCcw } from 'lucide-react';
-import { roomFor, graphicsAt, depthAt, ballAt, clipArrowToFrame } from './matchRoomModel';
+import { roomFor, graphicsAt, depthAt, ballAt, reviewedDirectionAt, clipArrowToFrame } from './matchRoomModel';
 import './matchroom.css';
 const clock = ms => `${String(Math.floor(ms / 60000)).padStart(2, '0')}:${String(Math.floor(ms / 1000) % 60).padStart(2, '0')}`;
 export function MatchRoomPlayer({
@@ -34,6 +34,11 @@ export function MatchRoomPlayer({
   const clip = !!proof.clip && Number.isFinite(proof.clipStart) && !failed;
   const offset = clip ? proof.clipStart : 0;
   const raw = proof.comment;
+  const originalContourWindows = raw?.match_room?.tracking?.contour_diagnostics?.windows;
+  const initialContourBudgetReached =
+    raw?.match_room?.contour_processing_budget?.status === "INITIAL_WINDOW_TIME_BUDGET_REACHED" ||
+    (Array.isArray(originalContourWindows) &&
+      originalContourWindows.some(w => w?.status === "TIME_BUDGET"));
   const fallback = finiteSeconds(proof.ts);
   const room = useMemo(() => roomFor(raw, fallback), [raw, fallback]);
   const from = Math.max(room.start, clip ? offset * 1000 : 0),
@@ -43,20 +48,27 @@ export function MatchRoomPlayer({
   const mark = candidate?.sourceFrameContour && !sourceAligned ? null : candidate;
   const id = useId().replace(/:/g, '');
   const depth = depthAt(mark, frameAt ?? at, !playing || (frameAt != null && mark?.sourceFrameContour));
-  const movingArrow = sourceAligned ? ballAt(room, frameAt) : null;
+  const movingArrow = sourceAligned ? (reviewedDirectionAt(room, frameAt) || ballAt(room, frameAt)) : null;
   const ellipsePolygons = depth ? [...depth.polygons,
     ...(movingArrow?.foreground?.media_ms === depth.media_ms ? movingArrow.foreground.polygons : [])] : [];
   const arrowSource = movingArrow || (depth && mark?.ballTrail ? {...mark, foreground: depth, opacity: 1} : null);
   const visibleTrail = arrowSource && clipArrowToFrame(arrowSource.ballTrail);
   const arrow = visibleTrail ? {...arrowSource, ballTrail: visibleTrail} : null;
-  // markerUnits=strokeWidth follows the non-scaling 2px shaft. A fixed
-  // 10px head can cover almost an entire short, source-bound direction line.
-  // Keep the approved maximum size, but reserve at least 70% for the shaft.
+  // Size the complete arrow in screen pixels, then convert to SVG units.
+  // A short direction keeps at least 70% of its length for the shaft.
   const arrowPixels = arrow && Number.isFinite(bounds.width) && Number.isFinite(bounds.height)
     ? Math.hypot((arrow.ballTrail[1][0]-arrow.ballTrail[0][0])*bounds.width,
                  (arrow.ballTrail[1][1]-arrow.ballTrail[0][1])*bounds.height) : 0;
-  const arrowHeadSize = Math.min(5, arrowPixels * .3 / 2);
+  const arrowHeadPixels = Math.min(10, arrowPixels * .3);
   const yScale = 1000 / ratio;
+  // SVG units per screen pixel keep the halo subtle at mobile sizes.
+  const arrowUnit = bounds.width > 0 ? 1000 / bounds.width : 1;
+  const arrowGlowBox = arrow ? {
+    x: Math.min(...arrow.ballTrail.map(p => p[0] * 1000)) - 12 * arrowUnit,
+    y: Math.min(...arrow.ballTrail.map(p => p[1] * yScale)) - 12 * arrowUnit,
+    width: Math.abs(arrow.ballTrail[1][0] - arrow.ballTrail[0][0]) * 1000 + 24 * arrowUnit,
+    height: Math.abs(arrow.ballTrail[1][1] - arrow.ballTrail[0][1]) * yScale + 24 * arrowUnit,
+  } : null;
   const observation = (skill?.lines || []).filter(x => typeof x === 'string').join(' ') || raw?.comment || 'Review the documented action in your match.';
   useEffect(() => {
     const el = stage.current;
@@ -180,8 +192,17 @@ export function MatchRoomPlayer({
       {(mark || arrow) && <svg className="mr-graphics" style={bounds} viewBox={`0 0 1000 ${yScale}`} preserveAspectRatio="none" aria-label={mark?.display_estimated ? "Camera-corrected player position estimate" : mark?.contourTrack ? "Measured player contour" : mark?.groundProxy ? "Optical player track" : "Observed positions at this source frame"}>
         <defs>
           <radialGradient id={`ground-${id}`}><stop offset="0" stopColor="#79f58a" stopOpacity=".72" /><stop offset="1" stopColor="#9fe870" stopOpacity="0" /></radialGradient>
-          {arrow && <linearGradient id={`pass-${id}`} x1={arrow?.ballTrail?.[0][0] * 1000} y1={arrow?.ballTrail?.[0][1] * yScale} x2={arrow?.ballTrail?.[1][0] * 1000} y2={arrow?.ballTrail?.[1][1] * yScale} gradientUnits="userSpaceOnUse"><stop offset="0" stopColor="#ecea94" stopOpacity=".25" /><stop offset="1" stopColor="#f0ed9c" stopOpacity=".95" /></linearGradient>}
-          <marker id={`arrow-${id}`} markerWidth={arrowHeadSize} markerHeight={arrowHeadSize} refX="5" refY="2.5" orient="auto" viewBox="0 0 5 5"><path d="M0 0L5 2.5L0 5Z" fill="#f0ed9c" /></marker>
+          {arrow && <linearGradient id={`pass-${id}`} x1={arrow?.ballTrail?.[0][0] * 1000} y1={arrow?.ballTrail?.[0][1] * yScale} x2={arrow?.ballTrail?.[1][0] * 1000} y2={arrow?.ballTrail?.[1][1] * yScale} gradientUnits="userSpaceOnUse"><stop offset="0" stopColor="#efc66b" stopOpacity=".8" /><stop offset="1" stopColor="#fff2bc" stopOpacity="1" /></linearGradient>}
+          <marker id={`arrow-${id}`} markerUnits="userSpaceOnUse" markerWidth={arrowHeadPixels * arrowUnit} markerHeight={arrowHeadPixels * arrowUnit} refX="5" refY="2.5" orient="auto" viewBox="0 0 5 5"><path d="M0 0L5 2.5L0 5L1.1 2.5Z" fill="#fff2bc" /></marker>
+          {arrow && <>
+            <path id={`pass-shape-${id}`} d={`M${arrow.ballTrail[0][0] * 1000} ${arrow.ballTrail[0][1] * yScale}L${arrow.ballTrail[1][0] * 1000} ${arrow.ballTrail[1][1] * yScale}`} />
+            <filter id={`pass-glow-${id}`} filterUnits="userSpaceOnUse" {...arrowGlowBox} colorInterpolationFilters="sRGB">
+              <feGaussianBlur in="SourceAlpha" stdDeviation={1.5 * arrowUnit} result="halo" />
+              <feFlood floodColor="#ffc34a" floodOpacity=".5" result="gold" />
+              <feComposite in="gold" in2="halo" operator="in" result="glow" />
+              <feMerge><feMergeNode in="glow" /><feMergeNode in="SourceGraphic" /></feMerge>
+            </filter>
+          </>}
           {depth && <mask id={`people-${id}`} maskUnits="userSpaceOnUse" x="0" y="0" width="1000" height={yScale}><rect width="1000" height={yScale} fill="white" />{ellipsePolygons.map((polygon, i) => <polygon key={i} points={polygon.map(p => `${p[0]*1000},${p[1]*yScale}`).join(' ')} fill="black" stroke="black" strokeWidth="1" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />)}</mask>}
           {arrow && <mask id={`ball-people-${id}`} maskUnits="userSpaceOnUse" x="0" y="0" width="1000" height={yScale}><rect width="1000" height={yScale} fill="white" />{arrow.foreground.polygons.map((polygon, i) => <polygon key={i} points={polygon.map(p => `${p[0]*1000},${p[1]*yScale}`).join(' ')} fill="black" stroke="black" strokeWidth="1" />)}</mask>}
         </defs>
@@ -191,10 +212,15 @@ export function MatchRoomPlayer({
             <ellipse cx={(mark.ellipseGround || mark.ground)[0] * 1000} cy={Math.min(1, mark.ground[1]) * yScale} rx={(mark.ellipseRadius ?? mark.player_width * .7) * 1000} ry={mark.player_width * 135} fill="#62ed7b" fillOpacity=".18" stroke="#91ffa3" strokeOpacity=".92" strokeWidth="2" vectorEffect="non-scaling-stroke" />
           </g>}
         </g>
-        {arrow && <g data-testid="match-room-ball-arrow" data-source-ms={arrow.media_ms} mask={`url(#ball-people-${id})`} opacity={arrow.opacity}>
-          <line x1={arrow.ballTrail[0][0] * 1000} y1={arrow.ballTrail[0][1] * yScale} x2={arrow.ballTrail[1][0] * 1000} y2={arrow.ballTrail[1][1] * yScale} stroke={`url(#pass-${id})`} strokeWidth="2" strokeLinecap="round" vectorEffect="non-scaling-stroke" markerEnd={`url(#arrow-${id})`} />
+        {arrow && <g data-testid="match-room-ball-arrow" data-source-ms={arrow.media_ms} data-reviewed-direction={arrow.reviewedDirection ? "true" : undefined} mask={`url(#ball-people-${id})`} opacity={arrow.opacity}>
+          {/* Mask the completed glow as well as the shaft so neither covers players. */}
+          <g filter={`url(#pass-glow-${id})`}>
+            <use href={`#pass-shape-${id}`} fill="none" stroke={`url(#pass-${id})`} strokeWidth={2 * arrowUnit} strokeLinecap="round" markerEnd={`url(#arrow-${id})`} />
+            <use href={`#pass-shape-${id}`} fill="none" stroke="#fff9e3" strokeOpacity=".75" strokeWidth={.7 * arrowUnit} strokeLinecap="round" />
+          </g>
         </g>}
       </svg>}
+      {arrow?.reviewedDirection && <div className="mr-kicker" style={{position:"absolute",top:12,left:12,background:"#111c",padding:"6px 10px",borderRadius:8}}>Reviewed pass direction</div>}
       {stop && !done && <div className="mr-caption"><span className="mr-kicker">{skill?.label || stop.label} · {stop.phase === 'result' ? 'THE RESULT' : 'YOUR QUALITY'}</span><strong>{(stop.caption || observation).length > 170 ? (stop.caption || observation).slice(0, 167) + '…' : stop.caption || observation}</strong></div>}
     </div>
     <div className="mr-controls"><button type="button" onClick={() => {
@@ -214,6 +240,11 @@ export function MatchRoomPlayer({
         if (video.current) video.current.playbackRate = next ? .5 : 1;
       }}>{slow ? '0.5×' : '1×'}</button></div>
     {room.tracks.some(rows => rows.some(row => row.display_estimated === true)) && <p className="mr-position-note">Player position between observations is estimated.</p>}
+    {initialContourBudgetReached && (
+      <p className="mr-position-note" data-testid="match-room-contour-time-limit">
+        Some initial tracking passes reached their processing limit. Markings are shown only where supported by the video.
+      </p>
+    )}
     {error && <p role="alert">Video could not play. <button type="button" onClick={play}>Try again</button></p>}
     {done && <div className="mr-explanation" aria-live="polite"><span className="mr-kicker">WHAT TO TAKE FROM THIS</span><p>{observation}</p>{typeof skill?.next_level === 'string' && <p>{skill.next_level}</p>}<button type="button" onClick={restart}><RotateCcw size={16} /> Watch again</button></div>}
   </section>;

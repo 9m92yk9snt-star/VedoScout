@@ -1,0 +1,48 @@
+name: Orman1000 vs prior approved assist source frames (offline once)
+on:
+  pull_request:
+    types: [synchronize]
+    paths:
+      - '.github/workflows/orman1000-prior-assist-frames-once.yml'
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  cross_source_action_frame_similarity:
+    if: >-
+      github.repository == '9m92yk9snt-star/VedoScout' &&
+      github.event.pull_request.number == 59 &&
+      github.event.pull_request.draft == true &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.head.ref == 'codex/matchroom-window-geometry-reuse' &&
+      github.event.before == '6360a0621d7f5e9349af63ffcc0221c9ddcb9932' &&
+      github.run_attempt == 1
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install exact offline image decoders only, no paid models
+        run: |
+          python -m pip install --disable-pip-version-check 'numpy==2.4.6' 'opencv-python-headless==4.13.0.92'
+          python -m py_compile backend/scripts/compare_orman1000_prior_assist_frames.py
+      - name: Verify old source SHA and inspect same-scene frame fingerprints
+        run: |
+          python -u backend/scripts/compare_orman1000_prior_assist_frames.py \
+            --work "$RUNNER_TEMP/prior-assist-video" \
+            --output "$RUNNER_TEMP/prior-assist-frame-similarity.json"
+      - name: Preserve only frame comparisons, no videos or personal frames
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: orman1000-prior-assist-frame-similarity-${{ github.run_id }}
+          path: ${{ runner.temp }}/prior-assist-frame-similarity.json
+          retention-days: 14
+          if-no-files-found: ignore

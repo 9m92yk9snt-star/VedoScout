@@ -1,0 +1,60 @@
+{
+  "source_video_sha256": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+  "scope": "Retained report metadata, eight event-bound clips only; no video decoder or frontend acceptance",
+  "run_id": 42298928415,
+  "run_url": "https://github.com/9m92yk9snt-star/VedoScout/actions/runs/42298928415",
+  "checked_events": 8,
+  "all_events_source_bound": true,
+  "hidden_source_pair_count": 0,
+  "events": [
+    {
+      "event_id": "9e9a8a68c1772db2614f",
+      "hidden_source_pair_count": 0,
+      "status": "AUDITED"
+    },
+    {
+      "event_id": "dc2acb1e19ba55950e7f",
+      "hidden_source_pair_count": 0,
+      "status": "AUDITED"
+    },
+    {
+      "event_id": "a512ae64e102f24b3383",
+      "hidden_source_pair_count": 0,
+      "status": "AUDITED"
+    },
+    {
+      "event_id": "ec74209ace700fa49d2e",
+      "hidden_source_pair_count": 0,
+      "status": "AUDITED"
+    },
+    {
+      "event_id": "9a392fb19c052dfe6719",
+      "hidden_source_pair_count": 0,
+      "status": "AUDITED"
+    },
+    {
+      "event_id": "88aa8bbdedbec570d4de",
+      "hidden_source_pair_count": 0,
+      "status": "AUDITED"
+    },
+    {
+      "event_id": "1349b8676c1e07e88c00",
+      "hidden_source_pair_count": 0,
+      "status": "AUDITED"
+    },
+    {
+      "event_id": "a8b5662ae46646b8f0ae",
+      "hidden_source_pair_count": 0,
+      "status": "AUDITED"
+    }
+  ],
+  "focused_regression_tests_passed": 6,
+  "model_calls": 0,
+  "production_code_changed": false,
+  "live_cache_enabled": false,
+  "limitations": [
+    "These findings do not apply to the distinct fa56f933... source video with 45 missing display frames.",
+    "The audit detects unproven spans in saved metadata; it does not decode every original video frame or reproduce live browser output.",
+    "No same-video conclusion can be drawn about 00:44 fa56... without its exact source-bound evidence."
+  ]
+}

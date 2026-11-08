@@ -1,0 +1,80 @@
+{
+  "scope": "two retained source-bound Match Room clips, full bounded ONNX contour scheduler, offline",
+  "source_video_sha256": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+  "original_taps": 10,
+  "production_cache_enabled": false,
+  "new_provider_model_requests": 0,
+  "comparisons": [
+    {
+      "run_id": 42294726090,
+      "status": "COMPLETED_BUT_PARITY_FAILED",
+      "same_source": true,
+      "baseline_seconds": 72.627,
+      "cached_seconds": 76.343,
+      "baseline_status": "COMPLETED",
+      "cached_status": "COMPLETED",
+      "events": [
+        {
+          "id": "a512ae64e102f24b3383",
+          "segments_equal": true,
+          "segments_count": 6,
+          "observations_equal": true,
+          "ball_equal": true
+        },
+        {
+          "id": "ec74209ace700fa49d2e",
+          "segments_equal": false,
+          "segments_count": 12,
+          "observations_equal": true,
+          "ball_equal": true
+        }
+      ],
+      "controls_without_cache": 1,
+      "acceptance": false,
+      "limitation": "No first-difference details retained in this first comparison"
+    },
+    {
+      "run_id": 42295904181,
+      "status": "COMPLETED_WITH_PARITY",
+      "same_source": true,
+      "baseline_seconds": 70.979,
+      "control_no_cache_seconds": 71.093,
+      "cached_seconds": 71.768,
+      "baseline_status": "COMPLETED",
+      "control_status": "COMPLETED",
+      "cached_status": "COMPLETED",
+      "events": [
+        {
+          "id": "a512ae64e102f24b3383",
+          "segments_equal": true,
+          "segments_count": 6,
+          "observations_equal": true,
+          "ball_equal": true,
+          "no_cache_control_equal": true
+        },
+        {
+          "id": "ec74209ace700fa49d2e",
+          "segments_equal": true,
+          "segments_count": 12,
+          "observations_equal": true,
+          "ball_equal": true,
+          "no_cache_control_equal": true
+        }
+      ],
+      "acceptance": false,
+      "limitation": "No speed benefit measured; earlier mismatched result is not explained"
+    }
+  ],
+  "conclusion": {
+    "stable_repeatability_across_full_replays_established": false,
+    "full_report_or_live_verified": false,
+    "production_speed_improvement_established": false,
+    "model_provider_billing_savings_established": false,
+    "recommendation": "Do not enable prediction reuse in production or merge PR #59 until demonstrated stable parity and worthwhile measured speed improvement",
+    "exact_prediction_cache_parity_established_for_one_full_onnx_replay": true
+  },
+  "related_runs": [
+    "https://github.com/9m92yk9snt-star/VedoScout/actions/runs/42294726090",
+    "https://github.com/9m92yk9snt-star/VedoScout/actions/runs/42295904181"
+  ]
+}

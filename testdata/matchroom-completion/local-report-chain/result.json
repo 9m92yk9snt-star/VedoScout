@@ -1,0 +1,13 @@
+{
+  "status": "LOCAL_REPLAY_PASS",
+  "original_zip_event_rejected": true,
+  "accepted_assertion_source": "retained owner-adjudicated decision, not a new model finding",
+  "event_unchanged_by_graphics": true,
+  "source_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2",
+  "samples": 30,
+  "elapsed_seconds": 6.934046203001344,
+  "llm_calls": 0,
+  "deployed": false,
+  "playback_status": "PENDING",
+  "scope": "presentation plus same attachment helper now called by runtime; full render_assets not run; no automatic producer of reviewed_direction_review yet"
+}

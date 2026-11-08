@@ -172,7 +172,7 @@ def follow(frames, detections, seed_index, target):
     return follow_instance(frames, detections, seed_index, candidates[0])
 
 
-def follow_instance(frames, detections, seed_index, source):
+def follow_instance(frames, detections, seed_index, source, *, association_cache=None):
     """Follow an explicitly resolved instance; caller owns its seed authority."""
     result = {seed_index: source}
     for direction in (-1, 1):
@@ -187,8 +187,17 @@ def follow_instance(frames, detections, seed_index, source):
             b = cv2.resize(frames[i]['gray'], (160, 90))
             if float(cv2.absdiff(a, b).mean()) > 45:
                 break
-            chosen = transport(frames[previous]['gray'], frames[i]['gray'],
-                               detections[previous][chosen], detections[i])
+            # Caller owns an immutable decoded window. Direction, exact source
+            # instance and target candidates all belong to the cache key.
+            key = (id(frames[previous]), id(frames[i]),
+                   id(detections[previous][chosen]), id(detections[i]))
+            if association_cache is not None and key in association_cache:
+                chosen = association_cache[key]
+            else:
+                chosen = transport(frames[previous]['gray'], frames[i]['gray'],
+                                   detections[previous][chosen], detections[i])
+                if association_cache is not None:
+                    association_cache[key] = chosen
             if chosen is None:
                 break
             result[i] = chosen

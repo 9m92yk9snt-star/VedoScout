@@ -46,3 +46,25 @@ export function VerifiedIdentityStrip({ verification }) {
     </div>
   );
 }
+
+/**
+ * Publication completeness and observed evidence are different authorities.
+ * A report can be ready for display while only some source windows have been
+ * analyzed. Never turn a partial video into complete-match statistics.
+ */
+export function EvidenceCoverageNotice({ report }) {
+  const canonical = report?.canonical_events;
+  const verified = report?.full_report?.verified_stats;
+  const status = verified?.coverage_status;
+  const hasPartialCanonical = canonical?.coverage_complete === false;
+  const hasPartialVerified = status === "PARTIAL" || status === "INCOMPLETE";
+  if (!hasPartialCanonical && !hasPartialVerified) return null;
+  return (
+    <div role="status" data-testid="v2-partial-source-coverage"
+      className="mb-4 rounded-lg border border-[#CBD8C7] bg-[#F5F8F2] px-4 py-3 text-xs font-semibold text-[#26432E]">
+      <span className="font-extrabold">Partial video coverage.</span>{" "}
+      This report covers only analyzed footage, not full-match totals.
+      Individual event classifications may still require review.
+    </div>
+  );
+}

@@ -1,0 +1,128 @@
+{
+  "scope": "Orman1000 / Orman500 same-underlying-footage verification (hashed dynamic image evidence only)",
+  "latest_source_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2",
+  "previous_approved_receipt_source_sha256": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+  "previous_approved_receipt_file": "docs/examples/native-third-assist-approval-receipt.json",
+  "previous_approved_receipt_response_sha256": "c1b78325895885002ccc58f036b0a29824406997108b12648f3805a46e0040ff",
+  "previous_approved_action": "PASS by p1 to p3; p3 performs a first-time finish around 50.331–50.648s; goal by 51.131s",
+  "current_contradictory_receipts": [
+    {
+      "packet_id": "sequence_006",
+      "response_sha256": "1515a8ae2285cb966cea66099cfcad0afd30c3b09de9f6e7e7ad15e253a065e6"
+    },
+    {
+      "packet_id": "contact_review_006",
+      "response_sha256": "7c3fd71f15b0b7736f9b879573c30c38e1426ddc4d6ea7d4daacb2182db06631"
+    }
+  ],
+  "comparison_method": "Grayscale whole-frame and dynamic-pitch ROI 64bit DCT pHash and dHash. Full source video bytes remain local; only 64-bit hashes shared.",
+  "dynamic_pitch_normalized_roi": [
+    0.05,
+    0.37,
+    0.9,
+    0.6
+  ],
+  "sample_columns": [
+    "requested_ms",
+    "whole_dhash",
+    "whole_phash",
+    "player_roi_dhash",
+    "player_roi_phash"
+  ],
+  "samples": [
+    [
+      47765,
+      "1000066312780384",
+      "ed79d199cc0e868c",
+      "a763454530124889",
+      "cf66a2cc0ca6e9b8"
+    ],
+    [
+      48765,
+      "100a434592e2bf13",
+      "e97df9d1c1028e89",
+      "6543c5c69a92a2ea",
+      "c166eed984ed7890"
+    ],
+    [
+      49265,
+      "10024345b1e23f31",
+      "e871f9d0d023cdd8",
+      "45c1c5c64a3292b2",
+      "c527eadc8661b8c6"
+    ],
+    [
+      49515,
+      "100243cd29c97eb1",
+      "ea71f9d85820e4f8",
+      "c7c2c5c460280414",
+      "c621e1de85603fcb"
+    ],
+    [
+      49715,
+      "0006c6c921c47e23",
+      "e874fcdc5820e4ec",
+      "ca878da5a9280818",
+      "c020e54f86e63fcb"
+    ],
+    [
+      49881,
+      "20048e8b31c47e67",
+      "e474fede4c20e0cc",
+      "8f878b85b1610038",
+      "e820f54f82e2bf13"
+    ],
+    [
+      50081,
+      "20208d8242c83e6d",
+      "f476decf4d00d086",
+      "950b136b63510138",
+      "ea30f04e87f33994"
+    ],
+    [
+      50331,
+      "40011b2466927c5b",
+      "f77bc3c14514b8a1",
+      "2a1e2616e6620232",
+      "ed3cfa678078308e"
+    ],
+    [
+      50515,
+      "80523b2cc580fc93",
+      "fb7fe9c04212b8b0",
+      "341d6cacae820260",
+      "f41ebb61945e3283"
+    ],
+    [
+      50648,
+      "80003659c1a5d8b3",
+      "fa78ecc0621bbcb0",
+      "792d588ccc840069",
+      "d21fad60965f2385"
+    ],
+    [
+      50881,
+      "00016d930a00f867",
+      "ea6ad4d57108ae96",
+      "f252b15999084042",
+      "fb088763e85f3c84"
+    ],
+    [
+      51131,
+      "0106da271620f14e",
+      "e86dd7d2680a85d5",
+      "e5ad632717950027",
+      "ea0a8278af4f92b3"
+    ],
+    [
+      51515,
+      "061a6a9e5b00c138",
+      "b535caca74a48bca",
+      "adb78f1f5f550439",
+      "af20965eb22a8cd7"
+    ]
+  ],
+  "note": "Perceptual equivalence supports same-scene comparison, NOT automatic player identity proof or permission to copy canonical events across different SHA-256 sources.",
+  "no_new_model_calls": true,
+  "production_overwrites_allowed": false
+}

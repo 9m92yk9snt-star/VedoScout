@@ -1,0 +1,23 @@
+{
+  "status": "OWNER_APPROVED_DIRECTION",
+  "review_id": "reconstructed-preview-20261107",
+  "event_id": "47ad617d2ba76a4683cd",
+  "source_video_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2",
+  "reference_ms": 49915,
+  "start_ms": 49915,
+  "end_ms": 50398,
+  "direction": [
+    [
+      0.4482991291089781,
+      0.5653010632207128
+    ],
+    [
+      0.5188730471619446,
+      0.5621829467342894
+    ]
+  ],
+  "animation": {
+    "kind": "RECONSTRUCTED_PASS",
+    "arrival_ms": 50381
+  }
+}

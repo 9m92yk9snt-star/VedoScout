@@ -1,0 +1,316 @@
+{
+  "decision": {
+    "schema_version": 1,
+    "status": "ACCEPTED_ASSIST_FROM_PRIOR_MODEL_WITH_EXPLICIT_OWNER_ADJUDICATION",
+    "date_utc": "2026-11-07",
+    "authority": "OWNER_ACCEPTED_PRIOR_MODEL_EVIDENCE",
+    "owner_instruction": "Godkend Den konflikt og spillerkoblingen til tredje assist ved cirka 50 sekunder mangler stadig. Intet er merget eller deployet. Tidliger model har godkendt det og påvist det",
+    "source_archive_sha256": "3b27260511ed965952a497f97d1c6345a0f1b4bef1b89a60912a62e0f6530c0c",
+    "source_video_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2",
+    "event_id": "47ad617d2ba76a4683cd",
+    "original_event_sha256": "6bd7c799b07856ae0e7dd98222049da5ab650077283698d31aa36b201fcae797",
+    "original_assertion": {
+      "action": "SHOT",
+      "outcome": "GOAL",
+      "finisher_visual_id": "p1"
+    },
+    "original_proof_sha256": "1d8479bc8b241b168ff9981a3ada91a8324eeb2ec4218d34f8dee680229ae96c",
+    "original_contradictory_receipts": [
+      {
+        "origin": "LIVE_MODEL_REQUEST",
+        "packet_id": "contact_review_006",
+        "payload_sha256": "f27b805a846d6f1681d33e31e7e6e3e4a4825dcd866981a02088b36cf295f669",
+        "response_sha256": "7c3fd71f15b0b7736f9b879573c30c38e1426ddc4d6ea7d4daacb2182db06631"
+      }
+    ],
+    "accepted_assertion": {
+      "action": "PASS",
+      "event_type": "ASSIST",
+      "outcome": "TEAMMATE_GOAL",
+      "selected_player_release_interval_ms": [
+        49715,
+        50081
+      ],
+      "distinct_white_teammate_finish_interval_ms": [
+        50331,
+        50648
+      ],
+      "goal_outcome_ms": 51131,
+      "contact_ms": null,
+      "foot_side": "UNRESOLVED_MODEL_USER_DISAGREEMENT"
+    },
+    "prior_model_receipt": {
+      "source_video_sha256": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+      "response_sha256": "c1b78325895885002ccc58f036b0a29824406997108b12648f3805a46e0040ff",
+      "path": "docs/examples/native-third-assist-approval-receipt.json",
+      "file_sha256": "e6b3ce50c62da25b9539f85b676e128659a93d56f3344a5b663869ba8e33b23c",
+      "approval_status": "APPROVED"
+    },
+    "role_evidence": {
+      "scope": {
+        "source_video_sha256": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+        "response_sha256": "c1b78325895885002ccc58f036b0a29824406997108b12648f3805a46e0040ff"
+      },
+      "selected_passer_person_id": "p1",
+      "different_white_receiver_and_finisher_person_id": "p3",
+      "mapping_authority": "EXPLICIT_OWNER_ACCEPTANCE_WITH_SAME_SCENE_AND_SELECTION_CORROBORATION",
+      "current_tracking_person_ids_assigned": false,
+      "prior_p3_copied_into_current_p3": false,
+      "current_source_finisher_geometry_verified": false
+    },
+    "same_scene_comparison": {
+      "scope": "CROSS_SHA_PERCEPTUAL_SOURCE_SIMILARITY_NOT_ACTION_RECLASSIFICATION",
+      "orman1000_source_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2",
+      "historical_approved_source_sha256": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+      "historical_source_pts_scanned": 268,
+      "source_sample_count": 13,
+      "visually_near_matches": 13,
+      "same_underlying_video_supported": true,
+      "match_threshold": "at least 10 of 13 source frames within 250ms with DCT and edge fingerprints satisfying both field and whole frame",
+      "matching_frame_evidence": [
+        {
+          "target_ms": 47765,
+          "historical_ms": 47781,
+          "source_time_offset_ms": 16,
+          "whole_dhash_hamming": 1,
+          "whole_phash_hamming": 0,
+          "player_dhash_hamming": 2,
+          "player_phash_hamming": 0,
+          "visual_near_match": true
+        },
+        {
+          "target_ms": 48765,
+          "historical_ms": 48765,
+          "source_time_offset_ms": 0,
+          "whole_dhash_hamming": 1,
+          "whole_phash_hamming": 2,
+          "player_dhash_hamming": 2,
+          "player_phash_hamming": 2,
+          "visual_near_match": true
+        },
+        {
+          "target_ms": 49265,
+          "historical_ms": 49265,
+          "source_time_offset_ms": 0,
+          "whole_dhash_hamming": 0,
+          "whole_phash_hamming": 0,
+          "player_dhash_hamming": 0,
+          "player_phash_hamming": 0,
+          "visual_near_match": true
+        },
+        {
+          "target_ms": 49515,
+          "historical_ms": 49515,
+          "source_time_offset_ms": 0,
+          "whole_dhash_hamming": 4,
+          "whole_phash_hamming": 0,
+          "player_dhash_hamming": 0,
+          "player_phash_hamming": 0,
+          "visual_near_match": true
+        },
+        {
+          "target_ms": 49715,
+          "historical_ms": 49715,
+          "source_time_offset_ms": 0,
+          "whole_dhash_hamming": 1,
+          "whole_phash_hamming": 0,
+          "player_dhash_hamming": 0,
+          "player_phash_hamming": 0,
+          "visual_near_match": true
+        },
+        {
+          "target_ms": 49881,
+          "historical_ms": 49881,
+          "source_time_offset_ms": 0,
+          "whole_dhash_hamming": 0,
+          "whole_phash_hamming": 0,
+          "player_dhash_hamming": 0,
+          "player_phash_hamming": 2,
+          "visual_near_match": true
+        },
+        {
+          "target_ms": 50081,
+          "historical_ms": 50081,
+          "source_time_offset_ms": 0,
+          "whole_dhash_hamming": 0,
+          "whole_phash_hamming": 0,
+          "player_dhash_hamming": 0,
+          "player_phash_hamming": 2,
+          "visual_near_match": true
+        },
+        {
+          "target_ms": 50331,
+          "historical_ms": 50331,
+          "source_time_offset_ms": 0,
+          "whole_dhash_hamming": 1,
+          "whole_phash_hamming": 2,
+          "player_dhash_hamming": 1,
+          "player_phash_hamming": 0,
+          "visual_near_match": true
+        },
+        {
+          "target_ms": 50515,
+          "historical_ms": 50515,
+          "source_time_offset_ms": 0,
+          "whole_dhash_hamming": 1,
+          "whole_phash_hamming": 2,
+          "player_dhash_hamming": 0,
+          "player_phash_hamming": 0,
+          "visual_near_match": true
+        },
+        {
+          "target_ms": 50648,
+          "historical_ms": 50648,
+          "source_time_offset_ms": 0,
+          "whole_dhash_hamming": 1,
+          "whole_phash_hamming": 0,
+          "player_dhash_hamming": 1,
+          "player_phash_hamming": 0,
+          "visual_near_match": true
+        },
+        {
+          "target_ms": 50881,
+          "historical_ms": 50881,
+          "source_time_offset_ms": 0,
+          "whole_dhash_hamming": 0,
+          "whole_phash_hamming": 0,
+          "player_dhash_hamming": 1,
+          "player_phash_hamming": 0,
+          "visual_near_match": true
+        },
+        {
+          "target_ms": 51131,
+          "historical_ms": 51131,
+          "source_time_offset_ms": 0,
+          "whole_dhash_hamming": 5,
+          "whole_phash_hamming": 0,
+          "player_dhash_hamming": 1,
+          "player_phash_hamming": 0,
+          "visual_near_match": true
+        },
+        {
+          "target_ms": 51515,
+          "historical_ms": 51515,
+          "source_time_offset_ms": 0,
+          "whole_dhash_hamming": 3,
+          "whole_phash_hamming": 0,
+          "player_dhash_hamming": 0,
+          "player_phash_hamming": 2,
+          "visual_near_match": true
+        }
+      ],
+      "prior_receipt_status": "APPROVED_ASSIST_P1_TO_P3",
+      "prior_receipt_source_is_distinct": true,
+      "result_cross_source_authoritative_for_current_orman1000": false,
+      "active_orman1000_canonical_event_overwritten": false,
+      "full_visual_player_identity_verified": false,
+      "provider_calls": 0
+    },
+    "current_video_manifest_fingerprints_reproduced": 13,
+    "selected_player_reference_alignment": {
+      "scope": "IDENTICAL_PTS_MANUAL_SELECTION_REGION_COMPATIBILITY_NOT_PERSON_OR_FINISHER_APPROVAL",
+      "previous_selection_count": 10,
+      "current_selection_count": 10,
+      "exact_shared_selection_times": 6,
+      "all_six_source_regions_compatible": true,
+      "matches": [
+        {
+          "media_ms": 3070,
+          "prior_point_margin_in_current_box": -0.004132,
+          "current_point_margin_in_prior_box": 0.051676,
+          "box_intersection_area": 0.00398034,
+          "mutual_subject_region_compatible": true
+        },
+        {
+          "media_ms": 15350,
+          "prior_point_margin_in_current_box": 0.008169,
+          "current_point_margin_in_prior_box": 0.051321,
+          "box_intersection_area": 0.01127049,
+          "mutual_subject_region_compatible": true
+        },
+        {
+          "media_ms": 21480,
+          "prior_point_margin_in_current_box": 0.034359,
+          "current_point_margin_in_prior_box": 0.03078,
+          "box_intersection_area": 0.00719088,
+          "mutual_subject_region_compatible": true
+        },
+        {
+          "media_ms": 27630,
+          "prior_point_margin_in_current_box": 0.034404,
+          "current_point_margin_in_prior_box": 0.045015,
+          "box_intersection_area": 0.01166402,
+          "mutual_subject_region_compatible": true
+        },
+        {
+          "media_ms": 33770,
+          "prior_point_margin_in_current_box": 0.025584,
+          "current_point_margin_in_prior_box": 0.061236,
+          "box_intersection_area": 0.0153884,
+          "mutual_subject_region_compatible": true
+        },
+        {
+          "media_ms": 55760,
+          "prior_point_margin_in_current_box": 0.030045,
+          "current_point_margin_in_prior_box": 0.042739,
+          "box_intersection_area": 0.0099186,
+          "mutual_subject_region_compatible": true
+        }
+      ],
+      "prior_person_local_ids_transferred": false,
+      "ball_contact_or_goal_scoring_actor_verified": false,
+      "new_provider_calls": 0
+    },
+    "scope_limits": {
+      "new_model_approval": false,
+      "independent_current_model_role_approval": false,
+      "automatic_release_gate_bypassed": false,
+      "production_report_modified": false,
+      "merged": false,
+      "deployed": false,
+      "provider_calls": 0,
+      "duel_graphics_conflict_at_9400_ms_resolved_by_this_decision": false
+    }
+  },
+  "verification": {
+    "status": "ACCEPTED_CORRECTION_VALIDATED_ON_ORIGINAL_ZIP",
+    "observed_goals": 1,
+    "observed_assists": 3,
+    "canonical_event_count": 21,
+    "other_19_canonical_events_unchanged": true,
+    "dependent_followup_run_only_neutralized": "baa4a5cfb76333175f55",
+    "contradictory_original_model_proof_retained": true,
+    "derived_consistency_errors": [],
+    "publication_projection_validation": "PASSED",
+    "published_key_actions": [
+      [
+        "9a392fb19c052dfe6719",
+        "Saved shot"
+      ],
+      [
+        "d1a34d11944defe8c2ce",
+        "Goal"
+      ],
+      [
+        "006dbd71ed71d464f19d",
+        "Assist"
+      ],
+      [
+        "47ad617d2ba76a4683cd",
+        "Assist"
+      ],
+      [
+        "16b70d6326506d906e7d",
+        "Assist"
+      ]
+    ],
+    "decision_sha256": "3b020e0e88c31a2261a2c57c5f7c7fc47b51e72d3d857d6d45b52dc960fbcb46",
+    "original_report_sha256": "9f5e317443e098ff4282ebf1149ad2ea9ddde63dd262ecd925fe2668d618e5b0",
+    "candidate_file_sha256": "8ec52b8b22e1bc0bf33a659fa147fbbc01be305208e53e4368e5c6e0dced5d6f",
+    "publication_file_sha256": "884604dfff94a6574044d05418f1b6c13859c1192724fa18b286a6c5fba981ff",
+    "paid_model_calls": 0,
+    "production_writes": 0,
+    "merged": false,
+    "deployed": false
+  }
+}

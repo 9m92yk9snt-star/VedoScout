@@ -44,7 +44,7 @@ def display_bridge(media_ms, camera_from_reference, stable_start, stable_end,
             'report_identity_approved': False}
 
 
-def tracked_display_positions(frames, detections, interval, *, deadline):
+def tracked_display_positions(frames, detections, interval, *, deadline, camera_cache=None):
     """Use the approved display curve only inside a caller-verified identity path.
 
     The source ground stays absent. Pixel-tracked intervals keep both paths;
@@ -74,8 +74,16 @@ def tracked_display_positions(frames, detections, interval, *, deadline):
         if float(cv2.absdiff(a,b).mean()) > 45:
             return None
         # Every detected person is excluded from the background estimate.
-        matrix, _ = estimate_camera(frames[ai]['gray'], frames[bi]['gray'],
-                                    [r['box'] for k in (ai, bi) for r in detections[k]])
+        # The caller owns this cache for one decoded window. All detected
+        # people, not the selected interval's owner, define the exclusions.
+        key = (ai, bi)
+        if camera_cache is not None and key in camera_cache:
+            matrix = camera_cache[key]
+        else:
+            matrix, _ = estimate_camera(frames[ai]['gray'], frames[bi]['gray'],
+                                        [r['box'] for k in (ai, bi) for r in detections[k]])
+            if camera_cache is not None:
+                camera_cache[key] = matrix
         if matrix is None:
             return None
         cameras.append(np.vstack([matrix, [0, 0, 1]]) @ cameras[-1])

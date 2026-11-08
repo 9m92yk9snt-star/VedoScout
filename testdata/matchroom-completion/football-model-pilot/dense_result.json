@@ -1,0 +1,412 @@
+{
+  "model_sha256": "8f9f94c258890ce739a6c2bbf9787827c571ce26796dd600d9c3e4cfb552f0d4",
+  "model": {
+    "repository": "https://huggingface.co/Dura-S/reco-yolo26s-football",
+    "revision": "d20231484951d4ebf3f9f2a7437aa922a4c1b395"
+  },
+  "llm_calls": 0,
+  "arrow_approved": false,
+  "frames": [
+    {
+      "media_ms": 49615,
+      "full_seconds": 2.190369132000342,
+      "full": [
+        {
+          "xyxy": [
+            483.1363525390625,
+            1095.55615234375,
+            505.651123046875,
+            1118.814697265625
+          ],
+          "score": 0.59903484582901
+        }
+      ]
+    },
+    {
+      "media_ms": 49631,
+      "full_seconds": 2.116732499000136,
+      "full": [
+        {
+          "xyxy": [
+            477.64117431640625,
+            1092.629638671875,
+            499.90679931640625,
+            1117.3408203125
+          ],
+          "score": 0.27580153942108154
+        }
+      ]
+    },
+    {
+      "media_ms": 49648,
+      "full_seconds": 1.8472393350002676,
+      "full": []
+    },
+    {
+      "media_ms": 49665,
+      "full_seconds": 1.5899730880000789,
+      "full": [
+        {
+          "xyxy": [
+            468.4725341796875,
+            1091.2398681640625,
+            490.5836181640625,
+            1115.015625
+          ],
+          "score": 0.3207821249961853
+        }
+      ]
+    },
+    {
+      "media_ms": 49681,
+      "full_seconds": 1.9877260570001454,
+      "full": []
+    },
+    {
+      "media_ms": 49698,
+      "full_seconds": 1.6035330550002982,
+      "full": []
+    },
+    {
+      "media_ms": 49715,
+      "full_seconds": 1.606755651999265,
+      "full": []
+    },
+    {
+      "media_ms": 49731,
+      "full_seconds": 1.2745811049999247,
+      "full": []
+    },
+    {
+      "media_ms": 49748,
+      "full_seconds": 1.343369736000568,
+      "full": []
+    },
+    {
+      "media_ms": 49765,
+      "full_seconds": 1.3569999049996113,
+      "full": []
+    },
+    {
+      "media_ms": 49781,
+      "full_seconds": 1.3036145139994915,
+      "full": []
+    },
+    {
+      "media_ms": 49798,
+      "full_seconds": 1.3585980120005843,
+      "full": []
+    },
+    {
+      "media_ms": 49815,
+      "full_seconds": 1.3241453559994625,
+      "full": []
+    },
+    {
+      "media_ms": 49831,
+      "full_seconds": 1.332336567999846,
+      "full": []
+    },
+    {
+      "media_ms": 49848,
+      "full_seconds": 1.3412926470000457,
+      "full": []
+    },
+    {
+      "media_ms": 49865,
+      "full_seconds": 1.2596922149996317,
+      "full": []
+    },
+    {
+      "media_ms": 49881,
+      "full_seconds": 1.4447578009994686,
+      "full": []
+    },
+    {
+      "media_ms": 49898,
+      "full_seconds": 1.3612138549997326,
+      "full": []
+    },
+    {
+      "media_ms": 49915,
+      "full_seconds": 1.2574715609998748,
+      "full": []
+    },
+    {
+      "media_ms": 49931,
+      "full_seconds": 1.4450018210000053,
+      "full": []
+    },
+    {
+      "media_ms": 49948,
+      "full_seconds": 1.3329545120004695,
+      "full": []
+    },
+    {
+      "media_ms": 49965,
+      "full_seconds": 1.3215268950007157,
+      "full": []
+    },
+    {
+      "media_ms": 49981,
+      "full_seconds": 1.2939346660004958,
+      "full": []
+    },
+    {
+      "media_ms": 49998,
+      "full_seconds": 1.5955231849993652,
+      "full": []
+    },
+    {
+      "media_ms": 50015,
+      "full_seconds": 1.7585339070001282,
+      "full": []
+    },
+    {
+      "media_ms": 50031,
+      "full_seconds": 2.0809428680004203,
+      "full": []
+    },
+    {
+      "media_ms": 50048,
+      "full_seconds": 1.746171262999269,
+      "full": []
+    },
+    {
+      "media_ms": 50065,
+      "full_seconds": 1.6349432639999577,
+      "full": []
+    },
+    {
+      "media_ms": 50081,
+      "full_seconds": 1.9259977140000046,
+      "full": []
+    },
+    {
+      "media_ms": 50098,
+      "full_seconds": 1.9011714429998392,
+      "full": []
+    },
+    {
+      "media_ms": 50115,
+      "full_seconds": 1.994684590000361,
+      "full": []
+    },
+    {
+      "media_ms": 50131,
+      "full_seconds": 2.0413767439995354,
+      "full": []
+    },
+    {
+      "media_ms": 50148,
+      "full_seconds": 2.02657165599976,
+      "full": []
+    },
+    {
+      "media_ms": 50165,
+      "full_seconds": 1.94963501500024,
+      "full": []
+    },
+    {
+      "media_ms": 50181,
+      "full_seconds": 1.8989478120001877,
+      "full": []
+    },
+    {
+      "media_ms": 50198,
+      "full_seconds": 1.8958004549995167,
+      "full": []
+    },
+    {
+      "media_ms": 50215,
+      "full_seconds": 1.7411042860003363,
+      "full": []
+    },
+    {
+      "media_ms": 50231,
+      "full_seconds": 1.791403127999729,
+      "full": []
+    },
+    {
+      "media_ms": 50248,
+      "full_seconds": 1.843603842000448,
+      "full": [
+        {
+          "xyxy": [
+            225.84375,
+            1082.447265625,
+            237.806884765625,
+            1094.6278076171875
+          ],
+          "score": 0.3175654411315918
+        }
+      ]
+    },
+    {
+      "media_ms": 50265,
+      "full_seconds": 1.8617107749996649,
+      "full": [
+        {
+          "xyxy": [
+            219.95745849609375,
+            1080.7486572265625,
+            231.611083984375,
+            1095.33203125
+          ],
+          "score": 0.5300233960151672
+        }
+      ]
+    },
+    {
+      "media_ms": 50281,
+      "full_seconds": 1.85730929500005,
+      "full": []
+    },
+    {
+      "media_ms": 50298,
+      "full_seconds": 1.8417274960002032,
+      "full": [
+        {
+          "xyxy": [
+            203.6851806640625,
+            1078.232177734375,
+            217.4351806640625,
+            1093.5567626953125
+          ],
+          "score": 0.5492439866065979
+        }
+      ]
+    },
+    {
+      "media_ms": 50315,
+      "full_seconds": 1.979972975000237,
+      "full": []
+    },
+    {
+      "media_ms": 50331,
+      "full_seconds": 1.9461768609999126,
+      "full": [
+        {
+          "xyxy": [
+            194.1358642578125,
+            1074.7265625,
+            209.1572265625,
+            1091.8333740234375
+          ],
+          "score": 0.38369205594062805
+        }
+      ]
+    },
+    {
+      "media_ms": 50348,
+      "full_seconds": 1.9390971419998095,
+      "full": []
+    },
+    {
+      "media_ms": 50365,
+      "full_seconds": 1.820894411000154,
+      "full": []
+    },
+    {
+      "media_ms": 50381,
+      "full_seconds": 1.8800907060003738,
+      "full": []
+    },
+    {
+      "media_ms": 50398,
+      "full_seconds": 1.7649080940000204,
+      "full": []
+    },
+    {
+      "media_ms": 50415,
+      "full_seconds": 1.857216745000187,
+      "full": []
+    },
+    {
+      "media_ms": 50431,
+      "full_seconds": 1.8008723120001378,
+      "full": []
+    },
+    {
+      "media_ms": 50448,
+      "full_seconds": 1.7963446459998522,
+      "full": []
+    },
+    {
+      "media_ms": 50465,
+      "full_seconds": 1.9023711380004897,
+      "full": []
+    },
+    {
+      "media_ms": 50481,
+      "full_seconds": 1.8429554630001803,
+      "full": []
+    },
+    {
+      "media_ms": 50498,
+      "full_seconds": 1.7326672320004946,
+      "full": []
+    },
+    {
+      "media_ms": 50515,
+      "full_seconds": 1.8577294309998251,
+      "full": []
+    },
+    {
+      "media_ms": 50531,
+      "full_seconds": 1.9396316200000001,
+      "full": []
+    },
+    {
+      "media_ms": 50548,
+      "full_seconds": 1.585316798000349,
+      "full": []
+    },
+    {
+      "media_ms": 50565,
+      "full_seconds": 1.9452486560003308,
+      "full": []
+    },
+    {
+      "media_ms": 50581,
+      "full_seconds": 1.6633102269997835,
+      "full": []
+    },
+    {
+      "media_ms": 50598,
+      "full_seconds": 1.3598948890003157,
+      "full": []
+    },
+    {
+      "media_ms": 50615,
+      "full_seconds": 1.6749630540007274,
+      "full": []
+    },
+    {
+      "media_ms": 50631,
+      "full_seconds": 1.7873578859998815,
+      "full": []
+    },
+    {
+      "media_ms": 50648,
+      "full_seconds": 1.634878437000225,
+      "full": []
+    }
+  ],
+  "elapsed_seconds": 111.86988894299975,
+  "source_video_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2",
+  "visual_review": {
+    "confirmed_visible_match_ball_ms": [
+      49615,
+      49631,
+      49665
+    ],
+    "unverified_near_blue_player_foot_ms": [
+      50248,
+      50265,
+      50298,
+      50331
+    ],
+    "pass_trajectory_verified": false
+  }
+}

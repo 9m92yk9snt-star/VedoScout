@@ -1,0 +1,23 @@
+{
+  "source_video_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2",
+  "model_run": 42171256971,
+  "model_elapsed_seconds": 35.902,
+  "prompt_tokens": 81511,
+  "completion_tokens": 1687,
+  "source_observation_count": 17,
+  "missing_ground_observations": 4,
+  "offline_engine": "opencv",
+  "cpu_affinity": 1,
+  "graphics_elapsed_seconds": 330.74451781300013,
+  "clip_source_frames": 279,
+  "ellipse_frames_before": 151,
+  "ellipse_frames_after": 279,
+  "tail_frames_before": 0,
+  "tail_frames_after": 128,
+  "minimum_visible_overlay_pixels_at_360x640": 298,
+  "arrow_frames_before": 25,
+  "arrow_frames_after": 25,
+  "ball_playback_identical": true,
+  "live_runtime_verified": false,
+  "full_visual_approval": false
+}

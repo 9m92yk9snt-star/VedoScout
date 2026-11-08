@@ -1,0 +1,148 @@
+{
+  "event_id": "47ad617d2ba76a4683cd",
+  "source_zip_sha256": "3b27260511ed965952a497f97d1c6345a0f1b4bef1b89a60912a62e0f6530c0c",
+  "source_video_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2",
+  "source_member": "sequence/match-room-localization.json",
+  "new_model_calls": 0,
+  "finding": "No target ground or active ball coordinates during 49881\u201350265; no receiver-specific coordinates in this localization response. Accepted assist does not supply missing positions. Automatic reconstructed start cannot be obtained from these records alone.",
+  "rows": [
+    {
+      "frame": "s000049881",
+      "target_status": "UNCERTAIN",
+      "ground": null,
+      "box": null,
+      "active_ball_status": "UNCERTAIN",
+      "ball": null
+    },
+    {
+      "frame": "s000050015",
+      "target_status": "UNCERTAIN",
+      "ground": null,
+      "box": null,
+      "active_ball_status": "UNCERTAIN",
+      "ball": null
+    },
+    {
+      "frame": "s000050131",
+      "target_status": "UNCERTAIN",
+      "ground": null,
+      "box": null,
+      "active_ball_status": "UNCERTAIN",
+      "ball": null
+    },
+    {
+      "frame": "s000050265",
+      "target_status": "UNCERTAIN",
+      "ground": null,
+      "box": null,
+      "active_ball_status": "UNCERTAIN",
+      "ball": null
+    },
+    {
+      "frame": "s000050381",
+      "target_status": "CONFIRMED",
+      "ground": null,
+      "box": [
+        0.163,
+        0.489,
+        0.129,
+        0.08
+      ],
+      "active_ball_status": "UNCERTAIN",
+      "ball": null
+    },
+    {
+      "frame": "s000050431",
+      "target_status": "CONFIRMED",
+      "ground": null,
+      "box": [
+        0.16,
+        0.489,
+        0.128,
+        0.08
+      ],
+      "active_ball_status": "CONFIRMED",
+      "ball": [
+        0.344,
+        0.552
+      ]
+    },
+    {
+      "frame": "s000050515",
+      "target_status": "CONFIRMED",
+      "ground": null,
+      "box": [
+        0.205,
+        0.487,
+        0.089,
+        0.07
+      ],
+      "active_ball_status": "CONFIRMED",
+      "ball": [
+        0.321,
+        0.551
+      ]
+    },
+    {
+      "frame": "s000050598",
+      "target_status": "CONFIRMED",
+      "ground": [
+        0.234,
+        0.563
+      ],
+      "box": [
+        0.187,
+        0.485,
+        0.105,
+        0.079
+      ],
+      "active_ball_status": "UNCERTAIN",
+      "ball": null
+    },
+    {
+      "frame": "s000050631",
+      "target_status": "CONFIRMED",
+      "ground": [
+        0.258,
+        0.565
+      ],
+      "box": [
+        0.177,
+        0.485,
+        0.106,
+        0.082
+      ],
+      "active_ball_status": "CONFIRMED",
+      "ball": [
+        0.347,
+        0.542
+      ]
+    },
+    {
+      "frame": "s000050648",
+      "target_status": "CONFIRMED",
+      "ground": [
+        0.257,
+        0.564
+      ],
+      "box": [
+        0.177,
+        0.485,
+        0.103,
+        0.081
+      ],
+      "active_ball_status": "CONFIRMED",
+      "ball": [
+        0.363,
+        0.539
+      ]
+    }
+  ],
+  "next_required_evidence": "Source-bound passer position before occlusion and a distinct receiver association; do not substitute post-reception shot coordinates for the pass.",
+  "experiments_not_to_repeat_without_new_input": [
+    "generic YOLO full-frame/ROI/tiles",
+    "football-trained ONNX full-frame/ROI",
+    "same forward/backward LK seeds"
+  ],
+  "approval": "ASSIST_UNCHANGED_ARROW_PENDING"
+}

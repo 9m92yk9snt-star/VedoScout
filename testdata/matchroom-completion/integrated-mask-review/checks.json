@@ -1,0 +1,152 @@
+[
+  {
+    "ms": 49915,
+    "visible_pixels": 0,
+    "mask_polygons": 8
+  },
+  {
+    "ms": 49931,
+    "visible_pixels": 0,
+    "mask_polygons": 6
+  },
+  {
+    "ms": 49948,
+    "visible_pixels": 17,
+    "mask_polygons": 7
+  },
+  {
+    "ms": 49965,
+    "visible_pixels": 33,
+    "mask_polygons": 8
+  },
+  {
+    "ms": 49981,
+    "visible_pixels": 60,
+    "mask_polygons": 8
+  },
+  {
+    "ms": 49998,
+    "visible_pixels": 105,
+    "mask_polygons": 9
+  },
+  {
+    "ms": 50015,
+    "visible_pixels": 33,
+    "mask_polygons": 8
+  },
+  {
+    "ms": 50031,
+    "visible_pixels": 27,
+    "mask_polygons": 6
+  },
+  {
+    "ms": 50048,
+    "visible_pixels": 34,
+    "mask_polygons": 10
+  },
+  {
+    "ms": 50065,
+    "visible_pixels": 16,
+    "mask_polygons": 9
+  },
+  {
+    "ms": 50081,
+    "visible_pixels": 9,
+    "mask_polygons": 5
+  },
+  {
+    "ms": 50098,
+    "visible_pixels": 52,
+    "mask_polygons": 5
+  },
+  {
+    "ms": 50115,
+    "visible_pixels": 0,
+    "mask_polygons": 5
+  },
+  {
+    "ms": 50131,
+    "visible_pixels": 0,
+    "mask_polygons": 5
+  },
+  {
+    "ms": 50148,
+    "visible_pixels": 0,
+    "mask_polygons": 5
+  },
+  {
+    "ms": 50165,
+    "visible_pixels": 0,
+    "mask_polygons": 5
+  },
+  {
+    "ms": 50181,
+    "visible_pixels": 0,
+    "mask_polygons": 6
+  },
+  {
+    "ms": 50198,
+    "visible_pixels": 3,
+    "mask_polygons": 7
+  },
+  {
+    "ms": 50215,
+    "visible_pixels": 39,
+    "mask_polygons": 7
+  },
+  {
+    "ms": 50231,
+    "visible_pixels": 53,
+    "mask_polygons": 8
+  },
+  {
+    "ms": 50248,
+    "visible_pixels": 42,
+    "mask_polygons": 7
+  },
+  {
+    "ms": 50265,
+    "visible_pixels": 23,
+    "mask_polygons": 7
+  },
+  {
+    "ms": 50281,
+    "visible_pixels": 55,
+    "mask_polygons": 5
+  },
+  {
+    "ms": 50298,
+    "visible_pixels": 81,
+    "mask_polygons": 5
+  },
+  {
+    "ms": 50315,
+    "visible_pixels": 227,
+    "mask_polygons": 5
+  },
+  {
+    "ms": 50331,
+    "visible_pixels": 138,
+    "mask_polygons": 8
+  },
+  {
+    "ms": 50348,
+    "visible_pixels": 182,
+    "mask_polygons": 5
+  },
+  {
+    "ms": 50365,
+    "visible_pixels": 181,
+    "mask_polygons": 5
+  },
+  {
+    "ms": 50381,
+    "visible_pixels": 213,
+    "mask_polygons": 5
+  },
+  {
+    "ms": 50398,
+    "visible_pixels": 228,
+    "mask_polygons": 7
+  }
+]

@@ -1,0 +1,68 @@
+{
+  "scope": "EXACT_SOURCE_REPLAY_OF_RECONSTRUCTED_PASS_PREVIEW",
+  "date": "2026-11-08",
+  "event_id": "47ad617d2ba76a4683cd",
+  "source_archive_sha256": "3b27260511ed965952a497f97d1c6345a0f1b4bef1b89a60912a62e0f6530c0c",
+  "source_video_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2",
+  "reproduction": {
+    "script": "testdata/matchroom-completion/reconstructed-pass-preview/render.py",
+    "runtime_opencv": "4.13.0",
+    "source_frames": 132,
+    "overlay_frames": 30,
+    "visible_overlay_frames": 21,
+    "maximum_coordinate_difference_from_retained_preview_px": 0,
+    "all_30_overlay_frames_visually_inspected": true,
+    "source_contact_frames_inspected": 12,
+    "actual_frontend_browser_verified": false
+  },
+  "timing": {
+    "first_overlay_source_ms": 49915,
+    "last_overlay_source_ms": 50398,
+    "accepted_pass_interval_ms": [
+      49715,
+      50081
+    ],
+    "accepted_receive_and_finish_interval_ms": [
+      50331,
+      50648
+    ],
+    "overlay_frames_inside_finish_bracket": [
+      50331,
+      50348,
+      50365,
+      50381,
+      50398
+    ],
+    "stop_before_actual_strike": "UNRESOLVED_WITHIN_ACCEPTED_CONTACT_BRACKET",
+    "note": "Overlap does not prove the arrow continues after the actual contact; it prevents certifying that it stops before it."
+  },
+  "endpoint_checks": [
+    {
+      "ms": 50365,
+      "distance_to_retained_flow_candidate_px": 4.445
+    },
+    {
+      "ms": 50381,
+      "distance_to_retained_flow_candidate_px": 0.002,
+      "independent": false,
+      "note": "This point was used to construct the arrow; agreement is tautological, not validation."
+    },
+    {
+      "ms": 50398,
+      "distance_to_retained_flow_candidate_px": 3.955
+    }
+  ],
+  "geometry": {
+    "middle_path": "INTERPOLATED_NOT_OBSERVED",
+    "receiver_side_reference": "RETAINED_OPTICAL_FLOW_CANDIDATES_NOT_INDEPENDENT_BALL_PROOF",
+    "mask": "ERODED_GRASS_COLOR_MASK_NOT_SOURCE_PERSON_SEGMENTATION",
+    "manual_preview_start": true,
+    "automatic_arrow_generation_verified": false
+  },
+  "verdict": "EXACT_REPLAY_VERIFIED_PRECISE_BALL_MOTION_NOT_VERIFIED",
+  "accepted_assist_unchanged": true,
+  "production_changed": false,
+  "new_model_calls": 0,
+  "merge_or_deploy": false,
+  "next_fix": "Resolve the visual receiving/striking transition within 50331–50648 on exact source frames; retain source-bound receiver-side observations separately from interpolated display. Validate real frontend masking and timing before approving playback. Do not repeat the semantic assist approval."
+}

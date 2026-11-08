@@ -1,0 +1,40 @@
+name: One pass position model probe
+on:
+  pull_request:
+    types: [synchronize]
+    paths: ['.github/workflows/pass-position-once.yml']
+permissions:
+  contents: read
+jobs:
+  positions:
+    if: >-
+      github.repository == '9m92yk9snt-star/VedoScout' &&
+      github.event.pull_request.number == 59 &&
+      github.event.pull_request.draft == true &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.head.ref == 'codex/matchroom-window-geometry-reuse' &&
+      github.event.before == '95cb45fceea528a4d0135c3893ac95dcd0992887' &&
+      github.run_attempt == 1
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install cryptography
+      - name: One position request through existing model key
+        env:
+          EMERGENT_LLM_KEY: ${{ secrets.EMERGENT_LLM_KEY }}
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: python backend/scripts/probe_pass_positions.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pass-position-result
+          path: ${{ runner.temp }}/pass-position-result.json
+          retention-days: 7
+          if-no-files-found: warn

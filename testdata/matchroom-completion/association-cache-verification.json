@@ -1,0 +1,31 @@
+{
+  "runs": [
+    {
+      "cached": false,
+      "seconds": 26.9782656210009,
+      "transport_calls": 99,
+      "diagnostics": {
+        "status": "SUPPORTED_SOURCE_OBSERVATIONS",
+        "method": "SOURCE_OBSERVATION_INSTANCE_CONTOUR",
+        "decoded_frames": 83,
+        "agreed_intervals": 9
+      }
+    },
+    {
+      "cached": true,
+      "seconds": 27.391721065003367,
+      "transport_calls": 69,
+      "diagnostics": {
+        "status": "SUPPORTED_SOURCE_OBSERVATIONS",
+        "method": "SOURCE_OBSERVATION_INSTANCE_CONTOUR",
+        "decoded_frames": 83,
+        "agreed_intervals": 9
+      }
+    }
+  ],
+  "segments_identical": true,
+  "segment_count": [
+    9,
+    9
+  ]
+}

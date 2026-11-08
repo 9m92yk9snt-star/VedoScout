@@ -1,0 +1,40 @@
+{
+  "mode": "PAUSED_COACHING_DIRECTION",
+  "source_video_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2",
+  "freeze_source_ms": 49881,
+  "pause_seconds": 1.8,
+  "frames_encoded": 240,
+  "dimensions": [
+    1080,
+    1920
+  ],
+  "crop": false,
+  "zoom": false,
+  "moving_tip": false,
+  "start_px": [
+    430.1053292357994,
+    1094.5039106360634
+  ],
+  "target_ground_px": [
+    580.9136689106654,
+    1084.5207918957985
+  ],
+  "rendered_tip_px": [
+    571.9333237631685,
+    1085.1152673215563
+  ],
+  "tip_center_masked": false,
+  "head_visible_fraction": 0.95,
+  "foreground_source_ms": 49881,
+  "is_measured_ball_trajectory": false,
+  "production_integration": false,
+  "playback_approved": false,
+  "notes": [
+    "User-indicated origin; not measured ball contact.",
+    "Candidate teammate ground from retained model at 49865, background-projected 16ms to freeze; not reception contact.",
+    "Full-length direction fades in together; tip does not simulate ball travel.",
+    "No new semantic adjudication or production approval."
+  ],
+  "decoded_output_frames": 240,
+  "visually_reviewed": true
+}

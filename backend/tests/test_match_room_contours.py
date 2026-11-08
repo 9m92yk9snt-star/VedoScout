@@ -143,3 +143,32 @@ def test_pinned_reacquisition_graph_runs_in_the_serving_opencv_runtime():
         assert any(o.ndim==4 and o.shape[1]==32 for o in outputs)
     finally:
         cv2.setNumThreads(threads)
+
+
+
+def test_exact_window_associations_keep_rejections_direction_and_cut_checks(monkeypatch):
+    frames = [{'media_ms': i*25, 'gray': np.zeros((90, 160), np.uint8)} for i in range(3)]
+    rows = [[{'name': (i,j)} for j in range(2)] for i in range(3)]
+    calls=[]
+    def transport(a,b,source,candidates):
+        calls.append((source['name'], candidates[0]['name']))
+        return None if source['name'][1] else 0
+    monkeypatch.setattr(contours,'transport',transport)
+    cache={}
+    expected=contours.follow_instance(frames,rows,0,0)
+    calls.clear()
+    assert contours.follow_instance(frames,rows,0,0,association_cache=cache)==expected
+    assert len(calls)==2
+    assert contours.follow_instance(frames,rows,0,0,association_cache=cache)==expected
+    assert len(calls)==2
+    assert contours.follow_instance(frames,rows,2,0,association_cache=cache)==expected
+    assert len(calls)==4  # opposite direction is independent
+    assert contours.follow_instance(frames,rows,0,1,association_cache=cache)=={0:1}
+    assert contours.follow_instance(frames,rows,0,1,association_cache=cache)=={0:1}
+    assert len(calls)==5  # rejected association also reused
+    frames[1]['gray'][:]=255
+    assert contours.follow_instance(frames,rows,0,0,association_cache=cache)=={0:0}
+    assert len(calls)==5  # cut gate still precedes lookup
+    frames[1]['gray'][:]=0
+    frames[1]['media_ms']=100
+    assert contours.follow_instance(frames,rows,0,0,association_cache=cache)=={0:0}
