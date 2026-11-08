@@ -722,3 +722,16 @@ def test_cancelled_publication_starts_no_later_assets(tmp_path, monkeypatch):
     assert started == ['a.jpg', 'a.mp4']
     assert sorted(finished) == sorted(started)
     assert writes == []
+
+
+def test_scoring_cards_stay_selected_despite_non_scoring_writer_mentions(retained):
+    canonical = bundle(retained)
+    scoring = {e['event_id'] for e in canonical['events']
+               if e['canonical_event_type'] in {'GOAL', 'ASSIST', 'SHOT'}}
+    assert 0 < len(scoring) <= 8
+    others = [e['event_id'] for e in canonical['events'] if e['event_id'] not in scoring]
+    for mentions in ([], [{'event_id': eid} for eid in others for _ in range(20)]):
+        full = adapter.build_report({'summary': 'Offline dependency audit', 'technical': {
+            'passing': {'evidence': mentions}}}, canonical)
+        assert scoring <= {c['event_id'] for c in full['video_comments']}
+        assert len(full['video_comments']) <= 8

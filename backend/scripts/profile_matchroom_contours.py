@@ -1,7 +1,8 @@
 """Offline contour profiling from an exported report and its exact source video.
 
 No model-provider calls, report writes or deployment. Uses the repository's
-pinned OpenCV segmenter; these timings are not ONNX/live acceptance evidence.
+pinned small/medium segmenters and the explicitly selected engine. These
+local profiling timings are not live acceptance evidence.
 """
 import argparse
 import cProfile
@@ -37,6 +38,7 @@ def main():
     parser.add_argument('--window-start-ms', type=int)
     parser.add_argument('--window-end-ms', type=int)
     parser.add_argument('--model', choices=('small', 'medium'), default='small')
+    parser.add_argument('--engine', choices=('opencv', 'onnxruntime'), default='opencv')
     parser.add_argument('--seconds', type=float, default=90)
     parser.add_argument('--one-cpu', action='store_true')
     parser.add_argument('--audit-pairs', action='store_true',
@@ -64,7 +66,7 @@ def main():
     except ValueError as exc:
         parser.error(str(exc))
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-    os.environ['SCOUTMEPLAY_MATCHROOM_ENGINE'] = 'opencv'
+    os.environ['SCOUTMEPLAY_MATCHROOM_ENGINE'] = args.engine
     import cv2
     from native_player_segmentation import PersonSegmenter
     from match_room_position_contours import contour_segments, refinement_model
@@ -80,7 +82,7 @@ def main():
                                 deadline=started+args.seconds, diagnostics=diagnostic, segmenter=model,
                                 audit_pairs=args.audit_pairs)
     profile.disable()
-    metadata = {'engine': 'opencv', 'opencv_version': cv2.__version__,
+    metadata = {'engine': args.engine, 'opencv_version': cv2.__version__,
                 'source_video_sha256': digest, 'event_id': room['event_id'],
                 'window_ms': [start_ms, end_ms], 'pair_audit_enabled': args.audit_pairs,
                 'model': args.model, 'model_sha256': model.sha256,
