@@ -1,0 +1,45 @@
+{
+  "scope": "EXPORTED_PAUSED_DIRECTION_VISUAL_QA_ONLY",
+  "status": "PASS",
+  "video_sha256": "aaae3fe3096eca8f3ef7f06e11f844e77dc6e530470c076653722629eadb1abd",
+  "source_video_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2",
+  "decoded_frames": 240,
+  "source_frames": 132,
+  "inserted_pause_frames": 108,
+  "pause_source_ms": 49881,
+  "pause_output_frame_range_inclusive": [
+    28,
+    135
+  ],
+  "output_fps": 60,
+  "dimensions": [
+    1080,
+    1920
+  ],
+  "frame_mapping": "all source frames retained in order; insert 108 repetitions before source frame at 49881ms",
+  "source_comparison_excluded_rectangles": [
+    [
+      30,
+      60,
+      720,
+      125
+    ],
+    [
+      400,
+      1050,
+      220,
+      80
+    ]
+  ],
+  "source_comparison_max_mean_absolute_channel_error": 2.8099000453948975,
+  "source_comparison_mean_absolute_channel_error": 2.356933373212814,
+  "tip_center_visible": true,
+  "nominal_head_area_visible_fraction": 0.95,
+  "visually_inspected_output_frame": 100,
+  "measured_ball_trajectory_verified": false,
+  "receiver_contact_geometry_verified": false,
+  "production_playback_approved": false,
+  "production_integrated": false,
+  "accepted_assist_changed": false,
+  "next_step": "Integrate a separately labeled paused coaching-direction mode with source/event binding; do not promote candidate anchors or change measured-ball gates."
+}
