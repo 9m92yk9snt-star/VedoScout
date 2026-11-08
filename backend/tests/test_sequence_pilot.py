@@ -1550,3 +1550,73 @@ def test_failed_process_setup_releases_shared_slot(monkeypatch):
     assert control._active == 0
     assert control.acquire(time.monotonic())
     control.release()
+
+
+def test_writer_lane_cannot_be_taken_by_position_queue():
+    control = t.RunCoordination(2)
+    writer, positions = t.RunLane(control), t.RunLane(control)
+    now = time.monotonic()
+    assert positions.acquire(now)
+    assert not positions.acquire(now)
+    assert writer.acquire(now)
+    assert not writer.acquire(now)
+    writer.release()
+    assert not positions.acquire(now)  # keep the next writer section's slot
+    assert writer.acquire(now)
+    writer.release()
+    positions.set_limit(2)  # only after both writer sections finish
+    assert positions.acquire(now)
+    assert control._active == positions._active == 2
+    assert not positions.acquire(now)
+    positions.release()
+    positions.release()
+    assert control._active == 0
+
+
+def test_lane_backoff_and_cancellation_are_shared():
+    control = t.RunCoordination(2)
+    writer, positions = t.RunLane(control), t.RunLane(control)
+    writer.pause(10)
+    assert not positions.acquire(time.monotonic())
+    assert not writer.acquire(time.monotonic())
+    positions.stopped.set()
+    assert control.stopped.is_set() and writer.stopped.is_set()
+    assert not writer.acquire(time.monotonic()+100)
+    assert not positions.acquire(time.monotonic()+100)
+    for limit in (0, 3, True, 1.5):
+        with pytest.raises(ValueError, match='INVALID_STAGE_CALL_LIMIT'):
+            positions.set_limit(limit)
+
+
+def test_live_position_pool_expands_after_writer_finishes():
+    import asyncio
+    async def scenario():
+        control = t.RunCoordination(2)
+        writer, positions = t.RunLane(control), t.RunLane(control)
+        events = []
+        async def write():
+            result = await t.run_jobs_async([{'packet_id':'writer','delay':.05}],
+                'emergent','gpt-6-astra',deadline=time.monotonic()+10,per_call_s=3,
+                coordination=writer,worker=synthetic_coordinated_worker)
+            events.append(('writer_done',time.monotonic()))
+            positions.set_limit(2)
+            return result
+        async def locate():
+            return await t.run_jobs_async([{'packet_id':f'position-{i}','delay':.3} for i in range(4)],
+                'emergent','gpt-6-astra',deadline=time.monotonic()+10,per_call_s=3,workers=2,
+                coordination=positions,worker=synthetic_coordinated_worker)
+        written, located = await asyncio.gather(write(),locate())
+        assert control._active == writer._active == positions._active == 0
+        return written, located, events[0][1]
+    written, located, writer_done = asyncio.run(scenario())
+    assert len(written) == 1 and len(located) == 4
+    assert all(r['status'] == 'COMPLETED' for r in written+located)
+    # No position concurrency before writer releases its reservation; at least
+    # one pair overlaps afterwards, proving the already-running pool expands.
+    overlaps = []
+    for i,a in enumerate(located):
+        for b in located[i+1:]:
+            start, stop = max(a['started'],b['started']), min(a['ended'],b['ended'])
+            if start < stop:
+                overlaps.append(start)
+    assert overlaps and min(overlaps) >= writer_done

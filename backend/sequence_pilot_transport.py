@@ -276,6 +276,41 @@ class RunCoordination:
             self._resume_at = max(self._resume_at, time.monotonic() + seconds)
 
 
+class RunLane:
+    """A dynamic stage limit inside one shared run's global call cap."""
+    def __init__(self, coordination, max_active=1):
+        if type(max_active) is not int or not 1 <= max_active <= coordination.max_active:
+            raise ValueError("INVALID_STAGE_CALL_LIMIT")
+        self.coordination = coordination
+        self.max_active = max_active
+        self._active = 0
+        self.stopped = coordination.stopped
+
+    def acquire(self, now):
+        owner = self.coordination
+        with owner._lock:
+            if (owner.stopped.is_set() or now < owner._resume_at
+                    or owner._active >= owner.max_active or self._active >= self.max_active):
+                return False
+            owner._active += 1
+            self._active += 1
+            return True
+
+    def release(self):
+        with self.coordination._lock:
+            self._active -= 1
+            self.coordination._active -= 1
+
+    def set_limit(self, limit):
+        if type(limit) is not int or not 1 <= limit <= self.coordination.max_active:
+            raise ValueError("INVALID_STAGE_CALL_LIMIT")
+        with self.coordination._lock:
+            self.max_active = limit
+
+    def pause(self, seconds):
+        self.coordination.pause(seconds)
+
+
 async def run_jobs_async(jobs, provider, model, *, coordination=None, runner=None, **kwargs):
     """Keep the supervising thread alive until its actual model children stop."""
     control = coordination or RunCoordination()
