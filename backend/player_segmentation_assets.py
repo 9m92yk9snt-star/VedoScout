@@ -17,7 +17,12 @@ MAX_MODEL_BYTES = 128 * 1024 * 1024
 def ensure_model_asset(path, expected_sha256):
     path = Path(path)
     if path.is_file():
-        if hashlib.sha256(path.read_bytes()).hexdigest() != expected_sha256:
+        # Validate every byte without allocating a second whole-model buffer.
+        digest = hashlib.sha256()
+        with path.open('rb') as source:
+            while block := source.read(1024 * 1024):
+                digest.update(block)
+        if digest.hexdigest() != expected_sha256:
             raise ValueError("Player model checksum mismatch")
         return path
     bundle = path.parent / "segmentation-assets"
