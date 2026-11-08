@@ -93,3 +93,32 @@ def build_reviewed_direction(video, event_id, source_sha256, review, deadline):
                 'is_measured_ball_trajectory': False, 'playback_status': 'PENDING', 'samples': rows}
     finally:
         cap.release()
+
+
+def attach_reviewed_direction(room, event, video, deadline):
+    """Optional, source-bound display review. Never derive event/ball evidence.
+
+    An ordinary analysis with no explicit review performs no extra decoding.
+    Building a review always leaves playback PENDING until separately verified.
+    """
+    review = event.get('reviewed_direction_review')
+    if review is None:
+        return
+    room.pop('reviewed_direction', None)
+    if (not isinstance(review, dict)
+            or event.get('canonical_action_type') != 'PASS'
+            or event.get('canonical_outcome') not in ('COMPLETED', 'TEAMMATE_GOAL')
+            or room.get('event_id') != event.get('event_id')
+            or room.get('source_video_sha256') != event.get('source_video_sha256')
+            or type(review.get('start_ms')) is not int
+            or type(review.get('end_ms')) is not int
+            or not room['start_ms'] <= review['start_ms'] < review['end_ms'] <= room['end_ms']):
+        room['reviewed_direction_diagnostics'] = {'status': 'REJECTED', 'reason': 'DISPLAY_REVIEW_BINDING_INVALID'}
+        return
+    try:
+        direction = build_reviewed_direction(video, event['event_id'], event['source_video_sha256'], review, deadline)
+    except (ValueError, OSError, cv2.error) as exc:
+        room['reviewed_direction_diagnostics'] = {'status': 'UNAVAILABLE', 'reason': type(exc).__name__}
+        return
+    room['reviewed_direction'] = direction
+    room['reviewed_direction_diagnostics'] = {'status': 'PENDING_PLAYBACK_REVIEW', 'sample_count': len(direction['samples'])}

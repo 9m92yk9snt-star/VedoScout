@@ -444,6 +444,13 @@ def render_assets(video, full, bundle, directory, anchors=None):
                        tele_clip_timebase="SOURCE_PTS_ALIGNED")
             from match_room import presentation
             row["match_room"] = presentation(event, event.get("visual_samples"))
+            # Optional reviewed graphics are separate from canonical action and
+            # measured ball tracks. No review means no extra inference work.
+            from match_room_reviewed_direction import attach_reviewed_direction
+            import time as display_review_time
+            attach_reviewed_direction(row["match_room"], event, video,
+                                      display_review_time.monotonic() + 20)
+
             row["match_room"]["tracking_status"] = tracking_status if event['event_id'] in tracks else 'NO_TRACK_INPUT'
             row["match_room"]["tracking"] = tracks.get(event["event_id"])
             tracked = tracks.get(event["event_id"]) or {}
