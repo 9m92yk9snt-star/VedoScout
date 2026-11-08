@@ -191,7 +191,7 @@ WRITER_SECTIONS = (
 )
 
 
-async def write_facts(prompt, *, canonical=None):
+async def write_facts(prompt, *, canonical=None, coordination=None):
     """Two bounded text sections; presentation consumes the completed assessment.
 
     No new perception, network retry or automatic model fallback. Canonical
@@ -215,7 +215,7 @@ async def write_facts(prompt, *, canonical=None):
                  "items": [{"type": "text", "text": section_prompt}]}]
         if model == "gpt-6-astra":
             jobs[0]["reasoning_effort"] = "low"
-        rows = await asyncio.to_thread(transport.run_jobs, jobs, "emergent", model,
+        rows = await transport.run_jobs_async(jobs, "emergent", model, coordination=coordination,
                                        deadline=time.monotonic()+195, per_call_s=180)
         receipt = rows[0]
         receipts.append(receipt)

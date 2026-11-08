@@ -7,6 +7,7 @@ Credentials are read inside owned child processes and never persisted.
 """
 from __future__ import annotations
 
+import asyncio
 import base64
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
@@ -17,6 +18,7 @@ import os
 from pathlib import Path
 import re
 import time
+import threading
 import urllib.error
 import urllib.request
 
@@ -247,7 +249,57 @@ def _stop(process):
     process.close()
 
 
-def run_jobs(jobs, provider, model, *, deadline, per_call_s=90., workers=2, worker=_worker, on_result=None):
+class RunCoordination:
+    """One analysis owns its call cap, rate-limit pause and cancellation."""
+    def __init__(self, max_active=2):
+        if type(max_active) is not int or not 1 <= max_active <= 2:
+            raise ValueError("INVALID_SHARED_CALL_LIMIT")
+        self.max_active = max_active
+        self._active = 0
+        self._resume_at = 0.0
+        self._lock = threading.Lock()
+        self.stopped = threading.Event()
+
+    def acquire(self, now):
+        with self._lock:
+            if self.stopped.is_set() or now < self._resume_at or self._active >= self.max_active:
+                return False
+            self._active += 1
+            return True
+
+    def release(self):
+        with self._lock:
+            self._active -= 1
+
+    def pause(self, seconds):
+        with self._lock:
+            self._resume_at = max(self._resume_at, time.monotonic() + seconds)
+
+
+async def run_jobs_async(jobs, provider, model, *, coordination=None, runner=None, **kwargs):
+    """Keep the supervising thread alive until its actual model children stop."""
+    control = coordination or RunCoordination()
+    task = asyncio.create_task(asyncio.to_thread(runner or run_jobs, jobs, provider, model,
+                                                coordination=control, **kwargs))
+    try:
+        return await asyncio.shield(task)
+    except asyncio.CancelledError:
+        control.stopped.set()
+        # Cancelling to_thread alone does not stop its subprocesses. Continue
+        # servicing checkpoint callbacks while the supervisor joins its children.
+        while not task.done():
+            try:
+                await asyncio.shield(task)
+            except asyncio.CancelledError:
+                continue
+            except Exception:
+                break
+        if task.done() and not task.cancelled():
+            task.exception()  # retrieve any cleanup error; preserve cancellation
+        raise
+
+
+def run_jobs(jobs, provider, model, *, deadline, per_call_s=90., workers=2, worker=_worker, on_result=None, coordination=None):
     """Two owned children; a wall deadline stops actual work, including hung IO."""
     if provider not in KEY_ENV or not 1 <= workers <= 2 or not 0 < per_call_s <= MAX_CALL_SECONDS:
         raise ValueError("INVALID_EXECUTION_BUDGET")
@@ -258,11 +310,27 @@ def run_jobs(jobs, provider, model, *, deadline, per_call_s=90., workers=2, work
     try:
         while pending or active:
             now = time.monotonic()
+            if coordination is not None and coordination.stopped.is_set():
+                abort = cancel_active = True
             while pending and len(active) < workers and resume_at <= now < deadline and not abort:
+                if coordination is not None and not coordination.acquire(now):
+                    break
                 job = pending.pop(0)
-                parent, child = context.Pipe(duplex=False)
-                process = context.Process(target=worker, args=(child, job, provider, model, min(per_call_s, deadline - now)))
-                process.start()
+                parent = child = process = None
+                try:
+                    parent, child = context.Pipe(duplex=False)
+                    process = context.Process(target=worker, args=(child, job, provider, model, min(per_call_s, deadline - now)))
+                    process.start()
+                except BaseException:
+                    if parent is not None:
+                        parent.close()
+                    if child is not None:
+                        child.close()
+                    if process is not None and process.pid is not None:
+                        _stop(process)
+                    if coordination is not None:
+                        coordination.release()
+                    raise
                 child.close()
                 active[process.pid] = (process, parent, job, min(deadline, now + per_call_s))
                 now = time.monotonic()
@@ -281,6 +349,9 @@ def run_jobs(jobs, provider, model, *, deadline, per_call_s=90., workers=2, work
                     now = time.monotonic()
                     packet_id = job["packet_id"]
                     delay = result.get("retry_after_seconds", RATE_LIMIT_DEFAULT_WAIT_SECONDS)
+                    if (coordination is not None and result.get("http_status") == 429):
+                        shared_delay = delay if type(delay) in {int, float} and 0 <= delay <= MAX_RATE_LIMIT_WAIT_SECONDS else RATE_LIMIT_DEFAULT_WAIT_SECONDS
+                        coordination.pause(max(1., shared_delay))
                     retry_rate_limit = (result.get("http_status") == 429
                         and result.get("error") == "MODEL_QUOTA_OR_RATE_LIMIT"
                         and result.get("limit_kind") != "QUOTA_EXHAUSTED"
@@ -312,6 +383,8 @@ def run_jobs(jobs, provider, model, *, deadline, per_call_s=90., workers=2, work
                     # still succeed. Keep their bounded deadlines and save results.
                     cancel_active = cancel_active or (stop and result.get("http_status") != 429)
                     pipe.close(); _stop(process); del active[pid]
+                    if coordination is not None:
+                        coordination.release()
             if (now >= deadline or abort) and not active:
                 for job in pending:
                     result = {"packet_id": job["packet_id"], "status": "NOT_SENT",
@@ -322,10 +395,12 @@ def run_jobs(jobs, provider, model, *, deadline, per_call_s=90., workers=2, work
                     if on_result:
                         on_result(result)
                 pending.clear()
-            if active or (pending and now < resume_at and now < deadline and not abort):
+            if active or (pending and now < deadline and not abort):
                 time.sleep(.02)
     finally:
         for process, pipe, _job, _expires in active.values():
             pipe.close(); _stop(process)
+            if coordination is not None:
+                coordination.release()
     order = {job["packet_id"]: i for i, job in enumerate(jobs)}
     return sorted(results, key=lambda r: order[r["packet_id"]])

@@ -1446,3 +1446,107 @@ def test_request_matches_preoptimization_wire_bytes_and_audit(tmp_path, case):
     media.write_bytes(b'changed')
     with pytest.raises(ValueError, match='PREPARED_IMAGE_CHANGED'):
         t.build_request(case['provider'], case['model'], items, **case['kwargs'])
+
+
+def synthetic_coordinated_worker(pipe, job, provider, model, timeout):
+    import os
+    start = time.monotonic()
+    if job.get('started_path'):
+        Path(job['started_path']).write_text(str(os.getpid()))
+    time.sleep(job.get('delay', .08))
+    pipe.send({'packet_id': job['packet_id'], 'status': 'COMPLETED',
+               'started': start, 'ended': time.monotonic()})
+    pipe.close()
+
+
+def test_two_job_pools_share_one_call_cap():
+    import asyncio
+    async def scenario():
+        control = t.RunCoordination(2)
+        results = await asyncio.gather(*[
+            t.run_jobs_async([{'packet_id': f'{pool}-{i}'} for i in range(3)],
+                'emergent', 'gpt-6-astra', deadline=time.monotonic()+10, per_call_s=3,
+                coordination=control, worker=synthetic_coordinated_worker)
+            for pool in range(2)])
+        assert control._active == 0
+        return results
+    results = asyncio.run(scenario())
+    assert [[r['packet_id'] for r in batch] for batch in results] == [
+        ['0-0', '0-1', '0-2'], ['1-0', '1-1', '1-2']]
+    events = sorted([(r['started'], 1) for batch in results for r in batch] +
+                    [(r['ended'], -1) for batch in results for r in batch])
+    active = peak = 0
+    for _, delta in events:
+        active += delta
+        peak = max(peak, active)
+    assert 1 <= peak <= 2
+    assert active == 0
+
+
+def test_shared_pause_and_stop_apply_to_every_pool(monkeypatch):
+    clock = [10.]
+    monkeypatch.setattr(t, 'time', type('Clock', (), {'monotonic': staticmethod(lambda: clock[0])}))
+    control = t.RunCoordination(2)
+    assert control.acquire(10.)
+    control.pause(3)
+    assert not control.acquire(12.)
+    control.release()
+    clock[0] = 11.
+    control.pause(1)  # A shorter pause cannot shorten the existing wait.
+    assert not control.acquire(12.5)
+    assert control.acquire(13.)
+    control.release()
+    control.stopped.set()
+    assert not control.acquire(100.)
+
+
+def test_async_cancellation_joins_actual_model_child(tmp_path):
+    import asyncio
+    import os
+    started = tmp_path / 'started'
+    async def scenario():
+        control = t.RunCoordination()
+        task = asyncio.create_task(t.run_jobs_async([
+            {'packet_id': 'running', 'started_path': str(started), 'delay': 20},
+            {'packet_id': 'must-not-start'}], 'emergent', 'gpt-6-astra',
+            deadline=time.monotonic()+30, per_call_s=25, workers=1,
+            coordination=control, worker=synthetic_coordinated_worker))
+        until = time.monotonic()+5
+        while not started.exists() and time.monotonic() < until:
+            await asyncio.sleep(.01)
+        assert started.exists()
+        pid = int(started.read_text())
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await asyncio.wait_for(task, 5)
+        assert control.stopped.is_set()
+        assert control._active == 0
+        with pytest.raises(ProcessLookupError):
+            os.kill(pid, 0)
+    asyncio.run(scenario())
+
+
+def test_rate_limit_response_pauses_shared_coordination(tmp_path):
+    control = t.RunCoordination()
+    result = t.run_jobs([{'packet_id': 'quota', 'marker': str(tmp_path/'quota'),
+                          'delay': 2, 'limit_kind': 'QUOTA_EXHAUSTED'}],
+        'emergent', 'gpt-6-astra', deadline=time.monotonic()+5, per_call_s=3,
+        coordination=control, worker=rate_limit_worker)
+    assert result[0]['http_status'] == 429
+    assert control._active == 0
+    assert not control.acquire(time.monotonic())
+    assert not control.stopped.is_set()  # retain already-running paid siblings
+
+
+def test_failed_process_setup_releases_shared_slot(monkeypatch):
+    control = t.RunCoordination(1)
+    class BrokenContext:
+        def Pipe(self, **kwargs):
+            raise OSError('synthetic pipe failure')
+    monkeypatch.setattr(t.multiprocessing, 'get_context', lambda *args: BrokenContext())
+    with pytest.raises(OSError, match='synthetic pipe failure'):
+        t.run_jobs([{'packet_id':'x'}], 'emergent', 'gpt-6-astra',
+                   deadline=time.monotonic()+2, coordination=control)
+    assert control._active == 0
+    assert control.acquire(time.monotonic())
+    control.release()

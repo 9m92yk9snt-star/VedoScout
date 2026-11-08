@@ -180,7 +180,7 @@ def completion_windows(event, record):
     return windows
 
 
-async def localize(video, doc, *, checkpoint, event_ids=None, run_jobs=None, budget_seconds=420):
+async def localize(video, doc, *, checkpoint, event_ids=None, run_jobs=None, budget_seconds=420, workers=2, coordination=None):
     """Observe presentation positions without changing canonical event identity.
 
     Missing/uncertain measurements suppress graphics, not the factual report.
@@ -267,8 +267,8 @@ async def localize(video, doc, *, checkpoint, event_ids=None, run_jobs=None, bud
             # Persist every completed paid result before the next callback.
             asyncio.run_coroutine_threadsafe(checkpoint(deepcopy(audit)), loop).result()
         if jobs:
-            results = await asyncio.to_thread(run_jobs, jobs, 'emergent', 'gpt-6-astra',
-                deadline=started+budget_seconds, per_call_s=150, workers=2, on_result=finished)
+            results = await transport.run_jobs_async(jobs, 'emergent', 'gpt-6-astra', runner=run_jobs, coordination=coordination,
+                deadline=started+budget_seconds, per_call_s=150, workers=workers, on_result=finished)
             for receipt in results:
                 accept(receipt)
         # Complete clip edges without changing the original request/cache key.
@@ -332,8 +332,8 @@ async def localize(video, doc, *, checkpoint, event_ids=None, run_jobs=None, bud
             accept_extra(receipt)
             asyncio.run_coroutine_threadsafe(checkpoint(deepcopy(audit)), loop).result()
         if extra_jobs:
-            results = await asyncio.to_thread(run_jobs, extra_jobs, 'emergent', 'gpt-6-astra',
-                deadline=started+budget_seconds, per_call_s=150, workers=2, on_result=finished_extra)
+            results = await transport.run_jobs_async(extra_jobs, 'emergent', 'gpt-6-astra', runner=run_jobs, coordination=coordination,
+                deadline=started+budget_seconds, per_call_s=150, workers=workers, on_result=finished_extra)
             for receipt in results:
                 accept_extra(receipt)
         for event in candidates:
