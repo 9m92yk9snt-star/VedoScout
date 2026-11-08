@@ -62,6 +62,14 @@ export function MatchRoomPlayer({
                  (arrow.ballTrail[1][1]-arrow.ballTrail[0][1])*bounds.height) : 0;
   const arrowHeadSize = Math.min(5, arrowPixels * .3 / 2);
   const yScale = 1000 / ratio;
+  // SVG units per screen pixel keep the halo subtle at mobile sizes.
+  const arrowUnit = bounds.width > 0 ? 1000 / bounds.width : 1;
+  const arrowGlowBox = arrow ? {
+    x: Math.min(...arrow.ballTrail.map(p => p[0] * 1000)) - 12 * arrowUnit,
+    y: Math.min(...arrow.ballTrail.map(p => p[1] * yScale)) - 12 * arrowUnit,
+    width: Math.abs(arrow.ballTrail[1][0] - arrow.ballTrail[0][0]) * 1000 + 24 * arrowUnit,
+    height: Math.abs(arrow.ballTrail[1][1] - arrow.ballTrail[0][1]) * yScale + 24 * arrowUnit,
+  } : null;
   const observation = (skill?.lines || []).filter(x => typeof x === 'string').join(' ') || raw?.comment || 'Review the documented action in your match.';
   useEffect(() => {
     const el = stage.current;
@@ -185,8 +193,17 @@ export function MatchRoomPlayer({
       {(mark || arrow) && <svg className="mr-graphics" style={bounds} viewBox={`0 0 1000 ${yScale}`} preserveAspectRatio="none" aria-label={mark?.display_estimated ? "Camera-corrected player position estimate" : mark?.contourTrack ? "Measured player contour" : mark?.groundProxy ? "Optical player track" : "Observed positions at this source frame"}>
         <defs>
           <radialGradient id={`ground-${id}`}><stop offset="0" stopColor="#79f58a" stopOpacity=".72" /><stop offset="1" stopColor="#9fe870" stopOpacity="0" /></radialGradient>
-          {arrow && <linearGradient id={`pass-${id}`} x1={arrow?.ballTrail?.[0][0] * 1000} y1={arrow?.ballTrail?.[0][1] * yScale} x2={arrow?.ballTrail?.[1][0] * 1000} y2={arrow?.ballTrail?.[1][1] * yScale} gradientUnits="userSpaceOnUse"><stop offset="0" stopColor="#ecea94" stopOpacity=".25" /><stop offset="1" stopColor="#f0ed9c" stopOpacity=".95" /></linearGradient>}
-          <marker id={`arrow-${id}`} markerWidth={arrowHeadSize} markerHeight={arrowHeadSize} refX="5" refY="2.5" orient="auto" viewBox="0 0 5 5"><path d="M0 0L5 2.5L0 5Z" fill="#f0ed9c" /></marker>
+          {arrow && <linearGradient id={`pass-${id}`} x1={arrow?.ballTrail?.[0][0] * 1000} y1={arrow?.ballTrail?.[0][1] * yScale} x2={arrow?.ballTrail?.[1][0] * 1000} y2={arrow?.ballTrail?.[1][1] * yScale} gradientUnits="userSpaceOnUse"><stop offset="0" stopColor="#efc66b" stopOpacity=".8" /><stop offset="1" stopColor="#fff2bc" stopOpacity="1" /></linearGradient>}
+          <marker id={`arrow-${id}`} markerWidth={arrowHeadSize} markerHeight={arrowHeadSize} refX="5" refY="2.5" orient="auto" viewBox="0 0 5 5"><path d="M0 0L5 2.5L0 5L1.1 2.5Z" fill="#fff2bc" /></marker>
+          {arrow && <>
+            <path id={`pass-shape-${id}`} vectorEffect="non-scaling-stroke" d={`M${arrow.ballTrail[0][0] * 1000} ${arrow.ballTrail[0][1] * yScale}L${arrow.ballTrail[1][0] * 1000} ${arrow.ballTrail[1][1] * yScale}`} />
+            <filter id={`pass-glow-${id}`} filterUnits="userSpaceOnUse" {...arrowGlowBox} colorInterpolationFilters="sRGB">
+              <feGaussianBlur in="SourceAlpha" stdDeviation={1.5 * arrowUnit} result="halo" />
+              <feFlood floodColor="#ffc34a" floodOpacity=".5" result="gold" />
+              <feComposite in="gold" in2="halo" operator="in" result="glow" />
+              <feMerge><feMergeNode in="glow" /><feMergeNode in="SourceGraphic" /></feMerge>
+            </filter>
+          </>}
           {depth && <mask id={`people-${id}`} maskUnits="userSpaceOnUse" x="0" y="0" width="1000" height={yScale}><rect width="1000" height={yScale} fill="white" />{ellipsePolygons.map((polygon, i) => <polygon key={i} points={polygon.map(p => `${p[0]*1000},${p[1]*yScale}`).join(' ')} fill="black" stroke="black" strokeWidth="1" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />)}</mask>}
           {arrow && <mask id={`ball-people-${id}`} maskUnits="userSpaceOnUse" x="0" y="0" width="1000" height={yScale}><rect width="1000" height={yScale} fill="white" />{arrow.foreground.polygons.map((polygon, i) => <polygon key={i} points={polygon.map(p => `${p[0]*1000},${p[1]*yScale}`).join(' ')} fill="black" stroke="black" strokeWidth="1" />)}</mask>}
         </defs>
@@ -197,7 +214,11 @@ export function MatchRoomPlayer({
           </g>}
         </g>
         {arrow && <g data-testid="match-room-ball-arrow" data-source-ms={arrow.media_ms} data-reviewed-direction={arrow.reviewedDirection ? "true" : undefined} mask={`url(#ball-people-${id})`} opacity={arrow.opacity}>
-          <line x1={arrow.ballTrail[0][0] * 1000} y1={arrow.ballTrail[0][1] * yScale} x2={arrow.ballTrail[1][0] * 1000} y2={arrow.ballTrail[1][1] * yScale} stroke={`url(#pass-${id})`} strokeWidth="2" strokeLinecap="round" vectorEffect="non-scaling-stroke" markerEnd={`url(#arrow-${id})`} />
+          {/* Mask the completed glow as well as the shaft so neither covers players. */}
+          <g filter={`url(#pass-glow-${id})`}>
+            <use href={`#pass-shape-${id}`} fill="none" stroke={`url(#pass-${id})`} strokeWidth="2" strokeLinecap="round" vectorEffect="non-scaling-stroke" markerEnd={`url(#arrow-${id})`} />
+            <use href={`#pass-shape-${id}`} fill="none" stroke="#fff9e3" strokeOpacity=".75" strokeWidth=".7" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+          </g>
         </g>}
       </svg>}
       {arrow?.reviewedDirection && <div className="mr-kicker" style={{position:"absolute",top:12,left:12,background:"#111c",padding:"6px 10px",borderRadius:8}}>Reviewed pass direction</div>}
