@@ -1,0 +1,90 @@
+{
+  "source_video_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2",
+  "packet_sha256": "0058f01c8dfb4d5f2003bec0d3f295211b5935f8e85b0b6fff2845dad661440e",
+  "status": "CANDIDATE_REQUIRES_SOURCE_CHECK",
+  "model_calls_requested": 1,
+  "report_written": false,
+  "approval_changed": false,
+  "receipts": [
+    {
+      "packet_id": "pass-contact-native-detail-20261108",
+      "provider": "emergent",
+      "requested_model": "gpt-6-astra",
+      "origin": "LIVE_MODEL_REQUEST",
+      "status": "COMPLETED",
+      "requested_reasoning_effort": "medium",
+      "payload_sha256": "717e79143b650f6ef819199e2b04accb1311357050e637a323fc95ad01ec3d2e",
+      "payload_bytes": 1640166,
+      "explicit_image_count": 11,
+      "images": [
+        {
+          "sha256": "1d73a6307ad718f0a4aff9b7eb7b975bf4e458420434af84ea93d42ae33b3562",
+          "bytes": 107536
+        },
+        {
+          "sha256": "9ce707878ab754d9217408e197a95c703ccfbcd2873a7ad2e5839fedd619a45a",
+          "bytes": 111696
+        },
+        {
+          "sha256": "156d0e857ab9c91fb5a4122c49e04f7c0ec8c32c1d0548d7b409c0263f36f71b",
+          "bytes": 111846
+        },
+        {
+          "sha256": "6b9f090d7902cb7b10c4a63564b63ee33b723a95feb2fdb419df96a05ae74961",
+          "bytes": 108813
+        },
+        {
+          "sha256": "3119b94fef44e48d7cbac757229de3fc409e6bc512a743ed02633f92a200eb1b",
+          "bytes": 131945
+        },
+        {
+          "sha256": "0a50aac5be2499816393f32962d9df711b785d3d28d6a5e73c2745be1b22820a",
+          "bytes": 127923
+        },
+        {
+          "sha256": "ab5c0696bfd99ac0ab54341e4449c88ca47c86eef8606c0f5699556de9523582",
+          "bytes": 124138
+        },
+        {
+          "sha256": "f279cefcc6e88b84fe6a36e48225192c888ddc8ddd639f12bb43eb6c84570b6e",
+          "bytes": 120895
+        },
+        {
+          "sha256": "09cc5fe1a0229d7b8faffd5f7cd163755175999018e6bfac39d6339775ae76dd",
+          "bytes": 118635
+        },
+        {
+          "sha256": "02c294a36f7b8b23287677c16c45989d6bff0603f4bf3c30a515c5606585023e",
+          "bytes": 115187
+        },
+        {
+          "sha256": "c240e690e3cdb7efb4986b5491e62a3b4a50254a02dacca6c9a560024225c803",
+          "bytes": 48641
+        }
+      ],
+      "frame_sampling_in_provider_metadata": false,
+      "videos": [],
+      "requested_image_detail": "high",
+      "model_version": "gpt-6-astra",
+      "response_id": "chatcmpl-EhoMr0PkqYJ2cLdzlAMFWYnopmP0Q",
+      "usage": {
+        "completion_tokens": 385,
+        "prompt_tokens": 10123,
+        "total_tokens": 10508,
+        "completion_tokens_details": {
+          "accepted_prediction_tokens": 0,
+          "audio_tokens": 0,
+          "reasoning_tokens": 183,
+          "rejected_prediction_tokens": 0
+        },
+        "prompt_tokens_details": {
+          "audio_tokens": 0,
+          "cached_tokens": 0
+        }
+      },
+      "raw_response": "{\n  \"visible_ball_samples\": [],\n  \"release_contact\": null,\n  \"reception_contact\": null,\n  \"continuity_supported\": false,\n  \"safe_direction_anchors\": false,\n  \"unresolved\": [\n    \"At 49865 ms and neighboring supplied timestamps, the hinted ball/toe region behind the blue players is too blurred and occluded to distinguish a ball boundary reliably from socks, boots and gaps. No ball center or radius is assigned.\",\n    \"The obscured white passer's foot/ball relationship and subsequent separation are not directly resolved, so a release contact cannot be localized.\",\n    \"No directly visible reception contact can be connected to the pass through the intervening occlusion.\",\n    \"The later clearly separated ball at 50631–50698 ms belongs to the outgoing-shot portion and is not used as a pass anchor.\",\n    \"No direction is inferred from screen displacement during the camera pan.\"\n  ]\n}",
+      "response_sha256": "cca37d422d391c810fd4313e2e1f912ecff56f000dc6172e5f97814004a93aed",
+      "elapsed_seconds": 16.033
+    }
+  ]
+}
