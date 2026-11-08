@@ -1,0 +1,151 @@
+{
+  "source_video_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2",
+  "packet_sha256": "0058f01c8dfb4d5f2003bec0d3f295211b5935f8e85b0b6fff2845dad661440e",
+  "source_frames": 57,
+  "images": 11,
+  "views": [
+    {
+      "context_ms": 49765
+    },
+    {
+      "context_ms": 49865
+    },
+    {
+      "context_ms": 50381
+    },
+    {
+      "context_ms": 50665
+    },
+    {
+      "panel_ms": [
+        49765,
+        49781,
+        49798,
+        49815,
+        49831,
+        49848,
+        49865,
+        49881,
+        49898
+      ],
+      "crop": [
+        200,
+        970,
+        420,
+        200
+      ]
+    },
+    {
+      "panel_ms": [
+        49915,
+        49931,
+        49948,
+        49965,
+        49981,
+        49998,
+        50015,
+        50031,
+        50048
+      ],
+      "crop": [
+        200,
+        970,
+        420,
+        200
+      ]
+    },
+    {
+      "panel_ms": [
+        50065,
+        50081,
+        50098,
+        50115,
+        50131,
+        50148,
+        50165,
+        50181,
+        50198
+      ],
+      "crop": [
+        200,
+        970,
+        420,
+        200
+      ]
+    },
+    {
+      "panel_ms": [
+        50215,
+        50231,
+        50248,
+        50265,
+        50281,
+        50298,
+        50315,
+        50331,
+        50348
+      ],
+      "crop": [
+        200,
+        970,
+        420,
+        200
+      ]
+    },
+    {
+      "panel_ms": [
+        50365,
+        50381,
+        50398,
+        50415,
+        50431,
+        50448,
+        50465,
+        50481,
+        50498
+      ],
+      "crop": [
+        200,
+        970,
+        420,
+        200
+      ]
+    },
+    {
+      "panel_ms": [
+        50515,
+        50531,
+        50548,
+        50565,
+        50581,
+        50598,
+        50615,
+        50631,
+        50648
+      ],
+      "crop": [
+        200,
+        970,
+        420,
+        200
+      ]
+    },
+    {
+      "panel_ms": [
+        50665,
+        50681,
+        50698
+      ],
+      "crop": [
+        200,
+        970,
+        420,
+        200
+      ]
+    }
+  ],
+  "prompt": "Examine original football source pixels to localize a previously accepted pass. Do not re-adjudicate the assist or goal. Task: find direct visible ball/boot contact anchors for rendering, or return unresolved. Do not infer ball centers through occlusion. The owner indicates the ball and a little toe at 49865 ms behind the blue players; treat that as a search hint, not measured coordinates or proof. White passer is mostly obscured between blue players. Distinguish white socks, boots and blurred gaps from the ball. Do not mistake the later outgoing shot for the pass. No expected arrow geometry is supplied. Camera pans: never compare screen displacement as pitch direction. Panels show consecutive native-resolution details at about 16.7 ms, chronological left-to-right then top-to-bottom. Each tile is crop x=200,y=970,w=420,h=200 from full 1080x1920; tile label occupies 20px above image. Return ONLY JSON {\"visible_ball_samples\":[{\"media_ms\":integer,\"xy_full_px\":[x,y],\"radius_px\":number,\"visibility\":\"CLEAR|PARTIAL\",\"evidence\":string}],\"release_contact\":{\"interval_ms\":[a,b],\"xy_full_px\":[x,y],\"evidence\":string}|null,\"reception_contact\":same|null,\"continuity_supported\":boolean,\"safe_direction_anchors\":boolean,\"unresolved\":[string]}. Only list actual supplied timestamps; never interpolate absent observations. The source appearance is blurry; if location is ambiguous say so. Contact requires foot/ball relationship and temporal change, not a foot location alone.",
+  "user_hint_used": true,
+  "manual_arrow_coordinates_used": false,
+  "approval_changed": false
+}
