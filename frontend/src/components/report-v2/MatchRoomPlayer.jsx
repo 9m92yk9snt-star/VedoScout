@@ -54,13 +54,12 @@ export function MatchRoomPlayer({
   const arrowSource = movingArrow || (depth && mark?.ballTrail ? {...mark, foreground: depth, opacity: 1} : null);
   const visibleTrail = arrowSource && clipArrowToFrame(arrowSource.ballTrail);
   const arrow = visibleTrail ? {...arrowSource, ballTrail: visibleTrail} : null;
-  // markerUnits=strokeWidth follows the non-scaling 2px shaft. A fixed
-  // 10px head can cover almost an entire short, source-bound direction line.
-  // Keep the approved maximum size, but reserve at least 70% for the shaft.
+  // Size the complete arrow in screen pixels, then convert to SVG units.
+  // A short direction keeps at least 70% of its length for the shaft.
   const arrowPixels = arrow && Number.isFinite(bounds.width) && Number.isFinite(bounds.height)
     ? Math.hypot((arrow.ballTrail[1][0]-arrow.ballTrail[0][0])*bounds.width,
                  (arrow.ballTrail[1][1]-arrow.ballTrail[0][1])*bounds.height) : 0;
-  const arrowHeadSize = Math.min(5, arrowPixels * .3 / 2);
+  const arrowHeadPixels = Math.min(10, arrowPixels * .3);
   const yScale = 1000 / ratio;
   // SVG units per screen pixel keep the halo subtle at mobile sizes.
   const arrowUnit = bounds.width > 0 ? 1000 / bounds.width : 1;
@@ -194,9 +193,9 @@ export function MatchRoomPlayer({
         <defs>
           <radialGradient id={`ground-${id}`}><stop offset="0" stopColor="#79f58a" stopOpacity=".72" /><stop offset="1" stopColor="#9fe870" stopOpacity="0" /></radialGradient>
           {arrow && <linearGradient id={`pass-${id}`} x1={arrow?.ballTrail?.[0][0] * 1000} y1={arrow?.ballTrail?.[0][1] * yScale} x2={arrow?.ballTrail?.[1][0] * 1000} y2={arrow?.ballTrail?.[1][1] * yScale} gradientUnits="userSpaceOnUse"><stop offset="0" stopColor="#efc66b" stopOpacity=".8" /><stop offset="1" stopColor="#fff2bc" stopOpacity="1" /></linearGradient>}
-          <marker id={`arrow-${id}`} markerWidth={arrowHeadSize} markerHeight={arrowHeadSize} refX="5" refY="2.5" orient="auto" viewBox="0 0 5 5"><path d="M0 0L5 2.5L0 5L1.1 2.5Z" fill="#fff2bc" /></marker>
+          <marker id={`arrow-${id}`} markerUnits="userSpaceOnUse" markerWidth={arrowHeadPixels * arrowUnit} markerHeight={arrowHeadPixels * arrowUnit} refX="5" refY="2.5" orient="auto" viewBox="0 0 5 5"><path d="M0 0L5 2.5L0 5L1.1 2.5Z" fill="#fff2bc" /></marker>
           {arrow && <>
-            <path id={`pass-shape-${id}`} vectorEffect="non-scaling-stroke" d={`M${arrow.ballTrail[0][0] * 1000} ${arrow.ballTrail[0][1] * yScale}L${arrow.ballTrail[1][0] * 1000} ${arrow.ballTrail[1][1] * yScale}`} />
+            <path id={`pass-shape-${id}`} d={`M${arrow.ballTrail[0][0] * 1000} ${arrow.ballTrail[0][1] * yScale}L${arrow.ballTrail[1][0] * 1000} ${arrow.ballTrail[1][1] * yScale}`} />
             <filter id={`pass-glow-${id}`} filterUnits="userSpaceOnUse" {...arrowGlowBox} colorInterpolationFilters="sRGB">
               <feGaussianBlur in="SourceAlpha" stdDeviation={1.5 * arrowUnit} result="halo" />
               <feFlood floodColor="#ffc34a" floodOpacity=".5" result="gold" />
@@ -216,8 +215,8 @@ export function MatchRoomPlayer({
         {arrow && <g data-testid="match-room-ball-arrow" data-source-ms={arrow.media_ms} data-reviewed-direction={arrow.reviewedDirection ? "true" : undefined} mask={`url(#ball-people-${id})`} opacity={arrow.opacity}>
           {/* Mask the completed glow as well as the shaft so neither covers players. */}
           <g filter={`url(#pass-glow-${id})`}>
-            <use href={`#pass-shape-${id}`} fill="none" stroke={`url(#pass-${id})`} strokeWidth="2" strokeLinecap="round" vectorEffect="non-scaling-stroke" markerEnd={`url(#arrow-${id})`} />
-            <use href={`#pass-shape-${id}`} fill="none" stroke="#fff9e3" strokeOpacity=".75" strokeWidth=".7" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+            <use href={`#pass-shape-${id}`} fill="none" stroke={`url(#pass-${id})`} strokeWidth={2 * arrowUnit} strokeLinecap="round" markerEnd={`url(#arrow-${id})`} />
+            <use href={`#pass-shape-${id}`} fill="none" stroke="#fff9e3" strokeOpacity=".75" strokeWidth={.7 * arrowUnit} strokeLinecap="round" />
           </g>
         </g>}
       </svg>}
