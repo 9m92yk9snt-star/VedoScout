@@ -1427,3 +1427,22 @@ def test_proxy_nested_error_and_safe_limit_headers():
 def test_default_cooldown_is_conservative_and_bounded():
     assert t.RATE_LIMIT_DEFAULT_WAIT_SECONDS == 30
     assert t.MAX_RATE_LIMIT_WAIT_SECONDS == 120
+
+
+@pytest.mark.parametrize('case', json.loads((Path(__file__).resolve().parents[2] /
+    'testdata/performance/request-wire-parity.json').read_text()))
+def test_request_matches_preoptimization_wire_bytes_and_audit(tmp_path, case):
+    media = tmp_path / 'media'
+    media.write_bytes(b'exact serialization fixture\x00\xff')
+    item = {'type': case['media'], 'path': str(media),
+            'sha256': hashlib.sha256(media.read_bytes()).hexdigest()}
+    if case['media'] == 'video':
+        item['fps'] = 12
+    items = [{'type': 'text', 'text': 'First æøå'}, item, {'type': 'text', 'text': 'Last'}]
+    url, payload, audit = t.build_request(case['provider'], case['model'], items, **case['kwargs'])
+    assert url == case['url']
+    assert payload == case['payload'].encode()
+    assert audit == case['audit']
+    media.write_bytes(b'changed')
+    with pytest.raises(ValueError, match='PREPARED_IMAGE_CHANGED'):
+        t.build_request(case['provider'], case['model'], items, **case['kwargs'])

@@ -101,8 +101,10 @@ def build_request(provider, model, items, *, reasoning_effort=None, image_detail
     parts, content, image_audit, video_audit = [], [], [], []
     for item in items:
         if item["type"] == "text":
-            parts.append({"text": item["text"]})
-            content.append({"type": "text", "text": item["text"]})
+            if provider == "gemini":
+                parts.append({"text": item["text"]})
+            else:
+                content.append({"type": "text", "text": item["text"]})
         else:
             pixels = Path(item["path"]).read_bytes()
             sha = hashlib.sha256(pixels).hexdigest()
@@ -114,19 +116,23 @@ def build_request(provider, model, items, *, reasoning_effort=None, image_detail
                 # Gemini VideoMetadata.fps accepts at most 24, independently of source FPS.
                 if isinstance(fps, bool) or not isinstance(fps, (int, float)) or not 1 <= fps <= 24:
                     raise ValueError("INVALID_VIDEO_FPS")
-                parts.append({"inlineData": {"mimeType": "video/mp4", "data": encoded}, "videoMetadata": {"fps": fps}})
-                file = {"file_data": "data:video/mp4;base64," + encoded, "format": "video/mp4",
-                        "video_metadata": {"fps": fps}}
-                if image_detail:
-                    file["detail"] = image_detail
-                content.append({"type": "file", "file": file})
+                if provider == "gemini":
+                    parts.append({"inlineData": {"mimeType": "video/mp4", "data": encoded}, "videoMetadata": {"fps": fps}})
+                else:
+                    file = {"file_data": "data:video/mp4;base64," + encoded, "format": "video/mp4",
+                            "video_metadata": {"fps": fps}}
+                    if image_detail:
+                        file["detail"] = image_detail
+                    content.append({"type": "file", "file": file})
                 video_audit.append({"sha256": sha, "bytes": len(pixels), "requested_fps": fps})
                 continue
-            parts.append({"inlineData": {"mimeType": "image/jpeg", "data": encoded}})
-            image_url = {"url": "data:image/jpeg;base64," + encoded}
-            if image_detail:
-                image_url["detail"] = image_detail
-            content.append({"type": "image_url", "image_url": image_url})
+            if provider == "gemini":
+                parts.append({"inlineData": {"mimeType": "image/jpeg", "data": encoded}})
+            else:
+                image_url = {"url": "data:image/jpeg;base64," + encoded}
+                if image_detail:
+                    image_url["detail"] = image_detail
+                content.append({"type": "image_url", "image_url": image_url})
             image_audit.append({"sha256": sha, "bytes": len(pixels)})
     if provider == "gemini":
         url = "https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent"
