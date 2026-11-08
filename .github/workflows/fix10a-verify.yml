@@ -280,6 +280,10 @@ jobs:
           yarn install --non-interactive
       - name: Verify reviewed directions and exact-frame ellipse display
         run: node --test frontend/tests/matchRoomEllipse.test.cjs frontend/tests/matchRoomReviewedDirection.test.cjs
+      - name: Verify mobile and desktop arrow rendering
+        run: |
+          npm install --prefix "$RUNNER_TEMP/matchroom-raster-tools" --no-audit --no-fund esbuild@0.28.2 @resvg/resvg-js@2.6.2
+          NODE_PATH="$RUNNER_TEMP/matchroom-raster-tools/node_modules:$GITHUB_WORKSPACE/frontend/node_modules" node frontend/scripts/test-matchroom-arrow-raster.cjs
       - name: Verify analysis polling and incomplete evidence display
         run: |
           node frontend/scripts/audit-analysis-poll.cjs
