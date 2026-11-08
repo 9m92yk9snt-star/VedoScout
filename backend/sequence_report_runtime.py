@@ -520,8 +520,14 @@ async def persist_assets(collection, doc, video, directory, publish, *, localize
                                      stage_timings=stage_timings)
     publish_started = time.monotonic()
     for row, image, clip in assets:
-        row["frame_url"] = await publish(image, "image/jpeg")
-        row["tele_clip_url"] = await publish(clip, "video/mp4")
+        # Only this pair runs concurrently. Settle both before reporting an
+        # error, so no sibling upload is abandoned and no later row starts.
+        published = await asyncio.gather(publish(image, "image/jpeg"),
+                                         publish(clip, "video/mp4"), return_exceptions=True)
+        for value in published:
+            if isinstance(value, BaseException):
+                raise value
+        row["frame_url"], row["tele_clip_url"] = published
         if not row["frame_url"] or not row["tele_clip_url"]:
             raise RuntimeError("SEQUENCE_ASSET_PUBLISH_FAILED")
         row["proof_frame_verified"] = compute_proof_frame_verified(row)

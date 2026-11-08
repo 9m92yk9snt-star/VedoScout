@@ -606,3 +606,119 @@ def test_asset_stage_timings_preserve_publication_and_failure_gate(tmp_path, mon
         assert writes[-1]["full_report"]["video_comments"][0]["proof_frame_verified"] is True
     assert calls == ["localize", "render", "image/jpeg", "video/mp4"]
     assert doc == original
+
+
+@pytest.mark.parametrize('failure', [None, 'image', 'clip', 'empty', 'proof'])
+def test_asset_upload_pair_overlaps_but_settles_before_finalizing(tmp_path, monkeypatch, failure):
+    doc = {'id': 'pair', 'full_report': {'video_comments': [{'event_id': 'a'}, {'event_id': 'b'}]}}
+    original = deepcopy(doc)
+    saved, starts, finished = [], [], []
+    active = [0, 0]
+    class Collection:
+        async def update_one(self, query, values):
+            assert active[0] == 0
+            saved.append(values['$set'])
+    async def localizer(*args, **kwargs):
+        return {}
+    def render(video, full, *args, **kwargs):
+        return [(r, tmp_path / (r['event_id']+'.jpg'), tmp_path / (r['event_id']+'.mp4'))
+                for r in full['video_comments']]
+    async def scenario():
+        events = {key: asyncio.Event() for key in ('a', 'b')}
+        async def publish(path, mime):
+            active[0] += 1
+            active[1] = max(active[1], active[0])
+            starts.append(path.name)
+            if path.suffix == '.mp4':
+                events[path.stem].set()
+            try:
+                # The image cannot finish until its sibling starts: serial code deadlocks.
+                await asyncio.wait_for(events[path.stem].wait(), timeout=1)
+                await asyncio.sleep(0)
+                if path.stem == 'a' and ((failure == 'image' and path.suffix == '.jpg') or
+                                        (failure == 'clip' and path.suffix == '.mp4')):
+                    raise OSError('synthetic upload failure')
+                return '' if failure == 'empty' else 'https://assets.test/'+path.name
+            finally:
+                active[0] -= 1
+                finished.append(path.name)
+        await runtime.persist_assets(Collection(), doc, 'source', tmp_path, publish, localizer=localizer)
+    monkeypatch.setattr(runtime, 'render_assets', render)
+    monkeypatch.setattr(runtime, 'compute_proof_frame_verified', lambda row: failure != 'proof')
+    if failure:
+        with pytest.raises((OSError, RuntimeError, ValueError)):
+            asyncio.run(scenario())
+        assert starts == ['a.jpg', 'a.mp4']
+        assert saved == []
+    else:
+        asyncio.run(scenario())
+        assert starts == ['a.jpg', 'a.mp4', 'b.jpg', 'b.mp4']
+        assert saved[-1]['full_report_status'] == 'finalizing'
+        assert all(r['frame_url'].endswith(r['event_id']+'.jpg') and
+                   r['tele_clip_url'].endswith(r['event_id']+'.mp4')
+                   for r in saved[-1]['full_report']['video_comments'])
+    assert sorted(finished) == sorted(starts)
+    assert active == [0, 2]
+    assert doc == original
+
+
+def test_storage_client_creation_is_serialized_and_retryable():
+    import threading
+    from concurrent.futures import ThreadPoolExecutor
+    tree = ast.parse((ROOT / 'backend/r2_storage.py').read_text())
+    fn = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == '_get_client')
+    lock, sentinel, calls = threading.Lock(), object(), []
+    def factory(*args, **kwargs):
+        assert lock.locked()
+        calls.append(1)
+        return sentinel
+    namespace = {'_client': None, '_client_lock': lock,
+                 '_cfg': lambda: dict(endpoint='unused', access_key='unused', secret_key='unused'),
+                 'boto3': SimpleNamespace(client=factory), 'Config': lambda **kw: kw}
+    exec(compile(ast.Module(body=[fn], type_ignores=[]), '<storage-client>', 'exec'), namespace)
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        results = list(pool.map(lambda _: namespace['_get_client'](), range(16)))
+    assert all(value is sentinel for value in results)
+    assert len(calls) == 1
+    namespace['_client'] = None
+    namespace['boto3'] = SimpleNamespace(client=lambda *a, **kw: (_ for _ in ()).throw(OSError('failed')))
+    with pytest.raises(OSError):
+        namespace['_get_client']()
+    assert not lock.locked()
+    namespace['boto3'] = SimpleNamespace(client=factory)
+    assert namespace['_get_client']() is sentinel
+
+
+def test_cancelled_publication_starts_no_later_assets(tmp_path, monkeypatch):
+    started, finished, writes = [], [], []
+    doc = {'id': 'cancel', 'full_report': {'video_comments': [{'event_id': 'a'}, {'event_id': 'b'}]}}
+    class Collection:
+        async def update_one(self, *args):
+            writes.append(args)
+    async def localizer(*args, **kwargs):
+        return {}
+    def render(video, full, *args, **kwargs):
+        return [(r, tmp_path/(r['event_id']+'.jpg'), tmp_path/(r['event_id']+'.mp4'))
+                for r in full['video_comments']]
+    async def scenario():
+        both = asyncio.Event()
+        never = asyncio.Event()
+        async def publish(path, mime):
+            started.append(path.name)
+            if len(started) == 2:
+                both.set()
+            try:
+                await never.wait()
+            finally:
+                finished.append(path.name)
+        task = asyncio.create_task(runtime.persist_assets(Collection(), doc, 'video', tmp_path,
+                                                          publish, localizer=localizer))
+        await asyncio.wait_for(both.wait(), 1)
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+    monkeypatch.setattr(runtime, 'render_assets', render)
+    asyncio.run(scenario())
+    assert started == ['a.jpg', 'a.mp4']
+    assert sorted(finished) == sorted(started)
+    assert writes == []
