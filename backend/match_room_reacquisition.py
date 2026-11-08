@@ -201,7 +201,12 @@ class AdaptiveAssociator(IdentityAssociator):
         for row in self.rows[i]:
             h = cv2.calcHist([hsv], [0,1], contours.measured_mask(row), [24,16], [0,180,0,256])
             self.histograms[i].append(cv2.normalize(h,None,norm_type=cv2.NORM_L1))
-        self.pair_cache.clear()
+        # A pair depends only on its source/destination detections and fixed
+        # decoded frames. Updating another frame cannot change its flow/votes.
+        # Invalidate both directions involving this frame; retain all others.
+        for key in list(self.pair_cache):
+            if i in key[:2]:
+                del self.pair_cache[key]
         (self.upgraded if large else self.small_done).add(i)
 
     def candidate(self, a, b, j, history):
