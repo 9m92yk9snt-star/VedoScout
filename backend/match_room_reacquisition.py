@@ -279,9 +279,6 @@ def segments_for_review(engine, review, observations):
 def reacquire(video, seeds, observations, small_segmenter, small_roi, deadline, diagnostic):
     from native_player_segmentation import PersonSegmenter
     from player_segmentation_assets import ensure_model_asset
-    ensure_model_asset(MODEL_PATH,MODEL_SHA256)
-    large = PersonSegmenter.__new__(PersonSegmenter)
-    large.net = cv2.dnn.readNetFromONNX(str(MODEL_PATH))
     start,end = [round(s['t']*1000) for s in seeds]
     frames = list(contours.read_clip(video,start-25,end+25))
     if len(frames)<3:
@@ -295,6 +292,13 @@ def reacquire(video, seeds, observations, small_segmenter, small_roi, deadline, 
             return []
         if cv2.absdiff(cv2.resize(a['gray'],(160,90)),cv2.resize(b['gray'],(160,90))).mean()>45:
             return []
+    # Validate the source before loading the expensive recovery model. These
+    # gates do not depend on predictions; failed clips cannot reach inference.
+    if deadline is not None and time.monotonic() >= deadline:
+        raise TimeoutError('Recovery deadline expired before model loading')
+    ensure_model_asset(MODEL_PATH,MODEL_SHA256)
+    large = PersonSegmenter.__new__(PersonSegmenter)
+    large.net = cv2.dnn.readNetFromONNX(str(MODEL_PATH))
     roi,cache,attempts = contours.select_seed_view([frames[i] for i in indices],seeds,large,deadline=deadline)
     diagnostic['reacquisition_views'] = attempts
     if roi is None:

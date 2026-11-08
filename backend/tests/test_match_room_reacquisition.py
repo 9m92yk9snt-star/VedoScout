@@ -56,3 +56,60 @@ def test_vector_votes_preserve_nonfinite_scalar_behavior():
     mask = np.ones((4, 4), np.uint8)
     with np.errstate(invalid='ignore'):
         assert recovery.count_owned(mask, points) == sum(contours.owns(mask, point) for point in points)
+
+
+def test_invalid_source_never_loads_recovery_model(monkeypatch):
+    import player_segmentation_assets as assets
+    engine, _ = fixture()
+    originals = engine.frames
+    seeds = [{'t': 1., 'target_point': {'x': .375, 'y': .5}},
+             {'t': 1.297, 'target_point': {'x': .375, 'y': .5}}]
+    def forbidden(*args, **kwargs):
+        raise AssertionError('Invalid source must not load or verify a model')
+    monkeypatch.setattr(assets, 'ensure_model_asset', forbidden)
+    monkeypatch.setattr(recovery.cv2.dnn, 'readNetFromONNX', forbidden)
+    gaps = deepcopy(originals)
+    gaps[4]['media_ms'] += 100
+    duplicate = deepcopy(originals)
+    duplicate[4]['media_ms'] = duplicate[3]['media_ms']
+    cut = deepcopy(originals)
+    cut[4]['gray'][:] = 255
+    for frames in (originals[:2], originals[2:], gaps, duplicate, cut):
+        monkeypatch.setattr(recovery.contours, 'read_clip', lambda *args, frames=frames: iter(frames))
+        assert recovery.reacquire('source', seeds, [], object(), (0,0,160,120), None, {}) == []
+
+
+def test_expired_recovery_never_loads_model(monkeypatch):
+    import pytest
+    import player_segmentation_assets as assets
+    engine, _ = fixture()
+    seeds = [{'t': 1., 'target_point': {'x': .375, 'y': .5}},
+             {'t': 1.297, 'target_point': {'x': .375, 'y': .5}}]
+    monkeypatch.setattr(recovery.contours, 'read_clip', lambda *args: iter(engine.frames))
+    monkeypatch.setattr(assets, 'ensure_model_asset', lambda *a: pytest.fail('Expired model load'))
+    with pytest.raises(TimeoutError):
+        recovery.reacquire('source', seeds, [], object(), (0,0,160,120), time.monotonic()-1, {})
+
+
+def test_valid_recovery_keeps_verified_model_and_seed_inputs(monkeypatch):
+    import player_segmentation_assets as assets
+    engine, _ = fixture()
+    seeds = [{'t': 1., 'target_point': {'x': .375, 'y': .5}},
+             {'t': 1.297, 'target_point': {'x': .375, 'y': .5}}]
+    calls = []
+    net = object()
+    monkeypatch.setattr(recovery.contours, 'read_clip', lambda *args: iter(engine.frames))
+    monkeypatch.setattr(assets, 'ensure_model_asset', lambda path, sha: calls.append(('verify', path, sha)))
+    def load(path):
+        assert calls == [('verify', recovery.MODEL_PATH, recovery.MODEL_SHA256)]
+        calls.append(('load', path))
+        return net
+    monkeypatch.setattr(recovery.cv2.dnn, 'readNetFromONNX', load)
+    def select(frames, actual_seeds, model, *, deadline):
+        assert frames[0] is engine.frames[0] and frames[1] is engine.frames[-1]
+        assert actual_seeds is seeds and model.net is net
+        calls.append(('select',))
+        return None, {}, []
+    monkeypatch.setattr(recovery.contours, 'select_seed_view', select)
+    assert recovery.reacquire('source', seeds, [], object(), (0,0,160,120), None, {}) == []
+    assert [c[0] for c in calls] == ['verify', 'load', 'select']
