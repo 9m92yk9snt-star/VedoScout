@@ -9,6 +9,16 @@ MODEL_SHA256 = '20877569fcfc4744855b1d6d05b0cd7031987ae31894af5c7e1e74328d18e653
 MODEL_PATH = Path(__file__).resolve().parent / 'models' / 'yolov8m-seg.onnx'
 METHOD = 'TAP_REACQUIRED_INSTANCE_CONTOUR'
 
+def count_owned(mask, points):
+    """Count the same rounded point votes in one array operation, including repeats."""
+    if len(points) == 0:
+        return 0
+    xy = np.round(points).astype(int)
+    x, y = xy[:, 0], xy[:, 1]
+    inside = (x >= 0) & (x < mask.shape[1]) & (y >= 0) & (y < mask.shape[0])
+    return int(np.count_nonzero(mask[y[inside], x[inside]]))
+
+
 class IdentityAssociator:
     MAX_GAP_MS = 300
     APPEARANCE_LIMIT = .56
@@ -59,7 +69,7 @@ class IdentityAssociator:
                     votes = []
                     for k, row in enumerate(self.rows[b]):
                         dst = cv2.dilate(contours.measured_mask(row), np.ones((3, 3), np.uint8))
-                        votes.append((sum(contours.owns(dst, point) for point in q), k))
+                        votes.append((count_owned(dst, q), k))
                     result = {'n': len(p), 'valid': int(sum(valid)), 'votes': sorted(votes, reverse=True)}
         self.pair_cache[key] = result
         return result

@@ -30,3 +30,29 @@ def test_deadline_prevents_more_inference_and_locked_rows_cannot_be_replaced():
     try:engine.fill(3)
     except TimeoutError:pass
     else:raise AssertionError('Expired inference was allowed')
+
+
+def test_vector_votes_match_scalar_rounding_edges_repeats_and_empty():
+    import match_room_contours as contours
+    rng = np.random.default_rng(412)
+    masks = [rng.integers(0, 3, (12, 17), dtype=np.uint8),
+             np.zeros((12, 17), dtype=np.uint8), np.ones((12, 17), dtype=np.uint8)]
+    points = np.array([[-.5, 0], [-.51, 0], [0, -.5], [0, -.51],
+                       [16.49, 11.49], [16.5, 11.5], [17, 12],
+                       [1.5, 2.5], [1.5, 2.5], [2.5, 3.5]])
+    for mask in masks:
+        for values in [points, points.astype(np.float32), points[::2],
+                       rng.uniform(-5, 20, (100, 2)), np.empty((0, 2))]:
+            original_mask, original_points = mask.copy(), values.copy()
+            expected = sum(contours.owns(mask, point) for point in values)
+            assert recovery.count_owned(mask, values) == expected
+            np.testing.assert_array_equal(mask, original_mask)
+            np.testing.assert_array_equal(values, original_points)
+
+
+def test_vector_votes_preserve_nonfinite_scalar_behavior():
+    import match_room_contours as contours
+    points = np.array([[np.nan, 2], [3, np.inf], [-np.inf, 1], [1e30, 3], [1, 1]])
+    mask = np.ones((4, 4), np.uint8)
+    with np.errstate(invalid='ignore'):
+        assert recovery.count_owned(mask, points) == sum(contours.owns(mask, point) for point in points)
