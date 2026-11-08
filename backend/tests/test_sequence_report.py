@@ -560,3 +560,49 @@ def test_existing_frontend_shows_verified_counts_and_joins_only_matching_proofs(
     assert stats["Verified Goals"] == 1 and stats["Verified Assists"] == 3 and stats["Shots"] == 2
     assert view["clip"] == full["video_comments"][0]["event_id"] and view["wrong"] is None
     assert view["highlight"]["thumbVerified"] is True
+
+
+@pytest.mark.parametrize("publish_fails", [False, True])
+def test_asset_stage_timings_preserve_publication_and_failure_gate(tmp_path, monkeypatch, publish_fails):
+    clock = [100.0]
+    monkeypatch.setattr(runtime, "time", SimpleNamespace(monotonic=lambda: clock[0]))
+    doc = {"id": "timing-test", "full_report": {"video_comments": [{"event_id": "event"}]},
+           "sequence_timings": {"before_assets_seconds": 20, "source_analysis_seconds": 12}}
+    original = deepcopy(doc)
+    writes, calls = [], []
+    class Collection:
+        async def update_one(self, query, update):
+            writes.append(update["$set"])
+    async def localizer(video, document, *, checkpoint):
+        calls.append("localize")
+        clock[0] += 2
+        return {"events": []}
+    def render(video, full, bundle, directory, anchors, *, stage_timings):
+        calls.append("render")
+        clock[0] += 5
+        stage_timings.update(tracking_seconds=4, render_seconds=5)
+        return [(full["video_comments"][0], tmp_path / "frame.jpg", tmp_path / "clip.mp4")]
+    async def publish(path, mime):
+        calls.append(mime)
+        clock[0] += 3
+        return None if publish_fails else "https://assets.test/" + path.name
+    monkeypatch.setattr(runtime, "render_assets", render)
+    monkeypatch.setattr(runtime, "compute_proof_frame_verified", lambda row: bool(row["frame_url"] and row["tele_clip_url"]))
+    operation = runtime.persist_assets(Collection(), doc, "source.mp4", tmp_path, publish, localizer=localizer)
+    if publish_fails:
+        with pytest.raises(RuntimeError, match="SEQUENCE_ASSET_PUBLISH_FAILED"):
+            asyncio.run(operation)
+        assert writes == []
+    else:
+        assert asyncio.run(operation)["checked"] == 1
+        timings = writes[-1]["sequence_timings"]
+        assert timings["asset_stages_seconds"] == {
+            "localization_seconds": 2, "tracking_seconds": 4,
+            "render_seconds": 5, "publish_and_proof_seconds": 6}
+        assert timings["assets_seconds"] == 13
+        assert timings["total_processing_seconds"] == 33  # child spans are not double counted
+        assert timings["source_analysis_seconds"] == 12
+        assert writes[-1]["full_report_status"] == "finalizing"
+        assert writes[-1]["full_report"]["video_comments"][0]["proof_frame_verified"] is True
+    assert calls == ["localize", "render", "image/jpeg", "video/mp4"]
+    assert doc == original

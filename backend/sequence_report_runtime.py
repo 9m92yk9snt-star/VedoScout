@@ -389,11 +389,14 @@ def validate_rendered_clip(path):
         capture.release()
 
 
-def render_assets(video, full, bundle, directory, anchors=None):
+def render_assets(video, full, bundle, directory, anchors=None, *, stage_timings=None):
     """Actual source PTS and unannotated clips. Zero re-identification calls."""
     import cv2
     import subprocess
+    import time
     import video_timebase
+    stage_timings = stage_timings if stage_timings is not None else {}
+    render_started = time.monotonic()
     from media_binaries import FFMPEG_BIN
     directory = Path(directory)
     directory.mkdir(parents=True, exist_ok=True)
@@ -401,7 +404,13 @@ def render_assets(video, full, bundle, directory, anchors=None):
         raise ValueError("SEQUENCE_ASSET_SOURCE_CHANGED")
     events = {e["event_id"]: e for e in bundle["events"]}
     from match_room_tracking import bounded_tracks
+    tracking_started = time.monotonic()
     tracks, tracking_status = bounded_tracks(video, anchors or [], [events[r["event_id"]] for r in (full.get("video_comments") or []) if r.get("event_id") in events])
+    stage_timings["tracking_seconds"] = time.monotonic() - tracking_started
+    stage_timings["frames_seconds"] = 0.0
+    stage_timings["clip_encoding_seconds"] = 0.0
+    stage_timings["clip_validation_seconds"] = 0.0
+    stage_timings["presentation_seconds"] = 0.0
     cap = cv2.VideoCapture(str(video))
     assets = []
     try:
@@ -412,6 +421,7 @@ def render_assets(video, full, bundle, directory, anchors=None):
                                  and row.get("evidence_time_ms") == event["proof"]["frame_ms"]
                                  and row.get("source_frame_id") == event["proof"]["frame_id"]):
                 raise ValueError("SEQUENCE_ASSET_BINDING_INVALID")
+            frame_started = time.monotonic()
             requested = row["evidence_time_ms"]
             ok, pixels, actual_s = video_timebase.read_frame_at(cap, requested / 1000.)
             if not ok or round(actual_s * 1000) != requested:
@@ -426,18 +436,24 @@ def render_assets(video, full, bundle, directory, anchors=None):
             if not clip_ok or not start-.002 <= clip_origin <= end:
                 raise ValueError("SEQUENCE_CLIP_ORIGIN_UNAVAILABLE")
             start = clip_origin
+            stage_timings["frames_seconds"] += time.monotonic() - frame_started
             clip = directory / (row["evidence_id"] + ".mp4")
             pending_clip = clip.with_suffix('.pending.mp4')
             try:
+                encoding_started = time.monotonic()
                 subprocess.run([FFMPEG_BIN, "-v", "error", "-y", "-ss", str(start), "-i", str(video),
                                 "-t", str(end-start), "-an", "-vf", "scale=720:1280:force_original_aspect_ratio=decrease",
                                 "-c:v", "libx264", "-preset", "ultrafast", "-crf", "24", "-threads", "1",
                                 "-vsync", "0", "-movflags", "+faststart", str(pending_clip)], check=True, timeout=45,
                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                stage_timings["clip_encoding_seconds"] += time.monotonic() - encoding_started
+                validation_started = time.monotonic()
                 validate_rendered_clip(pending_clip)
                 pending_clip.replace(clip)
+                stage_timings["clip_validation_seconds"] += time.monotonic() - validation_started
             finally:
                 pending_clip.unlink(missing_ok=True)
+            presentation_started = time.monotonic()
             row.update(frame_time_ms=round(actual_s*1000), frame_time_authority="ACTUAL_MEDIA_PTS",
                        identity_verified=True, identity_verification_status="SEQUENCE_SOURCE_CONTINUITY",
                        telestrated=False, tele_clip_start=start, tele_clip_end=end,
@@ -478,8 +494,10 @@ def render_assets(video, full, bundle, directory, anchors=None):
 
             attach_clip_authority(row, start, end, {row["event_id"]: event["canonical_ms"]})
             assets.append((row, image, clip))
+            stage_timings["presentation_seconds"] += time.monotonic() - presentation_started
     finally:
         cap.release()
+    stage_timings["render_seconds"] = time.monotonic() - render_started
     return assets
 
 
@@ -494,8 +512,13 @@ async def persist_assets(collection, doc, video, directory, publish, *, localize
     from match_room_localization import localize
     async def save_localization(audit):
         await collection.update_one({"id": doc["id"]}, {"$set": {"match_room_localization": audit}})
+    stage_timings = {}
+    localization_started = time.monotonic()
     graphics_bundle = await (localizer or localize)(video, doc, checkpoint=save_localization)
-    assets = await asyncio.to_thread(render_assets, video, full, graphics_bundle, directory, anchors)
+    stage_timings["localization_seconds"] = time.monotonic() - localization_started
+    assets = await asyncio.to_thread(render_assets, video, full, graphics_bundle, directory, anchors,
+                                     stage_timings=stage_timings)
+    publish_started = time.monotonic()
     for row, image, clip in assets:
         row["frame_url"] = await publish(image, "image/jpeg")
         row["tele_clip_url"] = await publish(clip, "video/mp4")
@@ -504,7 +527,10 @@ async def persist_assets(collection, doc, video, directory, publish, *, localize
         row["proof_frame_verified"] = compute_proof_frame_verified(row)
         if not row["proof_frame_verified"]:
             raise ValueError("SEQUENCE_PROOF_FRAME_NOT_VERIFIED")
+    stage_timings["publish_and_proof_seconds"] = time.monotonic() - publish_started
     timings = {**doc.get("sequence_timings", {}), "assets_seconds": round(time.monotonic()-started, 3)}
+    # Render is a parent span; its component durations must not be added to it.
+    timings["asset_stages_seconds"] = {key: round(value, 6) for key, value in stage_timings.items()}
     timings["total_processing_seconds"] = round(timings.get("before_assets_seconds", 0)+timings["assets_seconds"], 3)
     await collection.update_one({"id": doc["id"]}, {"$set": {
         "full_report": full, "sequence_timings": timings, "identity_gate_done": True,
