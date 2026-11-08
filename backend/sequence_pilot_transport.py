@@ -259,10 +259,11 @@ class RunCoordination:
         self._resume_at = 0.0
         self._lock = threading.Lock()
         self.stopped = threading.Event()
+        self.blocked = threading.Event()
 
     def acquire(self, now):
         with self._lock:
-            if self.stopped.is_set() or now < self._resume_at or self._active >= self.max_active:
+            if self.stopped.is_set() or self.blocked.is_set() or now < self._resume_at or self._active >= self.max_active:
                 return False
             self._active += 1
             return True
@@ -270,6 +271,12 @@ class RunCoordination:
     def release(self):
         with self._lock:
             self._active -= 1
+
+    def stop_new_calls(self, *, cancel_active=False):
+        with self._lock:
+            self.blocked.set()
+            if cancel_active:
+                self.stopped.set()
 
     def pause(self, seconds):
         with self._lock:
@@ -285,11 +292,12 @@ class RunLane:
         self.max_active = max_active
         self._active = 0
         self.stopped = coordination.stopped
+        self.blocked = coordination.blocked
 
     def acquire(self, now):
         owner = self.coordination
         with owner._lock:
-            if (owner.stopped.is_set() or now < owner._resume_at
+            if (owner.stopped.is_set() or owner.blocked.is_set() or now < owner._resume_at
                     or owner._active >= owner.max_active or self._active >= self.max_active):
                 return False
             owner._active += 1
@@ -306,6 +314,9 @@ class RunLane:
             raise ValueError("INVALID_STAGE_CALL_LIMIT")
         with self.coordination._lock:
             self.max_active = limit
+
+    def stop_new_calls(self, *, cancel_active=False):
+        self.coordination.stop_new_calls(cancel_active=cancel_active)
 
     def pause(self, seconds):
         self.coordination.pause(seconds)
@@ -345,8 +356,10 @@ def run_jobs(jobs, provider, model, *, deadline, per_call_s=90., workers=2, work
     try:
         while pending or active:
             now = time.monotonic()
-            if coordination is not None and coordination.stopped.is_set():
-                abort = cancel_active = True
+            if coordination is not None:
+                abort = abort or coordination.blocked.is_set()
+                if coordination.stopped.is_set():
+                    abort = cancel_active = True
             while pending and len(active) < workers and resume_at <= now < deadline and not abort:
                 if coordination is not None and not coordination.acquire(now):
                     break
@@ -410,6 +423,14 @@ def run_jobs(jobs, provider, model, *, deadline, per_call_s=90., workers=2, work
                             result = {**result, "rate_limit_retry_count": 1,
                                       "prior_rate_limit": histories[packet_id]}
                         results.append(result)
+                    # Publish provider-wide terminal failures before checkpoint
+                    # IO, so another supervisor cannot launch doomed work while
+                    # persistence waits. Temporary rate limits retain retry policy.
+                    if coordination is not None:
+                        if result.get("error") in {"MODEL_ACCESS_DENIED", "MODEL_KEY_NOT_CONFIGURED"}:
+                            coordination.stop_new_calls(cancel_active=True)
+                        elif result.get("http_status") == 429 and result.get("limit_kind") == "QUOTA_EXHAUSTED":
+                            coordination.stop_new_calls()
                     if on_result:
                         on_result(result)
                     stop = not retry_rate_limit and result.get("error") in STOP_ERRORS

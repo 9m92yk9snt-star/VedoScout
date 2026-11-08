@@ -12,7 +12,7 @@ The writer accepts an optional coordinator. Localization accepts an optional coo
 
 ## Verification
 
-253 sequence, report and localization tests pass locally. New tests use spawned local synthetic workers, not provider calls, and cover:
+256 sequence, report and localization tests pass locally. New tests use spawned local synthetic workers, not provider calls, and cover:
 
 - Two independent three-job pools sharing a two-call cap, with unchanged result ordering.
 - Shared pauses that cannot be shortened by later shorter delays.
@@ -28,3 +28,9 @@ Existing request-wire, checkpoint/retry, provider-error, writer-budget and local
 ## Remaining integration constraint
 
 The tested dynamic lanes now provide the capacity-allocation prerequisite. The outer integration still needs a common elapsed-time budget, saved receipts through writer failure, and exact receipt reuse for the final selected cards. Enable the overlap only with those checks and an output/timing comparison. The five guaranteed scoring cards remain the candidate subset; optional cards retain final writer-based selection.
+
+## Terminal provider failures across pools
+
+The coordination layer previously shared a temporary 429 pause but not terminal provider state: another supervisor could resume queued calls after a confirmed exhausted quota. It now blocks new calls across all lanes for that analysis when the provider explicitly reports `QUOTA_EXHAUSTED`. Already-sent siblings keep their bounded deadlines and their completed receipts are checkpointed. Missing credentials or denied access stop and join active children as well, matching the existing per-pool policy. The terminal state is published before the error's checkpoint callback, so slow persistence cannot delay the shared notification.
+
+Three spawned-worker regression cases cover quota exhaustion, denied access and missing credentials. Two independent pools each contain an active and a queued job. They verify that neither queued job launches, exhausted quota retains a paid sibling result, access errors stop that sibling, all four receipts are saved, and every lane reservation is released. Temporary rate-limit retry policy is unchanged. No provider requests were made. This fixes supervision; the outer overlap integration remains pending.

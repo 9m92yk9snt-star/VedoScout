@@ -1620,3 +1620,69 @@ def test_live_position_pool_expands_after_writer_finishes():
             if start < stop:
                 overlaps.append(start)
     assert overlaps and min(overlaps) >= writer_done
+
+
+def coordinated_terminal_worker(pipe, job, provider, model, timeout):
+    from pathlib import Path
+    started, release = Path(job['started']), Path(job['release'])
+    until = time.monotonic() + timeout
+    if job['packet_id'] == 'sibling':
+        started.write_text('started')
+        while not release.exists() and time.monotonic() < until:
+            time.sleep(.01)
+        pipe.send({'packet_id': 'sibling', 'status': 'COMPLETED'})
+    elif job['packet_id'] == 'failure':
+        while not started.exists() and time.monotonic() < until:
+            time.sleep(.01)
+        pipe.send({'packet_id': 'failure', 'status': 'ERROR', **job['failure']})
+    else:
+        Path(job['unexpected']).write_text('unexpected launch')
+        pipe.send({'packet_id': job['packet_id'], 'status': 'COMPLETED'})
+    pipe.close()
+
+
+@pytest.mark.parametrize('failure,cancel_active', [
+    ({'error': 'MODEL_QUOTA_OR_RATE_LIMIT', 'http_status': 429,
+      'limit_kind': 'QUOTA_EXHAUSTED', 'retry_after_seconds': 1}, False),
+    ({'error': 'MODEL_ACCESS_DENIED', 'http_status': 403}, True),
+    ({'error': 'MODEL_KEY_NOT_CONFIGURED'}, True),
+])
+def test_terminal_failure_stops_both_pools_before_checkpoint(tmp_path, failure, cancel_active):
+    import asyncio
+    shared = t.RunCoordination()
+    first, second = t.RunLane(shared), t.RunLane(shared)
+    release = tmp_path / 'release'
+    unexpected = tmp_path / 'unexpected'
+    common = {'started': str(tmp_path/'started'), 'release': str(release),
+              'unexpected': str(unexpected)}
+    saved = []
+    def checkpoint(receipt):
+        saved.append(receipt)
+        if receipt['packet_id'] == 'failure':
+            # This assertion runs before persistence returns to the supervisor.
+            assert shared.blocked.is_set()
+            assert shared.stopped.is_set() == cancel_active
+            assert not second.acquire(time.monotonic()+1000)
+            if not cancel_active:
+                release.write_text('finish paid sibling')
+    async def pool(lane, jobs):
+        return await t.run_jobs_async(jobs, 'emergent', 'gpt-6-astra',
+            deadline=time.monotonic()+10, per_call_s=5, workers=1,
+            coordination=lane, worker=coordinated_terminal_worker, on_result=checkpoint)
+    async def scenario():
+        return await asyncio.gather(
+            pool(first, [{**common, 'packet_id': 'failure', 'failure': failure},
+                         {**common, 'packet_id': 'queued-first'}]),
+            pool(second, [{**common, 'packet_id': 'sibling'},
+                          {**common, 'packet_id': 'queued-second'}]))
+    results = asyncio.run(scenario())
+    by_id = {r['packet_id']: r for group in results for r in group}
+    assert by_id['sibling']['status'] == ('ERROR' if cancel_active else 'COMPLETED')
+    if cancel_active:
+        assert by_id['sibling']['error'] == 'MODEL_ACCESS_STOPPED'
+    for name in ('queued-first', 'queued-second'):
+        assert by_id[name]['status'] == 'NOT_SENT'
+        assert by_id[name]['error'] == 'MODEL_ACCESS_STOPPED'
+    assert not unexpected.exists()
+    assert shared._active == first._active == second._active == 0
+    assert len(saved) == 4
