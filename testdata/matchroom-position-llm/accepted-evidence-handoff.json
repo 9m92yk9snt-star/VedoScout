@@ -1,0 +1,884 @@
+{
+  "event_id": "47ad617d2ba76a4683cd",
+  "source_video_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2",
+  "action_status": "ACCEPTED_ASSIST",
+  "authority": "OWNER_ACCEPTED_PRIOR_MODEL_EVIDENCE",
+  "accepted_sequence": {
+    "selected_player_pass_interval_ms": [
+      49715,
+      50081
+    ],
+    "teammate_first_time_receive_and_finish_interval_ms": [
+      50331,
+      50648
+    ],
+    "goal_outcome_ms": 51131,
+    "exact_contact_ms": null,
+    "foot_side": "UNRESOLVED_MODEL_USER_DISAGREEMENT",
+    "prior_receipt_source_video_sha256": "b9e2ba4975ed9dc2497f860a80644711bfd12a2125d9fba6390600b0409ab999",
+    "prior_receipt_response_sha256": "c1b78325895885002ccc58f036b0a29824406997108b12648f3805a46e0040ff"
+  },
+  "position_candidates": {
+    "status": "REQUIRES_SOURCE_PIXEL_REVIEW",
+    "source_video_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2",
+    "response_sha256": "56a283079be0d413f731f79dbd9f91a73676efaae28ee7868cf7d8c092cf9863",
+    "observations": [
+      {
+        "frame_id": "s000049215",
+        "selected_player": {
+          "status": "VISIBLE",
+          "box": [
+            0.45,
+            0.4948,
+            0.1241,
+            0.0964
+          ],
+          "ground": [
+            0.5694,
+            0.5859
+          ],
+          "evidence": "Central, light-haired white player controlling the ball between blue opponents; appearance and subsequent continuity support the reference match."
+        },
+        "receiver": {
+          "status": "VISIBLE",
+          "local_id": "receiver_01",
+          "box": [
+            0.5574,
+            0.4802,
+            0.0676,
+            0.0938
+          ],
+          "ground": [
+            0.6111,
+            0.5719
+          ],
+          "evidence": "Distinct dark-haired white player farther back/right. Tracked forward through the sequence, not identified by shirt colour alone."
+        },
+        "ball": {
+          "status": "VISIBLE",
+          "xy": [
+            0.475,
+            0.5813
+          ],
+          "possessor": "SELECTED"
+        },
+        "phase": "CONTROL"
+      },
+      {
+        "frame_id": "s000049315",
+        "selected_player": {
+          "status": "VISIBLE",
+          "box": [
+            0.4435,
+            0.4896,
+            0.1065,
+            0.0984
+          ],
+          "ground": [
+            0.4861,
+            0.5854
+          ],
+          "evidence": "Same central player; planted boot and raised opposite leg visible beside the ball."
+        },
+        "receiver": {
+          "status": "VISIBLE",
+          "local_id": "receiver_01",
+          "box": [
+            0.5574,
+            0.4818,
+            0.0676,
+            0.0917
+          ],
+          "ground": [
+            0.612,
+            0.5719
+          ],
+          "evidence": "Maintains the background position to the selected player's right."
+        },
+        "ball": {
+          "status": "VISIBLE",
+          "xy": [
+            0.5065,
+            0.5813
+          ],
+          "possessor": "SELECTED"
+        },
+        "phase": "CONTROL"
+      },
+      {
+        "frame_id": "s000049415",
+        "selected_player": {
+          "status": "VISIBLE",
+          "box": [
+            0.4315,
+            0.4875,
+            0.0843,
+            0.1026
+          ],
+          "ground": [
+            0.4583,
+            0.5875
+          ],
+          "evidence": "Last relatively clear full-body view before the blue players close across him; ball remains beside his boot."
+        },
+        "receiver": {
+          "status": "VISIBLE",
+          "local_id": "receiver_01",
+          "box": [
+            0.5546,
+            0.4823,
+            0.075,
+            0.0932
+          ],
+          "ground": [
+            0.6204,
+            0.5734
+          ],
+          "evidence": "Same separate background player, facing the central contest."
+        },
+        "ball": {
+          "status": "VISIBLE",
+          "xy": [
+            0.5148,
+            0.5802
+          ],
+          "possessor": "SELECTED"
+        },
+        "phase": "CONTROL"
+      },
+      {
+        "frame_id": "s000049515",
+        "selected_player": {
+          "status": "PARTIAL",
+          "box": [
+            0.4028,
+            0.4901,
+            0.0852,
+            0.1042
+          ],
+          "ground": [
+            0.412,
+            0.5922
+          ],
+          "evidence": "White torso and lower leg remain visible behind blue 10; box bounds visible portions rather than an inferred hidden body."
+        },
+        "receiver": {
+          "status": "VISIBLE",
+          "local_id": "receiver_01",
+          "box": [
+            0.537,
+            0.4844,
+            0.0889,
+            0.0896
+          ],
+          "ground": [
+            0.5444,
+            0.5719
+          ],
+          "evidence": "Background player remains separate from the selected player."
+        },
+        "ball": {
+          "status": "VISIBLE",
+          "xy": [
+            0.4898,
+            0.5781
+          ],
+          "possessor": "UNKNOWN"
+        },
+        "phase": "UNKNOWN"
+      },
+      {
+        "frame_id": "s000049615",
+        "selected_player": {
+          "status": "PARTIAL",
+          "box": null,
+          "ground": null,
+          "evidence": "Small white fragments remain behind the central blue players; their overlap prevents reliable selected-player bounds or foot localization."
+        },
+        "receiver": {
+          "status": "PARTIAL",
+          "local_id": "receiver_01",
+          "box": [
+            0.512,
+            0.4865,
+            0.0722,
+            0.0854
+          ],
+          "ground": [
+            0.5176,
+            0.5698
+          ],
+          "evidence": "Background white player partly crossed by the approaching blue defender; one extended white leg remains visible."
+        },
+        "ball": {
+          "status": "VISIBLE",
+          "xy": [
+            0.4574,
+            0.576
+          ],
+          "possessor": "UNKNOWN"
+        },
+        "phase": "UNKNOWN"
+      },
+      {
+        "frame_id": "s000049665",
+        "selected_player": {
+          "status": "PARTIAL",
+          "box": null,
+          "ground": null,
+          "evidence": "Selected player is largely masked by blue 8 and blue 10; visible fragments do not support a reliable foot point."
+        },
+        "receiver": {
+          "status": "PARTIAL",
+          "local_id": "receiver_01",
+          "box": null,
+          "ground": [
+            0.51,
+            0.5693
+          ],
+          "evidence": "White leg and boot remain visible left of the foreground defender; torso is substantially hidden."
+        },
+        "ball": {
+          "status": "VISIBLE",
+          "xy": [
+            0.4444,
+            0.5745
+          ],
+          "possessor": "UNKNOWN"
+        },
+        "phase": "UNKNOWN"
+      },
+      {
+        "frame_id": "s000049715",
+        "selected_player": {
+          "status": "PARTIAL",
+          "box": null,
+          "ground": null,
+          "evidence": "Central blue-player overlap prevents reliable localization beyond small white fragments."
+        },
+        "receiver": {
+          "status": "PARTIAL",
+          "local_id": "receiver_01",
+          "box": null,
+          "ground": null,
+          "evidence": "Mostly behind the blue defender to the right of the central group; no unambiguous grounded boot."
+        },
+        "ball": {
+          "status": "VISIBLE",
+          "xy": [
+            0.4296,
+            0.5734
+          ],
+          "possessor": "UNKNOWN"
+        },
+        "phase": "UNKNOWN"
+      },
+      {
+        "frame_id": "s000049765",
+        "selected_player": {
+          "status": "PARTIAL",
+          "box": null,
+          "ground": null,
+          "evidence": "White limb fragments remain behind blue 8/10; no reliable full extent."
+        },
+        "receiver": {
+          "status": "PARTIAL",
+          "local_id": "receiver_01",
+          "box": [
+            0.5398,
+            0.4813,
+            0.0472,
+            0.0865
+          ],
+          "ground": [
+            0.5556,
+            0.5656
+          ],
+          "evidence": "Head, right-side torso and a lower leg reappear beyond the defender, continuing the background track."
+        },
+        "ball": {
+          "status": "OCCLUDED",
+          "xy": null,
+          "possessor": "UNKNOWN"
+        },
+        "phase": "UNKNOWN"
+      },
+      {
+        "frame_id": "s000049815",
+        "selected_player": {
+          "status": "PARTIAL",
+          "box": null,
+          "ground": null,
+          "evidence": "A low white leg and torso fragments are visible in the central overlap; hidden feet are not reconstructed."
+        },
+        "receiver": {
+          "status": "PARTIAL",
+          "local_id": "receiver_01",
+          "box": [
+            0.5093,
+            0.4813,
+            0.0657,
+            0.0854
+          ],
+          "ground": [
+            0.5472,
+            0.5651
+          ],
+          "evidence": "Background track becomes clearer to the right of the defenders."
+        },
+        "ball": {
+          "status": "OCCLUDED",
+          "xy": null,
+          "possessor": "UNKNOWN"
+        },
+        "phase": "UNKNOWN"
+      },
+      {
+        "frame_id": "s000049865",
+        "selected_player": {
+          "status": "PARTIAL",
+          "box": null,
+          "ground": null,
+          "evidence": "Still behind the blue cluster; white fragments are insufficient for a dependable box."
+        },
+        "receiver": {
+          "status": "VISIBLE",
+          "local_id": "receiver_01",
+          "box": [
+            0.4944,
+            0.4823,
+            0.0694,
+            0.0844
+          ],
+          "ground": [
+            0.5426,
+            0.5651
+          ],
+          "evidence": "Same dark-haired background player, now largely unobstructed."
+        },
+        "ball": {
+          "status": "OCCLUDED",
+          "xy": null,
+          "possessor": "UNKNOWN"
+        },
+        "phase": "UNKNOWN"
+      },
+      {
+        "frame_id": "s000049915",
+        "selected_player": {
+          "status": "PARTIAL",
+          "box": null,
+          "ground": null,
+          "evidence": "Selected-player fragments remain low behind blue 8; the ball and actionable foot contact are hidden."
+        },
+        "receiver": {
+          "status": "VISIBLE",
+          "local_id": "receiver_01",
+          "box": [
+            0.4787,
+            0.4828,
+            0.0741,
+            0.0823
+          ],
+          "ground": [
+            0.5454,
+            0.562
+          ],
+          "evidence": "Continues watching the central contest from behind/right."
+        },
+        "ball": {
+          "status": "OCCLUDED",
+          "xy": null,
+          "possessor": "UNKNOWN"
+        },
+        "phase": "UNKNOWN"
+      },
+      {
+        "frame_id": "s000049965",
+        "selected_player": {
+          "status": "PARTIAL",
+          "box": null,
+          "ground": null,
+          "evidence": "Largely concealed behind the central blue players."
+        },
+        "receiver": {
+          "status": "VISIBLE",
+          "local_id": "receiver_01",
+          "box": [
+            0.4667,
+            0.487,
+            0.0833,
+            0.0771
+          ],
+          "ground": [
+            0.5417,
+            0.5578
+          ],
+          "evidence": "Same background player lowers into a wider stance; no visible ball contact establishes reception."
+        },
+        "ball": {
+          "status": "OCCLUDED",
+          "xy": null,
+          "possessor": "UNKNOWN"
+        },
+        "phase": "UNKNOWN"
+      },
+      {
+        "frame_id": "s000050015",
+        "selected_player": {
+          "status": "PARTIAL",
+          "box": null,
+          "ground": null,
+          "evidence": "White lower-body fragments remain behind blue 8; identity of individual overlapping boots is uncertain."
+        },
+        "receiver": {
+          "status": "VISIBLE",
+          "local_id": "receiver_01",
+          "box": [
+            0.4556,
+            0.4885,
+            0.0852,
+            0.0755
+          ],
+          "ground": [
+            0.5343,
+            0.5583
+          ],
+          "evidence": "Background track remains continuous; spread stance alone does not prove arrival of a pass."
+        },
+        "ball": {
+          "status": "OCCLUDED",
+          "xy": null,
+          "possessor": "UNKNOWN"
+        },
+        "phase": "UNKNOWN"
+      },
+      {
+        "frame_id": "s000050065",
+        "selected_player": {
+          "status": "PARTIAL",
+          "box": null,
+          "ground": null,
+          "evidence": "Still substantially screened by blue 8 and the adjacent defender."
+        },
+        "receiver": {
+          "status": "VISIBLE",
+          "local_id": "receiver_01",
+          "box": [
+            0.4463,
+            0.4896,
+            0.0796,
+            0.0729
+          ],
+          "ground": [
+            0.5176,
+            0.5583
+          ],
+          "evidence": "Same receiver candidate; no clearly separable ball at his feet."
+        },
+        "ball": {
+          "status": "OCCLUDED",
+          "xy": null,
+          "possessor": "UNKNOWN"
+        },
+        "phase": "UNKNOWN"
+      },
+      {
+        "frame_id": "s000050115",
+        "selected_player": {
+          "status": "PARTIAL",
+          "box": null,
+          "ground": null,
+          "evidence": "Only small fragments can be associated with the selected-player track."
+        },
+        "receiver": {
+          "status": "VISIBLE",
+          "local_id": "receiver_01",
+          "box": [
+            0.4287,
+            0.4885,
+            0.0759,
+            0.0745
+          ],
+          "ground": [
+            0.4963,
+            0.5573
+          ],
+          "evidence": "Continues in the background; apparent pale shapes near blue 10 are not secure ball detections."
+        },
+        "ball": {
+          "status": "OCCLUDED",
+          "xy": null,
+          "possessor": "UNKNOWN"
+        },
+        "phase": "UNKNOWN"
+      },
+      {
+        "frame_id": "s000050165",
+        "selected_player": {
+          "status": "PARTIAL",
+          "box": null,
+          "ground": null,
+          "evidence": "Central occlusion persists; no selected-player contact is visible."
+        },
+        "receiver": {
+          "status": "VISIBLE",
+          "local_id": "receiver_01",
+          "box": [
+            0.4139,
+            0.4875,
+            0.0787,
+            0.075
+          ],
+          "ground": [
+            0.4824,
+            0.5557
+          ],
+          "evidence": "Same background player, established by uninterrupted position and posture continuity."
+        },
+        "ball": {
+          "status": "OCCLUDED",
+          "xy": null,
+          "possessor": "UNKNOWN"
+        },
+        "phase": "UNKNOWN"
+      },
+      {
+        "frame_id": "s000050215",
+        "selected_player": {
+          "status": "PARTIAL",
+          "box": null,
+          "ground": null,
+          "evidence": "Selected player remains behind blue 8; visible fragments do not establish a release."
+        },
+        "receiver": {
+          "status": "VISIBLE",
+          "local_id": "receiver_01",
+          "box": [
+            0.4083,
+            0.4865,
+            0.0731,
+            0.075
+          ],
+          "ground": [
+            0.4667,
+            0.5578
+          ],
+          "evidence": "Background player begins adjusting his stance; ball remains unresolved."
+        },
+        "ball": {
+          "status": "OCCLUDED",
+          "xy": null,
+          "possessor": "UNKNOWN"
+        },
+        "phase": "UNKNOWN"
+      },
+      {
+        "frame_id": "s000050265",
+        "selected_player": {
+          "status": "PARTIAL",
+          "box": null,
+          "ground": null,
+          "evidence": "White leg fragments persist behind blue 8, without reliable foot attribution."
+        },
+        "receiver": {
+          "status": "PARTIAL",
+          "local_id": "receiver_01",
+          "box": [
+            0.4037,
+            0.4839,
+            0.0639,
+            0.0755
+          ],
+          "ground": [
+            0.4509,
+            0.5563
+          ],
+          "evidence": "Blue 10 begins to overlap his left side; no resolved reception contact."
+        },
+        "ball": {
+          "status": "OCCLUDED",
+          "xy": null,
+          "possessor": "UNKNOWN"
+        },
+        "phase": "UNKNOWN"
+      },
+      {
+        "frame_id": "s000050315",
+        "selected_player": {
+          "status": "PARTIAL",
+          "box": null,
+          "ground": null,
+          "evidence": "Selected-player lower-body fragments extend from behind blue 8, but a complete box would require inference."
+        },
+        "receiver": {
+          "status": "PARTIAL",
+          "local_id": "receiver_01",
+          "box": [
+            0.3898,
+            0.4818,
+            0.0815,
+            0.0766
+          ],
+          "ground": [
+            0.4259,
+            0.5568
+          ],
+          "evidence": "Same background player opens his arms while increasingly overlapped by blue 10."
+        },
+        "ball": {
+          "status": "OCCLUDED",
+          "xy": null,
+          "possessor": "UNKNOWN"
+        },
+        "phase": "UNKNOWN"
+      },
+      {
+        "frame_id": "s000050365",
+        "selected_player": {
+          "status": "PARTIAL",
+          "box": [
+            0.2519,
+            0.4896,
+            0.0463,
+            0.0766
+          ],
+          "ground": [
+            0.2935,
+            0.5641
+          ],
+          "evidence": "Head, white torso fragment and a boot emerge on the right of blue 8; box covers these visible portions."
+        },
+        "receiver": {
+          "status": "PARTIAL",
+          "local_id": "receiver_01",
+          "box": [
+            0.3815,
+            0.4771,
+            0.0704,
+            0.0802
+          ],
+          "ground": [
+            0.4074,
+            0.5547
+          ],
+          "evidence": "Background player's head and right side remain visible behind blue 10."
+        },
+        "ball": {
+          "status": "OCCLUDED",
+          "xy": null,
+          "possessor": "UNKNOWN"
+        },
+        "phase": "UNKNOWN"
+      },
+      {
+        "frame_id": "s000050415",
+        "selected_player": {
+          "status": "PARTIAL",
+          "box": [
+            0.2398,
+            0.4875,
+            0.0463,
+            0.0776
+          ],
+          "ground": [
+            0.2741,
+            0.5625
+          ],
+          "evidence": "Light-haired selected-player track emerges farther from blue 8, distinct from the background receiver candidate."
+        },
+        "receiver": {
+          "status": "PARTIAL",
+          "local_id": "receiver_01",
+          "box": [
+            0.3704,
+            0.475,
+            0.0741,
+            0.0807
+          ],
+          "ground": [
+            0.4,
+            0.5536
+          ],
+          "evidence": "Head, outstretched arm and one leg visible beyond blue 10; ball contact is hidden."
+        },
+        "ball": {
+          "status": "OCCLUDED",
+          "xy": null,
+          "possessor": "UNKNOWN"
+        },
+        "phase": "UNKNOWN"
+      },
+      {
+        "frame_id": "s000050465",
+        "selected_player": {
+          "status": "PARTIAL",
+          "box": [
+            0.2269,
+            0.4896,
+            0.0657,
+            0.0755
+          ],
+          "ground": [
+            0.2426,
+            0.562
+          ],
+          "evidence": "Head and white torso emerge right of blue 8; a visible boot supports the ground point."
+        },
+        "receiver": {
+          "status": "PARTIAL",
+          "local_id": "receiver_01",
+          "box": [
+            0.3602,
+            0.4771,
+            0.0704,
+            0.0786
+          ],
+          "ground": [
+            0.3796,
+            0.5536
+          ],
+          "evidence": "Tracked background player is mostly behind blue 10; right arm and lower leg remain visible."
+        },
+        "ball": {
+          "status": "OCCLUDED",
+          "xy": null,
+          "possessor": "UNKNOWN"
+        },
+        "phase": "UNKNOWN"
+      },
+      {
+        "frame_id": "s000050515",
+        "selected_player": {
+          "status": "PARTIAL",
+          "box": [
+            0.212,
+            0.488,
+            0.0833,
+            0.076
+          ],
+          "ground": null,
+          "evidence": "Selected player leans forward and continues out of the overlap; feet are not cleanly separable."
+        },
+        "receiver": {
+          "status": "PARTIAL",
+          "local_id": "receiver_01",
+          "box": null,
+          "ground": null,
+          "evidence": "White shirt/arm fragments remain behind blue 10; neither a reliable body box nor foot-ball contact is visible."
+        },
+        "ball": {
+          "status": "OCCLUDED",
+          "xy": null,
+          "possessor": "UNKNOWN"
+        },
+        "phase": "UNKNOWN"
+      },
+      {
+        "frame_id": "s000050565",
+        "selected_player": {
+          "status": "PARTIAL",
+          "box": [
+            0.2,
+            0.4865,
+            0.0944,
+            0.0776
+          ],
+          "ground": [
+            0.2167,
+            0.5609
+          ],
+          "evidence": "Light-haired white player continues forward from behind blue 8, consistent with the selected-player track."
+        },
+        "receiver": {
+          "status": "PARTIAL",
+          "local_id": "receiver_01",
+          "box": null,
+          "ground": null,
+          "evidence": "Background track remains behind blue 10; visible white fragments do not resolve a receiving or striking foot."
+        },
+        "ball": {
+          "status": "OCCLUDED",
+          "xy": null,
+          "possessor": "UNKNOWN"
+        },
+        "phase": "UNKNOWN"
+      },
+      {
+        "frame_id": "s000050615",
+        "selected_player": {
+          "status": "PARTIAL",
+          "box": [
+            0.1796,
+            0.4854,
+            0.1111,
+            0.0802
+          ],
+          "ground": [
+            0.2426,
+            0.5625
+          ],
+          "evidence": "Selected player's head, torso and forward grounded boot are visible; trailing leg still overlaps blue players."
+        },
+        "receiver": {
+          "status": "PARTIAL",
+          "local_id": "receiver_01",
+          "box": null,
+          "ground": null,
+          "evidence": "White torso and leg fragments behind blue 10 continue the distinct background track; striking contact is screened."
+        },
+        "ball": {
+          "status": "OCCLUDED",
+          "xy": null,
+          "possessor": "UNKNOWN"
+        },
+        "phase": "UNKNOWN"
+      },
+      {
+        "frame_id": "s000050665",
+        "selected_player": {
+          "status": "PARTIAL",
+          "box": [
+            0.1667,
+            0.4865,
+            0.1102,
+            0.0786
+          ],
+          "ground": [
+            0.2556,
+            0.562
+          ],
+          "evidence": "Selected player is forward-leaning left of blue 10, spatially distinct from the white player behind that defender."
+        },
+        "receiver": {
+          "status": "PARTIAL",
+          "local_id": "receiver_01",
+          "box": [
+            0.2648,
+            0.4839,
+            0.0361,
+            0.0698
+          ],
+          "ground": null,
+          "evidence": "White upper-body and leg fragments behind blue 10 continue the receiver-candidate track. Outgoing ball is visible, but direct foot-ball contact is not."
+        },
+        "ball": {
+          "status": "VISIBLE",
+          "xy": [
+            0.3806,
+            0.538
+          ],
+          "possessor": "UNKNOWN"
+        },
+        "phase": "SHOT"
+      }
+    ],
+    "receiver_role_mapping": null
+  },
+  "localization_unknowns_do_not_revoke_accepted_action": true,
+  "prior_player_ids_transferred": false,
+  "measured_ball_trajectory_approved": false,
+  "playback_status": "PENDING",
+  "production_integration": false,
+  "new_model_calls": 0
+}
