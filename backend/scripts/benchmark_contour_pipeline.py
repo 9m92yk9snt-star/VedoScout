@@ -21,9 +21,10 @@ def main():
     parser.add_argument('--video',type=Path,required=True)
     parser.add_argument('--baseline-segmenter',type=Path,required=True)
     parser.add_argument('--timestamp',default='00:31')
+    parser.add_argument('--engine',choices=('opencv','onnxruntime'),default='opencv')
     parser.add_argument('--output',type=Path,required=True)
     args=parser.parse_args()
-    os.environ['SCOUTMEPLAY_MATCHROOM_ENGINE']='opencv'
+    os.environ['SCOUTMEPLAY_MATCHROOM_ENGINE']=args.engine
     os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
     cv2.setNumThreads(2)
     import native_player_segmentation as native
@@ -84,7 +85,7 @@ def main():
         recovery.count_owned=candidate_votes
     medians={k:statistics.median(v) for k,v in timings.items()}
     result={'source_sha256':sha,'event_id':room['event_id'],
-            'window_ms':[room['start_ms'],room['end_ms']], 'engine':'opencv',
+            'window_ms':[room['start_ms'],room['end_ms']], 'engine':args.engine,
             'baseline_commit':'3f13f63f7c13e51cf159a82ccf7793d116f70362',
             'baseline_segmenter_sha256':hashlib.sha256(baseline.encode()).hexdigest(),
             'model_sha256':model.sha256,'single_cpu_affinity':True,'opencv_threads':2,
