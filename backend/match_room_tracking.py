@@ -551,7 +551,10 @@ def _bounded_event(video, anchors, events, *, refinement=False):
             subprocess.run([sys.executable, str(Path(__file__).resolve()), str(request), str(result)],
                            timeout=_refinement_timeout(events, refinement) if refinement else SOURCE_TIMEOUT_S if any(e.get('localization_method') == 'EXPLICIT_SOURCE_POSITIONS' for e in events) else TIMEOUT_S,
                            check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                           env={**os.environ, 'SCOUTMEPLAY_MATCHROOM_ENGINE': 'onnxruntime'})
+                           # Apply before NumPy/OpenBLAS imports in this owned child.
+                           # Tiny mask products should not spawn a CPU-sized BLAS pool.
+                           env={**os.environ, 'SCOUTMEPLAY_MATCHROOM_ENGINE': 'onnxruntime',
+                                'OPENBLAS_NUM_THREADS': '1'})
             return json.loads(result.read_text()), 'COMPLETED'
         except subprocess.TimeoutExpired:
             try:

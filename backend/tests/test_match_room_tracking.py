@@ -535,3 +535,27 @@ def test_onnx_scheduler_diff_diagnostics_are_bounded_and_precise():
     changed['ball_playback'].append({'id': 'unexpected'})
     assert any(row['reason'] == 'LENGTH_CHANGED' for row in first_differences(baseline, changed))
     assert len(first_differences(baseline, changed, limit=1)) == 1
+
+
+def test_owned_graphics_workers_limit_blas_without_mutating_parent(monkeypatch):
+    import json
+    import os
+    from pathlib import Path
+    monkeypatch.setenv('OPENBLAS_NUM_THREADS', '9')
+    monkeypatch.setenv('MATCHROOM_TEST_INHERITED', 'kept')
+    event = {'localization_method': 'EXPLICIT_SOURCE_POSITIONS', 'visual_samples': [{}]}
+    requests = []
+    def complete(command, **kwargs):
+        env = kwargs['env']
+        assert env['OPENBLAS_NUM_THREADS'] == '1'
+        assert env['SCOUTMEPLAY_MATCHROOM_ENGINE'] == 'onnxruntime'
+        assert env['MATCHROOM_TEST_INHERITED'] == 'kept'
+        assert os.environ['OPENBLAS_NUM_THREADS'] == '9'
+        requests.append(json.loads(Path(command[-2]).read_text()))
+        Path(command[-1]).write_text('{}')
+    monkeypatch.setattr(subprocess, 'run', complete)
+    for kind in (False, 'small', 'medium', 'ball'):
+        assert tracking._bounded_event('video', [], [event], refinement=kind) == ({}, 'COMPLETED')
+    assert [r['refinement'] for r in requests] == [False, 'small', 'medium', 'ball']
+    assert all(r['events'] == [event] and r['video'] == 'video' for r in requests)
+    assert os.environ['OPENBLAS_NUM_THREADS'] == '9'

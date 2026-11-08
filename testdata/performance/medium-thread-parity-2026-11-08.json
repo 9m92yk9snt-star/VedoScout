@@ -1,0 +1,11 @@
+{
+  "source_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2",
+  "model_sha256": "20877569fcfc4744855b1d6d05b0cd7031987ae31894af5c7e1e74328d18e653",
+  "engine": "onnxruntime",
+  "baseline_blas_threads": 9,
+  "candidate_blas_threads": 1,
+  "views": 10,
+  "masks_compared": 61,
+  "mask_or_metadata_differences": 0,
+  "scope": "medium model on five real frames, full and detail views; no live publication"
+}
