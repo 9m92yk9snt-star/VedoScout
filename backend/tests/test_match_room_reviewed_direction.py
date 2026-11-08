@@ -45,7 +45,8 @@ def test_invalid_animation_rejected_before_decode(tmp_path, animation):
         build_reviewed_direction(tmp_path/'absent','event','source',r,time.monotonic()+5)
 
 
-def test_animated_output_moves_tip_but_preserves_masks_and_pending_status(tmp_path, monkeypatch):
+@pytest.mark.parametrize("expire_on_last_mask", [False, True])
+def test_animated_output_moves_tip_but_preserves_masks_and_pending_status(tmp_path, monkeypatch, expire_on_last_mask):
     import numpy as np
     import cv2
     import video_timebase
@@ -67,6 +68,22 @@ def test_animated_output_moves_tip_but_preserves_masks_and_pending_status(tmp_pa
     polygons=[[[.1,.1],[.2,.1],[.2,.2]]]
     monkeypatch.setattr(match_room_tracking,'foreground_polygons',lambda *a:polygons)
     p=tmp_path/'clip';p.write_bytes(b'test');sha=hashlib.sha256(p.read_bytes()).hexdigest()
+    if expire_on_last_mask:
+        clock = [0.]
+        calls = [0]
+        released = []
+        monkeypatch.setattr(time, 'monotonic', lambda: clock[0])
+        monkeypatch.setattr(Capture, 'release', lambda self: released.append(True))
+        def slow_last_mask(*args):
+            calls[0] += 1
+            if calls[0] == 3:
+                clock[0] = 6.
+            return [], None
+        monkeypatch.setattr(native_player_segmentation, '_instances', slow_last_mask)
+        with pytest.raises(ValueError, match='TIME_OR_BUDGET'):
+            build_reviewed_direction(p, 'event', sha, review(sha), 5.)
+        assert calls[0] == 3 and released == [True]
+        return
     static=build_reviewed_direction(p,'event',sha,review(sha),time.monotonic()+5)
     animated=build_reviewed_direction(p,'event',sha,{**review(sha),'playback_status':'VERIFIED',
         'animation':{'kind':'RECONSTRUCTED_PASS','arrival_ms':1100}},time.monotonic()+5)
@@ -78,3 +95,8 @@ def test_animated_output_moves_tip_but_preserves_masks_and_pending_status(tmp_pa
     for old,new in zip(static['samples'],animated['samples']):
         assert old['foreground']==new['foreground']
         assert old['directionTrail'][1]==pytest.approx([.5,.55])
+
+
+def test_expired_budget_does_not_open_source(tmp_path):
+    with pytest.raises(ValueError, match='TIME_OR_BUDGET'):
+        build_reviewed_direction(tmp_path/'absent', 'event', 'source', review('source'), 0)

@@ -30,9 +30,15 @@ def build_reviewed_direction(video, event_id, source_sha256, review, deadline):
             or type(animation.get('arrival_ms')) is not int
             or not start < animation['arrival_ms'] <= end):
         raise ValueError('REVIEWED_DIRECTION_ANIMATION_INVALID')
+    def check_budget():
+        if time.monotonic() >= deadline:
+            raise ValueError('REVIEWED_DIRECTION_TIME_OR_BUDGET')
+
+    check_budget()
     digest = hashlib.sha256()
     with open(video, 'rb') as stream:
         for chunk in iter(lambda: stream.read(1024*1024), b''):
+            check_budget()
             digest.update(chunk)
     if digest.hexdigest() != source_sha256:
         raise ValueError('REVIEWED_DIRECTION_SOURCE_MISMATCH')
@@ -78,6 +84,7 @@ def build_reviewed_direction(video, event_id, source_sha256, review, deadline):
                 top = max(0, int((min(p[1] for p in trail)-.25)*h))
                 bottom = min(h, int((max(p[1] for p in trail)+.06)*h)+1)
                 instances, _ = _instances(pixels[top:bottom])
+                check_budget()
                 polygons = foreground_polygons(instances, w, h, top)
                 if not polygons:
                     raise ValueError('REVIEWED_DIRECTION_FOREGROUND_UNAVAILABLE')
@@ -87,6 +94,7 @@ def build_reviewed_direction(video, event_id, source_sha256, review, deadline):
                                             'frame_id': fid, 'polygons': polygons}})
             previous, previous_ms = gray, ms
             ok, stamp, fallback = grab_frame_time_seconds(cap)
+        check_budget()
         if not rows or abs(rows[0]['media_ms']-start) > 2 or abs(rows[-1]['media_ms']-end) > 2:
             raise ValueError('REVIEWED_DIRECTION_INCOMPLETE')
         return {**review, 'method': 'REVIEWED_DIRECTION_BACKGROUND_AFFINE',
