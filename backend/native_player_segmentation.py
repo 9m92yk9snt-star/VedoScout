@@ -22,6 +22,14 @@ _LOCK = threading.Lock()
 _MODEL = None
 
 
+def _bounded_threshold_mask(probabilities, bounds):
+    """Threshold only retained pixels after the unchanged full-image resize."""
+    x0, y0, x1, y1 = bounds
+    bounded = np.zeros(probabilities.shape, dtype=np.uint8)
+    bounded[y0:y1, x0:x1] = probabilities[y0:y1, x0:x1] >= .5
+    return bounded
+
+
 class PersonSegmenter:
     def __init__(self):
         self.net = None
@@ -67,13 +75,14 @@ class PersonSegmenter:
             logits = row[84:] @ prototypes[0].reshape(32, -1)
             probabilities = 1 / (1 + np.exp(-np.clip(logits, -30, 30)))
             probabilities = cv2.resize(probabilities.reshape(prototypes.shape[2:]), (INPUT, INPUT))[:nh, :nw]
-            mask = (cv2.resize(probabilities, (width, height)) >= .5).astype(np.uint8)
+            # Preserve full-frame resize/interpolation exactly. Only threshold
+            # the box that survives into the returned mask; discard no evidence.
+            resized = cv2.resize(probabilities, (width, height))
             x0, y0 = max(0, int(box[0] / scale)), max(0, int(box[1] / scale))
             x1 = min(width, int(np.ceil((box[0] + box[2]) / scale)))
             y1 = min(height, int(np.ceil((box[1] + box[3]) / scale)))
-            bounded = np.zeros_like(mask)
-            bounded[y0:y1, x0:x1] = mask[y0:y1, x0:x1]
             if x1 > x0 and y1 > y0:
+                bounded = _bounded_threshold_mask(resized, (x0, y0, x1, y1))
                 result.append({"box": (x0, y0, x1 - x0, y1 - y0),
                                "mask": bounded, "score": scores[index], "class_id": int(labels[index])})
         return result
