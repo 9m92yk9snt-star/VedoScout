@@ -111,8 +111,23 @@ def prepare(video, selection, event, work, reference_images=None, *, window=None
                 any(saved.get(k) != tap[k] for k in ('reference_id', 'requested_ms', 'box', 'target_point', 'selection_hints'))
                 for tap, saved in zip(taps, reference_images))):
             raise ValueError('LOCALIZATION_REFERENCE_CACHE_CHANGED')
+        prepared_references = {}
+        if reference_images is None:
+            by_time = {}
+            for tap in taps:
+                by_time.setdefault(tap['requested_ms'], []).append(tap)
+            for requested_ms, decoded in iter_frames_at(cap, by_time):
+                for tap in by_time[requested_ms]:
+                    prepared_references[tap['reference_id']] = image(
+                        requested_ms, tap['reference_id'], 85, decoded=decoded)
+            # Preserve the prior random-access behavior for any request the
+            # streaming decoder could not satisfy (including its PTS policy).
+            for tap in taps:
+                if tap['reference_id'] not in prepared_references:
+                    prepared_references[tap['reference_id']] = image(
+                        tap['requested_ms'], tap['reference_id'], 85)
         for i, tap in enumerate(taps):
-            f = deepcopy(reference_images[i]) if reference_images is not None else image(tap['requested_ms'], tap['reference_id'], 85)
+            f = deepcopy(reference_images[i]) if reference_images is not None else prepared_references[tap['reference_id']]
             references.append({**f, **tap})
             items.extend([{'type': 'text', 'text': 'ORIGINAL HUMAN IDENTITY REFERENCE '+json.dumps({
                 'frame': f['frame_id'], 'reference_id': tap['reference_id'],

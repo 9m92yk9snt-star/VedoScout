@@ -49,9 +49,10 @@ def test_selective_retry_keeps_other_paid_event_receipts(monkeypatch):
     assert 'other' not in saved[-1]['events']
 
 
-def test_prepare_preserves_all_ten_original_reference_points(tmp_path, monkeypatch):
+@pytest.mark.parametrize('order', [list(range(10)), list(reversed(range(10))), [0,0,1,1,2,2,3,3,4,4]])
+def test_prepare_preserves_all_ten_original_reference_points(tmp_path, monkeypatch, order):
     anchors = [{'t': i, 'target_point': {'x': .4, 'y': .5},
-                'box': {'x': .3, 'y': .3, 'w': .2, 'h': .3}} for i in range(10)]
+                'box': {'x': .3, 'y': .3, 'w': .2, 'h': .3}} for i in order]
     selection = {'raw_marker_anchors': anchors}
     event = {'event_id': 'e', 'source_video_sha256': 'source', 'proof': {
         'proof_start_ms': 2000, 'proof_end_ms': 6000, 'frame_ms': 3000,
@@ -65,8 +66,8 @@ def test_prepare_preserves_all_ten_original_reference_points(tmp_path, monkeypat
     monkeypatch.setattr(loc, 'iter_frames_at', grouped)
     before = deepcopy(selection)
     record, job = loc.prepare('source', selection, event, tmp_path)
-    assert len(batches) == 1
-    assert [ms for batch in batches for ms in batch] == sorted({f['media_ms'] for f in record['frames']})
+    assert len(batches) == 2
+    assert list(batches[1]) == sorted({f['media_ms'] for f in record['frames']})
     assert len(record['references']) == 10 and selection == before
     assert [r['target_point'] for r in record['references']] == [a['target_point'] for a in anchors]
     assert record['window_ms'] == [2250, 4750]
