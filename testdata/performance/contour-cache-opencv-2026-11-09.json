@@ -1,0 +1,120 @@
+{
+  "source_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2",
+  "model_sha256": "20877569fcfc4744855b1d6d05b0cd7031987ae31894af5c7e1e74328d18e653",
+  "engine": "opencv",
+  "opencv_version": "4.14.0",
+  "window_ms": [
+    8750,
+    10000
+  ],
+  "one_cpu": true,
+  "runs": [
+    {
+      "mode": "plain",
+      "seconds": 103.44660158099941,
+      "detector_seconds": 98.3578141150092,
+      "inference_calls": 76,
+      "cache_hits": 0,
+      "cache_misses": 0,
+      "segments": 8,
+      "output_sha256": "a31beb3bcb8cc3e2eb7168256e601ca6b9a1d3057e176a210bf8dc1b7ebea129"
+    },
+    {
+      "mode": "cold",
+      "seconds": 100.3168289109999,
+      "detector_seconds": 95.25526391299627,
+      "inference_calls": 76,
+      "cache_hits": 0,
+      "cache_misses": 76,
+      "segments": 8,
+      "output_sha256": "a31beb3bcb8cc3e2eb7168256e601ca6b9a1d3057e176a210bf8dc1b7ebea129"
+    },
+    {
+      "mode": "warm",
+      "seconds": 5.47067169499951,
+      "detector_seconds": 0.651058581000143,
+      "inference_calls": 0,
+      "cache_hits": 76,
+      "cache_misses": 0,
+      "segments": 8,
+      "output_sha256": "a31beb3bcb8cc3e2eb7168256e601ca6b9a1d3057e176a210bf8dc1b7ebea129"
+    }
+  ],
+  "exact_complete_output_equal": true,
+  "scope": "One real medium-model contour window. Warm replay is an upper bound for exact overlap, not measured production cache hit rate. Includes cache read/write cost; excludes model loading. No provider calls, deployment or production cache activation.",
+  "diagnostics": {
+    "status": "SUPPORTED_SOURCE_OBSERVATIONS",
+    "method": "SOURCE_OBSERVATION_INSTANCE_CONTOUR",
+    "detector_frames": 76,
+    "source_pairs_expected": 9,
+    "source_pairs_reached": 9,
+    "source_pairs_unreached": 0,
+    "source_pairs_no_agreement": 0,
+    "source_pairs_source_conflict": 0,
+    "source_pairs_display_unavailable": 0,
+    "source_pairs_display_source_conflict": 1,
+    "source_pairs_missing_foreground": 0,
+    "source_segments_accepted": 8,
+    "last_decoded_ms": 10000,
+    "source_pair_results": [
+      {
+        "start_ms": 8750,
+        "end_ms": 8883,
+        "accepted_segments": 1,
+        "rejection_codes": []
+      },
+      {
+        "start_ms": 8750,
+        "end_ms": 9000,
+        "accepted_segments": 1,
+        "rejection_codes": []
+      },
+      {
+        "start_ms": 9000,
+        "end_ms": 9250,
+        "accepted_segments": 1,
+        "rejection_codes": []
+      },
+      {
+        "start_ms": 9250,
+        "end_ms": 9383,
+        "accepted_segments": 1,
+        "rejection_codes": []
+      },
+      {
+        "start_ms": 9250,
+        "end_ms": 9500,
+        "accepted_segments": 0,
+        "rejection_codes": [
+          "DISPLAY_SOURCE_CONFLICT"
+        ]
+      },
+      {
+        "start_ms": 9500,
+        "end_ms": 9633,
+        "accepted_segments": 1,
+        "rejection_codes": []
+      },
+      {
+        "start_ms": 9500,
+        "end_ms": 9750,
+        "accepted_segments": 1,
+        "rejection_codes": []
+      },
+      {
+        "start_ms": 9750,
+        "end_ms": 9883,
+        "accepted_segments": 1,
+        "rejection_codes": []
+      },
+      {
+        "start_ms": 9750,
+        "end_ms": 10000,
+        "accepted_segments": 1,
+        "rejection_codes": []
+      }
+    ],
+    "decoded_frames": 76,
+    "agreed_intervals": 8
+  }
+}

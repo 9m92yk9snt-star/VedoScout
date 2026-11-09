@@ -125,3 +125,44 @@ def test_pinned_onnx_runtime_exact_prediction_cache_parity(tmp_path, monkeypatch
     changed[0, 0, 0] ^= 1
     CachedSegmenter(model, tmp_path, 'verified-source').predict(changed)
     assert calls == [1, 1], 'Changed pixels must always run real inference'
+
+
+def test_medium_refinement_reuses_only_identical_source_model_pixels(tmp_path, monkeypatch):
+    import match_room_tracking as tracking
+    import match_room_position_contours as contours
+    import match_room
+    monkeypatch.setenv('SCOUTMEPLAY_MATCHROOM_ENGINE', 'opencv')
+    model = Model()
+    monkeypatch.setattr(contours, 'refinement_model', lambda: model)
+    monkeypatch.setattr(match_room, 'presentation_window', lambda event: (0, 250))
+    image = np.ones((4, 4, 3), np.uint8)
+    seen = []
+    def render(video, observations, lo, hi, **kwargs):
+        rows = kwargs['segmenter'].predict(image)
+        seen.append((rows[0]['score'], rows[0]['mask'].copy()))
+        rows[0]['mask'][:] = 0
+        return []
+    monkeypatch.setattr(contours, 'contour_segments', render)
+    event = {'event_id': 'e', 'source_video_sha256': 'source',
+             'localization_method': 'EXPLICIT_SOURCE_POSITIONS',
+             'visual_samples': [{'media_ms': 0}],
+             '_display_refinement_windows': [[0, 125], [125, 250]]}
+    tracking.compute_refinement('video', [], [event])
+    assert model.calls == 2  # Default remains uncached.
+    scoped = {**event, '_contour_prediction_cache': str(tmp_path)}
+    tracking.compute_refinement('video', [], [scoped])
+    assert model.calls == 3
+    tracking.compute_refinement('video', [], [scoped])
+    assert model.calls == 3  # New wrapper can read the previous worker's entry.
+    tracking.compute_refinement('video', [], [{**scoped, 'source_video_sha256': 'other'}])
+    assert model.calls == 4
+    model.sha256 = 'model-b'
+    tracking.compute_refinement('video', [], [scoped])
+    assert model.calls == 5
+    image[0, 0, 0] = 0
+    tracking.compute_refinement('video', [], [scoped])
+    assert model.calls == 6
+    assert all(score == .875 for score, _ in seen)
+    assert all(mask.sum() == 16 for _, mask in seen[:-2])
+    assert all(mask.sum() == 15 for _, mask in seen[-2:])
+    assert '_contour_prediction_cache' not in event
