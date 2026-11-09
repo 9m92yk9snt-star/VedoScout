@@ -17,7 +17,7 @@ import sequence_pilot_transport as transport
 from match_room_position_evidence import selection_digest, bound_samples
 from match_room import position_window
 from sequence_run_checkpoint import reusable_receipt
-from video_timebase import read_frame_at, read_frames_at
+from video_timebase import read_frame_at, iter_frames_at
 
 PROMPT = '''Locate the SAME physical player selected by the original human point in the reference image. Reference images identify a person, not an action. Use ALL original human reference images to establish the same requested player. Reference timestamps may span cuts. A reference point that misses a visible person is not positive identity evidence; do not move that point onto a neighbour. Use the timeline to test continuity and competing identities. These context images contain no extra selections. If a cut, disappearance or competing appearance prevents re-identification, keep identity uncertain; never assume the next highlighted player is the target. Output rows only for TIMELINE images. Examine the full timeline independently; never transfer identity to a nearby teammate, recipient or scorer. A jersey number alone, proximity to the ball or the expected role is insufficient when conflicting people are visible.
 Return JSON {"frames":[...]} with exactly one row for EVERY supplied timeline frame, in order. Each row: {"frame":"source frame ID","target_status":"CONFIRMED|UNCERTAIN|ABSENT","identity_evidence":"visible reason for this decision","feet_visible":true|false,"ground":[x,y] or null,"box":[x,y,w,h] or null,"active_ball_status":"CONFIRMED|UNCERTAIN|ABSENT","ball":[x,y] or null}.
@@ -121,14 +121,10 @@ def prepare(video, selection, event, work, reference_images=None, *, window=None
         times = sorted(set(range(start, end+1, 125)) | {end} |
                        {t for t in proof['cited_frames'].values() if start <= t <= end})
         seen = set()
-        decoded = {}
+        decoded = iter_frames_at(cap, times)
         for i, ms in enumerate(times):
-            # Bound retained pixels to eight frames while sharing forward decoding.
-            if i % 8 == 0:
-                decoded.clear()
-                decoded = read_frames_at(cap, times[i:i+8])
-            frame = decoded.pop(ms, None)
-            if frame is None:
+            actual_request, frame = next(decoded, (None, None))
+            if actual_request != ms or frame is None:
                 raise ValueError('LOCALIZATION_SOURCE_FRAME_UNAVAILABLE')
             f = image(ms, f'timeline-{i}', decoded=frame)
             del frame

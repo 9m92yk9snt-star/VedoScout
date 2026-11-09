@@ -96,7 +96,7 @@ def read_frame_at(cap, seconds: float, fps=None, max_forward: int = 240):
     return False, None, t
 
 
-def read_frames_at(cap, requested_ms, fps=None, max_forward=240):
+def iter_frames_at(cap, requested_ms, fps=None, max_forward=240):
     """Read ordered requests in nearby groups using actual post-grab PTS.
 
     Adjacent requests reuse forward decoding. Large gaps still seek, so a
@@ -106,7 +106,7 @@ def read_frames_at(cap, requested_ms, fps=None, max_forward=240):
     import math
     wanted = sorted({max(0, int(round(ms))) for ms in requested_ms
                      if isinstance(ms, (int, float)) and not isinstance(ms, bool) and math.isfinite(ms)})
-    result, ready, current_pixels = {}, False, None
+    ready, current_pixels = False, None
     t, fallback = 0., False
     for ms in wanted:
         target = ms / 1000.
@@ -125,7 +125,7 @@ def read_frames_at(cap, requested_ms, fps=None, max_forward=240):
                     if not ok:
                         current_pixels = None
                 if current_pixels is not None:
-                    result[ms] = (int(round(t*1000)), current_pixels)
+                    yield ms, (int(round(t*1000)), current_pixels)
                 break
             ready, t, fallback = grab_frame_time_seconds(cap, fps)
             current_pixels = None
@@ -133,7 +133,11 @@ def read_frames_at(cap, requested_ms, fps=None, max_forward=240):
                 break
         else:
             ready = False
-    return result
+
+
+def read_frames_at(cap, requested_ms, fps=None, max_forward=240):
+    """Materialize ordered frames; streaming callers can retain fewer pixels."""
+    return dict(iter_frames_at(cap, requested_ms, fps, max_forward))
 
 
 def nearest_slot_choice(slot, prev_local, cur_local) -> bool:

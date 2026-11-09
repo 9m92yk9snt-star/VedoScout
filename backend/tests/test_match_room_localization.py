@@ -61,11 +61,11 @@ def test_prepare_preserves_all_ten_original_reference_points(tmp_path, monkeypat
     batches = []
     def grouped(cap, times):
         batches.append(times)
-        return {ms: (ms, np.zeros((80, 60, 3), np.uint8)) for ms in times}
-    monkeypatch.setattr(loc, 'read_frames_at', grouped)
+        return ((ms, (ms, np.zeros((80, 60, 3), np.uint8))) for ms in times)
+    monkeypatch.setattr(loc, 'iter_frames_at', grouped)
     before = deepcopy(selection)
     record, job = loc.prepare('source', selection, event, tmp_path)
-    assert batches and max(map(len, batches)) <= 8
+    assert len(batches) == 1
     assert [ms for batch in batches for ms in batch] == sorted({f['media_ms'] for f in record['frames']})
     assert len(record['references']) == 10 and selection == before
     assert [r['target_point'] for r in record['references']] == [a['target_point'] for a in anchors]
@@ -154,7 +154,7 @@ def test_missing_grouped_source_frame_stops_before_request(tmp_path, monkeypatch
     released = []
     monkeypatch.setattr(loc.cv2, 'VideoCapture', lambda _: type('Cap', (), {'release': lambda self: released.append(True)})())
     monkeypatch.setattr(loc, 'read_frame_at', lambda cap, t: (True, np.zeros((80, 60, 3), np.uint8), t))
-    monkeypatch.setattr(loc, 'read_frames_at', lambda cap, times: {})
+    monkeypatch.setattr(loc, 'iter_frames_at', lambda cap, times: iter(()))
     monkeypatch.setattr(loc.transport, 'build_request', lambda *a, **k: pytest.fail('request with missing source frame'))
     with pytest.raises(ValueError, match='SOURCE_FRAME_UNAVAILABLE'):
         loc.prepare('source', selection, event, tmp_path)
