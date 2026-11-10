@@ -72,15 +72,19 @@ class PersonSegmenter:
         result = []
         for index in np.asarray(indices).reshape(-1)[:24]:
             row, box = rows[index], boxes[index]
+            x0, y0 = max(0, int(box[0] / scale)), max(0, int(box[1] / scale))
+            x1 = min(width, int(np.ceil((box[0] + box[2]) / scale)))
+            y1 = min(height, int(np.ceil((box[1] + box[3]) / scale)))
+            # The same clipped-area gate previously ran after mask decoding.
+            # Keep the selected top 24 unchanged; skip only discarded masks.
+            if x1 <= x0 or y1 <= y0:
+                continue
             logits = row[84:] @ prototypes[0].reshape(32, -1)
             probabilities = 1 / (1 + np.exp(-np.clip(logits, -30, 30)))
             probabilities = cv2.resize(probabilities.reshape(prototypes.shape[2:]), (INPUT, INPUT))[:nh, :nw]
             # Preserve full-frame resize/interpolation exactly. Only threshold
             # the box that survives into the returned mask; discard no evidence.
             resized = cv2.resize(probabilities, (width, height))
-            x0, y0 = max(0, int(box[0] / scale)), max(0, int(box[1] / scale))
-            x1 = min(width, int(np.ceil((box[0] + box[2]) / scale)))
-            y1 = min(height, int(np.ceil((box[1] + box[3]) / scale)))
             if x1 > x0 and y1 > y0:
                 bounded = _bounded_threshold_mask(resized, (x0, y0, x1, y1))
                 result.append({"box": (x0, y0, x1 - x0, y1 - y0),
