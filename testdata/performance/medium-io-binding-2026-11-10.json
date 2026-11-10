@@ -1,0 +1,54 @@
+{
+  "model_sha256": "20877569fcfc4744855b1d6d05b0cd7031987ae31894af5c7e1e74328d18e653",
+  "onnxruntime": "1.31.1",
+  "one_cpu": true,
+  "frames": 3,
+  "rounds": [
+    {
+      "round": 0,
+      "mode": "run",
+      "seconds": 3.094822599000281
+    },
+    {
+      "round": 0,
+      "mode": "binding",
+      "seconds": 3.0718869560000712
+    },
+    {
+      "round": 1,
+      "mode": "binding",
+      "seconds": 3.1214645219999966
+    },
+    {
+      "round": 1,
+      "mode": "run",
+      "seconds": 3.115550226000096
+    },
+    {
+      "round": 2,
+      "mode": "run",
+      "seconds": 3.043907029000138
+    },
+    {
+      "round": 2,
+      "mode": "binding",
+      "seconds": 3.029577991999986
+    },
+    {
+      "round": 3,
+      "mode": "binding",
+      "seconds": 3.008154529999956
+    },
+    {
+      "round": 3,
+      "mode": "run",
+      "seconds": 3.067320028999575
+    }
+  ],
+  "median_seconds": {
+    "run": 3.081071313999928,
+    "binding": 3.0507324740000286
+  },
+  "all_raw_outputs_exact": true,
+  "scope": "Offline same-session forward-only comparison. Fixed output-buffer reuse, three source-derived crops. No production activation or overall-analysis claim."
+}
