@@ -1,0 +1,83 @@
+{
+  "rows": [
+    {
+      "requested_seconds": 8.25,
+      "actual_seconds": 8.24967,
+      "old_mask_decodes": 3,
+      "new_mask_decodes": 3,
+      "exact_equal": true
+    },
+    {
+      "requested_seconds": 8.5,
+      "actual_seconds": 8.49966,
+      "old_mask_decodes": 4,
+      "new_mask_decodes": 4,
+      "exact_equal": true
+    },
+    {
+      "requested_seconds": 8.75,
+      "actual_seconds": 8.749649999999999,
+      "old_mask_decodes": 4,
+      "new_mask_decodes": 4,
+      "exact_equal": true
+    },
+    {
+      "requested_seconds": 9,
+      "actual_seconds": 8.99964,
+      "old_mask_decodes": 3,
+      "new_mask_decodes": 3,
+      "exact_equal": true
+    },
+    {
+      "requested_seconds": 9.25,
+      "actual_seconds": 9.24963,
+      "old_mask_decodes": 4,
+      "new_mask_decodes": 4,
+      "exact_equal": true
+    },
+    {
+      "requested_seconds": 9.5,
+      "actual_seconds": 9.49962,
+      "old_mask_decodes": 5,
+      "new_mask_decodes": 5,
+      "exact_equal": true
+    },
+    {
+      "requested_seconds": 9.75,
+      "actual_seconds": 9.749609999999999,
+      "old_mask_decodes": 7,
+      "new_mask_decodes": 7,
+      "exact_equal": true
+    },
+    {
+      "requested_seconds": 23.68,
+      "actual_seconds": 23.682385999999997,
+      "old_mask_decodes": 4,
+      "new_mask_decodes": 4,
+      "exact_equal": true
+    },
+    {
+      "requested_seconds": 30.83,
+      "actual_seconds": 30.832099999999997,
+      "old_mask_decodes": 7,
+      "new_mask_decodes": 7,
+      "exact_equal": true
+    },
+    {
+      "requested_seconds": 49.44,
+      "actual_seconds": 49.448021999999995,
+      "old_mask_decodes": 9,
+      "new_mask_decodes": 9,
+      "exact_equal": true
+    },
+    {
+      "requested_seconds": 56.44,
+      "actual_seconds": 56.447742,
+      "old_mask_decodes": 5,
+      "new_mask_decodes": 5,
+      "exact_equal": true
+    }
+  ],
+  "saved_mask_decodes": 0,
+  "scope": "Eleven full-width source frames, pinned medium ONNX. Same recorded neural outputs passed through both decoders. Not production crop workload or full-analysis timing."
+}
