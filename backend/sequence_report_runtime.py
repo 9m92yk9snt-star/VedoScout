@@ -216,11 +216,18 @@ async def write_facts(prompt, *, canonical=None, coordination=None, previous_rec
         if model == "gpt-6-astra":
             jobs[0]["reasoning_effort"] = "low"
         job = jobs[0]
-        request = transport.build_request("emergent", model, job["items"],
-            reasoning_effort=job.get("reasoning_effort"),
-            max_output_tokens=job["max_output_tokens"])[2]
-        cached = next((r for r in previous_receipts if reusable_receipt(
-            r, request, provider="emergent", model=model, packet_id=job["packet_id"])), None)
+        candidates = [r for r in previous_receipts
+                      if r.get("packet_id") == job["packet_id"]
+                      and r.get("status") == "COMPLETED"
+                      and r.get("provider") == "emergent"
+                      and r.get("requested_model") == model]
+        cached = None
+        if candidates:
+            request = transport.build_request("emergent", model, job["items"],
+                reasoning_effort=job.get("reasoning_effort"),
+                max_output_tokens=job["max_output_tokens"])[2]
+            cached = next((r for r in candidates if reusable_receipt(
+                r, request, provider="emergent", model=model, packet_id=job["packet_id"])), None)
         if cached is not None:
             receipt = deepcopy(cached)
         else:

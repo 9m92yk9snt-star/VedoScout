@@ -773,3 +773,63 @@ def test_writer_retry_reuses_only_exact_completed_section(monkeypatch, change):
     assert calls == (["report_section_2"] if change is None else ["report_section_1", "report_section_2"])
     assert len(result["receipts"]) == 2
     assert set(result["report"]) == set(sum(runtime.WRITER_SECTIONS, ()))
+
+
+@pytest.mark.parametrize("interruption", ["transport", "checkpoint"])
+def test_real_report_retry_keeps_validated_writer_work(tmp_path, monkeypatch, interruption):
+    import hashlib
+    doc = current_code_checkpoint()
+    video = tmp_path / "source.mp4"
+    digest = runtime.pilot.digest
+    monkeypatch.setattr(runtime.pilot, "digest", lambda p:
+        doc["sequence_audit"]["source_video_sha256"] if Path(p) == video else digest(p))
+    async def forbidden(*args, **kwargs):
+        pytest.fail("Repeated source analysis")
+    monkeypatch.setattr(runtime, "owned_process", forbidden)
+    actual, _ = actual_section_reports()
+    calls, snapshots = [], []
+    first_attempt = True
+    async def send(jobs, provider, model, **kwargs):
+        job = jobs[0]
+        calls.append(job["packet_id"])
+        if first_attempt and job["packet_id"] == "report_section_2":
+            raise asyncio.CancelledError()
+        raw = actual["writer_receipts"][int(job["packet_id"][-1])-1]["raw_response"]
+        request = runtime.transport.build_request(provider, model, job["items"],
+            reasoning_effort=job.get("reasoning_effort"), max_output_tokens=job["max_output_tokens"])[2]
+        return [{**request, "packet_id": job["packet_id"], "provider": provider,
+            "requested_model": model, "origin": "LIVE_MODEL_REQUEST", "status": "COMPLETED",
+            "raw_response": raw, "response_sha256": hashlib.sha256(raw.encode()).hexdigest()}]
+    async def checkpoint(values):
+        doc.update(deepcopy(values))
+        snapshots.append(deepcopy(values))
+        if (first_attempt and interruption == "checkpoint"
+                and len(values.get("sequence_audit", {}).get("writer_receipts", [])) == 1):
+            raise asyncio.CancelledError()
+    monkeypatch.setattr(runtime.transport, "run_jobs_async", send)
+    ns, _, _, _ = server_harness(video, doc, tmp_path)
+    with pytest.raises(asyncio.CancelledError):
+        asyncio.run(runtime.generate(video, doc, template=ns["FULL_REPORT_PROMPT"], checkpoint=checkpoint))
+    assert len(doc["sequence_audit"]["writer_receipts"]) == 1
+    first_attempt = False
+    calls.clear()
+    snapshots.clear()
+    result = asyncio.run(runtime.generate(video, doc, template=ns["FULL_REPORT_PROMPT"], checkpoint=checkpoint))
+    assert calls == ["report_section_2"]
+    assert all(s["sequence_audit"]["writer_receipts"] for s in snapshots if "sequence_audit" in s)
+    assert result["full_report"]["match_stats"]["observed_assists"] == 3
+    assert len(result["sequence_audit"]["writer_receipts"]) == 2
+
+
+def test_first_writer_attempt_does_not_build_duplicate_request(monkeypatch):
+    actual, _ = actual_section_reports()
+    calls = []
+    async def send(jobs, *args, **kwargs):
+        calls.append(jobs[0]["packet_id"])
+        return [deepcopy(actual["writer_receipts"][len(calls)-1])]
+    monkeypatch.setattr(runtime.transport, "run_jobs_async", send)
+    monkeypatch.setattr(runtime.transport, "build_request",
+        lambda *a, **k: pytest.fail("No cached candidate: transport owns request building"))
+    result = asyncio.run(runtime.write_facts("prompt"))
+    assert calls == ["report_section_1", "report_section_2"]
+    assert len(result["receipts"]) == 2
