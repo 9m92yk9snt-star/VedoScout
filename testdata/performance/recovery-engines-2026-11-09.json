@@ -1,0 +1,93 @@
+{
+  "source_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2",
+  "model_sha256": "20877569fcfc4744855b1d6d05b0cd7031987ae31894af5c7e1e74328d18e653",
+  "frames": [
+    {
+      "requested_seconds": 8.75,
+      "counts": {
+        "opencv": 4,
+        "onnxruntime": 4
+      },
+      "seconds": {
+        "opencv": 1.3691766470000175,
+        "onnxruntime": 1.0767627679999805
+      },
+      "same_count": true,
+      "mask_pixel_differences": 0,
+      "metadata_differences": 2,
+      "box_differences": 0,
+      "class_differences": 0,
+      "max_score_difference": 1.7881393432617188e-07
+    },
+    {
+      "requested_seconds": 23.68,
+      "counts": {
+        "opencv": 4,
+        "onnxruntime": 4
+      },
+      "seconds": {
+        "opencv": 1.335487880999949,
+        "onnxruntime": 1.053289482000082
+      },
+      "same_count": true,
+      "mask_pixel_differences": 0,
+      "metadata_differences": 4,
+      "box_differences": 0,
+      "class_differences": 0,
+      "max_score_difference": 1.430511474609375e-06
+    },
+    {
+      "requested_seconds": 30.83,
+      "counts": {
+        "opencv": 7,
+        "onnxruntime": 7
+      },
+      "seconds": {
+        "opencv": 1.359829676000004,
+        "onnxruntime": 1.1290594509999892
+      },
+      "same_count": true,
+      "mask_pixel_differences": 0,
+      "metadata_differences": 5,
+      "box_differences": 0,
+      "class_differences": 0,
+      "max_score_difference": 1.9073486328125e-06
+    },
+    {
+      "requested_seconds": 49.44,
+      "counts": {
+        "opencv": 9,
+        "onnxruntime": 9
+      },
+      "seconds": {
+        "opencv": 1.4121926340000073,
+        "onnxruntime": 1.025046853000049
+      },
+      "same_count": true,
+      "mask_pixel_differences": 0,
+      "metadata_differences": 8,
+      "box_differences": 0,
+      "class_differences": 0,
+      "max_score_difference": 8.940696716308594e-07
+    },
+    {
+      "requested_seconds": 56.44,
+      "counts": {
+        "opencv": 5,
+        "onnxruntime": 5
+      },
+      "seconds": {
+        "opencv": 1.420324402999995,
+        "onnxruntime": 1.0527139299999817
+      },
+      "same_count": true,
+      "mask_pixel_differences": 0,
+      "metadata_differences": 3,
+      "box_differences": 0,
+      "class_differences": 0,
+      "max_score_difference": 1.6689300537109375e-06
+    }
+  ],
+  "exact_parity": false,
+  "scope": "Five fixed real frames; timings include cold effects, no end-to-end speed claim or engine-switch approval."
+}

@@ -1,0 +1,58 @@
+{
+  "source_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2",
+  "model_sha256": "015043fb9cc94830ad7065dd3e28d6f8e5758fe03071451675120f6a6b6e44e9",
+  "frame_ms": [
+    49448,
+    49465,
+    49481,
+    49498,
+    49515,
+    49531,
+    49548,
+    49565,
+    49581,
+    49598,
+    49615,
+    49631,
+    49648
+  ],
+  "replays_per_round": 16,
+  "feature_extractions": {
+    "before": [
+      505,
+      505,
+      505,
+      505,
+      505
+    ],
+    "after": [
+      396,
+      396,
+      396,
+      396,
+      396
+    ]
+  },
+  "round_seconds": {
+    "before": [
+      8.713754955002514,
+      8.592503079999005,
+      8.55155165400356,
+      8.59500325100089,
+      8.579922401004296
+    ],
+    "after": [
+      7.053320908999012,
+      7.123141117001069,
+      6.985494565000408,
+      7.129611309996108,
+      7.028697639994789
+    ]
+  },
+  "median_seconds": {
+    "before": 8.592503079999005,
+    "after": 7.053320908999012
+  },
+  "differences": 0,
+  "scope": "Association only with fixed real detections and synthetic endpoint combinations; no identity or full-analysis speed claim."
+}

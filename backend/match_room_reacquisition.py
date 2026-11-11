@@ -9,6 +9,16 @@ MODEL_SHA256 = '20877569fcfc4744855b1d6d05b0cd7031987ae31894af5c7e1e74328d18e653
 MODEL_PATH = Path(__file__).resolve().parent / 'models' / 'yolov8m-seg.onnx'
 METHOD = 'TAP_REACQUIRED_INSTANCE_CONTOUR'
 
+def count_owned(mask, points):
+    """Count the same rounded point votes in one array operation, including repeats."""
+    if len(points) == 0:
+        return 0
+    xy = np.round(points).astype(int)
+    x, y = xy[:, 0], xy[:, 1]
+    inside = (x >= 0) & (x < mask.shape[1]) & (y >= 0) & (y < mask.shape[0])
+    return int(np.count_nonzero(mask[y[inside], x[inside]]))
+
+
 class IdentityAssociator:
     MAX_GAP_MS = 300
     APPEARANCE_LIMIT = .56
@@ -59,7 +69,7 @@ class IdentityAssociator:
                     votes = []
                     for k, row in enumerate(self.rows[b]):
                         dst = cv2.dilate(contours.measured_mask(row), np.ones((3, 3), np.uint8))
-                        votes.append((sum(contours.owns(dst, point) for point in q), k))
+                        votes.append((count_owned(dst, q), k))
                     result = {'n': len(p), 'valid': int(sum(valid)), 'votes': sorted(votes, reverse=True)}
         self.pair_cache[key] = result
         return result
@@ -191,7 +201,12 @@ class AdaptiveAssociator(IdentityAssociator):
         for row in self.rows[i]:
             h = cv2.calcHist([hsv], [0,1], contours.measured_mask(row), [24,16], [0,180,0,256])
             self.histograms[i].append(cv2.normalize(h,None,norm_type=cv2.NORM_L1))
-        self.pair_cache.clear()
+        # A pair depends only on its source/destination detections and fixed
+        # decoded frames. Updating another frame cannot change its flow/votes.
+        # Invalidate both directions involving this frame; retain all others.
+        for key in list(self.pair_cache):
+            if i in key[:2]:
+                del self.pair_cache[key]
         (self.upgraded if large else self.small_done).add(i)
 
     def candidate(self, a, b, j, history):
@@ -269,9 +284,6 @@ def segments_for_review(engine, review, observations):
 def reacquire(video, seeds, observations, small_segmenter, small_roi, deadline, diagnostic):
     from native_player_segmentation import PersonSegmenter
     from player_segmentation_assets import ensure_model_asset
-    ensure_model_asset(MODEL_PATH,MODEL_SHA256)
-    large = PersonSegmenter.__new__(PersonSegmenter)
-    large.net = cv2.dnn.readNetFromONNX(str(MODEL_PATH))
     start,end = [round(s['t']*1000) for s in seeds]
     frames = list(contours.read_clip(video,start-25,end+25))
     if len(frames)<3:
@@ -285,6 +297,13 @@ def reacquire(video, seeds, observations, small_segmenter, small_roi, deadline, 
             return []
         if cv2.absdiff(cv2.resize(a['gray'],(160,90)),cv2.resize(b['gray'],(160,90))).mean()>45:
             return []
+    # Validate the source before loading the expensive recovery model. These
+    # gates do not depend on predictions; failed clips cannot reach inference.
+    if deadline is not None and time.monotonic() >= deadline:
+        raise TimeoutError('Recovery deadline expired before model loading')
+    ensure_model_asset(MODEL_PATH,MODEL_SHA256)
+    large = PersonSegmenter.__new__(PersonSegmenter)
+    large.net = cv2.dnn.readNetFromONNX(str(MODEL_PATH))
     roi,cache,attempts = contours.select_seed_view([frames[i] for i in indices],seeds,large,deadline=deadline)
     diagnostic['reacquisition_views'] = attempts
     if roi is None:

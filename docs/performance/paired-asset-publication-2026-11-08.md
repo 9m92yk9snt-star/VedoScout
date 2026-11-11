@@ -1,0 +1,11 @@
+# Overlap independent image and clip publication
+
+For each completed report card, publication previously waited for its JPEG upload before starting its MP4 upload. These files do not depend on each other. `persist_assets` now starts just that pair together, then waits for both before checking URLs and proof authority. Later cards remain sequential. At most two publish callbacks are active per report, with only one MP4 transfer at a time.
+
+No analysis, encoding, frame selection, file contents, object keys, image/clip URL mapping or proof requirements change. The final database update remains after all cards pass. If either callback raises, both callbacks settle before the error propagates, and no later card starts. Empty URLs and failed proof checks remain fatal. Cancellation cancels the coroutine pair and prevents later publication; as before, cancellation cannot forcibly terminate an underlying synchronous SDK call already running via `asyncio.to_thread`.
+
+R2 client creation is protected by a lock so the two first uploads cannot race to initialize the shared client. The lock only covers initialization/access, not the uploads themselves; initialization errors release it and can be retried. AWS documents that clients can generally be shared across threads but their construction via the default session must not race: https://docs.aws.amazon.com/boto3/latest/guide/clients.html#multithreading-or-multiprocessing-with-clients . This repository does not mutate client metadata or register custom events in the storage helper.
+
+Offline tests use deterministic events to prove overlap (a serial implementation cannot complete), cap active calls at two, preserve URL ownership, wait for both siblings on either failure, reject empty URLs/bad proofs, and avoid final database writes on failure or cancellation. Concurrent client access creates exactly one client, and failed initialization remains retryable. No actual files were uploaded during validation.
+
+This removes a serial network dependency. No live latency improvement, percentage or upload-throughput gain has been measured; benefit depends on image/clip transfer times, network bandwidth and storage service behavior. The existing `publish_and_proof_seconds` measurement will capture the combined stage on a future run. No synchronization or deployment.

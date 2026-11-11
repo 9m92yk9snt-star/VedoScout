@@ -671,6 +671,14 @@ def test_retry_only_sends_unfinished_or_changed_exact_requests(tmp_path, monkeyp
         for row in rows: on_result(row)
         return rows
     monkeypatch.setattr(t, "run_jobs", send)
+    if change == "legacy_code":
+        # The historical migration cannot bypass newer analysis dependencies.
+        with pytest.raises(ValueError, match="INITIAL_RECEIPT_INPUT_MISMATCH"):
+            run(path, tmp_path / "result", provider="emergent", model="gpt-6-astra",
+                fresh_originals=True, contact_reviews=True, automatic_outcomes=True,
+                reasoning_effort="medium", image_detail="high", retry_receipts=retry_path)
+        assert sent == []
+        return
     result = run(path, tmp_path / "result", provider="emergent", model="gpt-6-astra", fresh_originals=True,
                  contact_reviews=True, automatic_outcomes=True, reasoning_effort="medium", image_detail="high",
                  retry_receipts=retry_path)
@@ -1427,3 +1435,262 @@ def test_proxy_nested_error_and_safe_limit_headers():
 def test_default_cooldown_is_conservative_and_bounded():
     assert t.RATE_LIMIT_DEFAULT_WAIT_SECONDS == 30
     assert t.MAX_RATE_LIMIT_WAIT_SECONDS == 120
+
+
+@pytest.mark.parametrize('case', json.loads((Path(__file__).resolve().parents[2] /
+    'testdata/performance/request-wire-parity.json').read_text()))
+def test_request_matches_preoptimization_wire_bytes_and_audit(tmp_path, case):
+    media = tmp_path / 'media'
+    media.write_bytes(b'exact serialization fixture\x00\xff')
+    item = {'type': case['media'], 'path': str(media),
+            'sha256': hashlib.sha256(media.read_bytes()).hexdigest()}
+    if case['media'] == 'video':
+        item['fps'] = 12
+    items = [{'type': 'text', 'text': 'First æøå'}, item, {'type': 'text', 'text': 'Last'}]
+    url, payload, audit = t.build_request(case['provider'], case['model'], items, **case['kwargs'])
+    assert url == case['url']
+    assert payload == case['payload'].encode()
+    assert audit == case['audit']
+    media.write_bytes(b'changed')
+    with pytest.raises(ValueError, match='PREPARED_IMAGE_CHANGED'):
+        t.build_request(case['provider'], case['model'], items, **case['kwargs'])
+
+
+def synthetic_coordinated_worker(pipe, job, provider, model, timeout):
+    import os
+    start = time.monotonic()
+    if job.get('started_path'):
+        Path(job['started_path']).write_text(str(os.getpid()))
+    time.sleep(job.get('delay', .08))
+    pipe.send({'packet_id': job['packet_id'], 'status': 'COMPLETED',
+               'started': start, 'ended': time.monotonic()})
+    pipe.close()
+
+
+def test_two_job_pools_share_one_call_cap():
+    import asyncio
+    async def scenario():
+        control = t.RunCoordination(2)
+        results = await asyncio.gather(*[
+            t.run_jobs_async([{'packet_id': f'{pool}-{i}'} for i in range(3)],
+                'emergent', 'gpt-6-astra', deadline=time.monotonic()+10, per_call_s=3,
+                coordination=control, worker=synthetic_coordinated_worker)
+            for pool in range(2)])
+        assert control._active == 0
+        return results
+    results = asyncio.run(scenario())
+    assert [[r['packet_id'] for r in batch] for batch in results] == [
+        ['0-0', '0-1', '0-2'], ['1-0', '1-1', '1-2']]
+    events = sorted([(r['started'], 1) for batch in results for r in batch] +
+                    [(r['ended'], -1) for batch in results for r in batch])
+    active = peak = 0
+    for _, delta in events:
+        active += delta
+        peak = max(peak, active)
+    assert 1 <= peak <= 2
+    assert active == 0
+
+
+def test_shared_pause_and_stop_apply_to_every_pool(monkeypatch):
+    clock = [10.]
+    monkeypatch.setattr(t, 'time', type('Clock', (), {'monotonic': staticmethod(lambda: clock[0])}))
+    control = t.RunCoordination(2)
+    assert control.acquire(10.)
+    control.pause(3)
+    assert not control.acquire(12.)
+    control.release()
+    clock[0] = 11.
+    control.pause(1)  # A shorter pause cannot shorten the existing wait.
+    assert not control.acquire(12.5)
+    assert control.acquire(13.)
+    control.release()
+    control.stopped.set()
+    assert not control.acquire(100.)
+
+
+def test_async_cancellation_joins_actual_model_child(tmp_path):
+    import asyncio
+    import os
+    started = tmp_path / 'started'
+    async def scenario():
+        control = t.RunCoordination()
+        task = asyncio.create_task(t.run_jobs_async([
+            {'packet_id': 'running', 'started_path': str(started), 'delay': 20},
+            {'packet_id': 'must-not-start'}], 'emergent', 'gpt-6-astra',
+            deadline=time.monotonic()+30, per_call_s=25, workers=1,
+            coordination=control, worker=synthetic_coordinated_worker))
+        until = time.monotonic()+5
+        while not started.exists() and time.monotonic() < until:
+            await asyncio.sleep(.01)
+        assert started.exists()
+        pid = int(started.read_text())
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await asyncio.wait_for(task, 5)
+        assert control.stopped.is_set()
+        assert control._active == 0
+        with pytest.raises(ProcessLookupError):
+            os.kill(pid, 0)
+    asyncio.run(scenario())
+
+
+def test_rate_limit_response_pauses_shared_coordination(tmp_path):
+    control = t.RunCoordination()
+    result = t.run_jobs([{'packet_id': 'quota', 'marker': str(tmp_path/'quota'),
+                          'delay': 2, 'limit_kind': 'QUOTA_EXHAUSTED'}],
+        'emergent', 'gpt-6-astra', deadline=time.monotonic()+5, per_call_s=3,
+        coordination=control, worker=rate_limit_worker)
+    assert result[0]['http_status'] == 429
+    assert control._active == 0
+    assert not control.acquire(time.monotonic())
+    assert not control.stopped.is_set()  # retain already-running paid siblings
+
+
+def test_failed_process_setup_releases_shared_slot(monkeypatch):
+    control = t.RunCoordination(1)
+    class BrokenContext:
+        def Pipe(self, **kwargs):
+            raise OSError('synthetic pipe failure')
+    monkeypatch.setattr(t.multiprocessing, 'get_context', lambda *args: BrokenContext())
+    with pytest.raises(OSError, match='synthetic pipe failure'):
+        t.run_jobs([{'packet_id':'x'}], 'emergent', 'gpt-6-astra',
+                   deadline=time.monotonic()+2, coordination=control)
+    assert control._active == 0
+    assert control.acquire(time.monotonic())
+    control.release()
+
+
+def test_writer_lane_cannot_be_taken_by_position_queue():
+    control = t.RunCoordination(2)
+    writer, positions = t.RunLane(control), t.RunLane(control)
+    now = time.monotonic()
+    assert positions.acquire(now)
+    assert not positions.acquire(now)
+    assert writer.acquire(now)
+    assert not writer.acquire(now)
+    writer.release()
+    assert not positions.acquire(now)  # keep the next writer section's slot
+    assert writer.acquire(now)
+    writer.release()
+    positions.set_limit(2)  # only after both writer sections finish
+    assert positions.acquire(now)
+    assert control._active == positions._active == 2
+    assert not positions.acquire(now)
+    positions.release()
+    positions.release()
+    assert control._active == 0
+
+
+def test_lane_backoff_and_cancellation_are_shared():
+    control = t.RunCoordination(2)
+    writer, positions = t.RunLane(control), t.RunLane(control)
+    writer.pause(10)
+    assert not positions.acquire(time.monotonic())
+    assert not writer.acquire(time.monotonic())
+    positions.stopped.set()
+    assert control.stopped.is_set() and writer.stopped.is_set()
+    assert not writer.acquire(time.monotonic()+100)
+    assert not positions.acquire(time.monotonic()+100)
+    for limit in (0, 3, True, 1.5):
+        with pytest.raises(ValueError, match='INVALID_STAGE_CALL_LIMIT'):
+            positions.set_limit(limit)
+
+
+def test_live_position_pool_expands_after_writer_finishes():
+    import asyncio
+    async def scenario():
+        control = t.RunCoordination(2)
+        writer, positions = t.RunLane(control), t.RunLane(control)
+        events = []
+        async def write():
+            result = await t.run_jobs_async([{'packet_id':'writer','delay':.05}],
+                'emergent','gpt-6-astra',deadline=time.monotonic()+10,per_call_s=3,
+                coordination=writer,worker=synthetic_coordinated_worker)
+            events.append(('writer_done',time.monotonic()))
+            positions.set_limit(2)
+            return result
+        async def locate():
+            return await t.run_jobs_async([{'packet_id':f'position-{i}','delay':.3} for i in range(4)],
+                'emergent','gpt-6-astra',deadline=time.monotonic()+10,per_call_s=3,workers=2,
+                coordination=positions,worker=synthetic_coordinated_worker)
+        written, located = await asyncio.gather(write(),locate())
+        assert control._active == writer._active == positions._active == 0
+        return written, located, events[0][1]
+    written, located, writer_done = asyncio.run(scenario())
+    assert len(written) == 1 and len(located) == 4
+    assert all(r['status'] == 'COMPLETED' for r in written+located)
+    # No position concurrency before writer releases its reservation; at least
+    # one pair overlaps afterwards, proving the already-running pool expands.
+    overlaps = []
+    for i,a in enumerate(located):
+        for b in located[i+1:]:
+            start, stop = max(a['started'],b['started']), min(a['ended'],b['ended'])
+            if start < stop:
+                overlaps.append(start)
+    assert overlaps and min(overlaps) >= writer_done
+
+
+def coordinated_terminal_worker(pipe, job, provider, model, timeout):
+    from pathlib import Path
+    started, release = Path(job['started']), Path(job['release'])
+    until = time.monotonic() + timeout
+    if job['packet_id'] == 'sibling':
+        started.write_text('started')
+        while not release.exists() and time.monotonic() < until:
+            time.sleep(.01)
+        pipe.send({'packet_id': 'sibling', 'status': 'COMPLETED'})
+    elif job['packet_id'] == 'failure':
+        while not started.exists() and time.monotonic() < until:
+            time.sleep(.01)
+        pipe.send({'packet_id': 'failure', 'status': 'ERROR', **job['failure']})
+    else:
+        Path(job['unexpected']).write_text('unexpected launch')
+        pipe.send({'packet_id': job['packet_id'], 'status': 'COMPLETED'})
+    pipe.close()
+
+
+@pytest.mark.parametrize('failure,cancel_active', [
+    ({'error': 'MODEL_QUOTA_OR_RATE_LIMIT', 'http_status': 429,
+      'limit_kind': 'QUOTA_EXHAUSTED', 'retry_after_seconds': 1}, False),
+    ({'error': 'MODEL_ACCESS_DENIED', 'http_status': 403}, True),
+    ({'error': 'MODEL_KEY_NOT_CONFIGURED'}, True),
+])
+def test_terminal_failure_stops_both_pools_before_checkpoint(tmp_path, failure, cancel_active):
+    import asyncio
+    shared = t.RunCoordination()
+    first, second = t.RunLane(shared), t.RunLane(shared)
+    release = tmp_path / 'release'
+    unexpected = tmp_path / 'unexpected'
+    common = {'started': str(tmp_path/'started'), 'release': str(release),
+              'unexpected': str(unexpected)}
+    saved = []
+    def checkpoint(receipt):
+        saved.append(receipt)
+        if receipt['packet_id'] == 'failure':
+            # This assertion runs before persistence returns to the supervisor.
+            assert shared.blocked.is_set()
+            assert shared.stopped.is_set() == cancel_active
+            assert not second.acquire(time.monotonic()+1000)
+            if not cancel_active:
+                release.write_text('finish paid sibling')
+    async def pool(lane, jobs):
+        return await t.run_jobs_async(jobs, 'emergent', 'gpt-6-astra',
+            deadline=time.monotonic()+10, per_call_s=5, workers=1,
+            coordination=lane, worker=coordinated_terminal_worker, on_result=checkpoint)
+    async def scenario():
+        return await asyncio.gather(
+            pool(first, [{**common, 'packet_id': 'failure', 'failure': failure},
+                         {**common, 'packet_id': 'queued-first'}]),
+            pool(second, [{**common, 'packet_id': 'sibling'},
+                          {**common, 'packet_id': 'queued-second'}]))
+    results = asyncio.run(scenario())
+    by_id = {r['packet_id']: r for group in results for r in group}
+    assert by_id['sibling']['status'] == ('ERROR' if cancel_active else 'COMPLETED')
+    if cancel_active:
+        assert by_id['sibling']['error'] == 'MODEL_ACCESS_STOPPED'
+    for name in ('queued-first', 'queued-second'):
+        assert by_id[name]['status'] == 'NOT_SENT'
+        assert by_id[name]['error'] == 'MODEL_ACCESS_STOPPED'
+    assert not unexpected.exists()
+    assert shared._active == first._active == second._active == 0
+    assert len(saved) == 4

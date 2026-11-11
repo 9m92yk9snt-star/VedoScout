@@ -1,0 +1,99 @@
+{
+  "baseline_commit": "ecbb8fbd8dcf51e1899eecb9306ef625d8e34654",
+  "baseline_module_sha256": "b712a01f9c6733a1b1f47238a90d89b350083c8a575a16f05eebe464014535b4",
+  "source_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2",
+  "opencv": "4.14.0",
+  "event_id": "e6cfdd0f01aedac57b43",
+  "reference_times_ms": [
+    3070,
+    41420,
+    70600,
+    15350,
+    21480,
+    27630,
+    33770,
+    51180,
+    55760,
+    63910
+  ],
+  "rounds": [
+    {
+      "round": 0,
+      "order": [
+        "before",
+        "after"
+      ],
+      "seconds": {
+        "before": 2.49298620799982,
+        "after": 2.471176182000363
+      },
+      "equal": true
+    },
+    {
+      "round": 1,
+      "order": [
+        "after",
+        "before"
+      ],
+      "seconds": {
+        "after": 2.5138071609999315,
+        "before": 2.6120700349997605
+      },
+      "equal": true
+    },
+    {
+      "round": 2,
+      "order": [
+        "before",
+        "after"
+      ],
+      "seconds": {
+        "before": 2.5938854609999,
+        "after": 2.479895922000196
+      },
+      "equal": true
+    },
+    {
+      "round": 3,
+      "order": [
+        "after",
+        "before"
+      ],
+      "seconds": {
+        "after": 2.4683689319999758,
+        "before": 2.519338585999776
+      },
+      "equal": true
+    },
+    {
+      "round": 4,
+      "order": [
+        "before",
+        "after"
+      ],
+      "seconds": {
+        "before": 2.5204968590001045,
+        "after": 2.479206281000188
+      },
+      "equal": true
+    },
+    {
+      "round": 5,
+      "order": [
+        "after",
+        "before"
+      ],
+      "seconds": {
+        "after": 2.4572322100002566,
+        "before": 2.415545216999817
+      },
+      "equal": true
+    }
+  ],
+  "median_seconds": {
+    "before": 2.5204968590001045,
+    "after": 2.479206281000188
+  },
+  "relative_change_percent": -1.63819200378994,
+  "scope": "First request preparation with uncached references; timeline streaming enabled in both versions. Alternating order, one warm-up pair excluded, five measured pairs. No provider calls or total-analysis timing."
+}

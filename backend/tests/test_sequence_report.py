@@ -560,3 +560,276 @@ def test_existing_frontend_shows_verified_counts_and_joins_only_matching_proofs(
     assert stats["Verified Goals"] == 1 and stats["Verified Assists"] == 3 and stats["Shots"] == 2
     assert view["clip"] == full["video_comments"][0]["event_id"] and view["wrong"] is None
     assert view["highlight"]["thumbVerified"] is True
+
+
+@pytest.mark.parametrize("publish_fails", [False, True])
+def test_asset_stage_timings_preserve_publication_and_failure_gate(tmp_path, monkeypatch, publish_fails):
+    clock = [100.0]
+    monkeypatch.setattr(runtime, "time", SimpleNamespace(monotonic=lambda: clock[0]))
+    doc = {"id": "timing-test", "full_report": {"video_comments": [{"event_id": "event"}]},
+           "sequence_timings": {"before_assets_seconds": 20, "source_analysis_seconds": 12}}
+    original = deepcopy(doc)
+    writes, calls = [], []
+    class Collection:
+        async def update_one(self, query, update):
+            writes.append(update["$set"])
+    async def localizer(video, document, *, checkpoint):
+        calls.append("localize")
+        clock[0] += 2
+        return {"events": []}
+    def render(video, full, bundle, directory, anchors, *, stage_timings):
+        calls.append("render")
+        clock[0] += 5
+        stage_timings.update(tracking_seconds=4, render_seconds=5)
+        return [(full["video_comments"][0], tmp_path / "frame.jpg", tmp_path / "clip.mp4")]
+    async def publish(path, mime):
+        calls.append(mime)
+        clock[0] += 3
+        return None if publish_fails else "https://assets.test/" + path.name
+    monkeypatch.setattr(runtime, "render_assets", render)
+    monkeypatch.setattr(runtime, "compute_proof_frame_verified", lambda row: bool(row["frame_url"] and row["tele_clip_url"]))
+    operation = runtime.persist_assets(Collection(), doc, "source.mp4", tmp_path, publish, localizer=localizer)
+    if publish_fails:
+        with pytest.raises(RuntimeError, match="SEQUENCE_ASSET_PUBLISH_FAILED"):
+            asyncio.run(operation)
+        assert writes == []
+    else:
+        assert asyncio.run(operation)["checked"] == 1
+        timings = writes[-1]["sequence_timings"]
+        assert timings["asset_stages_seconds"] == {
+            "localization_seconds": 2, "tracking_seconds": 4,
+            "render_seconds": 5, "publish_and_proof_seconds": 6}
+        assert timings["assets_seconds"] == 13
+        assert timings["total_processing_seconds"] == 33  # child spans are not double counted
+        assert timings["source_analysis_seconds"] == 12
+        assert writes[-1]["full_report_status"] == "finalizing"
+        assert writes[-1]["full_report"]["video_comments"][0]["proof_frame_verified"] is True
+    assert calls == ["localize", "render", "image/jpeg", "video/mp4"]
+    assert doc == original
+
+
+@pytest.mark.parametrize('failure', [None, 'image', 'clip', 'empty', 'proof'])
+def test_asset_upload_pair_overlaps_but_settles_before_finalizing(tmp_path, monkeypatch, failure):
+    doc = {'id': 'pair', 'full_report': {'video_comments': [{'event_id': 'a'}, {'event_id': 'b'}]}}
+    original = deepcopy(doc)
+    saved, starts, finished = [], [], []
+    active = [0, 0]
+    class Collection:
+        async def update_one(self, query, values):
+            assert active[0] == 0
+            saved.append(values['$set'])
+    async def localizer(*args, **kwargs):
+        return {}
+    def render(video, full, *args, **kwargs):
+        return [(r, tmp_path / (r['event_id']+'.jpg'), tmp_path / (r['event_id']+'.mp4'))
+                for r in full['video_comments']]
+    async def scenario():
+        events = {key: asyncio.Event() for key in ('a', 'b')}
+        async def publish(path, mime):
+            active[0] += 1
+            active[1] = max(active[1], active[0])
+            starts.append(path.name)
+            if path.suffix == '.mp4':
+                events[path.stem].set()
+            try:
+                # The image cannot finish until its sibling starts: serial code deadlocks.
+                await asyncio.wait_for(events[path.stem].wait(), timeout=1)
+                await asyncio.sleep(0)
+                if path.stem == 'a' and ((failure == 'image' and path.suffix == '.jpg') or
+                                        (failure == 'clip' and path.suffix == '.mp4')):
+                    raise OSError('synthetic upload failure')
+                return '' if failure == 'empty' else 'https://assets.test/'+path.name
+            finally:
+                active[0] -= 1
+                finished.append(path.name)
+        await runtime.persist_assets(Collection(), doc, 'source', tmp_path, publish, localizer=localizer)
+    monkeypatch.setattr(runtime, 'render_assets', render)
+    monkeypatch.setattr(runtime, 'compute_proof_frame_verified', lambda row: failure != 'proof')
+    if failure:
+        with pytest.raises((OSError, RuntimeError, ValueError)):
+            asyncio.run(scenario())
+        assert starts == ['a.jpg', 'a.mp4']
+        assert saved == []
+    else:
+        asyncio.run(scenario())
+        assert starts == ['a.jpg', 'a.mp4', 'b.jpg', 'b.mp4']
+        assert saved[-1]['full_report_status'] == 'finalizing'
+        assert all(r['frame_url'].endswith(r['event_id']+'.jpg') and
+                   r['tele_clip_url'].endswith(r['event_id']+'.mp4')
+                   for r in saved[-1]['full_report']['video_comments'])
+    assert sorted(finished) == sorted(starts)
+    assert active == [0, 2]
+    assert doc == original
+
+
+def test_storage_client_creation_is_serialized_and_retryable():
+    import threading
+    from concurrent.futures import ThreadPoolExecutor
+    tree = ast.parse((ROOT / 'backend/r2_storage.py').read_text())
+    fn = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == '_get_client')
+    lock, sentinel, calls = threading.Lock(), object(), []
+    def factory(*args, **kwargs):
+        assert lock.locked()
+        calls.append(1)
+        return sentinel
+    namespace = {'_client': None, '_client_lock': lock,
+                 '_cfg': lambda: dict(endpoint='unused', access_key='unused', secret_key='unused'),
+                 'boto3': SimpleNamespace(client=factory), 'Config': lambda **kw: kw}
+    exec(compile(ast.Module(body=[fn], type_ignores=[]), '<storage-client>', 'exec'), namespace)
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        results = list(pool.map(lambda _: namespace['_get_client'](), range(16)))
+    assert all(value is sentinel for value in results)
+    assert len(calls) == 1
+    namespace['_client'] = None
+    namespace['boto3'] = SimpleNamespace(client=lambda *a, **kw: (_ for _ in ()).throw(OSError('failed')))
+    with pytest.raises(OSError):
+        namespace['_get_client']()
+    assert not lock.locked()
+    namespace['boto3'] = SimpleNamespace(client=factory)
+    assert namespace['_get_client']() is sentinel
+
+
+def test_cancelled_publication_starts_no_later_assets(tmp_path, monkeypatch):
+    started, finished, writes = [], [], []
+    doc = {'id': 'cancel', 'full_report': {'video_comments': [{'event_id': 'a'}, {'event_id': 'b'}]}}
+    class Collection:
+        async def update_one(self, *args):
+            writes.append(args)
+    async def localizer(*args, **kwargs):
+        return {}
+    def render(video, full, *args, **kwargs):
+        return [(r, tmp_path/(r['event_id']+'.jpg'), tmp_path/(r['event_id']+'.mp4'))
+                for r in full['video_comments']]
+    async def scenario():
+        both = asyncio.Event()
+        never = asyncio.Event()
+        async def publish(path, mime):
+            started.append(path.name)
+            if len(started) == 2:
+                both.set()
+            try:
+                await never.wait()
+            finally:
+                finished.append(path.name)
+        task = asyncio.create_task(runtime.persist_assets(Collection(), doc, 'video', tmp_path,
+                                                          publish, localizer=localizer))
+        await asyncio.wait_for(both.wait(), 1)
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+    monkeypatch.setattr(runtime, 'render_assets', render)
+    asyncio.run(scenario())
+    assert started == ['a.jpg', 'a.mp4']
+    assert sorted(finished) == sorted(started)
+    assert writes == []
+
+
+def test_scoring_cards_stay_selected_despite_non_scoring_writer_mentions(retained):
+    canonical = bundle(retained)
+    scoring = {e['event_id'] for e in canonical['events']
+               if e['canonical_event_type'] in {'GOAL', 'ASSIST', 'SHOT'}}
+    assert 0 < len(scoring) <= 8
+    others = [e['event_id'] for e in canonical['events'] if e['event_id'] not in scoring]
+    for mentions in ([], [{'event_id': eid} for eid in others for _ in range(20)]):
+        full = adapter.build_report({'summary': 'Offline dependency audit', 'technical': {
+            'passing': {'evidence': mentions}}}, canonical)
+        assert scoring <= {c['event_id'] for c in full['video_comments']}
+        assert len(full['video_comments']) <= 8
+
+
+@pytest.mark.parametrize("change", [None, "prompt", "model", "response", "payload"])
+def test_writer_retry_reuses_only_exact_completed_section(monkeypatch, change):
+    import hashlib
+    monkeypatch.setenv("SEQUENCE_REPORT_WRITER_MODEL", "gemini-2.5-pro")
+    calls, saved = [], []
+    async def checkpoint(rows):
+        saved.append(deepcopy(rows))
+    async def send(jobs, provider, model, **kwargs):
+        job = jobs[0]
+        calls.append(job["packet_id"])
+        if job["packet_id"] == "report_section_2" and len(saved) == 1:
+            raise RuntimeError("interrupted")
+        section = int(job["packet_id"][-1])-1
+        raw = json.dumps({k: {} for k in runtime.WRITER_SECTIONS[section]})
+        audit = runtime.transport.build_request(provider, model, job["items"],
+            reasoning_effort=job.get("reasoning_effort"), max_output_tokens=job["max_output_tokens"])[2]
+        return [{**audit, "packet_id": job["packet_id"], "provider": provider,
+            "requested_model": model, "origin": "LIVE_MODEL_REQUEST", "status": "COMPLETED",
+            "raw_response": raw, "response_sha256": hashlib.sha256(raw.encode()).hexdigest()}]
+    monkeypatch.setattr(runtime.transport, "run_jobs_async", send)
+    with pytest.raises(RuntimeError, match="interrupted"):
+        asyncio.run(runtime.write_facts("prompt", checkpoint=checkpoint))
+    previous = deepcopy(saved[0])
+    saved.append([])  # let the second section finish on retry
+    calls.clear()
+    prompt = "changed" if change == "prompt" else "prompt"
+    if change == "model":
+        monkeypatch.setenv("SEQUENCE_REPORT_WRITER_MODEL", "gpt-6-astra")
+    if change == "response":
+        previous[0]["raw_response"] += "corrupt"
+    if change == "payload":
+        previous[0]["payload_sha256"] = "changed"
+    result = asyncio.run(runtime.write_facts(prompt, previous_receipts=previous, checkpoint=checkpoint))
+    assert calls == (["report_section_2"] if change is None else ["report_section_1", "report_section_2"])
+    assert len(result["receipts"]) == 2
+    assert set(result["report"]) == set(sum(runtime.WRITER_SECTIONS, ()))
+
+
+@pytest.mark.parametrize("interruption", ["transport", "checkpoint"])
+def test_real_report_retry_keeps_validated_writer_work(tmp_path, monkeypatch, interruption):
+    import hashlib
+    doc = current_code_checkpoint()
+    video = tmp_path / "source.mp4"
+    digest = runtime.pilot.digest
+    monkeypatch.setattr(runtime.pilot, "digest", lambda p:
+        doc["sequence_audit"]["source_video_sha256"] if Path(p) == video else digest(p))
+    async def forbidden(*args, **kwargs):
+        pytest.fail("Repeated source analysis")
+    monkeypatch.setattr(runtime, "owned_process", forbidden)
+    actual, _ = actual_section_reports()
+    calls, snapshots = [], []
+    first_attempt = True
+    async def send(jobs, provider, model, **kwargs):
+        job = jobs[0]
+        calls.append(job["packet_id"])
+        if first_attempt and job["packet_id"] == "report_section_2":
+            raise asyncio.CancelledError()
+        raw = actual["writer_receipts"][int(job["packet_id"][-1])-1]["raw_response"]
+        request = runtime.transport.build_request(provider, model, job["items"],
+            reasoning_effort=job.get("reasoning_effort"), max_output_tokens=job["max_output_tokens"])[2]
+        return [{**request, "packet_id": job["packet_id"], "provider": provider,
+            "requested_model": model, "origin": "LIVE_MODEL_REQUEST", "status": "COMPLETED",
+            "raw_response": raw, "response_sha256": hashlib.sha256(raw.encode()).hexdigest()}]
+    async def checkpoint(values):
+        doc.update(deepcopy(values))
+        snapshots.append(deepcopy(values))
+        if (first_attempt and interruption == "checkpoint"
+                and len(values.get("sequence_audit", {}).get("writer_receipts", [])) == 1):
+            raise asyncio.CancelledError()
+    monkeypatch.setattr(runtime.transport, "run_jobs_async", send)
+    ns, _, _, _ = server_harness(video, doc, tmp_path)
+    with pytest.raises(asyncio.CancelledError):
+        asyncio.run(runtime.generate(video, doc, template=ns["FULL_REPORT_PROMPT"], checkpoint=checkpoint))
+    assert len(doc["sequence_audit"]["writer_receipts"]) == 1
+    first_attempt = False
+    calls.clear()
+    snapshots.clear()
+    result = asyncio.run(runtime.generate(video, doc, template=ns["FULL_REPORT_PROMPT"], checkpoint=checkpoint))
+    assert calls == ["report_section_2"]
+    assert all(s["sequence_audit"]["writer_receipts"] for s in snapshots if "sequence_audit" in s)
+    assert result["full_report"]["match_stats"]["observed_assists"] == 3
+    assert len(result["sequence_audit"]["writer_receipts"]) == 2
+
+
+def test_first_writer_attempt_does_not_build_duplicate_request(monkeypatch):
+    actual, _ = actual_section_reports()
+    calls = []
+    async def send(jobs, *args, **kwargs):
+        calls.append(jobs[0]["packet_id"])
+        return [deepcopy(actual["writer_receipts"][len(calls)-1])]
+    monkeypatch.setattr(runtime.transport, "run_jobs_async", send)
+    monkeypatch.setattr(runtime.transport, "build_request",
+        lambda *a, **k: pytest.fail("No cached candidate: transport owns request building"))
+    result = asyncio.run(runtime.write_facts("prompt"))
+    assert calls == ["report_section_1", "report_section_2"]
+    assert len(result["receipts"]) == 2

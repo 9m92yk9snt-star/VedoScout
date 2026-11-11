@@ -1,0 +1,110 @@
+{
+  "baseline_commit": "fb271c18000bcbc71f51b443f87fd48beedd02bc",
+  "source_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2",
+  "requests": [
+    {
+      "event_id": "e6cfdd0f01aedac57b43",
+      "window": null,
+      "frames": 32,
+      "references": 10,
+      "wire_equal": true,
+      "before_after_seconds": [
+        3.117052736000005,
+        2.5778232180000487
+      ]
+    },
+    {
+      "event_id": "966c91c7243829d6fab0",
+      "window": null,
+      "frames": 21,
+      "references": 10,
+      "wire_equal": true,
+      "before_after_seconds": [
+        0.8326909879997402,
+        0.5041963130001932
+      ]
+    },
+    {
+      "event_id": "966c91c7243829d6fab0",
+      "window": [
+        10125,
+        12133
+      ],
+      "frames": 17,
+      "references": 10,
+      "wire_equal": true,
+      "before_after_seconds": [
+        0.8612070340000173,
+        0.4090819170000941
+      ]
+    },
+    {
+      "event_id": "0fc666670ff612a8af2f",
+      "window": null,
+      "frames": 12,
+      "references": 10,
+      "wire_equal": true,
+      "before_after_seconds": [
+        0.40461050900012197,
+        0.28330770499997016
+      ]
+    },
+    {
+      "event_id": "9a392fb19c052dfe6719",
+      "window": null,
+      "frames": 23,
+      "references": 10,
+      "wire_equal": true,
+      "before_after_seconds": [
+        0.9082334139998238,
+        0.5452127999997174
+      ]
+    },
+    {
+      "event_id": "d1a34d11944defe8c2ce",
+      "window": null,
+      "frames": 21,
+      "references": 10,
+      "wire_equal": true,
+      "before_after_seconds": [
+        0.5620399839999664,
+        0.3365676590001385
+      ]
+    },
+    {
+      "event_id": "006dbd71ed71d464f19d",
+      "window": null,
+      "frames": 26,
+      "references": 10,
+      "wire_equal": true,
+      "before_after_seconds": [
+        0.9052338080000482,
+        0.4345107620001727
+      ]
+    },
+    {
+      "event_id": "47ad617d2ba76a4683cd",
+      "window": null,
+      "frames": 24,
+      "references": 10,
+      "wire_equal": true,
+      "before_after_seconds": [
+        1.11057607299972,
+        0.5593677120000393
+      ]
+    },
+    {
+      "event_id": "16b70d6326506d906e7d",
+      "window": null,
+      "frames": 10,
+      "references": 10,
+      "wire_equal": true,
+      "before_after_seconds": [
+        0.7338679419999607,
+        0.36853850200031957
+      ]
+    }
+  ],
+  "all_equal": true,
+  "scope": "Offline request construction only; no provider calls or total-analysis latency claim."
+}

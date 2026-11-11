@@ -7,6 +7,7 @@ Credentials are read inside owned child processes and never persisted.
 """
 from __future__ import annotations
 
+import asyncio
 import base64
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
@@ -17,6 +18,7 @@ import os
 from pathlib import Path
 import re
 import time
+import threading
 import urllib.error
 import urllib.request
 
@@ -101,8 +103,10 @@ def build_request(provider, model, items, *, reasoning_effort=None, image_detail
     parts, content, image_audit, video_audit = [], [], [], []
     for item in items:
         if item["type"] == "text":
-            parts.append({"text": item["text"]})
-            content.append({"type": "text", "text": item["text"]})
+            if provider == "gemini":
+                parts.append({"text": item["text"]})
+            else:
+                content.append({"type": "text", "text": item["text"]})
         else:
             pixels = Path(item["path"]).read_bytes()
             sha = hashlib.sha256(pixels).hexdigest()
@@ -114,19 +118,23 @@ def build_request(provider, model, items, *, reasoning_effort=None, image_detail
                 # Gemini VideoMetadata.fps accepts at most 24, independently of source FPS.
                 if isinstance(fps, bool) or not isinstance(fps, (int, float)) or not 1 <= fps <= 24:
                     raise ValueError("INVALID_VIDEO_FPS")
-                parts.append({"inlineData": {"mimeType": "video/mp4", "data": encoded}, "videoMetadata": {"fps": fps}})
-                file = {"file_data": "data:video/mp4;base64," + encoded, "format": "video/mp4",
-                        "video_metadata": {"fps": fps}}
-                if image_detail:
-                    file["detail"] = image_detail
-                content.append({"type": "file", "file": file})
+                if provider == "gemini":
+                    parts.append({"inlineData": {"mimeType": "video/mp4", "data": encoded}, "videoMetadata": {"fps": fps}})
+                else:
+                    file = {"file_data": "data:video/mp4;base64," + encoded, "format": "video/mp4",
+                            "video_metadata": {"fps": fps}}
+                    if image_detail:
+                        file["detail"] = image_detail
+                    content.append({"type": "file", "file": file})
                 video_audit.append({"sha256": sha, "bytes": len(pixels), "requested_fps": fps})
                 continue
-            parts.append({"inlineData": {"mimeType": "image/jpeg", "data": encoded}})
-            image_url = {"url": "data:image/jpeg;base64," + encoded}
-            if image_detail:
-                image_url["detail"] = image_detail
-            content.append({"type": "image_url", "image_url": image_url})
+            if provider == "gemini":
+                parts.append({"inlineData": {"mimeType": "image/jpeg", "data": encoded}})
+            else:
+                image_url = {"url": "data:image/jpeg;base64," + encoded}
+                if image_detail:
+                    image_url["detail"] = image_detail
+                content.append({"type": "image_url", "image_url": image_url})
             image_audit.append({"sha256": sha, "bytes": len(pixels)})
     if provider == "gemini":
         url = "https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent"
@@ -241,7 +249,103 @@ def _stop(process):
     process.close()
 
 
-def run_jobs(jobs, provider, model, *, deadline, per_call_s=90., workers=2, worker=_worker, on_result=None):
+class RunCoordination:
+    """One analysis owns its call cap, rate-limit pause and cancellation."""
+    def __init__(self, max_active=2):
+        if type(max_active) is not int or not 1 <= max_active <= 2:
+            raise ValueError("INVALID_SHARED_CALL_LIMIT")
+        self.max_active = max_active
+        self._active = 0
+        self._resume_at = 0.0
+        self._lock = threading.Lock()
+        self.stopped = threading.Event()
+        self.blocked = threading.Event()
+
+    def acquire(self, now):
+        with self._lock:
+            if self.stopped.is_set() or self.blocked.is_set() or now < self._resume_at or self._active >= self.max_active:
+                return False
+            self._active += 1
+            return True
+
+    def release(self):
+        with self._lock:
+            self._active -= 1
+
+    def stop_new_calls(self, *, cancel_active=False):
+        with self._lock:
+            self.blocked.set()
+            if cancel_active:
+                self.stopped.set()
+
+    def pause(self, seconds):
+        with self._lock:
+            self._resume_at = max(self._resume_at, time.monotonic() + seconds)
+
+
+class RunLane:
+    """A dynamic stage limit inside one shared run's global call cap."""
+    def __init__(self, coordination, max_active=1):
+        if type(max_active) is not int or not 1 <= max_active <= coordination.max_active:
+            raise ValueError("INVALID_STAGE_CALL_LIMIT")
+        self.coordination = coordination
+        self.max_active = max_active
+        self._active = 0
+        self.stopped = coordination.stopped
+        self.blocked = coordination.blocked
+
+    def acquire(self, now):
+        owner = self.coordination
+        with owner._lock:
+            if (owner.stopped.is_set() or owner.blocked.is_set() or now < owner._resume_at
+                    or owner._active >= owner.max_active or self._active >= self.max_active):
+                return False
+            owner._active += 1
+            self._active += 1
+            return True
+
+    def release(self):
+        with self.coordination._lock:
+            self._active -= 1
+            self.coordination._active -= 1
+
+    def set_limit(self, limit):
+        if type(limit) is not int or not 1 <= limit <= self.coordination.max_active:
+            raise ValueError("INVALID_STAGE_CALL_LIMIT")
+        with self.coordination._lock:
+            self.max_active = limit
+
+    def stop_new_calls(self, *, cancel_active=False):
+        self.coordination.stop_new_calls(cancel_active=cancel_active)
+
+    def pause(self, seconds):
+        self.coordination.pause(seconds)
+
+
+async def run_jobs_async(jobs, provider, model, *, coordination=None, runner=None, **kwargs):
+    """Keep the supervising thread alive until its actual model children stop."""
+    control = coordination or RunCoordination()
+    task = asyncio.create_task(asyncio.to_thread(runner or run_jobs, jobs, provider, model,
+                                                coordination=control, **kwargs))
+    try:
+        return await asyncio.shield(task)
+    except asyncio.CancelledError:
+        control.stopped.set()
+        # Cancelling to_thread alone does not stop its subprocesses. Continue
+        # servicing checkpoint callbacks while the supervisor joins its children.
+        while not task.done():
+            try:
+                await asyncio.shield(task)
+            except asyncio.CancelledError:
+                continue
+            except Exception:
+                break
+        if task.done() and not task.cancelled():
+            task.exception()  # retrieve any cleanup error; preserve cancellation
+        raise
+
+
+def run_jobs(jobs, provider, model, *, deadline, per_call_s=90., workers=2, worker=_worker, on_result=None, coordination=None):
     """Two owned children; a wall deadline stops actual work, including hung IO."""
     if provider not in KEY_ENV or not 1 <= workers <= 2 or not 0 < per_call_s <= MAX_CALL_SECONDS:
         raise ValueError("INVALID_EXECUTION_BUDGET")
@@ -252,11 +356,29 @@ def run_jobs(jobs, provider, model, *, deadline, per_call_s=90., workers=2, work
     try:
         while pending or active:
             now = time.monotonic()
+            if coordination is not None:
+                abort = abort or coordination.blocked.is_set()
+                if coordination.stopped.is_set():
+                    abort = cancel_active = True
             while pending and len(active) < workers and resume_at <= now < deadline and not abort:
+                if coordination is not None and not coordination.acquire(now):
+                    break
                 job = pending.pop(0)
-                parent, child = context.Pipe(duplex=False)
-                process = context.Process(target=worker, args=(child, job, provider, model, min(per_call_s, deadline - now)))
-                process.start()
+                parent = child = process = None
+                try:
+                    parent, child = context.Pipe(duplex=False)
+                    process = context.Process(target=worker, args=(child, job, provider, model, min(per_call_s, deadline - now)))
+                    process.start()
+                except BaseException:
+                    if parent is not None:
+                        parent.close()
+                    if child is not None:
+                        child.close()
+                    if process is not None and process.pid is not None:
+                        _stop(process)
+                    if coordination is not None:
+                        coordination.release()
+                    raise
                 child.close()
                 active[process.pid] = (process, parent, job, min(deadline, now + per_call_s))
                 now = time.monotonic()
@@ -275,6 +397,9 @@ def run_jobs(jobs, provider, model, *, deadline, per_call_s=90., workers=2, work
                     now = time.monotonic()
                     packet_id = job["packet_id"]
                     delay = result.get("retry_after_seconds", RATE_LIMIT_DEFAULT_WAIT_SECONDS)
+                    if (coordination is not None and result.get("http_status") == 429):
+                        shared_delay = delay if type(delay) in {int, float} and 0 <= delay <= MAX_RATE_LIMIT_WAIT_SECONDS else RATE_LIMIT_DEFAULT_WAIT_SECONDS
+                        coordination.pause(max(1., shared_delay))
                     retry_rate_limit = (result.get("http_status") == 429
                         and result.get("error") == "MODEL_QUOTA_OR_RATE_LIMIT"
                         and result.get("limit_kind") != "QUOTA_EXHAUSTED"
@@ -298,6 +423,14 @@ def run_jobs(jobs, provider, model, *, deadline, per_call_s=90., workers=2, work
                             result = {**result, "rate_limit_retry_count": 1,
                                       "prior_rate_limit": histories[packet_id]}
                         results.append(result)
+                    # Publish provider-wide terminal failures before checkpoint
+                    # IO, so another supervisor cannot launch doomed work while
+                    # persistence waits. Temporary rate limits retain retry policy.
+                    if coordination is not None:
+                        if result.get("error") in {"MODEL_ACCESS_DENIED", "MODEL_KEY_NOT_CONFIGURED"}:
+                            coordination.stop_new_calls(cancel_active=True)
+                        elif result.get("http_status") == 429 and result.get("limit_kind") == "QUOTA_EXHAUSTED":
+                            coordination.stop_new_calls()
                     if on_result:
                         on_result(result)
                     stop = not retry_rate_limit and result.get("error") in STOP_ERRORS
@@ -306,6 +439,8 @@ def run_jobs(jobs, provider, model, *, deadline, per_call_s=90., workers=2, work
                     # still succeed. Keep their bounded deadlines and save results.
                     cancel_active = cancel_active or (stop and result.get("http_status") != 429)
                     pipe.close(); _stop(process); del active[pid]
+                    if coordination is not None:
+                        coordination.release()
             if (now >= deadline or abort) and not active:
                 for job in pending:
                     result = {"packet_id": job["packet_id"], "status": "NOT_SENT",
@@ -316,10 +451,12 @@ def run_jobs(jobs, provider, model, *, deadline, per_call_s=90., workers=2, work
                     if on_result:
                         on_result(result)
                 pending.clear()
-            if active or (pending and now < resume_at and now < deadline and not abort):
+            if active or (pending and now < deadline and not abort):
                 time.sleep(.02)
     finally:
         for process, pipe, _job, _expires in active.values():
             pipe.close(); _stop(process)
+            if coordination is not None:
+                coordination.release()
     order = {job["packet_id"]: i for i, job in enumerate(jobs)}
     return sorted(results, key=lambda r: order[r["packet_id"]])

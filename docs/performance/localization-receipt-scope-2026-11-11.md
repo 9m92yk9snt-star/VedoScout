@@ -1,0 +1,5 @@
+# Scope retained localization events before every use
+
+Previously a mismatched source/selection cleared the initial output audit but left `previous` populated. Budget/preparation failure branches could copy old records, and receipt lookup could still consult the old context. Filter `previous` itself before any branch. Both source SHA and selection digest must match and be nonempty. Matching primary and supplemental receipts are deep-copied; existing payload-hash validation still runs before actual reuse.
+
+Five focused standard-library tests passed against the extracted helper: same-context retention and mutation isolation, source mismatch, selection mismatch, missing context and empty audit. The committed test imports the helper from the actual localization module. Full localization/provider integration was not executed in this step. No new model calls, concurrent execution activation or deployment. This is correctness groundwork for early-receipt handoff, not a measured speed improvement.

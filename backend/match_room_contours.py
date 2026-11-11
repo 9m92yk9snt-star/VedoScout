@@ -108,7 +108,9 @@ def owns(mask, point):
 
 
 def mask_iou(a, b):
-    return np.count_nonzero((a > 0) & (b > 0))/max(1, np.count_nonzero((a > 0) | (b > 0)))
+    # Reuse the exact positivity tests for intersection and union.
+    positive_a, positive_b = a > 0, b > 0
+    return np.count_nonzero(positive_a & positive_b)/max(1, np.count_nonzero(positive_a | positive_b))
 
 
 def seed_candidates(rows, target, shape):

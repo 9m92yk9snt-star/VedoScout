@@ -17,7 +17,8 @@ import sequence_pilot_transport as transport
 from match_room_position_evidence import selection_digest, bound_samples
 from match_room import position_window
 from sequence_run_checkpoint import reusable_receipt
-from video_timebase import read_frame_at, read_frames_at
+from video_timebase import read_frame_at, iter_frames_at
+from sequence_deadline import bounded_deadline
 
 PROMPT = '''Locate the SAME physical player selected by the original human point in the reference image. Reference images identify a person, not an action. Use ALL original human reference images to establish the same requested player. Reference timestamps may span cuts. A reference point that misses a visible person is not positive identity evidence; do not move that point onto a neighbour. Use the timeline to test continuity and competing identities. These context images contain no extra selections. If a cut, disappearance or competing appearance prevents re-identification, keep identity uncertain; never assume the next highlighted player is the target. Output rows only for TIMELINE images. Examine the full timeline independently; never transfer identity to a nearby teammate, recipient or scorer. A jersey number alone, proximity to the ball or the expected role is insufficient when conflicting people are visible.
 Return JSON {"frames":[...]} with exactly one row for EVERY supplied timeline frame, in order. Each row: {"frame":"source frame ID","target_status":"CONFIRMED|UNCERTAIN|ABSENT","identity_evidence":"visible reason for this decision","feet_visible":true|false,"ground":[x,y] or null,"box":[x,y,w,h] or null,"active_ball_status":"CONFIRMED|UNCERTAIN|ABSENT","ball":[x,y] or null}.
@@ -111,8 +112,23 @@ def prepare(video, selection, event, work, reference_images=None, *, window=None
                 any(saved.get(k) != tap[k] for k in ('reference_id', 'requested_ms', 'box', 'target_point', 'selection_hints'))
                 for tap, saved in zip(taps, reference_images))):
             raise ValueError('LOCALIZATION_REFERENCE_CACHE_CHANGED')
+        prepared_references = {}
+        if reference_images is None:
+            by_time = {}
+            for tap in taps:
+                by_time.setdefault(tap['requested_ms'], []).append(tap)
+            for requested_ms, decoded in iter_frames_at(cap, by_time):
+                for tap in by_time[requested_ms]:
+                    prepared_references[tap['reference_id']] = image(
+                        requested_ms, tap['reference_id'], 85, decoded=decoded)
+            # Preserve the prior random-access behavior for any request the
+            # streaming decoder could not satisfy (including its PTS policy).
+            for tap in taps:
+                if tap['reference_id'] not in prepared_references:
+                    prepared_references[tap['reference_id']] = image(
+                        tap['requested_ms'], tap['reference_id'], 85)
         for i, tap in enumerate(taps):
-            f = deepcopy(reference_images[i]) if reference_images is not None else image(tap['requested_ms'], tap['reference_id'], 85)
+            f = deepcopy(reference_images[i]) if reference_images is not None else prepared_references[tap['reference_id']]
             references.append({**f, **tap})
             items.extend([{'type': 'text', 'text': 'ORIGINAL HUMAN IDENTITY REFERENCE '+json.dumps({
                 'frame': f['frame_id'], 'reference_id': tap['reference_id'],
@@ -121,14 +137,10 @@ def prepare(video, selection, event, work, reference_images=None, *, window=None
         times = sorted(set(range(start, end+1, 125)) | {end} |
                        {t for t in proof['cited_frames'].values() if start <= t <= end})
         seen = set()
-        decoded = {}
+        decoded = iter_frames_at(cap, times)
         for i, ms in enumerate(times):
-            # Bound retained pixels to eight frames while sharing forward decoding.
-            if i % 8 == 0:
-                decoded.clear()
-                decoded = read_frames_at(cap, times[i:i+8])
-            frame = decoded.pop(ms, None)
-            if frame is None:
+            actual_request, frame = next(decoded, (None, None))
+            if actual_request != ms or frame is None:
                 raise ValueError('LOCALIZATION_SOURCE_FRAME_UNAVAILABLE')
             f = image(ms, f'timeline-{i}', decoded=frame)
             del frame
@@ -180,13 +192,23 @@ def completion_windows(event, record):
     return windows
 
 
-async def localize(video, doc, *, checkpoint, event_ids=None, run_jobs=None, budget_seconds=420):
+def retained_localization_events(audit, source_sha256, selection_sha256):
+    """Expose receipts only within the exact source and selection context."""
+    if (not source_sha256 or not selection_sha256
+            or audit.get('source_video_sha256') != source_sha256
+            or audit.get('original_selection_values_sha256') != selection_sha256):
+        return {}
+    return deepcopy(audit.get('events') or {})
+
+
+async def localize(video, doc, *, checkpoint, event_ids=None, run_jobs=None, budget_seconds=420, workers=2, coordination=None, shared_deadline=None):
     """Observe presentation positions without changing canonical event identity.
 
     Missing/uncertain measurements suppress graphics, not the factual report.
     Source/model errors are explicit in the persisted per-event audit.
     """
     started = time.monotonic()
+    deadline = bounded_deadline(started, budget_seconds, shared_deadline)
     run_jobs = run_jobs or transport.run_jobs
     bundle = deepcopy(doc['canonical_events'])
     if await asyncio.to_thread(pilot.digest, Path(video)) != bundle['source_video_sha256']:
@@ -200,19 +222,18 @@ async def localize(video, doc, *, checkpoint, event_ids=None, run_jobs=None, bud
                  [r['event_id'] for r in doc['full_report']['video_comments']])
     candidates = [e for e in bundle['events'] if e['event_id'] in chosen and not e.get('visual_samples')][:8]
     previous_audit = doc.get('match_room_localization') or {}
-    previous = previous_audit.get('events') or {}
-    same_context = (previous_audit.get('source_video_sha256') == bundle['source_video_sha256']
-                    and previous_audit.get('original_selection_values_sha256') == selection_digest(selection))
+    previous = retained_localization_events(previous_audit, bundle['source_video_sha256'],
+                                            selection_digest(selection))
     audit = {'version': 2, 'source_video_sha256': bundle['source_video_sha256'],
              'original_selection_values_sha256': selection_digest(selection),
-             'events': deepcopy(previous) if same_context else {}}
+             'events': deepcopy(previous)}
     loop = asyncio.get_running_loop()
     jobs, records, by_packet = [], {}, {}
     reference_images = None
     with tempfile.TemporaryDirectory(prefix='matchroom-positions-') as work:
         for event in candidates:
             eid = event['event_id']
-            if time.monotonic()-started >= budget_seconds:
+            if time.monotonic() >= deadline:
                 audit['events'][eid] = {**deepcopy(previous.get(eid) or {}),
                     'status': 'NOT_SENT', 'error': 'LOCALIZATION_TIME_BUDGET'}
                 continue
@@ -267,8 +288,8 @@ async def localize(video, doc, *, checkpoint, event_ids=None, run_jobs=None, bud
             # Persist every completed paid result before the next callback.
             asyncio.run_coroutine_threadsafe(checkpoint(deepcopy(audit)), loop).result()
         if jobs:
-            results = await asyncio.to_thread(run_jobs, jobs, 'emergent', 'gpt-6-astra',
-                deadline=started+budget_seconds, per_call_s=150, workers=2, on_result=finished)
+            results = await transport.run_jobs_async(jobs, 'emergent', 'gpt-6-astra', runner=run_jobs, coordination=coordination,
+                deadline=deadline, per_call_s=150, workers=workers, on_result=finished)
             for receipt in results:
                 accept(receipt)
         # Complete clip edges without changing the original request/cache key.
@@ -282,7 +303,7 @@ async def localize(video, doc, *, checkpoint, event_ids=None, run_jobs=None, bud
                 continue
             for window in completion_windows(event, record):
                 pid = packet_id(event)+f'_coverage_{window[0]}_{window[1]}'
-                if time.monotonic()-started >= budget_seconds:
+                if time.monotonic() >= deadline:
                     record['completion_error'] = 'LOCALIZATION_TIME_BUDGET'
                     break
                 try:
@@ -332,8 +353,8 @@ async def localize(video, doc, *, checkpoint, event_ids=None, run_jobs=None, bud
             accept_extra(receipt)
             asyncio.run_coroutine_threadsafe(checkpoint(deepcopy(audit)), loop).result()
         if extra_jobs:
-            results = await asyncio.to_thread(run_jobs, extra_jobs, 'emergent', 'gpt-6-astra',
-                deadline=started+budget_seconds, per_call_s=150, workers=2, on_result=finished_extra)
+            results = await transport.run_jobs_async(extra_jobs, 'emergent', 'gpt-6-astra', runner=run_jobs, coordination=coordination,
+                deadline=deadline, per_call_s=150, workers=workers, on_result=finished_extra)
             for receipt in results:
                 accept_extra(receipt)
         for event in candidates:

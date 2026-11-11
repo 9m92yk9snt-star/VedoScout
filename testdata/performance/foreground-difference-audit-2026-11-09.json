@@ -1,0 +1,42 @@
+{
+  "source_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2",
+  "raster_dimensions": [
+    720,
+    1280
+  ],
+  "samples_compared": 99,
+  "non_foreground_non_confidence_sample_fields_equal": true,
+  "changes": [
+    {
+      "segment_id": "position-contour:9750:10000",
+      "media_ms": 9983,
+      "removed_raster_pixels": 3,
+      "added_raster_pixels": 2,
+      "removed_xy": [
+        [
+          457,
+          714
+        ],
+        [
+          455,
+          721
+        ],
+        [
+          454,
+          723
+        ]
+      ],
+      "added_xy": [
+        [
+          456,
+          719
+        ],
+        [
+          452,
+          726
+        ]
+      ]
+    }
+  ],
+  "scope": "Rounded polygon union on analysis raster; not raw detector mask equality, visual quality judgment or permission to relax gates."
+}

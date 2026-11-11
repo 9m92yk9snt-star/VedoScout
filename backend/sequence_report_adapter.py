@@ -13,6 +13,7 @@ from verified_stats import apply_verified_stats_authority
 from sequence_foot_evidence import assess_foot, filter_foot_prose
 from sequence_action_evidence import supported_movements, MOVEMENT_TEXT
 from match_room import from_receipts
+from sequence_report_selection import select_report_cards
 
 ENGINE = "SEQUENCE_V1"
 
@@ -178,11 +179,8 @@ def build_report(prose, bundle):
             "proof_media_style": "SOURCE_UNANNOTATED", "identity_confidence": "high",
             "contact_ms": e["contact_ms"], "contact_interval_ms": e["contact_interval_ms"],
         })
-    priority = {e["event_id"]: (0 if e["canonical_event_type"] in {"GOAL", "ASSIST", "SHOT"} else 1)
-                for e in bundle["events"]}
     mentions = Counter(row.get("event_id") for row in _iter_structured_rows(full) if isinstance(row, dict))
-    full["video_comments"] = sorted(full["video_comments"],
-        key=lambda c: (priority[c["event_id"]], -mentions[c["event_id"]], c["evidence_time_ms"]))[:8]
+    full["video_comments"] = select_report_cards(full["video_comments"], bundle["events"], mentions)
     full["_scoring_scan"] = {"performed": True, "coverage_complete": False,
                               "coverage_status": "PARTIAL", "authority": ENGINE}
     attach_event_evidence_authority(full)

@@ -1,0 +1,36 @@
+{
+  "source_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2",
+  "model_sha256": "015043fb9cc94830ad7065dd3e28d6f8e5758fe03071451675120f6a6b6e44e9",
+  "cases": 24,
+  "instances": 126,
+  "pixel_mismatches": 0,
+  "preprocessing_blob_mismatches": 0,
+  "metadata_mismatches": 0,
+  "real_inference_and_new_decode_seconds": 3.247186773995054,
+  "legacy_decode_seconds": [
+    0.23493757599499077,
+    0.21058042300137458,
+    0.20925057199929142,
+    0.212405004996981,
+    0.21595708500535693,
+    0.2108757429959951,
+    0.21027115899778437
+  ],
+  "optimized_decode_seconds": [
+    0.22633161100384314,
+    0.20367151300160913,
+    0.20363885500410106,
+    0.20234938199428143,
+    0.20196407799812732,
+    0.20396881699707592,
+    0.2070518480031751
+  ],
+  "legacy_median_seconds": 0.2108757429959951,
+  "optimized_median_seconds": 0.20367151300160913,
+  "decoder_speedup_percent": 3.4163388790159677,
+  "engine": "onnxruntime",
+  "blas_threads_in_benchmark": 1,
+  "measured_scope": "preprocessing and mask decoding with retained real model outputs; excludes inference from paired timing",
+  "end_to_end_analysis_speedup_claimed": false,
+  "provider_calls": 0
+}

@@ -1,0 +1,7 @@
+# Stream original identity references without changing request order
+
+On the first localization preparation, decode original reference requests in timestamp order through iter_frames_at. Encode each original reference at its existing quality and filename; retain only metadata, then construct the request in the original human-selection order. Duplicate requested times retain separate reference IDs and point/box metadata. Later jobs continue reusing existing verified reference images. For any reference unavailable from streaming, use the previous read_frame_at path rather than changing its fallback behavior. Missing timeline frames remain explicit errors.
+
+20 focused localization/timebase tests pass, including reversed and duplicate reference timestamps, preserved original references, completion reuse, and missing-frame failure/cleanup. The original video/export replay again returned identical URL, payload bytes, audits and frame/reference metadata for all nine requests (eight primary and one completion). Raw results: reference-streaming-parity-2026-11-09.json. That replay ran before the missing-reference fallback addition; its successful streaming paths are unchanged by the addition, and focused tests were rerun afterwards.
+
+The timing comparison includes the earlier timeline-streaming improvement, so no isolated new percentage or full-analysis latency gain is claimed. Existing large-gap seeking remains. No model, reference count, JPEG quality, identity gate, synchronization or deployment changes.

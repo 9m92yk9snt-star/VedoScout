@@ -1,0 +1,53 @@
+{
+  "source_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2",
+  "event_id": "d1a34d11944defe8c2ce",
+  "window_ms": [
+    30765,
+    32132
+  ],
+  "engine": "onnxruntime",
+  "comparison": "same current code; BLAS threads only",
+  "baseline_blas_threads": 9,
+  "candidate_blas_threads": 1,
+  "model_sha256": "015043fb9cc94830ad7065dd3e28d6f8e5758fe03071451675120f6a6b6e44e9",
+  "single_cpu_affinity": true,
+  "opencv_threads": 2,
+  "rounds_seconds": {
+    "legacy": [
+      16.53760226399754,
+      15.947803035000106,
+      15.820246267001494
+    ],
+    "candidate": [
+      15.582920676999493,
+      15.486593362002168,
+      15.656033279999974
+    ]
+  },
+  "median_seconds": {
+    "legacy": 15.947803035000106,
+    "candidate": 15.582920676999493
+  },
+  "reduction_percent": 2.2879788344502328,
+  "output_differences": 0,
+  "output_sha256": "23de63f65421bec5feac5829424e23e5a4b480f915b60f67697801eed495ef8a",
+  "diagnostics": {
+    "status": "SUPPORTED_SOURCE_OBSERVATIONS",
+    "method": "SOURCE_OBSERVATION_INSTANCE_CONTOUR",
+    "detector_frames": 83,
+    "source_pairs_expected": 16,
+    "source_pairs_reached": 16,
+    "source_pairs_unreached": 0,
+    "source_pairs_no_agreement": 7,
+    "source_pairs_source_conflict": 0,
+    "source_pairs_display_unavailable": 0,
+    "source_pairs_display_source_conflict": 0,
+    "source_pairs_missing_foreground": 0,
+    "source_segments_accepted": 9,
+    "last_decoded_ms": 32132,
+    "decoded_frames": 83,
+    "agreed_intervals": 9
+  },
+  "scope": "one small-model contour window; excludes model loading, medium refinement, source analysis, report writing and upload",
+  "live_verified": false
+}

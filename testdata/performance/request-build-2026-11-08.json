@@ -1,0 +1,78 @@
+{
+  "image_sha256": "87e56b7930b52caac5df841cac8d89a7f8ae5b4d41b5ec216dd6552b5188af57",
+  "image_bytes": 534142,
+  "image_count": 16,
+  "providers": {
+    "emergent": {
+      "rounds_seconds": {
+        "baseline": [
+          0.05247420899831923,
+          0.054384991999540944,
+          0.05342731799464673,
+          0.05708933700225316,
+          0.05350587299471954,
+          0.05421173899958376,
+          0.05543818900332553
+        ],
+        "candidate": [
+          0.049440517999755684,
+          0.049173694002092816,
+          0.04848516699712491,
+          0.048425669003336225,
+          0.05326786699879449,
+          0.048726360000728164,
+          0.049557767997612245
+        ]
+      },
+      "median_seconds": {
+        "baseline": 0.05421173899958376,
+        "candidate": 0.049173694002092816
+      },
+      "peak_python_bytes": {
+        "baseline": 46123179,
+        "candidate": 35438444
+      },
+      "payload_bytes": 11396601,
+      "payload_sha256": "536e9fed1a5fe8b5a42e24a774ddb32b52009cb63d1de427440b2c426523867b",
+      "payload_or_audit_differences": 0,
+      "time_reduction_percent": 9.293273173785522
+    },
+    "gemini": {
+      "rounds_seconds": {
+        "baseline": [
+          0.0451248549943557,
+          0.04569160100072622,
+          0.045724509000137914,
+          0.04548361400520662,
+          0.04549380899698008,
+          0.0448380809975788,
+          0.04609308299404802
+        ],
+        "candidate": [
+          0.04123770600563148,
+          0.04138937000243459,
+          0.04180728700157488,
+          0.04239533499639947,
+          0.041179138999723364,
+          0.04207273800420808,
+          0.04131682300067041
+        ]
+      },
+      "median_seconds": {
+        "baseline": 0.04549380899698008,
+        "candidate": 0.04138937000243459
+      },
+      "peak_python_bytes": {
+        "baseline": 46122138,
+        "candidate": 34724802
+      },
+      "payload_bytes": 11396121,
+      "payload_sha256": "680cb024d824cfe5d3b3ee22c22f0e35599e843a776dd9229eec392c2706fbaa",
+      "payload_or_audit_differences": 0,
+      "time_reduction_percent": 9.021972626688491
+    }
+  },
+  "baseline_source_sha256": "b51b69fcf8422d4de91cdbc2d532ccf87972ecd29f8a8562f729340480d6e4d9",
+  "provider_calls": 0,
+  "scope": "request building only, unchanged provider payload bytes"
+}

@@ -1,0 +1,71 @@
+{
+  "commit": "75a7272c09a755f2b3087f7941c2eb68b365a431",
+  "scope": "Single-run offline scheduler measurements using exported source observations, one CPU affinity. No paid model calls or quality equivalence claim. Not production timing. Initial child result objects are subsequently mutated by scheduler merge; only captured stage durations are used for that stage.",
+  "clips": {
+    "00:31": {
+      "seconds": 25.511059083000077,
+      "status": "COMPLETED",
+      "stages": [
+        {
+          "kind": "initial",
+          "seconds": 25.40304473399999,
+          "status": "COMPLETED"
+        }
+      ],
+      "final_output_sha256": "9169e89a474f4ac272f043a7e8a0612d27a762211f6ca9ff6fc71fdf70dfb2fe"
+    },
+    "00:08": {
+      "seconds": 160.50449374699997,
+      "status": "COMPLETED",
+      "stages": [
+        {
+          "kind": "initial",
+          "seconds": 31.312202794999962,
+          "status": "COMPLETED"
+        },
+        {
+          "kind": "small",
+          "seconds": 18.370850234000045,
+          "status": "COMPLETED"
+        },
+        {
+          "kind": "medium",
+          "seconds": 105.37562589100003,
+          "status": "COMPLETED"
+        },
+        {
+          "kind": "ball",
+          "seconds": 5.311914422999962,
+          "status": "COMPLETED"
+        }
+      ],
+      "final_output_sha256": "d20ef44482e65047878adbe12d7cc1f6c2065bcb702b915d630eabd0728e82bd",
+      "medium_diagnostics": {
+        "windows": [
+          {
+            "start_ms": 8250,
+            "end_ms": 9750,
+            "status": "SUPPORTED_SOURCE_OBSERVATIONS",
+            "method": "SOURCE_OBSERVATION_INSTANCE_CONTOUR",
+            "detector_frames": 91,
+            "detector_seconds": 99.68780735500036,
+            "source_pairs_expected": 11,
+            "source_pairs_reached": 11,
+            "source_pairs_unreached": 0,
+            "source_pairs_no_agreement": 2,
+            "source_pairs_source_conflict": 0,
+            "source_pairs_display_unavailable": 0,
+            "source_pairs_display_source_conflict": 0,
+            "source_pairs_missing_foreground": 0,
+            "source_segments_accepted": 9,
+            "last_decoded_ms": 9750,
+            "decoded_frames": 91,
+            "agreed_intervals": 9
+          }
+        ],
+        "segmenter_kind": "medium",
+        "budget_seconds": 611.6285997259998
+      }
+    }
+  }
+}

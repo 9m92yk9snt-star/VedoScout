@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import logging
 import os
+import threading
 from pathlib import Path
 from typing import Optional
 
@@ -51,6 +52,7 @@ R2_BUCKET = os.environ.get("R2_BUCKET")
 R2_PUBLIC_URL = (os.environ.get("R2_PUBLIC_URL") or "").rstrip("/")
 
 _client = None
+_client_lock = threading.Lock()
 
 
 def is_configured() -> bool:
@@ -62,20 +64,21 @@ def is_configured() -> bool:
 
 def _get_client():
     global _client
-    if _client is None:
-        c = _cfg()
-        _client = boto3.client(
-            "s3",
-            endpoint_url=c["endpoint"],
-            aws_access_key_id=c["access_key"],
-            aws_secret_access_key=c["secret_key"],
-            region_name="auto",  # R2 uses "auto" — required by boto3 signature
-            config=Config(
-                signature_version="s3v4",
-                retries={"max_attempts": 3, "mode": "standard"},
-                s3={"addressing_style": "path"},  # R2 requires path-style addressing
-            ),
-        )
+    with _client_lock:
+        if _client is None:
+            c = _cfg()
+            _client = boto3.client(
+                "s3",
+                endpoint_url=c["endpoint"],
+                aws_access_key_id=c["access_key"],
+                aws_secret_access_key=c["secret_key"],
+                region_name="auto",  # R2 uses "auto" — required by boto3 signature
+                config=Config(
+                    signature_version="s3v4",
+                    retries={"max_attempts": 3, "mode": "standard"},
+                    s3={"addressing_style": "path"},  # R2 requires path-style addressing
+                ),
+            )
     return _client
 
 

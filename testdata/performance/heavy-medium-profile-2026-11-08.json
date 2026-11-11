@@ -1,0 +1,39 @@
+{
+  "engine": "onnxruntime",
+  "opencv_version": "4.13.0",
+  "source_video_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2",
+  "event_id": "966c91c7243829d6fab0",
+  "window_ms": [
+    8750,
+    10000
+  ],
+  "pair_audit_enabled": false,
+  "model": "medium",
+  "model_sha256": "20877569fcfc4744855b1d6d05b0cd7031987ae31894af5c7e1e74328d18e653",
+  "one_cpu": true,
+  "model_load_seconds": 0.2096882949990686,
+  "contour_seconds": 82.67140004599787,
+  "diagnostic": {
+    "status": "SUPPORTED_SOURCE_OBSERVATIONS",
+    "method": "SOURCE_OBSERVATION_INSTANCE_CONTOUR",
+    "detector_frames": 76,
+    "detector_seconds": 77.66687686598016,
+    "source_pairs_expected": 9,
+    "source_pairs_reached": 9,
+    "source_pairs_unreached": 0,
+    "source_pairs_no_agreement": 0,
+    "source_pairs_source_conflict": 0,
+    "source_pairs_display_unavailable": 0,
+    "source_pairs_display_source_conflict": 1,
+    "source_pairs_missing_foreground": 0,
+    "source_segments_accepted": 8,
+    "last_decoded_ms": 10000,
+    "decoded_frames": 76,
+    "agreed_intervals": 8
+  },
+  "live_verified": false,
+  "onnx_forward_seconds": 76.837339727,
+  "onnx_forward_share_percent": 92.94307303886006,
+  "scope": "Single medium-model ONNX profile, not a before/after optimization comparison",
+  "production_changed": false
+}

@@ -49,9 +49,10 @@ def test_selective_retry_keeps_other_paid_event_receipts(monkeypatch):
     assert 'other' not in saved[-1]['events']
 
 
-def test_prepare_preserves_all_ten_original_reference_points(tmp_path, monkeypatch):
+@pytest.mark.parametrize('order', [list(range(10)), list(reversed(range(10))), [0,0,1,1,2,2,3,3,4,4]])
+def test_prepare_preserves_all_ten_original_reference_points(tmp_path, monkeypatch, order):
     anchors = [{'t': i, 'target_point': {'x': .4, 'y': .5},
-                'box': {'x': .3, 'y': .3, 'w': .2, 'h': .3}} for i in range(10)]
+                'box': {'x': .3, 'y': .3, 'w': .2, 'h': .3}} for i in order]
     selection = {'raw_marker_anchors': anchors}
     event = {'event_id': 'e', 'source_video_sha256': 'source', 'proof': {
         'proof_start_ms': 2000, 'proof_end_ms': 6000, 'frame_ms': 3000,
@@ -61,12 +62,12 @@ def test_prepare_preserves_all_ten_original_reference_points(tmp_path, monkeypat
     batches = []
     def grouped(cap, times):
         batches.append(times)
-        return {ms: (ms, np.zeros((80, 60, 3), np.uint8)) for ms in times}
-    monkeypatch.setattr(loc, 'read_frames_at', grouped)
+        return ((ms, (ms, np.zeros((80, 60, 3), np.uint8))) for ms in times)
+    monkeypatch.setattr(loc, 'iter_frames_at', grouped)
     before = deepcopy(selection)
     record, job = loc.prepare('source', selection, event, tmp_path)
-    assert batches and max(map(len, batches)) <= 8
-    assert [ms for batch in batches for ms in batch] == sorted({f['media_ms'] for f in record['frames']})
+    assert len(batches) == 2
+    assert list(batches[1]) == sorted({f['media_ms'] for f in record['frames']})
     assert len(record['references']) == 10 and selection == before
     assert [r['target_point'] for r in record['references']] == [a['target_point'] for a in anchors]
     assert record['window_ms'] == [2250, 4750]
@@ -154,7 +155,7 @@ def test_missing_grouped_source_frame_stops_before_request(tmp_path, monkeypatch
     released = []
     monkeypatch.setattr(loc.cv2, 'VideoCapture', lambda _: type('Cap', (), {'release': lambda self: released.append(True)})())
     monkeypatch.setattr(loc, 'read_frame_at', lambda cap, t: (True, np.zeros((80, 60, 3), np.uint8), t))
-    monkeypatch.setattr(loc, 'read_frames_at', lambda cap, times: {})
+    monkeypatch.setattr(loc, 'iter_frames_at', lambda cap, times: iter(()))
     monkeypatch.setattr(loc.transport, 'build_request', lambda *a, **k: pytest.fail('request with missing source frame'))
     with pytest.raises(ValueError, match='SOURCE_FRAME_UNAVAILABLE'):
         loc.prepare('source', selection, event, tmp_path)
@@ -202,7 +203,10 @@ def completion_setup(monkeypatch):
         if window: assert window == [425, 600]
         return {k: deepcopy(v) for k,v in chosen.items() if k != 'receipt'}, {'packet_id': chosen['packet_id']}
     monkeypatch.setattr(loc, 'prepare', prepare)
-    doc['match_room_localization'] = {'events': {event['event_id']: deepcopy(primary)}}
+    doc['match_room_localization'] = {
+        'source_video_sha256': doc['canonical_events']['source_video_sha256'],
+        'original_selection_values_sha256': primary['original_selection_values_sha256'],
+        'events': {event['event_id']: deepcopy(primary)}}
     return doc, primary, extra
 
 
@@ -288,3 +292,25 @@ def test_exhausted_shared_budget_does_not_start_supplement(monkeypatch):
     assert [r['media_ms'] for r in bundle['events'][0]['visual_samples']]==[100,200,300]
     assert saved[-1]['events']['event']['completion_error']=='LOCALIZATION_TIME_BUDGET'
     assert saved[-1]['events']['event']['coverage']['clip_edges_observed'] is False
+
+
+@pytest.mark.parametrize('field,value', [
+    ('source_video_sha256', 'different-video'),
+    ('original_selection_values_sha256', 'different-selection'),
+    ('source_video_sha256', None),
+])
+def test_foreign_context_receipts_are_replaced_by_fresh_requests(monkeypatch, field, value):
+    doc, primary, extra = completion_setup(monkeypatch)
+    doc['match_room_localization'][field] = value
+    calls, saved = [], []
+    async def checkpoint(audit):
+        saved.append(deepcopy(audit))
+    def run(jobs, *args, **kwargs):
+        receipts = {r['packet_id']: r['receipt'] for r in (primary, extra)}
+        calls.extend(j['packet_id'] for j in jobs)
+        return [receipts[j['packet_id']] for j in jobs]
+    bundle = asyncio.run(loc.localize('source', doc, checkpoint=checkpoint, run_jobs=run))
+    assert calls == [primary['packet_id'], extra['packet_id']]
+    assert saved[0]['events'] == {}
+    assert saved[-1]['events']['event']['reused'] is False
+    assert [r['media_ms'] for r in bundle['events'][0]['visual_samples']] == [100, 200, 300, 425, 500, 600]

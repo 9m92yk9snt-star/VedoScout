@@ -473,13 +473,13 @@ def compute_refinement(video, anchors, events, checkpoint=None, segmenter_kind='
         if segmenter_kind == 'small':
             from native_player_segmentation import PersonSegmenter
             model = PersonSegmenter()
-            if event.get('_contour_prediction_cache'):
-                from match_room_prediction_cache import CachedSegmenter
-                model = CachedSegmenter(model, event['_contour_prediction_cache'], event['source_video_sha256'])
         elif segmenter_kind == 'medium':
             model = refinement_model()
         else:
             raise ValueError('UNSUPPORTED_REFINEMENT_MODEL')
+        if event.get('_contour_prediction_cache'):
+            from match_room_prediction_cache import CachedSegmenter
+            model = CachedSegmenter(model, event['_contour_prediction_cache'], event['source_video_sha256'])
         result['refinement_diagnostics']['segmenter_kind'] = segmenter_kind
         result['refinement_diagnostics']['budget_seconds'] = _refinement_timeout(events, segmenter_kind)
         def preserve(segment):
@@ -551,7 +551,10 @@ def _bounded_event(video, anchors, events, *, refinement=False):
             subprocess.run([sys.executable, str(Path(__file__).resolve()), str(request), str(result)],
                            timeout=_refinement_timeout(events, refinement) if refinement else SOURCE_TIMEOUT_S if any(e.get('localization_method') == 'EXPLICIT_SOURCE_POSITIONS' for e in events) else TIMEOUT_S,
                            check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                           env={**os.environ, 'SCOUTMEPLAY_MATCHROOM_ENGINE': 'onnxruntime'})
+                           # Apply before NumPy/OpenBLAS imports in this owned child.
+                           # Tiny mask products should not spawn a CPU-sized BLAS pool.
+                           env={**os.environ, 'SCOUTMEPLAY_MATCHROOM_ENGINE': 'onnxruntime',
+                                'OPENBLAS_NUM_THREADS': '1'})
             return json.loads(result.read_text()), 'COMPLETED'
         except subprocess.TimeoutExpired:
             try:

@@ -1,0 +1,52 @@
+{
+  "source_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2",
+  "event_id": "d1a34d11944defe8c2ce",
+  "window_ms": [
+    30765,
+    32132
+  ],
+  "engine": "opencv",
+  "baseline_commit": "3f13f63f7c13e51cf159a82ccf7793d116f70362",
+  "baseline_segmenter_sha256": "b87d2c87288bf464b11b3cf01cea7f0f6b07507e51624c510a42c743b3942e11",
+  "model_sha256": "015043fb9cc94830ad7065dd3e28d6f8e5758fe03071451675120f6a6b6e44e9",
+  "single_cpu_affinity": true,
+  "opencv_threads": 2,
+  "rounds_seconds": {
+    "legacy": [
+      22.499100957000337,
+      23.05176424599631,
+      22.824081904000195
+    ],
+    "candidate": [
+      22.851282437004556,
+      22.45471258199541,
+      22.21031523700367
+    ]
+  },
+  "median_seconds": {
+    "legacy": 22.824081904000195,
+    "candidate": 22.45471258199541
+  },
+  "reduction_percent": 1.6183315655735053,
+  "output_differences": 0,
+  "output_sha256": "38e284047c479d3101b0f6527df667118dda3bde00e06887714090fbdbec820d",
+  "diagnostics": {
+    "status": "SUPPORTED_SOURCE_OBSERVATIONS",
+    "method": "SOURCE_OBSERVATION_INSTANCE_CONTOUR",
+    "detector_frames": 83,
+    "source_pairs_expected": 16,
+    "source_pairs_reached": 16,
+    "source_pairs_unreached": 0,
+    "source_pairs_no_agreement": 7,
+    "source_pairs_source_conflict": 0,
+    "source_pairs_display_unavailable": 0,
+    "source_pairs_display_source_conflict": 0,
+    "source_pairs_missing_foreground": 0,
+    "source_segments_accepted": 9,
+    "last_decoded_ms": 32132,
+    "decoded_frames": 83,
+    "agreed_intervals": 9
+  },
+  "scope": "one small-model contour window; excludes model loading, medium refinement, source analysis, report writing and upload",
+  "live_verified": false
+}

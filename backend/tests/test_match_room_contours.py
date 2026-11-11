@@ -172,3 +172,20 @@ def test_exact_window_associations_keep_rejections_direction_and_cut_checks(monk
     frames[1]['gray'][:]=0
     frames[1]['media_ms']=100
     assert contours.follow_instance(frames,rows,0,0,association_cache=cache)=={0:0}
+
+
+def test_mask_iou_exact_parity_and_no_input_mutation():
+    rng = np.random.default_rng(816)
+    cases = [(np.zeros((3, 7)), np.zeros((3, 7))),
+             (np.array([[0, -1, np.nan, np.inf, -np.inf, .1]]), np.ones((1, 6))),
+             (rng.integers(-2, 3, (9, 1)), rng.integers(-2, 3, (1, 7)))]
+    for shape in [(1, 1), (120, 160), (1280, 720)]:
+        a = rng.integers(0, 256, shape, dtype=np.uint8)
+        b = rng.integers(0, 2, shape, dtype=np.uint8)
+        cases.extend([(a, b), (a[:, ::2], b[:, ::2]), (a, a)])
+    for a, b in cases:
+        before_a, before_b = a.copy(), b.copy()
+        expected = np.count_nonzero((a > 0) & (b > 0))/max(1, np.count_nonzero((a > 0) | (b > 0)))
+        assert contours.mask_iou(a, b) == expected
+        np.testing.assert_array_equal(a, before_a)
+        np.testing.assert_array_equal(b, before_b)

@@ -1,0 +1,426 @@
+[
+  {
+    "provider": "gemini",
+    "model": "gemini-2.5-pro",
+    "media": "image",
+    "kwargs": {
+      "image_detail": null,
+      "reasoning_effort": "low",
+      "max_output_tokens": 4096
+    },
+    "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent",
+    "payload": "{\"contents\":[{\"role\":\"user\",\"parts\":[{\"text\":\"First \\u00e6\\u00f8\\u00e5\"},{\"inlineData\":{\"mimeType\":\"image/jpeg\",\"data\":\"ZXhhY3Qgc2VyaWFsaXphdGlvbiBmaXh0dXJlAP8=\"}},{\"text\":\"Last\"}]}],\"generationConfig\":{\"temperature\":0,\"responseMimeType\":\"application/json\",\"maxOutputTokens\":4096,\"thinkingConfig\":{\"thinkingBudget\":1024}}}",
+    "audit": {
+      "payload_sha256": "9711fe40e0ee4ea7abf0ee0709ac6ea0c92f3086f884bd8b655e1663f7024a01",
+      "payload_bytes": 322,
+      "explicit_image_count": 1,
+      "images": [
+        {
+          "sha256": "20ee86e027daccb369b65842c40c3d269a1b361d903bbf1f8bd1a4dd11ba13ef",
+          "bytes": 29
+        }
+      ],
+      "frame_sampling_in_provider_metadata": false,
+      "videos": [],
+      "requested_image_detail": null
+    }
+  },
+  {
+    "provider": "gemini",
+    "model": "gemini-2.5-pro",
+    "media": "video",
+    "kwargs": {
+      "image_detail": null,
+      "reasoning_effort": "low",
+      "max_output_tokens": 4096
+    },
+    "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent",
+    "payload": "{\"contents\":[{\"role\":\"user\",\"parts\":[{\"text\":\"First \\u00e6\\u00f8\\u00e5\"},{\"inlineData\":{\"mimeType\":\"video/mp4\",\"data\":\"ZXhhY3Qgc2VyaWFsaXphdGlvbiBmaXh0dXJlAP8=\"},\"videoMetadata\":{\"fps\":12}},{\"text\":\"Last\"}]}],\"generationConfig\":{\"temperature\":0,\"responseMimeType\":\"application/json\",\"maxOutputTokens\":4096,\"thinkingConfig\":{\"thinkingBudget\":1024}}}",
+    "audit": {
+      "payload_sha256": "98bcb64d96e1679af91a83dbf2ddb2a4a09bb8d93683256d7269f8203585a81d",
+      "payload_bytes": 348,
+      "explicit_image_count": 0,
+      "images": [],
+      "frame_sampling_in_provider_metadata": true,
+      "videos": [
+        {
+          "sha256": "20ee86e027daccb369b65842c40c3d269a1b361d903bbf1f8bd1a4dd11ba13ef",
+          "bytes": 29,
+          "requested_fps": 12
+        }
+      ],
+      "requested_image_detail": null
+    }
+  },
+  {
+    "provider": "gemini",
+    "model": "gemini-2.5-pro",
+    "media": "image",
+    "kwargs": {
+      "image_detail": "high",
+      "reasoning_effort": "low",
+      "max_output_tokens": 4096
+    },
+    "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent",
+    "payload": "{\"contents\":[{\"role\":\"user\",\"parts\":[{\"text\":\"First \\u00e6\\u00f8\\u00e5\"},{\"inlineData\":{\"mimeType\":\"image/jpeg\",\"data\":\"ZXhhY3Qgc2VyaWFsaXphdGlvbiBmaXh0dXJlAP8=\"}},{\"text\":\"Last\"}]}],\"generationConfig\":{\"temperature\":0,\"responseMimeType\":\"application/json\",\"maxOutputTokens\":4096,\"mediaResolution\":\"MEDIA_RESOLUTION_HIGH\",\"thinkingConfig\":{\"thinkingBudget\":1024}}}",
+    "audit": {
+      "payload_sha256": "f1a4d4f1c2e83d5824c57ba9a3767e89d83116581d455b19bc3b816b876638b4",
+      "payload_bytes": 364,
+      "explicit_image_count": 1,
+      "images": [
+        {
+          "sha256": "20ee86e027daccb369b65842c40c3d269a1b361d903bbf1f8bd1a4dd11ba13ef",
+          "bytes": 29
+        }
+      ],
+      "frame_sampling_in_provider_metadata": false,
+      "videos": [],
+      "requested_image_detail": "high"
+    }
+  },
+  {
+    "provider": "gemini",
+    "model": "gemini-2.5-pro",
+    "media": "video",
+    "kwargs": {
+      "image_detail": "high",
+      "reasoning_effort": "low",
+      "max_output_tokens": 4096
+    },
+    "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent",
+    "payload": "{\"contents\":[{\"role\":\"user\",\"parts\":[{\"text\":\"First \\u00e6\\u00f8\\u00e5\"},{\"inlineData\":{\"mimeType\":\"video/mp4\",\"data\":\"ZXhhY3Qgc2VyaWFsaXphdGlvbiBmaXh0dXJlAP8=\"},\"videoMetadata\":{\"fps\":12}},{\"text\":\"Last\"}]}],\"generationConfig\":{\"temperature\":0,\"responseMimeType\":\"application/json\",\"maxOutputTokens\":4096,\"mediaResolution\":\"MEDIA_RESOLUTION_HIGH\",\"thinkingConfig\":{\"thinkingBudget\":1024}}}",
+    "audit": {
+      "payload_sha256": "59b187800fefe70429b3a5daf1e00c9b0388ceb29a7edd137ed3745e26954026",
+      "payload_bytes": 390,
+      "explicit_image_count": 0,
+      "images": [],
+      "frame_sampling_in_provider_metadata": true,
+      "videos": [
+        {
+          "sha256": "20ee86e027daccb369b65842c40c3d269a1b361d903bbf1f8bd1a4dd11ba13ef",
+          "bytes": 29,
+          "requested_fps": 12
+        }
+      ],
+      "requested_image_detail": "high"
+    }
+  },
+  {
+    "provider": "gemini",
+    "model": "gemini-3-pro",
+    "media": "image",
+    "kwargs": {
+      "image_detail": null,
+      "reasoning_effort": "low",
+      "max_output_tokens": 4096
+    },
+    "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro:generateContent",
+    "payload": "{\"contents\":[{\"role\":\"user\",\"parts\":[{\"text\":\"First \\u00e6\\u00f8\\u00e5\"},{\"inlineData\":{\"mimeType\":\"image/jpeg\",\"data\":\"ZXhhY3Qgc2VyaWFsaXphdGlvbiBmaXh0dXJlAP8=\"}},{\"text\":\"Last\"}]}],\"generationConfig\":{\"responseMimeType\":\"application/json\",\"maxOutputTokens\":4096,\"thinkingConfig\":{\"thinkingLevel\":\"LOW\"}}}",
+    "audit": {
+      "payload_sha256": "a7fd277c6ee5d9835d07657570dd7493141fdfd12c181fb13faaa731ef011504",
+      "payload_bytes": 306,
+      "explicit_image_count": 1,
+      "images": [
+        {
+          "sha256": "20ee86e027daccb369b65842c40c3d269a1b361d903bbf1f8bd1a4dd11ba13ef",
+          "bytes": 29
+        }
+      ],
+      "frame_sampling_in_provider_metadata": false,
+      "videos": [],
+      "requested_image_detail": null
+    }
+  },
+  {
+    "provider": "gemini",
+    "model": "gemini-3-pro",
+    "media": "video",
+    "kwargs": {
+      "image_detail": null,
+      "reasoning_effort": "low",
+      "max_output_tokens": 4096
+    },
+    "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro:generateContent",
+    "payload": "{\"contents\":[{\"role\":\"user\",\"parts\":[{\"text\":\"First \\u00e6\\u00f8\\u00e5\"},{\"inlineData\":{\"mimeType\":\"video/mp4\",\"data\":\"ZXhhY3Qgc2VyaWFsaXphdGlvbiBmaXh0dXJlAP8=\"},\"videoMetadata\":{\"fps\":12}},{\"text\":\"Last\"}]}],\"generationConfig\":{\"responseMimeType\":\"application/json\",\"maxOutputTokens\":4096,\"thinkingConfig\":{\"thinkingLevel\":\"LOW\"}}}",
+    "audit": {
+      "payload_sha256": "db82014317bced981de139386b0f481b58702a793d375099ef1b078112b222b5",
+      "payload_bytes": 332,
+      "explicit_image_count": 0,
+      "images": [],
+      "frame_sampling_in_provider_metadata": true,
+      "videos": [
+        {
+          "sha256": "20ee86e027daccb369b65842c40c3d269a1b361d903bbf1f8bd1a4dd11ba13ef",
+          "bytes": 29,
+          "requested_fps": 12
+        }
+      ],
+      "requested_image_detail": null
+    }
+  },
+  {
+    "provider": "gemini",
+    "model": "gemini-3-pro",
+    "media": "image",
+    "kwargs": {
+      "image_detail": "high",
+      "reasoning_effort": "low",
+      "max_output_tokens": 4096
+    },
+    "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro:generateContent",
+    "payload": "{\"contents\":[{\"role\":\"user\",\"parts\":[{\"text\":\"First \\u00e6\\u00f8\\u00e5\"},{\"inlineData\":{\"mimeType\":\"image/jpeg\",\"data\":\"ZXhhY3Qgc2VyaWFsaXphdGlvbiBmaXh0dXJlAP8=\"}},{\"text\":\"Last\"}]}],\"generationConfig\":{\"responseMimeType\":\"application/json\",\"maxOutputTokens\":4096,\"mediaResolution\":\"MEDIA_RESOLUTION_HIGH\",\"thinkingConfig\":{\"thinkingLevel\":\"LOW\"}}}",
+    "audit": {
+      "payload_sha256": "c859f98ac99ff938095e81c81f07019d9e8c05493ce7469264ba7ceb12717b33",
+      "payload_bytes": 348,
+      "explicit_image_count": 1,
+      "images": [
+        {
+          "sha256": "20ee86e027daccb369b65842c40c3d269a1b361d903bbf1f8bd1a4dd11ba13ef",
+          "bytes": 29
+        }
+      ],
+      "frame_sampling_in_provider_metadata": false,
+      "videos": [],
+      "requested_image_detail": "high"
+    }
+  },
+  {
+    "provider": "gemini",
+    "model": "gemini-3-pro",
+    "media": "video",
+    "kwargs": {
+      "image_detail": "high",
+      "reasoning_effort": "low",
+      "max_output_tokens": 4096
+    },
+    "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro:generateContent",
+    "payload": "{\"contents\":[{\"role\":\"user\",\"parts\":[{\"text\":\"First \\u00e6\\u00f8\\u00e5\"},{\"inlineData\":{\"mimeType\":\"video/mp4\",\"data\":\"ZXhhY3Qgc2VyaWFsaXphdGlvbiBmaXh0dXJlAP8=\"},\"videoMetadata\":{\"fps\":12}},{\"text\":\"Last\"}]}],\"generationConfig\":{\"responseMimeType\":\"application/json\",\"maxOutputTokens\":4096,\"mediaResolution\":\"MEDIA_RESOLUTION_HIGH\",\"thinkingConfig\":{\"thinkingLevel\":\"LOW\"}}}",
+    "audit": {
+      "payload_sha256": "2a25515e6b1ae39eac682057480cbff6d0dca0986e167e6a4f1fc7af73bdc637",
+      "payload_bytes": 374,
+      "explicit_image_count": 0,
+      "images": [],
+      "frame_sampling_in_provider_metadata": true,
+      "videos": [
+        {
+          "sha256": "20ee86e027daccb369b65842c40c3d269a1b361d903bbf1f8bd1a4dd11ba13ef",
+          "bytes": 29,
+          "requested_fps": 12
+        }
+      ],
+      "requested_image_detail": "high"
+    }
+  },
+  {
+    "provider": "emergent",
+    "model": "gemini-2.5-pro",
+    "media": "image",
+    "kwargs": {
+      "image_detail": null,
+      "reasoning_effort": "low",
+      "max_output_tokens": 4096
+    },
+    "url": "https://integrations.emergentagent.com/llm/chat/completions",
+    "payload": "{\"model\":\"gemini/gemini-2.5-pro\",\"messages\":[{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"First \\u00e6\\u00f8\\u00e5\"},{\"type\":\"image_url\",\"image_url\":{\"url\":\"data:image/jpeg;base64,ZXhhY3Qgc2VyaWFsaXphdGlvbiBmaXh0dXJlAP8=\"}},{\"type\":\"text\",\"text\":\"Last\"}]}],\"temperature\":0,\"response_format\":{\"type\":\"json_object\"},\"max_tokens\":4096,\"reasoning_effort\":\"low\"}",
+    "audit": {
+      "payload_sha256": "2e4da76122de2fa62f6ab6ce99416fc8d34e46651359ad619cf7f2f562a66cf6",
+      "payload_bytes": 361,
+      "explicit_image_count": 1,
+      "images": [
+        {
+          "sha256": "20ee86e027daccb369b65842c40c3d269a1b361d903bbf1f8bd1a4dd11ba13ef",
+          "bytes": 29
+        }
+      ],
+      "frame_sampling_in_provider_metadata": false,
+      "videos": [],
+      "requested_image_detail": null
+    }
+  },
+  {
+    "provider": "emergent",
+    "model": "gemini-2.5-pro",
+    "media": "video",
+    "kwargs": {
+      "image_detail": null,
+      "reasoning_effort": "low",
+      "max_output_tokens": 4096
+    },
+    "url": "https://integrations.emergentagent.com/llm/chat/completions",
+    "payload": "{\"model\":\"gemini/gemini-2.5-pro\",\"messages\":[{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"First \\u00e6\\u00f8\\u00e5\"},{\"type\":\"file\",\"file\":{\"file_data\":\"data:video/mp4;base64,ZXhhY3Qgc2VyaWFsaXphdGlvbiBmaXh0dXJlAP8=\",\"format\":\"video/mp4\",\"video_metadata\":{\"fps\":12}}},{\"type\":\"text\",\"text\":\"Last\"}]}],\"temperature\":0,\"response_format\":{\"type\":\"json_object\"},\"max_tokens\":4096,\"reasoning_effort\":\"low\"}",
+    "audit": {
+      "payload_sha256": "4b6a6d790e490c52bb7716f1d1d7846da443f0fd09c64207a5f776cab472b4d7",
+      "payload_bytes": 405,
+      "explicit_image_count": 0,
+      "images": [],
+      "frame_sampling_in_provider_metadata": true,
+      "videos": [
+        {
+          "sha256": "20ee86e027daccb369b65842c40c3d269a1b361d903bbf1f8bd1a4dd11ba13ef",
+          "bytes": 29,
+          "requested_fps": 12
+        }
+      ],
+      "requested_image_detail": null
+    }
+  },
+  {
+    "provider": "emergent",
+    "model": "gemini-2.5-pro",
+    "media": "image",
+    "kwargs": {
+      "image_detail": "high",
+      "reasoning_effort": "low",
+      "max_output_tokens": 4096
+    },
+    "url": "https://integrations.emergentagent.com/llm/chat/completions",
+    "payload": "{\"model\":\"gemini/gemini-2.5-pro\",\"messages\":[{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"First \\u00e6\\u00f8\\u00e5\"},{\"type\":\"image_url\",\"image_url\":{\"url\":\"data:image/jpeg;base64,ZXhhY3Qgc2VyaWFsaXphdGlvbiBmaXh0dXJlAP8=\",\"detail\":\"high\"}},{\"type\":\"text\",\"text\":\"Last\"}]}],\"temperature\":0,\"response_format\":{\"type\":\"json_object\"},\"max_tokens\":4096,\"reasoning_effort\":\"low\"}",
+    "audit": {
+      "payload_sha256": "e183719a42922a2ef39113757383cf34b5937b846fec82f63f8e165441dc7ae3",
+      "payload_bytes": 377,
+      "explicit_image_count": 1,
+      "images": [
+        {
+          "sha256": "20ee86e027daccb369b65842c40c3d269a1b361d903bbf1f8bd1a4dd11ba13ef",
+          "bytes": 29
+        }
+      ],
+      "frame_sampling_in_provider_metadata": false,
+      "videos": [],
+      "requested_image_detail": "high"
+    }
+  },
+  {
+    "provider": "emergent",
+    "model": "gemini-2.5-pro",
+    "media": "video",
+    "kwargs": {
+      "image_detail": "high",
+      "reasoning_effort": "low",
+      "max_output_tokens": 4096
+    },
+    "url": "https://integrations.emergentagent.com/llm/chat/completions",
+    "payload": "{\"model\":\"gemini/gemini-2.5-pro\",\"messages\":[{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"First \\u00e6\\u00f8\\u00e5\"},{\"type\":\"file\",\"file\":{\"file_data\":\"data:video/mp4;base64,ZXhhY3Qgc2VyaWFsaXphdGlvbiBmaXh0dXJlAP8=\",\"format\":\"video/mp4\",\"video_metadata\":{\"fps\":12},\"detail\":\"high\"}},{\"type\":\"text\",\"text\":\"Last\"}]}],\"temperature\":0,\"response_format\":{\"type\":\"json_object\"},\"max_tokens\":4096,\"reasoning_effort\":\"low\"}",
+    "audit": {
+      "payload_sha256": "7881311541183c092707fb52e1c644ad25c907133a3ed8b5347581ace7034dc5",
+      "payload_bytes": 421,
+      "explicit_image_count": 0,
+      "images": [],
+      "frame_sampling_in_provider_metadata": true,
+      "videos": [
+        {
+          "sha256": "20ee86e027daccb369b65842c40c3d269a1b361d903bbf1f8bd1a4dd11ba13ef",
+          "bytes": 29,
+          "requested_fps": 12
+        }
+      ],
+      "requested_image_detail": "high"
+    }
+  },
+  {
+    "provider": "emergent",
+    "model": "gpt-6-astra",
+    "media": "image",
+    "kwargs": {
+      "image_detail": null,
+      "reasoning_effort": "low",
+      "max_output_tokens": 4096
+    },
+    "url": "https://integrations.emergentagent.com/llm/chat/completions",
+    "payload": "{\"model\":\"gpt-6-astra\",\"messages\":[{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"First \\u00e6\\u00f8\\u00e5\"},{\"type\":\"image_url\",\"image_url\":{\"url\":\"data:image/jpeg;base64,ZXhhY3Qgc2VyaWFsaXphdGlvbiBmaXh0dXJlAP8=\"}},{\"type\":\"text\",\"text\":\"Last\"}]}],\"response_format\":{\"type\":\"json_object\"},\"max_completion_tokens\":4096,\"reasoning_effort\":\"low\"}",
+    "audit": {
+      "payload_sha256": "e07422394c3fe3a5ff69aef86cfcb4d31722ab8e16539c5f8ecbb636586c5833",
+      "payload_bytes": 346,
+      "explicit_image_count": 1,
+      "images": [
+        {
+          "sha256": "20ee86e027daccb369b65842c40c3d269a1b361d903bbf1f8bd1a4dd11ba13ef",
+          "bytes": 29
+        }
+      ],
+      "frame_sampling_in_provider_metadata": false,
+      "videos": [],
+      "requested_image_detail": null
+    }
+  },
+  {
+    "provider": "emergent",
+    "model": "gpt-6-astra",
+    "media": "video",
+    "kwargs": {
+      "image_detail": null,
+      "reasoning_effort": "low",
+      "max_output_tokens": 4096
+    },
+    "url": "https://integrations.emergentagent.com/llm/chat/completions",
+    "payload": "{\"model\":\"gpt-6-astra\",\"messages\":[{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"First \\u00e6\\u00f8\\u00e5\"},{\"type\":\"file\",\"file\":{\"file_data\":\"data:video/mp4;base64,ZXhhY3Qgc2VyaWFsaXphdGlvbiBmaXh0dXJlAP8=\",\"format\":\"video/mp4\",\"video_metadata\":{\"fps\":12}}},{\"type\":\"text\",\"text\":\"Last\"}]}],\"response_format\":{\"type\":\"json_object\"},\"max_completion_tokens\":4096,\"reasoning_effort\":\"low\"}",
+    "audit": {
+      "payload_sha256": "ef420290d34cd1a2885cc54ec7b101729f7c09021ca1b2529eeace6d086c93ba",
+      "payload_bytes": 390,
+      "explicit_image_count": 0,
+      "images": [],
+      "frame_sampling_in_provider_metadata": true,
+      "videos": [
+        {
+          "sha256": "20ee86e027daccb369b65842c40c3d269a1b361d903bbf1f8bd1a4dd11ba13ef",
+          "bytes": 29,
+          "requested_fps": 12
+        }
+      ],
+      "requested_image_detail": null
+    }
+  },
+  {
+    "provider": "emergent",
+    "model": "gpt-6-astra",
+    "media": "image",
+    "kwargs": {
+      "image_detail": "high",
+      "reasoning_effort": "low",
+      "max_output_tokens": 4096
+    },
+    "url": "https://integrations.emergentagent.com/llm/chat/completions",
+    "payload": "{\"model\":\"gpt-6-astra\",\"messages\":[{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"First \\u00e6\\u00f8\\u00e5\"},{\"type\":\"image_url\",\"image_url\":{\"url\":\"data:image/jpeg;base64,ZXhhY3Qgc2VyaWFsaXphdGlvbiBmaXh0dXJlAP8=\",\"detail\":\"high\"}},{\"type\":\"text\",\"text\":\"Last\"}]}],\"response_format\":{\"type\":\"json_object\"},\"max_completion_tokens\":4096,\"reasoning_effort\":\"low\"}",
+    "audit": {
+      "payload_sha256": "488c994143b44ecdffa8906358f62bb9803351ec194aad2bf038c3bd8abce3a0",
+      "payload_bytes": 362,
+      "explicit_image_count": 1,
+      "images": [
+        {
+          "sha256": "20ee86e027daccb369b65842c40c3d269a1b361d903bbf1f8bd1a4dd11ba13ef",
+          "bytes": 29
+        }
+      ],
+      "frame_sampling_in_provider_metadata": false,
+      "videos": [],
+      "requested_image_detail": "high"
+    }
+  },
+  {
+    "provider": "emergent",
+    "model": "gpt-6-astra",
+    "media": "video",
+    "kwargs": {
+      "image_detail": "high",
+      "reasoning_effort": "low",
+      "max_output_tokens": 4096
+    },
+    "url": "https://integrations.emergentagent.com/llm/chat/completions",
+    "payload": "{\"model\":\"gpt-6-astra\",\"messages\":[{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"First \\u00e6\\u00f8\\u00e5\"},{\"type\":\"file\",\"file\":{\"file_data\":\"data:video/mp4;base64,ZXhhY3Qgc2VyaWFsaXphdGlvbiBmaXh0dXJlAP8=\",\"format\":\"video/mp4\",\"video_metadata\":{\"fps\":12},\"detail\":\"high\"}},{\"type\":\"text\",\"text\":\"Last\"}]}],\"response_format\":{\"type\":\"json_object\"},\"max_completion_tokens\":4096,\"reasoning_effort\":\"low\"}",
+    "audit": {
+      "payload_sha256": "2a021d7580ee9c90fcb16d5f1d7f686ac2719bad3fae7ae527ffa794cf5b5b91",
+      "payload_bytes": 406,
+      "explicit_image_count": 0,
+      "images": [],
+      "frame_sampling_in_provider_metadata": true,
+      "videos": [
+        {
+          "sha256": "20ee86e027daccb369b65842c40c3d269a1b361d903bbf1f8bd1a4dd11ba13ef",
+          "bytes": 29,
+          "requested_fps": 12
+        }
+      ],
+      "requested_image_detail": "high"
+    }
+  }
+]
