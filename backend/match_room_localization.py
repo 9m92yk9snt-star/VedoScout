@@ -192,6 +192,15 @@ def completion_windows(event, record):
     return windows
 
 
+def retained_localization_events(audit, source_sha256, selection_sha256):
+    """Expose receipts only within the exact source and selection context."""
+    if (not source_sha256 or not selection_sha256
+            or audit.get('source_video_sha256') != source_sha256
+            or audit.get('original_selection_values_sha256') != selection_sha256):
+        return {}
+    return deepcopy(audit.get('events') or {})
+
+
 async def localize(video, doc, *, checkpoint, event_ids=None, run_jobs=None, budget_seconds=420, workers=2, coordination=None, shared_deadline=None):
     """Observe presentation positions without changing canonical event identity.
 
@@ -213,12 +222,11 @@ async def localize(video, doc, *, checkpoint, event_ids=None, run_jobs=None, bud
                  [r['event_id'] for r in doc['full_report']['video_comments']])
     candidates = [e for e in bundle['events'] if e['event_id'] in chosen and not e.get('visual_samples')][:8]
     previous_audit = doc.get('match_room_localization') or {}
-    previous = previous_audit.get('events') or {}
-    same_context = (previous_audit.get('source_video_sha256') == bundle['source_video_sha256']
-                    and previous_audit.get('original_selection_values_sha256') == selection_digest(selection))
+    previous = retained_localization_events(previous_audit, bundle['source_video_sha256'],
+                                            selection_digest(selection))
     audit = {'version': 2, 'source_video_sha256': bundle['source_video_sha256'],
              'original_selection_values_sha256': selection_digest(selection),
-             'events': deepcopy(previous) if same_context else {}}
+             'events': deepcopy(previous)}
     loop = asyncio.get_running_loop()
     jobs, records, by_packet = [], {}, {}
     reference_images = None
