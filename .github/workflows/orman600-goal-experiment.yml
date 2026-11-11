@@ -1,0 +1,46 @@
+name: Orman600 isolated goal evidence
+on:
+  pull_request:
+    types: [opened]
+    paths:
+      - '.github/workflows/orman600-goal-experiment.yml'
+      - 'backend/scripts/review_prepared_goal.py'
+permissions:
+  contents: read
+jobs:
+  source_review:
+    if: >-
+      github.repository == '9m92yk9snt-star/VedoScout' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.head.ref == 'experiment/orman600-goal-evidence' &&
+      github.run_attempt == 1
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify prepared evidence without a model
+        run: >-
+          python backend/scripts/review_prepared_goal.py
+          --bundle testdata/orman600-goal-evidence/source.json.gz.b64
+          --output "$RUNNER_TEMP/goal-preflight"
+      - name: One source review request
+        env:
+          EMERGENT_LLM_KEY: ${{ secrets.EMERGENT_LLM_KEY }}
+        run: >-
+          python -u backend/scripts/review_prepared_goal.py
+          --bundle testdata/orman600-goal-evidence/source.json.gz.b64
+          --output "$RUNNER_TEMP/goal-result" --run-model
+      - name: Preserve model receipt and source frames
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: orman600-goal-evidence-${{ github.run_id }}
+          path: ${{ runner.temp }}/goal-result/
+          retention-days: 14
+          if-no-files-found: warn
