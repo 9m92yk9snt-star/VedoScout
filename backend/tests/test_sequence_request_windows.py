@@ -159,6 +159,6 @@ def test_call_budget_release_preserves_exact_receipt_admission():
     current = code_fingerprint()
     assert retry_code_compatible(_PRE_CALL_BUDGET_CODE, current)
     for field in current:
-        if field not in {"sequence_report_runtime.py", "sequence_run_checkpoint.py"}:
+        if field not in {"sequence_report_runtime.py", "sequence_run_checkpoint.py", "sequence_pilot_transport.py", "run_sequence_pilot.py"}:
             assert not retry_code_compatible(_PRE_CALL_BUDGET_CODE, {**current, field: "changed"})
     assert not retry_code_compatible({**_PRE_CALL_BUDGET_CODE, "sequence_pilot.py": "unknown"}, current)

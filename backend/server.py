@@ -14545,7 +14545,7 @@ app.add_middleware(
 # kills it mid-flight and the doc stays `full_report_status="generating"`
 # forever — the premium building dashboard then spins at 98% with no recovery.
 FULL_REPORT_STALL_SECONDS = 3 * 60    # Four missed 45-second heartbeats; not an analysis-duration limit.
-FULL_REPORT_MAX_RUN_SECONDS = 30 * 60  # Sequence source + writer + assets; never the retired two-hour chain.
+FULL_REPORT_MAX_RUN_SECONDS = None  # Stage/call idle deadlines supervise work; no total elapsed cutoff.
 FULL_REPORT_MAX_RETRIES = 1
 
 

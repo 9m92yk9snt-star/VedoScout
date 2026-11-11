@@ -9,3 +9,12 @@ Three initial packets succeeded only on within-run recovery: 161.924, 136.169 an
 Allow exact-request receipt migration from the exported release fingerprint only when all modules except runtime orchestration and checkpoint code remain identical. Payload/provider/model/response checksum and current-parser checks remain mandatory. This is essential to avoid invalidating the twelve paid receipts on deployment.
 
 Remaining validation: a deployed retry must rebuild matching follow-up requests and complete remaining source reviews, report writing and graphics. No new provider calls have been made for this patch. The total source deadline can still be reached; this patch is not a claim of universal interruption immunity.
+
+
+## Progress-based source supervision
+
+Production now passes --progress-budget. The source deadline renews after completed response receipts, including exact verified reuse; error receipts do not renew it. Each already-running child retains its original per-call deadline. Pending work can therefore finish after the former overall source cutoff while idle/error-only work still exhausts the source deadline. The outer source process no longer has a second fixed elapsed timer.
+
+The server's 30-minute overall cutoff is disabled (None). Existing lease heartbeats, individual call limits and bounded stage operations remain. This is not removal of all stage timeouts or a guarantee against provider failures.
+
+The exact deployed migration permits the reviewed runner and transport timing changes too; payload and response checks remain unchanged. Validation: 274 regression tests plus a focused three-test real-process run (one existing timeout test, two new success/error renewal cases) passed. Live Orman2000 completion is still unverified.

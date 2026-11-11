@@ -463,6 +463,8 @@ def test_discovery_checkpoints_before_process_finishes_and_preserves_failure(tmp
             # Slow valid responses observed at 136-162 seconds must fit the
             # first call, while the whole source stage stays bounded.
             assert args[args.index("--per-call-s") + 1] == "180"
+            assert "--progress-budget" in args
+            assert kwargs["timeout_s"] is None
             assert 0 < float(args[args.index("--budget-s") + 1]) <= 900
             runtime.pilot.write_json(tmp_path / "observations/responses/sequence_001.json", {
                 "packet_id": "sequence_001", "status": "COMPLETED", "raw_response": "retained reply"})

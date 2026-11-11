@@ -91,16 +91,16 @@ async def discover(video, anchors_document, work, *, checkpoint=None, resume=Non
             await progress({"phase": "source", "started_at": source_started_at,
                             "initial_total": len(pilot.read_json(prepared / "manifest.json")["packets"]),
                             "initial_completed": 0, "updated_at": datetime.now(timezone.utc).isoformat()})
-        budget = max(1, 900 - (time.monotonic() - started))
+        budget = 900  # Idle budget renewed by completed source receipts.
         args = [sys.executable, script, "run", "--prepared", prepared / "manifest.json",
                          "--output", output, "--provider", "emergent", "--model", "gpt-6-astra",
-                         "--reasoning-effort", "medium", "--budget-s", str(budget), "--per-call-s", "180",
+                         "--progress-budget", "--reasoning-effort", "medium", "--budget-s", str(budget), "--per-call-s", "180",
                          "--max-initial", "12", "--max-followups", "6", "--fresh-originals",
                          "--contact-reviews", "--automatic-outcomes", "--image-detail", "high"]
         if resume:
             pilot.write_json(root / "retry.json", resume)
             args += ["--retry-receipts", root / "retry.json"]
-        await owned_process(args, timeout_s=budget + 10, log_path=root / "observations.log")
+        await owned_process(args, timeout_s=None, log_path=root / "observations.log")
 
     seen = None
     async def persist_progress():

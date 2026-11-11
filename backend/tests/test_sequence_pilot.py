@@ -1697,3 +1697,27 @@ def test_terminal_failure_stops_both_pools_before_checkpoint(tmp_path, failure, 
     assert not unexpected.exists()
     assert shared._active == first._active == second._active == 0
     assert len(saved) == 4
+
+
+def progress_budget_worker(connection, job, provider, model, timeout_s):
+    import time
+    time.sleep(.6)
+    connection.send({"packet_id": job["packet_id"], "status": job["result_status"]})
+    connection.close()
+
+
+@pytest.mark.parametrize("status", ["COMPLETED", "ERROR"])
+def test_source_idle_deadline_renews_only_for_completed_work(status):
+    import time
+    jobs = [{"packet_id": str(i), "result_status": status} for i in range(5)]
+    start = time.monotonic()
+    rows = t.run_jobs(jobs, "emergent", "gpt-6-astra", deadline=start+2,
+                      per_call_s=2, workers=1, worker=progress_budget_worker,
+                      progress_timeout_s=2)
+    assert len(rows) == 5
+    if status == "COMPLETED":
+        assert all(r["status"] == "COMPLETED" for r in rows)
+        assert time.monotonic() - start > 2
+    else:
+        assert any(r.get("error") == "RUN_TIME_BUDGET_EXHAUSTED" for r in rows)
+        assert not any(r["status"] == "COMPLETED" for r in rows)

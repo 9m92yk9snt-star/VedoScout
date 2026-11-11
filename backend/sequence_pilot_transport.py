@@ -345,10 +345,12 @@ async def run_jobs_async(jobs, provider, model, *, coordination=None, runner=Non
         raise
 
 
-def run_jobs(jobs, provider, model, *, deadline, per_call_s=90., workers=2, worker=_worker, on_result=None, coordination=None):
+def run_jobs(jobs, provider, model, *, deadline, per_call_s=90., workers=2, worker=_worker, on_result=None, coordination=None, progress_timeout_s=None):
     """Two owned children; a wall deadline stops actual work, including hung IO."""
     if provider not in KEY_ENV or not 1 <= workers <= 2 or not 0 < per_call_s <= MAX_CALL_SECONDS:
         raise ValueError("INVALID_EXECUTION_BUDGET")
+    if progress_timeout_s is not None and not 1 <= progress_timeout_s <= 900:
+        raise ValueError("INVALID_PROGRESS_TIMEOUT")
     pending, active, results, abort = list(jobs), {}, [], False
     cancel_active = False
     rate_retries, histories, resume_at = set(), {}, 0.
@@ -431,6 +433,8 @@ def run_jobs(jobs, provider, model, *, deadline, per_call_s=90., workers=2, work
                             coordination.stop_new_calls(cancel_active=True)
                         elif result.get("http_status") == 429 and result.get("limit_kind") == "QUOTA_EXHAUSTED":
                             coordination.stop_new_calls()
+                    if progress_timeout_s is not None and result.get("status") == "COMPLETED":
+                        deadline = time.monotonic() + progress_timeout_s
                     if on_result:
                         on_result(result)
                     stop = not retry_rate_limit and result.get("error") in STOP_ERRORS

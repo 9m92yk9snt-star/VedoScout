@@ -105,7 +105,7 @@ def retry_code_compatible(saved, current=None):
         return True
     if saved == _PRE_CALL_BUDGET_CODE:
         return (set(current) == set(saved) and all(current[k] == saved[k]
-                for k in saved if k not in {"sequence_report_runtime.py", "sequence_run_checkpoint.py"}))
+                for k in saved if k not in {"sequence_report_runtime.py", "sequence_run_checkpoint.py", "sequence_pilot_transport.py", "run_sequence_pilot.py"}))
     changed = {"run_sequence_pilot.py", "sequence_report_runtime.py", "sequence_run_checkpoint.py"}
     changed.add("sequence_pilot_transport.py")
     return (saved in (_PRE_SPLIT_CODE, _PRE_RATE_LIMIT_CODE) and set(current) == set(saved)
