@@ -94,7 +94,7 @@ async def discover(video, anchors_document, work, *, checkpoint=None, resume=Non
         budget = max(1, 900 - (time.monotonic() - started))
         args = [sys.executable, script, "run", "--prepared", prepared / "manifest.json",
                          "--output", output, "--provider", "emergent", "--model", "gpt-6-astra",
-                         "--reasoning-effort", "medium", "--budget-s", str(budget), "--per-call-s", "120",
+                         "--reasoning-effort", "medium", "--budget-s", str(budget), "--per-call-s", "180",
                          "--max-initial", "12", "--max-followups", "6", "--fresh-originals",
                          "--contact-reviews", "--automatic-outcomes", "--image-detail", "high"]
         if resume:

@@ -460,6 +460,10 @@ def test_discovery_checkpoints_before_process_finishes_and_preserves_failure(tmp
                 runtime.pilot.write_json(tmp_path / "prepared/manifest.json", {
                     "source_video_sha256": "source", "original_taps_sha256": "selection"})
                 return
+            # Slow valid responses observed at 136-162 seconds must fit the
+            # first call, while the whole source stage stays bounded.
+            assert args[args.index("--per-call-s") + 1] == "180"
+            assert 0 < float(args[args.index("--budget-s") + 1]) <= 900
             runtime.pilot.write_json(tmp_path / "observations/responses/sequence_001.json", {
                 "packet_id": "sequence_001", "status": "COMPLETED", "raw_response": "retained reply"})
             # The source process cannot finish until the server has persisted its receipt.

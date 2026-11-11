@@ -623,7 +623,7 @@ def test_transport_persists_result_before_returning_the_batch():
 
 
 @pytest.mark.parametrize("change,expected_sent", [
-    (None, ["second"]), ("legacy_code", ["second"]), ("request", ["first", "second"]),
+    (None, ["second"]), ("deployed_code", ["second"]), ("legacy_code", ["second"]), ("request", ["first", "second"]),
     ("response", ["first", "second"]), ("model", ["first", "second"]),
     ("status", ["first", "second"]), ("invalid_json", ["first", "second"]),
 ])
@@ -660,6 +660,9 @@ def test_retry_only_sends_unfinished_or_changed_exact_requests(tmp_path, monkeyp
         first["response_sha256"] = hashlib.sha256(b"not JSON").hexdigest()
     retry = {"code_sha256": code_fingerprint(), "source_video_sha256": manifest["source_video_sha256"],
              "original_taps_sha256": "selections", "receipts": [first]}
+    if change == "deployed_code":
+        from sequence_run_checkpoint import _PRE_CALL_BUDGET_CODE
+        retry["code_sha256"] = _PRE_CALL_BUDGET_CODE
     if change == "legacy_code":
         from sequence_run_checkpoint import _PRE_SPLIT_CODE
         retry["code_sha256"] = _PRE_SPLIT_CODE
@@ -684,8 +687,8 @@ def test_retry_only_sends_unfinished_or_changed_exact_requests(tmp_path, monkeyp
                  retry_receipts=retry_path)
     assert sent == expected_sent
     assert result["status"] == "MODEL_OBSERVATIONS_RETURNED"
-    assert result["retry_reused_packet_ids"] == (["first"] if change in (None, "legacy_code") else [])
-    assert result["fresh_end_to_end_run"] is (change not in (None, "legacy_code"))
+    assert result["retry_reused_packet_ids"] == (["first"] if change in (None, "legacy_code", "deployed_code") else [])
+    assert result["fresh_end_to_end_run"] is (change not in (None, "legacy_code", "deployed_code"))
     for name in ("first", "second"):
         assert p.read_json(tmp_path / "result/responses" / (name + ".json"))["status"] == "COMPLETED"
 
