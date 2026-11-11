@@ -118,8 +118,10 @@ def test_retry_code_migration_is_narrow_and_payload_still_must_match():
 
 def test_rate_limit_release_migration_keeps_exact_request_gate():
     from sequence_run_checkpoint import retry_code_compatible, _PRE_RATE_LIMIT_CODE, code_fingerprint
-    current = code_fingerprint()
+    # Historical migration is bounded to unchanged analysis dependencies.
+    current = {**_PRE_RATE_LIMIT_CODE, 'sequence_pilot_transport.py': 'new-transport'}
     assert retry_code_compatible(_PRE_RATE_LIMIT_CODE, current)
+    assert not retry_code_compatible(_PRE_RATE_LIMIT_CODE, code_fingerprint())
     for field in ('sequence_pilot.py', 'player_selection.py', 'match_room.py', 'sequence_report_adapter.py'):
         assert not retry_code_compatible(_PRE_RATE_LIMIT_CODE, {**current, field: 'changed'})
     assert not retry_code_compatible({**_PRE_RATE_LIMIT_CODE, 'sequence_pilot_transport.py': 'unknown'}, current)
@@ -137,3 +139,16 @@ def test_failed_retry_cannot_erase_intact_completed_response():
     assert merge_retry_receipts([good], [newer]) == [newer]
     failed = dict(packet_id='one', status='ERROR')
     assert merge_retry_receipts([{**good, 'raw_response':'damaged'}], [failed]) == [failed]
+
+
+def test_checkpoint_fingerprint_tracks_shared_analysis_rules(monkeypatch):
+    from pathlib import Path
+    from sequence_run_checkpoint import code_fingerprint
+    original = Path.read_bytes
+    baseline = code_fingerprint()
+    for module in ('sequence_report_selection.py', 'sequence_deadline.py'):
+        monkeypatch.setattr(Path, 'read_bytes',
+            lambda p, module=module: original(p) + (b'changed' if p.name == module else b''))
+        changed = code_fingerprint()
+        assert changed[module] != baseline[module]
+        assert {k for k in baseline if baseline[k] != changed[k]} == {module}

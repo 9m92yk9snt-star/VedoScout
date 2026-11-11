@@ -203,7 +203,10 @@ def completion_setup(monkeypatch):
         if window: assert window == [425, 600]
         return {k: deepcopy(v) for k,v in chosen.items() if k != 'receipt'}, {'packet_id': chosen['packet_id']}
     monkeypatch.setattr(loc, 'prepare', prepare)
-    doc['match_room_localization'] = {'events': {event['event_id']: deepcopy(primary)}}
+    doc['match_room_localization'] = {
+        'source_video_sha256': doc['canonical_events']['source_video_sha256'],
+        'original_selection_values_sha256': primary['original_selection_values_sha256'],
+        'events': {event['event_id']: deepcopy(primary)}}
     return doc, primary, extra
 
 
@@ -289,3 +292,25 @@ def test_exhausted_shared_budget_does_not_start_supplement(monkeypatch):
     assert [r['media_ms'] for r in bundle['events'][0]['visual_samples']]==[100,200,300]
     assert saved[-1]['events']['event']['completion_error']=='LOCALIZATION_TIME_BUDGET'
     assert saved[-1]['events']['event']['coverage']['clip_edges_observed'] is False
+
+
+@pytest.mark.parametrize('field,value', [
+    ('source_video_sha256', 'different-video'),
+    ('original_selection_values_sha256', 'different-selection'),
+    ('source_video_sha256', None),
+])
+def test_foreign_context_receipts_are_replaced_by_fresh_requests(monkeypatch, field, value):
+    doc, primary, extra = completion_setup(monkeypatch)
+    doc['match_room_localization'][field] = value
+    calls, saved = [], []
+    async def checkpoint(audit):
+        saved.append(deepcopy(audit))
+    def run(jobs, *args, **kwargs):
+        receipts = {r['packet_id']: r['receipt'] for r in (primary, extra)}
+        calls.extend(j['packet_id'] for j in jobs)
+        return [receipts[j['packet_id']] for j in jobs]
+    bundle = asyncio.run(loc.localize('source', doc, checkpoint=checkpoint, run_jobs=run))
+    assert calls == [primary['packet_id'], extra['packet_id']]
+    assert saved[0]['events'] == {}
+    assert saved[-1]['events']['event']['reused'] is False
+    assert [r['media_ms'] for r in bundle['events'][0]['visual_samples']] == [100, 200, 300, 425, 500, 600]

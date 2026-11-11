@@ -671,6 +671,14 @@ def test_retry_only_sends_unfinished_or_changed_exact_requests(tmp_path, monkeyp
         for row in rows: on_result(row)
         return rows
     monkeypatch.setattr(t, "run_jobs", send)
+    if change == "legacy_code":
+        # The historical migration cannot bypass newer analysis dependencies.
+        with pytest.raises(ValueError, match="INITIAL_RECEIPT_INPUT_MISMATCH"):
+            run(path, tmp_path / "result", provider="emergent", model="gpt-6-astra",
+                fresh_originals=True, contact_reviews=True, automatic_outcomes=True,
+                reasoning_effort="medium", image_detail="high", retry_receipts=retry_path)
+        assert sent == []
+        return
     result = run(path, tmp_path / "result", provider="emergent", model="gpt-6-astra", fresh_originals=True,
                  contact_reviews=True, automatic_outcomes=True, reasoning_effort="medium", image_detail="high",
                  retry_receipts=retry_path)
