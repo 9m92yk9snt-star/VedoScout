@@ -20,7 +20,7 @@ import sequence_pilot_transport as transport
 import sequence_report_adapter as adapter
 from evidence_authority import attach_clip_authority, compute_proof_frame_verified
 from report_fact_authority import assessment_prompt
-from sequence_run_checkpoint import code_fingerprint, failure_metadata, retry_code_compatible, merge_retry_receipts
+from sequence_run_checkpoint import code_fingerprint, failure_metadata, retry_code_compatible, merge_retry_receipts, reusable_receipt
 
 
 def enabled():
@@ -191,7 +191,7 @@ WRITER_SECTIONS = (
 )
 
 
-async def write_facts(prompt, *, canonical=None, coordination=None):
+async def write_facts(prompt, *, canonical=None, coordination=None, previous_receipts=(), checkpoint=None):
     """Two bounded text sections; presentation consumes the completed assessment.
 
     No new perception, network retry or automatic model fallback. Canonical
@@ -215,9 +215,18 @@ async def write_facts(prompt, *, canonical=None, coordination=None):
                  "items": [{"type": "text", "text": section_prompt}]}]
         if model == "gpt-6-astra":
             jobs[0]["reasoning_effort"] = "low"
-        rows = await transport.run_jobs_async(jobs, "emergent", model, coordination=coordination,
-                                       deadline=time.monotonic()+195, per_call_s=180)
-        receipt = rows[0]
+        job = jobs[0]
+        request = transport.build_request("emergent", model, job["items"],
+            reasoning_effort=job.get("reasoning_effort"),
+            max_output_tokens=job["max_output_tokens"])[2]
+        cached = next((r for r in previous_receipts if reusable_receipt(
+            r, request, provider="emergent", model=model, packet_id=job["packet_id"])), None)
+        if cached is not None:
+            receipt = deepcopy(cached)
+        else:
+            rows = await transport.run_jobs_async(jobs, "emergent", model, coordination=coordination,
+                                           deadline=time.monotonic()+195, per_call_s=180)
+            receipt = rows[0]
         receipts.append(receipt)
         if receipt.get("status") != "COMPLETED":
             raise ReportWriterFailure("SEQUENCE_REPORT_WRITER_FAILED", receipts)
@@ -239,6 +248,8 @@ async def write_facts(prompt, *, canonical=None, coordination=None):
                 report = {k: checked[k] for k in keys}
         except ValueError:
             raise ReportWriterFailure("SEQUENCE_REPORT_WRITER_INVALID", receipts)
+        if checkpoint:
+            await checkpoint(deepcopy(receipts))
     return {"report": report, "receipts": receipts}
 
 
@@ -319,7 +330,7 @@ async def generate(video, doc, *, template, writer=write_facts, discovery=discov
             result, manifest, receipts = await discovery(video, anchor_document, work)
         # Persist paid observations before projection/writing can fail. A failed
         # writer must never discard nine minutes of source-reading receipts.
-        audit = {"result": result, "receipts": receipts, "writer_receipts": [],
+        audit = {"result": result, "receipts": receipts, "writer_receipts": deepcopy((doc.get("sequence_audit") or {}).get("writer_receipts") or []) if retained else [],
                  "source_video_sha256": source,
                  "original_taps_sha256": manifest.get("original_taps_sha256"),
                  "original_selection_values_sha256": selection_sha,
@@ -351,8 +362,16 @@ async def generate(video, doc, *, template, writer=write_facts, discovery=discov
             await checkpoint({"canonical_events": bundle, "sequence_audit": audit,
                               "sequence_timings": source_timings})
             await save_live_progress({"phase": "writer", "started_at": datetime.now(timezone.utc).isoformat()})
+        previous_writer = ((doc.get("sequence_audit") or {}).get("writer_receipts") or []) if retained else []
+        async def save_writer(receipts):
+            audit["writer_receipts"] = receipts
+            if len(json.dumps(audit).encode()) > 4_000_000:
+                raise ValueError("SEQUENCE_AUDIT_TOO_LARGE")
+            if checkpoint:
+                await checkpoint({"sequence_audit": deepcopy(audit)})
         try:
-            operation = writer(prompt, canonical=bundle) if writer is write_facts else writer(prompt)
+            operation = writer(prompt, canonical=bundle, previous_receipts=previous_writer,
+                               checkpoint=save_writer) if writer is write_facts else writer(prompt)
             written = await asyncio.wait_for(operation, timeout=420)
         except ReportWriterFailure as exc:
             audit["writer_receipts"] = exc.receipts

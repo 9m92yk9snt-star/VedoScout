@@ -735,3 +735,41 @@ def test_scoring_cards_stay_selected_despite_non_scoring_writer_mentions(retaine
             'passing': {'evidence': mentions}}}, canonical)
         assert scoring <= {c['event_id'] for c in full['video_comments']}
         assert len(full['video_comments']) <= 8
+
+
+@pytest.mark.parametrize("change", [None, "prompt", "model", "response", "payload"])
+def test_writer_retry_reuses_only_exact_completed_section(monkeypatch, change):
+    import hashlib
+    monkeypatch.setenv("SEQUENCE_REPORT_WRITER_MODEL", "gemini-2.5-pro")
+    calls, saved = [], []
+    async def checkpoint(rows):
+        saved.append(deepcopy(rows))
+    async def send(jobs, provider, model, **kwargs):
+        job = jobs[0]
+        calls.append(job["packet_id"])
+        if job["packet_id"] == "report_section_2" and len(saved) == 1:
+            raise RuntimeError("interrupted")
+        section = int(job["packet_id"][-1])-1
+        raw = json.dumps({k: {} for k in runtime.WRITER_SECTIONS[section]})
+        audit = runtime.transport.build_request(provider, model, job["items"],
+            reasoning_effort=job.get("reasoning_effort"), max_output_tokens=job["max_output_tokens"])[2]
+        return [{**audit, "packet_id": job["packet_id"], "provider": provider,
+            "requested_model": model, "origin": "LIVE_MODEL_REQUEST", "status": "COMPLETED",
+            "raw_response": raw, "response_sha256": hashlib.sha256(raw.encode()).hexdigest()}]
+    monkeypatch.setattr(runtime.transport, "run_jobs_async", send)
+    with pytest.raises(RuntimeError, match="interrupted"):
+        asyncio.run(runtime.write_facts("prompt", checkpoint=checkpoint))
+    previous = deepcopy(saved[0])
+    saved.append([])  # let the second section finish on retry
+    calls.clear()
+    prompt = "changed" if change == "prompt" else "prompt"
+    if change == "model":
+        monkeypatch.setenv("SEQUENCE_REPORT_WRITER_MODEL", "gpt-6-astra")
+    if change == "response":
+        previous[0]["raw_response"] += "corrupt"
+    if change == "payload":
+        previous[0]["payload_sha256"] = "changed"
+    result = asyncio.run(runtime.write_facts(prompt, previous_receipts=previous, checkpoint=checkpoint))
+    assert calls == (["report_section_2"] if change is None else ["report_section_1", "report_section_2"])
+    assert len(result["receipts"]) == 2
+    assert set(result["report"]) == set(sum(runtime.WRITER_SECTIONS, ()))
