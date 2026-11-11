@@ -18,6 +18,7 @@ from match_room_position_evidence import selection_digest, bound_samples
 from match_room import position_window
 from sequence_run_checkpoint import reusable_receipt
 from video_timebase import read_frame_at, iter_frames_at
+from sequence_deadline import bounded_deadline
 
 PROMPT = '''Locate the SAME physical player selected by the original human point in the reference image. Reference images identify a person, not an action. Use ALL original human reference images to establish the same requested player. Reference timestamps may span cuts. A reference point that misses a visible person is not positive identity evidence; do not move that point onto a neighbour. Use the timeline to test continuity and competing identities. These context images contain no extra selections. If a cut, disappearance or competing appearance prevents re-identification, keep identity uncertain; never assume the next highlighted player is the target. Output rows only for TIMELINE images. Examine the full timeline independently; never transfer identity to a nearby teammate, recipient or scorer. A jersey number alone, proximity to the ball or the expected role is insufficient when conflicting people are visible.
 Return JSON {"frames":[...]} with exactly one row for EVERY supplied timeline frame, in order. Each row: {"frame":"source frame ID","target_status":"CONFIRMED|UNCERTAIN|ABSENT","identity_evidence":"visible reason for this decision","feet_visible":true|false,"ground":[x,y] or null,"box":[x,y,w,h] or null,"active_ball_status":"CONFIRMED|UNCERTAIN|ABSENT","ball":[x,y] or null}.
@@ -191,13 +192,14 @@ def completion_windows(event, record):
     return windows
 
 
-async def localize(video, doc, *, checkpoint, event_ids=None, run_jobs=None, budget_seconds=420, workers=2, coordination=None):
+async def localize(video, doc, *, checkpoint, event_ids=None, run_jobs=None, budget_seconds=420, workers=2, coordination=None, shared_deadline=None):
     """Observe presentation positions without changing canonical event identity.
 
     Missing/uncertain measurements suppress graphics, not the factual report.
     Source/model errors are explicit in the persisted per-event audit.
     """
     started = time.monotonic()
+    deadline = bounded_deadline(started, budget_seconds, shared_deadline)
     run_jobs = run_jobs or transport.run_jobs
     bundle = deepcopy(doc['canonical_events'])
     if await asyncio.to_thread(pilot.digest, Path(video)) != bundle['source_video_sha256']:
@@ -223,7 +225,7 @@ async def localize(video, doc, *, checkpoint, event_ids=None, run_jobs=None, bud
     with tempfile.TemporaryDirectory(prefix='matchroom-positions-') as work:
         for event in candidates:
             eid = event['event_id']
-            if time.monotonic()-started >= budget_seconds:
+            if time.monotonic() >= deadline:
                 audit['events'][eid] = {**deepcopy(previous.get(eid) or {}),
                     'status': 'NOT_SENT', 'error': 'LOCALIZATION_TIME_BUDGET'}
                 continue
@@ -279,7 +281,7 @@ async def localize(video, doc, *, checkpoint, event_ids=None, run_jobs=None, bud
             asyncio.run_coroutine_threadsafe(checkpoint(deepcopy(audit)), loop).result()
         if jobs:
             results = await transport.run_jobs_async(jobs, 'emergent', 'gpt-6-astra', runner=run_jobs, coordination=coordination,
-                deadline=started+budget_seconds, per_call_s=150, workers=workers, on_result=finished)
+                deadline=deadline, per_call_s=150, workers=workers, on_result=finished)
             for receipt in results:
                 accept(receipt)
         # Complete clip edges without changing the original request/cache key.
@@ -293,7 +295,7 @@ async def localize(video, doc, *, checkpoint, event_ids=None, run_jobs=None, bud
                 continue
             for window in completion_windows(event, record):
                 pid = packet_id(event)+f'_coverage_{window[0]}_{window[1]}'
-                if time.monotonic()-started >= budget_seconds:
+                if time.monotonic() >= deadline:
                     record['completion_error'] = 'LOCALIZATION_TIME_BUDGET'
                     break
                 try:
@@ -344,7 +346,7 @@ async def localize(video, doc, *, checkpoint, event_ids=None, run_jobs=None, bud
             asyncio.run_coroutine_threadsafe(checkpoint(deepcopy(audit)), loop).result()
         if extra_jobs:
             results = await transport.run_jobs_async(extra_jobs, 'emergent', 'gpt-6-astra', runner=run_jobs, coordination=coordination,
-                deadline=started+budget_seconds, per_call_s=150, workers=workers, on_result=finished_extra)
+                deadline=deadline, per_call_s=150, workers=workers, on_result=finished_extra)
             for receipt in results:
                 accept_extra(receipt)
         for event in candidates:
