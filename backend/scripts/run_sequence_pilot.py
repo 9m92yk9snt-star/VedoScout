@@ -120,7 +120,7 @@ def bounded_detail_packets(packet, manifest, overview_ids, fits):
 def run(manifest_path, output_dir, *, provider="gemini", model="gemini-2.5-pro", budget_s=300., max_initial=4,
         max_followups=2, per_call_s=90., reasoning_effort=None, identity_profile=False, image_detail=None,
         identity_profile_receipt=None, contact_reviews=False, resume_initial_receipts=None, fresh_originals=False,
-        resume_fresh_initial=None, automatic_outcomes=False, retry_receipts=None):
+        resume_fresh_initial=None, automatic_outcomes=False, retry_receipts=None, progress_budget=False):
     started, out = time.monotonic(), Path(output_dir).resolve()
     if out.exists() and any(out.iterdir()):
         raise ValueError("OUTPUT_MUST_BE_NEW_OR_EMPTY")
@@ -144,7 +144,8 @@ def run(manifest_path, output_dir, *, provider="gemini", model="gemini-2.5-pro",
     summary = {"version": pilot.VERSION, "status": "NOT_STARTED", "provider": provider, "model": model,
                "code_sha256": code_fingerprint(),
                "source_video_sha256": manifest["source_video_sha256"], "preparation_reused": True,
-               "prior_preparation_seconds": manifest["preparation_seconds"], "wall_budget_seconds": budget_s,
+               "prior_preparation_seconds": manifest["preparation_seconds"], "wall_budget_seconds": None if progress_budget else budget_s,
+               "progress_timeout_seconds": budget_s if progress_budget else None,
                "production_pipeline_changed": False, "expected_answers_used_as_input": False,
                "model_jobs_completed": 0, "independent_visual_correctness_verified": False,
                "requested_reasoning_effort": reasoning_effort,
@@ -267,6 +268,9 @@ def run(manifest_path, output_dir, *, provider="gemini", model="gemini-2.5-pro",
         print(json.dumps({"phase": packets[0]["phase"] if packets else "NONE", "jobs": len(jobs),
                           "remaining_seconds": round(max(0, deadline - time.monotonic()), 1)}), flush=True)
         def save_receipt(receipt):
+            nonlocal deadline
+            if progress_budget and receipt.get("status") == "COMPLETED":
+                deadline = time.monotonic() + budget_s
             pilot.write_json(out / "responses" / (receipt["packet_id"] + ".json"), receipt)
         for receipt in reused:
             save_receipt(receipt)
@@ -275,7 +279,7 @@ def run(manifest_path, output_dir, *, provider="gemini", model="gemini-2.5-pro",
             jobs = []
         responses = reused + (transport.run_jobs(jobs, provider, model, deadline=deadline,
                                                 per_call_s=per_call_s if call_seconds is None else call_seconds,
-                                                on_result=save_receipt) if jobs else [])
+                                                on_result=save_receipt, **({"progress_timeout_s": budget_s} if progress_budget else {})) if jobs else [])
         by_id = {p["packet_id"]: p for p in packets}
         for receipt in responses:
             previous = next((r for r in receipts if r.get("packet_id") == receipt["packet_id"]), None)
@@ -457,6 +461,7 @@ def main():
     model.add_argument("--provider", choices=sorted(transport.KEY_ENV), default="gemini")
     model.add_argument("--model", default="gemini-2.5-pro")
     model.add_argument("--budget-s", type=float, default=300.)
+    model.add_argument("--progress-budget", action="store_true", help="Renew source idle budget after completed receipts")
     model.add_argument("--per-call-s", type=float, default=90.)
     model.add_argument("--max-followups", type=int, default=2)
     model.add_argument("--max-initial", type=int, default=4)
@@ -486,7 +491,7 @@ def main():
                      identity_profile_receipt=args.identity_profile_receipt, contact_reviews=args.contact_reviews,
                      resume_initial_receipts=args.resume_initial_receipts, fresh_originals=args.fresh_originals,
                      resume_fresh_initial=args.resume_fresh_initial,automatic_outcomes=args.automatic_outcomes,
-                     retry_receipts=args.retry_receipts)
+                     retry_receipts=args.retry_receipts, progress_budget=args.progress_budget)
         print(json.dumps({k: result.get(k) for k in ("status", "analysis_seconds", "model_jobs_completed", "counts")}, indent=2))
         return 0 if result["status"] == "MODEL_OBSERVATIONS_RETURNED" else 3
     else:

@@ -152,3 +152,13 @@ def test_checkpoint_fingerprint_tracks_shared_analysis_rules(monkeypatch):
         changed = code_fingerprint()
         assert changed[module] != baseline[module]
         assert {k for k in baseline if baseline[k] != changed[k]} == {module}
+
+
+def test_call_budget_release_preserves_exact_receipt_admission():
+    from sequence_run_checkpoint import _PRE_CALL_BUDGET_CODE, code_fingerprint, retry_code_compatible
+    current = code_fingerprint()
+    assert retry_code_compatible(_PRE_CALL_BUDGET_CODE, current)
+    for field in current:
+        if field not in {"sequence_report_runtime.py", "sequence_run_checkpoint.py", "sequence_pilot_transport.py", "run_sequence_pilot.py"}:
+            assert not retry_code_compatible(_PRE_CALL_BUDGET_CODE, {**current, field: "changed"})
+    assert not retry_code_compatible({**_PRE_CALL_BUDGET_CODE, "sequence_pilot.py": "unknown"}, current)

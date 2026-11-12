@@ -94,10 +94,18 @@ _PRE_SPLIT_CODE = {'match_room.py': 'a3443e30891199a91a7dbc3d8c88cb8a7372a7507ed
 _PRE_RATE_LIMIT_CODE = {'match_room.py': 'a3443e30891199a91a7dbc3d8c88cb8a7372a7507ed0c00334abf82ba294bf3d', 'player_selection.py': 'ea5f699ccd586fcf9f1e1f813eabb8ca2f389c5b80251fdb7e064f3d59e59f4d', 'run_sequence_pilot.py': '52d64ec0e71803641fc833596b19d6485ac607333e6f97dc4831e2c6e3f87107', 'sequence_action_evidence.py': 'e922d414e6656b37fb4b3a8c9de88fc29218cab958b35228fadd761202d4876c', 'sequence_foot_evidence.py': 'ac9cf01076d82dd85e26ec3e3a574842a843c525cbb2b65b3fd96f3fed9c6186', 'sequence_pilot.py': '89bc18abdddeb83b2f8b9d89dd6c0a1f0e04712a31523eac074a9aa3c38cf01a', 'sequence_pilot_transport.py': '25b85d01426662f662e37c3bbe94888b2904e3683d4f961c157338e2a32a6cdf', 'sequence_report_adapter.py': '9719e53b65727fc6184b89fc6007fc8db51ae21d29a6a6903afc35e720befb6f', 'sequence_report_runtime.py': 'fa80d2a02d78ef7ba8f94bc2ae52927a6a568389e728213a466c35072762e103', 'sequence_run_checkpoint.py': '3bea039bb707fbdbec4c32b9f72438764770b9f0b1aa8ff7dd727459c8b82a8d'}
 
 
+# Exact deployed release before the source-call budget correction.
+# Only orchestration/checkpoint code may differ; wire-request checks still apply.
+_PRE_CALL_BUDGET_CODE = {'match_room.py': 'a3443e30891199a91a7dbc3d8c88cb8a7372a7507ed0c00334abf82ba294bf3d', 'player_selection.py': 'ea5f699ccd586fcf9f1e1f813eabb8ca2f389c5b80251fdb7e064f3d59e59f4d', 'run_sequence_pilot.py': '52d64ec0e71803641fc833596b19d6485ac607333e6f97dc4831e2c6e3f87107', 'sequence_action_evidence.py': 'e922d414e6656b37fb4b3a8c9de88fc29218cab958b35228fadd761202d4876c', 'sequence_deadline.py': '870b08db9ba12471b80a988f21e1a09660f7363d871521b12ab963fe46436e07', 'sequence_foot_evidence.py': 'ac9cf01076d82dd85e26ec3e3a574842a843c525cbb2b65b3fd96f3fed9c6186', 'sequence_pilot.py': '89bc18abdddeb83b2f8b9d89dd6c0a1f0e04712a31523eac074a9aa3c38cf01a', 'sequence_pilot_transport.py': '875fcb818f25e04e935ebd61ca78c82e4c087827a8e6eafe6dd8d44bc5f9c4d6', 'sequence_report_adapter.py': 'b566a1581233fe889aa620b8812532b37a437c8ada2339735a59d7de0874bc5e', 'sequence_report_runtime.py': 'd1df272bdfd06e54321dd5d75ddeee9191e985accae5857ef2ea265a7d56bd6a', 'sequence_report_selection.py': '51586c1971749a8e8246d4245b4ca260386453a8051ab22291ae79af67a09a23', 'sequence_run_checkpoint.py': 'a6095781ee36e39d6caf0ad64dea3a35266f74d36f2f3fc05b22fb6b8bc42694'}
+
+
 def retry_code_compatible(saved, current=None):
     current = code_fingerprint() if current is None else current
     if saved == current:
         return True
+    if saved == _PRE_CALL_BUDGET_CODE:
+        return (set(current) == set(saved) and all(current[k] == saved[k]
+                for k in saved if k not in {"sequence_report_runtime.py", "sequence_run_checkpoint.py", "sequence_pilot_transport.py", "run_sequence_pilot.py"}))
     changed = {"run_sequence_pilot.py", "sequence_report_runtime.py", "sequence_run_checkpoint.py"}
     changed.add("sequence_pilot_transport.py")
     return (saved in (_PRE_SPLIT_CODE, _PRE_RATE_LIMIT_CODE) and set(current) == set(saved)

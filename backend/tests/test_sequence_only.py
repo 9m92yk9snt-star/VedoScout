@@ -156,7 +156,7 @@ def test_asset_repair_keeps_saved_urls_and_uses_the_leased_worker(tmp_path, engi
 
 def test_sequence_watchdog_limits_apply_to_every_production_admission():
     tree = ast.parse(SERVER.read_text())
-    expected = {'FULL_REPORT_STALL_SECONDS': 180, 'FULL_REPORT_MAX_RUN_SECONDS': 1800,
+    expected = {'FULL_REPORT_STALL_SECONDS': 180, 'FULL_REPORT_MAX_RUN_SECONDS': None,
                 'FULL_REPORT_MAX_RETRIES': 1}
     values = {n.targets[0].id: eval(compile(ast.Expression(n.value), 'watchdog-constant', 'eval'), {})
               for n in tree.body if isinstance(n, ast.Assign) and isinstance(n.targets[0], ast.Name)
