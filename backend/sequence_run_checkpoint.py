@@ -101,7 +101,7 @@ _PRE_CALL_BUDGET_CODE = {'match_room.py': 'a3443e30891199a91a7dbc3d8c88cb8a7372a
 
 def retry_code_compatible(saved, current=None):
     current = code_fingerprint() if current is None else current
-    if saved == current:
+    if writer_source_code_compatible(saved, current):
         return True
     if saved == _PRE_CALL_BUDGET_CODE:
         return (set(current) == set(saved) and all(current[k] == saved[k]
@@ -110,3 +110,15 @@ def retry_code_compatible(saved, current=None):
     changed.add("sequence_pilot_transport.py")
     return (saved in (_PRE_SPLIT_CODE, _PRE_RATE_LIMIT_CODE) and set(current) == set(saved)
             and all(current[k] == saved[k] for k in saved if k not in changed))
+
+
+# Exact release with completed source analysis and failing report writing.
+# Only writer orchestration and response diagnostics changed in this migration.
+_PRE_WRITER_RECOVERY_CODE = {'sequence_pilot.py': '89bc18abdddeb83b2f8b9d89dd6c0a1f0e04712a31523eac074a9aa3c38cf01a', 'sequence_pilot_transport.py': '25b185f6963515939f8ed87fcce25df6dc21363cfb1cf8691f246899e22a47b6', 'player_selection.py': 'ea5f699ccd586fcf9f1e1f813eabb8ca2f389c5b80251fdb7e064f3d59e59f4d', 'sequence_run_checkpoint.py': '39b31d6e1cdf4871ffbe72533c6bc04a84802b197ebd9cac24c3d4a8e68bbc48', 'sequence_report_runtime.py': 'a6dd0e00a622e97a1e11df3d54cac557f2c16600beb89bcadf6bc9b2e30421ca', 'sequence_report_adapter.py': 'b566a1581233fe889aa620b8812532b37a437c8ada2339735a59d7de0874bc5e', 'sequence_foot_evidence.py': 'ac9cf01076d82dd85e26ec3e3a574842a843c525cbb2b65b3fd96f3fed9c6186', 'sequence_action_evidence.py': 'e922d414e6656b37fb4b3a8c9de88fc29218cab958b35228fadd761202d4876c', 'match_room.py': 'a3443e30891199a91a7dbc3d8c88cb8a7372a7507ed0c00334abf82ba294bf3d', 'sequence_report_selection.py': '51586c1971749a8e8246d4245b4ca260386453a8051ab22291ae79af67a09a23', 'sequence_deadline.py': '870b08db9ba12471b80a988f21e1a09660f7363d871521b12ab963fe46436e07', 'run_sequence_pilot.py': '7ef7c721cc06fc99bf13c1b7540f70eeea92ee6243c54a125da59fa814a12290'}
+
+
+def writer_source_code_compatible(saved, current=None):
+    current = code_fingerprint() if current is None else current
+    return (saved == current or (saved == _PRE_WRITER_RECOVERY_CODE
+            and set(saved) == set(current) and all(saved[k] == current[k] for k in saved
+            if k not in {"sequence_report_runtime.py", "sequence_pilot_transport.py", "sequence_run_checkpoint.py"})))
