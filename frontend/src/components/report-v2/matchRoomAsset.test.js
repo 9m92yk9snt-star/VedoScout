@@ -1,7 +1,7 @@
 import {loadGraphics} from './matchRoomAsset';
 import {webcrypto} from 'crypto';
 import {TextDecoder} from 'util';
-beforeEach(()=>{Object.defineProperty(global.crypto,'subtle',{value:webcrypto.subtle,configurable:true});global.TextDecoder=TextDecoder;});
+beforeEach(()=>{Object.defineProperty(global,'crypto',{value:webcrypto,configurable:true});global.TextDecoder=TextDecoder;});
 afterEach(()=>{delete global.fetch;});
 async function fixture(graphics={version:1,event_id:'e',source_video_sha256:'s',tracking:{samples:[{x:.123456789}]}}) {
  const bytes=Uint8Array.from(Buffer.from(JSON.stringify(graphics))).buffer;

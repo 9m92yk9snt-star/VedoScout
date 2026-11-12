@@ -47,7 +47,7 @@ export function MatchRoomPlayer({
     }
     return () => controller.abort();
   }, [proof.comment]);
-  const raw = loadedGraphics?.original === proof.comment ? loadedGraphics.value : proof.comment;
+  const raw = loadedGraphics && loadedGraphics.original === proof.comment ? loadedGraphics.value : proof.comment;
   const originalContourWindows = raw?.match_room?.tracking?.contour_diagnostics?.windows;
   const initialContourBudgetReached =
     raw?.match_room?.contour_processing_budget?.status === "INITIAL_WINDOW_TIME_BUDGET_REACHED" ||
