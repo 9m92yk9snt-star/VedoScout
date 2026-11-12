@@ -294,7 +294,7 @@ jobs:
         working-directory: frontend
         env:
           CI: 'true'
-        run: yarn test --watchAll=false --runInBand --testPathPattern='(MarkerStudio|ScoutMode|sceneDetect|MarkedCropCanvas|AnalysisWaiting|BackgroundAnalysisTracker|ProfileAnalysisStatus|publication|MatchRoomContext|MatchRoomPlayer|matchRoomModel)\.test\.'
+        run: yarn test --watchAll=false --runInBand --testPathPattern='(MarkerStudio|ScoutMode|sceneDetect|MarkedCropCanvas|AnalysisWaiting|BackgroundAnalysisTracker|ProfileAnalysisStatus|publication|MatchRoomContext|MatchRoomPlayer|matchRoomAsset|matchRoomModel)\.test\.'
       - name: Build frontend
         working-directory: frontend
         env:

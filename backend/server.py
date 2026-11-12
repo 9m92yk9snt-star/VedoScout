@@ -7760,6 +7760,37 @@ async def _cv_gap_bridge_allowed() -> bool:
         return False
 
 
+@api_router.get("/reports/{report_id}/graphics/{digest}")
+async def report_graphics_asset(report_id: str, digest: str):
+    # Same public, unguessable asset model as report clips, served through our
+    # origin so object-storage CORS cannot silently remove the graphics.
+    import re
+    if not re.fullmatch(r"[a-f0-9-]{36}", report_id) or not re.fullmatch(r"[a-f0-9]{64}", digest):
+        raise HTTPException(404, "Graphics not found")
+    doc = await db.reports.find_one({"id": report_id}, {"full_report.video_comments": 1})
+    rows = ((doc or {}).get("full_report") or {}).get("video_comments") or []
+    if not any(((row.get("match_room") or {}).get("graphics_asset") or {}).get("sha256") == digest for row in rows):
+        raise HTTPException(404, "Graphics not found")
+    filename = f"graphics-{digest}.json"
+    path = _analysis_frames_dir(report_id) / "sequence" / filename
+    if not path.is_file() and r2_storage.is_configured():
+        path.parent.mkdir(parents=True, exist_ok=True)
+        # Separate temporary file per request; a concurrent reader never sees
+        # an incomplete download. Final filenames are content addressed.
+        import tempfile
+        with tempfile.TemporaryDirectory(dir=path.parent) as temp_dir:
+            pending_path = Path(temp_dir) / "graphics.pending"
+            ok = await asyncio.to_thread(r2_storage.download_to_file,
+                f"reports/{report_id}/sequence/{filename}", pending_path)
+            if ok:
+                import hashlib
+                if await asyncio.to_thread(lambda: hashlib.sha256(pending_path.read_bytes()).hexdigest()) == digest:
+                    await asyncio.to_thread(os.replace, pending_path, path)
+    if not path.is_file():
+        raise HTTPException(404, "Graphics not available")
+    return FileResponse(path, media_type="application/json", headers={"Cache-Control": "public, max-age=31536000, immutable"})
+
+
 async def _persist_video_frames(report_id: str, video_path) -> Optional[dict]:
     """Publish source-bound Sequence evidence; never invoke legacy model verification."""
     doc = await db.reports.find_one({"id": report_id})
@@ -7768,8 +7799,14 @@ async def _persist_video_frames(report_id: str, video_path) -> Optional[dict]:
         async def publish_sequence_asset(path, content_type):
             key = f"reports/{report_id}/sequence/{path.name}"
             if r2_storage.is_configured():
-                return await asyncio.to_thread(r2_storage.upload_file, key, path, content_type)
-            return f"/api/uploads/{path.relative_to(UPLOAD_DIR).as_posix()}"
+                url = await asyncio.to_thread(r2_storage.upload_file, key, path, content_type)
+                if not url:
+                    return None
+            else:
+                url = f"/api/uploads/{path.relative_to(UPLOAD_DIR).as_posix()}"
+            if content_type == "application/json":
+                return f"/api/reports/{report_id}/graphics/{path.stem.removeprefix('graphics-')}"
+            return url
         return await sequence_report_runtime.persist_assets(db.reports, doc, video_path, directory, publish_sequence_asset)
     raise RuntimeError("LEGACY_EVIDENCE_REGENERATION_RETIRED")
 
