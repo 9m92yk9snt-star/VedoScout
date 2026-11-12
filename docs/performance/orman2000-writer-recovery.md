@@ -1,0 +1,9 @@
+# Orman2000 report writer interruption
+
+The second diagnostic export for report c74d5920-0219-4d9f-a01a-66f6605db0b1 records a completed source result (`MODEL_OBSERVATIONS_RETURNED`) and `source_phase_reused=true`. Its first report section failed after 89.316 seconds with `INCOMPLETE_MODEL_RESPONSE`. This is not the old 900-second source deadline. The old transport discarded finish-reason metadata on rejected replies, so token exhaustion versus another provider termination cannot be established retrospectively.
+
+The transport now retains an allowlisted termination category and numeric token counts before rejecting incomplete replies. Only a confirmed token-length termination triggers one section retry with 32768 rather than 12288 output tokens. Model, evidence, prompts, schema validation and score authority are unchanged. Other failures, blocked responses and repeated truncation still fail closed. Completed expanded-output sections can be reused only with their exact rebuilt request and response hashes. The outer writer allowance covers the bounded four-call path; individual calls remain supervised.
+
+An exact-release migration admits completed source checkpoints from 15e150d only when all source interpretation modules remain unchanged. Video/selection checks and canonical evidence validation still run. This prevents the writer-only deployment from rerunning paid video analysis. The actual new ZIP was successfully passed through retained_source with the patched code; no model call was made.
+
+Regression coverage includes rejection of partial replies, bounded length recovery, no retry of other termination categories, exact expanded-result reuse, credential-free diagnostics, and rejection of migrations with changed source logic. This does not demonstrate a successful new production model response; deployment and the next report retry remain the live verification.

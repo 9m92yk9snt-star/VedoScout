@@ -20,7 +20,7 @@ import sequence_pilot_transport as transport
 import sequence_report_adapter as adapter
 from evidence_authority import attach_clip_authority, compute_proof_frame_verified
 from report_fact_authority import assessment_prompt
-from sequence_run_checkpoint import code_fingerprint, failure_metadata, retry_code_compatible, merge_retry_receipts, reusable_receipt
+from sequence_run_checkpoint import code_fingerprint, failure_metadata, retry_code_compatible, merge_retry_receipts, reusable_receipt, writer_source_code_compatible
 
 
 def enabled():
@@ -194,7 +194,8 @@ WRITER_SECTIONS = (
 async def write_facts(prompt, *, canonical=None, coordination=None, previous_receipts=(), checkpoint=None):
     """Two bounded text sections; presentation consumes the completed assessment.
 
-    No new perception, network retry or automatic model fallback. Canonical
+    No new perception or automatic model fallback. Token-truncated sections
+    get one larger-output retry; incomplete replies never become reports. Canonical
     timelines, comments and statistics are supplied by the application.
     """
     model = writer_model()
@@ -222,19 +223,32 @@ async def write_facts(prompt, *, canonical=None, coordination=None, previous_rec
                       and r.get("provider") == "emergent"
                       and r.get("requested_model") == model]
         cached = None
-        if candidates:
-            request = transport.build_request("emergent", model, job["items"],
-                reasoning_effort=job.get("reasoning_effort"),
-                max_output_tokens=job["max_output_tokens"])[2]
-            cached = next((r for r in candidates if reusable_receipt(
-                r, request, provider="emergent", model=model, packet_id=job["packet_id"])), None)
+        # A successful expanded-output retry is reusable only with its exact wire hash.
+        for output_limit in (12288, 32768):
+            if candidates:
+                request = transport.build_request("emergent", model, job["items"],
+                    reasoning_effort=job.get("reasoning_effort"),
+                    max_output_tokens=output_limit)[2]
+                cached = next((r for r in candidates if reusable_receipt(
+                    r, request, provider="emergent", model=model, packet_id=job["packet_id"])), None)
+                if cached is not None:
+                    break
         if cached is not None:
             receipt = deepcopy(cached)
+            receipts.append(receipt)
         else:
-            rows = await transport.run_jobs_async(jobs, "emergent", model, coordination=coordination,
-                                           deadline=time.monotonic()+195, per_call_s=180)
-            receipt = rows[0]
-        receipts.append(receipt)
+            for output_limit in (12288, 32768):
+                job["max_output_tokens"] = output_limit
+                rows = await transport.run_jobs_async(jobs, "emergent", model, coordination=coordination,
+                                               deadline=time.monotonic()+195, per_call_s=180)
+                receipt = rows[0]
+                receipts.append(receipt)
+                if not (output_limit == 12288 and receipt.get("status") == "ERROR"
+                        and receipt.get("error") == "INCOMPLETE_MODEL_RESPONSE"
+                        and receipt.get("response_stop_kind") == "LENGTH"):
+                    break
+                if checkpoint:
+                    await checkpoint(deepcopy(receipts))
         if receipt.get("status") != "COMPLETED":
             raise ReportWriterFailure("SEQUENCE_REPORT_WRITER_FAILED", receipts)
         try:
@@ -281,7 +295,7 @@ def retained_source(doc, source, selection_sha):
     code = code_fingerprint()
     if (audit.get("source_video_sha256") != source
             or audit.get("original_selection_values_sha256") != selection_sha
-            or result.get("code_sha256") != code
+            or not writer_source_code_compatible(result.get("code_sha256"), code)
             or result.get("identity_mode") != "FRESH_ORIGINAL_SELECTIONS"
             or result.get("status") != "MODEL_OBSERVATIONS_RETURNED"):
         return None
@@ -379,7 +393,7 @@ async def generate(video, doc, *, template, writer=write_facts, discovery=discov
         try:
             operation = writer(prompt, canonical=bundle, previous_receipts=previous_writer,
                                checkpoint=save_writer) if writer is write_facts else writer(prompt)
-            written = await asyncio.wait_for(operation, timeout=420)
+            written = await asyncio.wait_for(operation, timeout=810)
         except ReportWriterFailure as exc:
             audit["writer_receipts"] = exc.receipts
             if checkpoint:

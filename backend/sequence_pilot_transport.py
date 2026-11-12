@@ -171,6 +171,29 @@ def build_request(provider, model, items, *, reasoning_effort=None, image_detail
                           "requested_image_detail": image_detail}
 
 
+def response_diagnostics(provider, body):
+    """Allowlisted termination metadata, including on rejected responses."""
+    if not isinstance(body, dict):
+        return {"response_stop_kind": "INVALID"}
+    native = provider == "gemini"
+    rows = body.get("candidates" if native else "choices")
+    if not isinstance(rows, list) or len(rows) != 1 or not isinstance(rows[0], dict):
+        return {"response_stop_kind": "INVALID"}
+    reason = rows[0].get("finishReason" if native else "finish_reason")
+    kinds = {"STOP": "COMPLETE", "stop": "COMPLETE", "MAX_TOKENS": "LENGTH",
+             "length": "LENGTH", "SAFETY": "BLOCKED", "RECITATION": "BLOCKED",
+             "BLOCKLIST": "BLOCKED", "PROHIBITED_CONTENT": "BLOCKED",
+             "content_filter": "BLOCKED"}
+    result = {"response_stop_kind": kinds.get(reason, "OTHER") if isinstance(reason, str) else "OTHER"}
+    usage = body.get("usageMetadata" if native else "usage")
+    if isinstance(usage, dict):
+        allowed = ("promptTokenCount", "candidatesTokenCount", "thoughtsTokenCount", "totalTokenCount") if native else (
+            "prompt_tokens", "completion_tokens", "total_tokens")
+        result["response_token_usage"] = {k: usage[k] for k in allowed
+            if type(usage.get(k)) is int and 0 <= usage[k] <= 100_000_000}
+    return result
+
+
 def extract_reply(provider, body):
     if provider == "gemini":
         candidates = body.get("candidates") or []
@@ -212,7 +235,9 @@ def _worker(connection, job, provider, model, timeout_s):
             data = response.read(MAX_RESPONSE_BYTES + 1)
         if len(data) > MAX_RESPONSE_BYTES:
             raise ValueError("RESPONSE_BYTE_BUDGET_EXCEEDED")
-        text, info = extract_reply(provider, json.loads(data))
+        body = json.loads(data)
+        audit.update(response_diagnostics(provider, body))
+        text, info = extract_reply(provider, body)
         audit.update(info, status="COMPLETED", raw_response=text,
                      response_sha256=hashlib.sha256(text.encode()).hexdigest())
     except urllib.error.HTTPError as exc:
