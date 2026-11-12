@@ -63,3 +63,25 @@ def test_graphics_route_restores_exact_file_and_rejects_unbound_requests(tmp_pat
     with pytest.raises(NotFound):asyncio.run(ns['report_graphics_asset'](rid,'f'*64))
     with pytest.raises(NotFound):asyncio.run(ns['report_graphics_asset']('../secret',sha))
     assert len(calls)==1
+
+
+def test_final_database_write_contains_reference_not_large_graphics(tmp_path, monkeypatch):
+    import sequence_report_runtime as runtime
+    room={'version':1,'event_id':'e','source_video_sha256':'source','tracking':{'data':'x'*17_000_000}}
+    doc={'id':'r','full_report':{'video_comments':[{'event_id':'e'}]}}
+    def render(video,full,*a,**kw):
+        full['video_comments'][0]['match_room']=room
+        return [(full['video_comments'][0],tmp_path/'frame.jpg',tmp_path/'clip.mp4')]
+    async def localizer(*a,**kw):return {}
+    async def publish(path,mime):return '/assets/'+path.name
+    writes=[]
+    class Collection:
+        async def update_one(self,query,update):
+            assert len(json.dumps(update))<16000000, 'update command document too large'
+            writes.append(update)
+    monkeypatch.setattr(runtime,'render_assets',render)
+    monkeypatch.setattr(runtime,'compute_proof_frame_verified',lambda row:True)
+    asyncio.run(runtime.persist_assets(Collection(),doc,'source.mp4',tmp_path,publish,localizer=localizer))
+    final=writes[-1]['$set'];assert final['full_report_status']=='finalizing'
+    assert 'graphics_asset' in final['full_report']['video_comments'][0]['match_room']
+    assert 'match_room' not in doc['full_report']['video_comments'][0]
