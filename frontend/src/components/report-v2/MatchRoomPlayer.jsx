@@ -3,6 +3,7 @@ import { flushSync } from 'react-dom';
 import { Play, Pause, X, RotateCcw } from 'lucide-react';
 import { roomFor, graphicsAt, depthAt, ballAt, reviewedDirectionAt, clipArrowToFrame } from './matchRoomModel';
 import './matchroom.css';
+import { loadGraphics } from './matchRoomAsset';
 const clock = ms => `${String(Math.floor(ms / 60000)).padStart(2, '0')}:${String(Math.floor(ms / 1000) % 60).padStart(2, '0')}`;
 export function MatchRoomPlayer({
   proof,
@@ -33,7 +34,20 @@ export function MatchRoomPlayer({
   });
   const clip = !!proof.clip && Number.isFinite(proof.clipStart) && !failed;
   const offset = clip ? proof.clipStart : 0;
-  const raw = proof.comment;
+  const [loadedGraphics, setLoadedGraphics] = useState(null);
+  const [graphicsError, setGraphicsError] = useState(false);
+  useEffect(() => {
+    const controller = new AbortController();
+    setLoadedGraphics(null);
+    setGraphicsError(false);
+    if (proof.comment?.match_room?.graphics_asset) {
+      loadGraphics(proof.comment, controller.signal).then(value => {
+        if (!controller.signal.aborted) setLoadedGraphics({original: proof.comment, value});
+      }).catch(() => { if (!controller.signal.aborted) setGraphicsError(true); });
+    }
+    return () => controller.abort();
+  }, [proof.comment]);
+  const raw = loadedGraphics?.original === proof.comment ? loadedGraphics.value : proof.comment;
   const originalContourWindows = raw?.match_room?.tracking?.contour_diagnostics?.windows;
   const initialContourBudgetReached =
     raw?.match_room?.contour_processing_budget?.status === "INITIAL_WINDOW_TIME_BUDGET_REACHED" ||
@@ -148,6 +162,7 @@ export function MatchRoomPlayer({
     };
   }, [clip, offset, room, until]);
   const play = () => {
+    if (proof.comment?.match_room?.graphics_asset && loadedGraphics?.original !== proof.comment) return;
     const v = video.current;
     if (!v) return;
     setError(false);
@@ -245,6 +260,7 @@ export function MatchRoomPlayer({
         Some initial tracking passes reached their processing limit. Markings are shown only where supported by the video.
       </p>
     )}
+    {proof.comment?.match_room?.graphics_asset && loadedGraphics?.original !== proof.comment && <p role={graphicsError ? "alert" : "status"}>{graphicsError ? 'Graphics could not load. Reopen the clip to try again.' : 'Loading match graphics…'}</p>}
     {error && <p role="alert">Video could not play. <button type="button" onClick={play}>Try again</button></p>}
     {done && <div className="mr-explanation" aria-live="polite"><span className="mr-kicker">WHAT TO TAKE FROM THIS</span><p>{observation}</p>{typeof skill?.next_level === 'string' && <p>{skill.next_level}</p>}<button type="button" onClick={restart}><RotateCcw size={16} /> Watch again</button></div>}
   </section>;

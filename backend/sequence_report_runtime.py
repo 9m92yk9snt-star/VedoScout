@@ -559,7 +559,9 @@ async def persist_assets(collection, doc, video, directory, publish, *, localize
     assets = await asyncio.to_thread(render_assets, video, full, graphics_bundle, directory, anchors,
                                      stage_timings=stage_timings)
     publish_started = time.monotonic()
+    from match_room_asset import publish_graphics
     for row, image, clip in assets:
+        await publish_graphics(row, directory, publish)
         # Only this pair runs concurrently. Settle both before reporting an
         # error, so no sibling upload is abandoned and no later row starts.
         published = await asyncio.gather(publish(image, "image/jpeg"),
