@@ -171,6 +171,32 @@ def build_request(provider, model, items, *, reasoning_effort=None, image_detail
                           "requested_image_detail": image_detail}
 
 
+
+def cached_wire_payload(provider, model, payload, prefix_items=None):
+    """Add cache hints only on the wire; preserve exact receipt identity.
+
+    The canonical payload still covers every image, instruction and model
+    setting. Only routing metadata is excluded from that existing identity.
+    """
+    if prefix_items is None:
+        return payload, {}
+    if provider != "emergent" or model != "gpt-6-astra":
+        raise ValueError("UNSUPPORTED_REFERENCE_CACHE_MODEL")
+    body = json.loads(payload)
+    content = body["messages"][0]["content"]
+    if (type(prefix_items) is not int or not 0 < prefix_items < len(content)
+            or content[prefix_items-1].get("type") != "image_url"):
+        raise ValueError("INVALID_REFERENCE_CACHE_BOUNDARY")
+    content[prefix_items-1]["prompt_cache_breakpoint"] = {"mode": "explicit"}
+    body["prompt_cache_options"] = {"mode": "explicit"}
+    wire = json.dumps(body, separators=(",", ":")).encode()
+    if len(wire) > MAX_REQUEST_BYTES:
+        raise ValueError("REQUEST_IMAGE_BUDGET_EXCEEDED")
+    return wire, {"wire_payload_sha256": hashlib.sha256(wire).hexdigest(),
+                  "wire_payload_bytes": len(wire),
+                  "reference_cache_prefix_items": prefix_items}
+
+
 def response_diagnostics(provider, body):
     """Allowlisted termination metadata, including on rejected responses."""
     if not isinstance(body, dict):
@@ -227,6 +253,9 @@ def _worker(connection, job, provider, model, timeout_s):
             max_output_tokens=job.get("max_output_tokens"))
         audit["requested_reasoning_effort"] = job.get("reasoning_effort")
         audit.update(prepared)
+        payload, cache_audit = cached_wire_payload(
+            provider, model, payload, job.get("reference_cache_prefix_items"))
+        audit.update(cache_audit)
         headers = {"Content-Type": "application/json"}
         headers.update({"x-goog-api-key": key} if provider == "gemini" else {"Authorization": "Bearer " + key})
         request = urllib.request.Request(url, data=payload, method="POST", headers=headers)

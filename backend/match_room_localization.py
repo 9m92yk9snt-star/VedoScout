@@ -162,6 +162,8 @@ def prepare(video, selection, event, work, reference_images=None, *, window=None
               'window_ms': [start, end], 'context_after_ms': context}
     job = {'packet_id': pid, 'items': items, 'reasoning_effort': 'medium',
            'image_detail': 'high', 'max_output_tokens': 10000}
+    if references:
+        job['reference_cache_prefix_items'] = 1 + 2 * len(references)
     return record, job
 
 
