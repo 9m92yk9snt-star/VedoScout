@@ -43,6 +43,7 @@ def main():
     parser.add_argument('--start-ms', type=int, required=True)
     parser.add_argument('--end-ms', type=int, required=True)
     parser.add_argument('--output', type=Path, required=True)
+    parser.add_argument('--selection-json', type=Path, help='Source-bound JSON with source_video_sha256 and original taps')
     args = parser.parse_args()
     if not 0 <= args.start_ms < args.end_ms <= args.start_ms + 10000:
         parser.error('Choose a positive window of at most ten seconds')
@@ -103,7 +104,7 @@ def main():
         tick = time.perf_counter()
         tracked = tracker.update_with_detections(sv.Detections(xyxy=boxes,confidence=scores,class_id=np.zeros(len(scores),dtype=int)))
         timings['tracking'] += time.perf_counter()-tick
-        rows.append({'media_ms':ms,'scene':scene,'barrier':bool(cut or gap),
+        rows.append({'media_ms':ms,'width':row['width'],'height':row['height'],'scene':scene,'barrier':bool(cut or gap),
                      'person_detections':len(scores),'detection_boxes':boxes.tolist(),'detection_scores':scores.tolist(),'tracks':[{
                          'id':f'{scene}:{int(track_id)}','box':box.tolist(),
                          'confidence':float(score),'proof_eligible':False}
@@ -122,6 +123,11 @@ def main():
              'distinct_track_ids':len({t['id'] for row in rows for t in row['tracks']}),
              'identity_switches':'NOT_MEASURED_REQUIRES_LABELLED_TARGET',
              'rows':rows}
+    if args.selection_json:
+        from local_track_selection import bind_taps
+        selection = json.loads(args.selection_json.read_text())
+        summary['tap_candidates'] = bind_taps(rows, selection['taps'],
+            source_sha=source_sha, expected_source_sha=selection['source_video_sha256'])
     args.output.parent.mkdir(parents=True,exist_ok=True)
     args.output.write_text(json.dumps(summary,indent=2)+'\n')
     print(json.dumps({k:v for k,v in summary.items() if k!='rows'},indent=2))
