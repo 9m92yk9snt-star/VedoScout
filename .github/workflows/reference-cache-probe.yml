@@ -1,0 +1,22 @@
+name: One-off shared reference cache probe
+on:
+  pull_request:
+    types: [opened]
+permissions:
+  contents: read
+jobs:
+  cache_probe:
+    if: github.repository == '9m92yk9snt-star/VedoScout' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'codex/reference-cache-probe' && github.run_attempt == 1
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+          sparse-checkout: backend/scripts/probe_reference_cache.py
+          sparse-checkout-cone-mode: false
+      - name: Two bounded synthetic requests using existing credential
+        env:
+          EMERGENT_LLM_KEY: ${{ secrets.EMERGENT_LLM_KEY }}
+        run: python backend/scripts/probe_reference_cache.py
