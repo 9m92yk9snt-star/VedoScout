@@ -51,3 +51,35 @@ def bind_taps(rows, taps, *, source_sha, expected_source_sha):
         result.update(status='CANDIDATE_SEED', reason='UNIQUE_VISIBLE_DETECTION',
                       track_id=tracks[0]['id'])
     return results
+
+
+def seed_component(rows, seed):
+    """Restrict a candidate seed to consecutive observed frames, never bridge.
+
+    Availability only: even a continuous component can contain identity swaps.
+    Missing detections, duplicate IDs, cuts and time gaps split components.
+    """
+    if seed.get('status') != 'CANDIDATE_SEED':
+        return None
+    groups, current, previous = [], [], None
+    for row in rows:
+        stamp = row.get('media_ms')
+        if not number(stamp) or (previous is not None and stamp <= previous):
+            raise ValueError('NON_INCREASING_SOURCE_TIMESTAMPS')
+        tracks = [t for t in row.get('tracks', []) if t.get('id') == seed.get('track_id')
+                  and t.get('box') in row.get('detection_boxes', [])]
+        split = row.get('barrier') or (previous is not None and stamp-previous > 120)
+        if split or len(tracks) != 1:
+            if current: groups.append(current)
+            current = []
+        if len(tracks) == 1 and not row.get('barrier'):
+            current.append(stamp)
+        previous = stamp
+    if current: groups.append(current)
+    matches = [g for g in groups if seed.get('media_ms') in g]
+    if len(matches) != 1:
+        return None
+    group = matches[0]
+    return {'track_id': seed['track_id'], 'start_ms':group[0], 'end_ms':group[-1],
+            'observed_frames':len(group), 'proof_eligible':False,
+            'status':'OBSERVED_CANDIDATE_COMPONENT', 'identity_verified':False}
