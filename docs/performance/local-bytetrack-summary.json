@@ -1,0 +1,32 @@
+{
+  "scope": "LOCAL_PROPOSALS_ONLY_NOT_PLAYER_IDENTITY_OR_REPORT_PARITY",
+  "source_video_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2",
+  "model_sha256": "013a98f3bc0264a3d793ef29ccbd178ceb0bbb86bc12ff3510273ce85b1c4526",
+  "engine": "opencv",
+  "window_ms": [
+    15000,
+    18000
+  ],
+  "frames": 180,
+  "llm_calls": 0,
+  "cpu_affinity_count": 1,
+  "opencv_threads": 1,
+  "versions": {
+    "supervision": "0.26.1",
+    "numpy": "2.4.6",
+    "opencv-python": "4.13.0.92"
+  },
+  "seconds": 32.5208036289996,
+  "stage_seconds": {
+    "decode": 1.7085986319962103,
+    "detection": 30.420841020996704,
+    "tracking": 0.26334853100343025
+  },
+  "frames_with_tracks": 180,
+  "distinct_track_ids": 20,
+  "identity_switches": "NOT_MEASURED_REQUIRES_LABELLED_TARGET",
+  "onnxruntime_version": null,
+  "raw_receipt_sha256": "73d7f6154da5d851534db8b71c2971a7f6343d9b09f5662c0afa36576588ef5d",
+  "candidate_rows_sha256": "86699828c145ff83121eb1d05d4d4f7f6cd576e54a73890f294dbbbe70b163db",
+  "onnx_comparison": "BLOCKED_BY_AUTOMATIC_REVIEW_TELEMETRY_CONNECTION; NO_VALID_RESULT"
+}
