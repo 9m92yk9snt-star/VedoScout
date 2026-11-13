@@ -1,0 +1,189 @@
+{
+  "scope": "HISTORICAL_PROPOSAL_REPLAY_ONLY",
+  "source_video_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2",
+  "receipt_sha256": "838b40f1a4deefb8b20d4d4ae5b003ac5acf9f8374d3804abe8825ae6572f52f",
+  "original_model_sha256": "013a98f3bc0264a3d793ef29ccbd178ceb0bbb86bc12ff3510273ce85b1c4526",
+  "original_versions": {
+    "supervision": "0.26.1",
+    "numpy": "2.4.6",
+    "opencv-python": "4.13.0.92"
+  },
+  "window_ms": [
+    15000,
+    18000
+  ],
+  "new_detector_calls": 0,
+  "new_llm_calls": 0,
+  "proof_eligible": false,
+  "tap_candidates": [
+    {
+      "tap_index": 0,
+      "status": "UNRESOLVED",
+      "track_id": null,
+      "proof_eligible": false,
+      "reason": "NO_NEARBY_SOURCE_FRAME"
+    },
+    {
+      "tap_index": 1,
+      "status": "UNRESOLVED",
+      "track_id": null,
+      "proof_eligible": false,
+      "reason": "NO_NEARBY_SOURCE_FRAME"
+    },
+    {
+      "tap_index": 2,
+      "status": "UNRESOLVED",
+      "track_id": null,
+      "proof_eligible": false,
+      "reason": "NO_NEARBY_SOURCE_FRAME"
+    },
+    {
+      "tap_index": 3,
+      "status": "CANDIDATE_SEED",
+      "track_id": "0:7",
+      "proof_eligible": false,
+      "reason": "UNIQUE_VISIBLE_DETECTION",
+      "media_ms": 15849
+    },
+    {
+      "tap_index": 4,
+      "status": "UNRESOLVED",
+      "track_id": null,
+      "proof_eligible": false,
+      "reason": "NO_NEARBY_SOURCE_FRAME"
+    },
+    {
+      "tap_index": 5,
+      "status": "UNRESOLVED",
+      "track_id": null,
+      "proof_eligible": false,
+      "reason": "NO_NEARBY_SOURCE_FRAME"
+    },
+    {
+      "tap_index": 6,
+      "status": "UNRESOLVED",
+      "track_id": null,
+      "proof_eligible": false,
+      "reason": "NO_NEARBY_SOURCE_FRAME"
+    },
+    {
+      "tap_index": 7,
+      "status": "UNRESOLVED",
+      "track_id": null,
+      "proof_eligible": false,
+      "reason": "NO_NEARBY_SOURCE_FRAME"
+    },
+    {
+      "tap_index": 8,
+      "status": "UNRESOLVED",
+      "track_id": null,
+      "proof_eligible": false,
+      "reason": "NO_NEARBY_SOURCE_FRAME"
+    },
+    {
+      "tap_index": 9,
+      "status": "UNRESOLVED",
+      "track_id": null,
+      "proof_eligible": false,
+      "reason": "NO_NEARBY_SOURCE_FRAME"
+    }
+  ],
+  "seed_components": [
+    null,
+    null,
+    null,
+    {
+      "track_id": "0:7",
+      "start_ms": 15599,
+      "end_ms": 16549,
+      "observed_frames": 58,
+      "proof_eligible": false,
+      "status": "OBSERVED_CANDIDATE_COMPONENT",
+      "identity_verified": false
+    },
+    null,
+    null,
+    null,
+    null,
+    null,
+    null
+  ],
+  "review_windows": [
+    [],
+    [],
+    [],
+    [
+      {
+        "start_ms": 15349,
+        "end_ms": 16799,
+        "review_frames_ms": [
+          15599,
+          15616,
+          15633,
+          15649,
+          15666,
+          15683,
+          15699,
+          15716,
+          15733,
+          15749,
+          15766,
+          15783,
+          15799,
+          15816,
+          15849,
+          15866,
+          15883,
+          15899,
+          15916,
+          15933,
+          15949,
+          15966,
+          15983,
+          15999,
+          16016,
+          16033,
+          16049,
+          16066,
+          16083,
+          16099,
+          16116,
+          16133,
+          16149,
+          16166,
+          16183,
+          16199,
+          16216,
+          16233,
+          16249,
+          16266,
+          16283,
+          16299,
+          16316,
+          16333,
+          16349,
+          16383,
+          16399,
+          16416,
+          16433,
+          16449,
+          16466,
+          16483,
+          16499,
+          16516,
+          16533,
+          16549
+        ],
+        "status": "REVIEW_PLAN_ONLY",
+        "proof_eligible": false
+      }
+    ],
+    [],
+    [],
+    [],
+    [],
+    [],
+    []
+  ],
+  "replay_seconds": 0.03233013499993831
+}

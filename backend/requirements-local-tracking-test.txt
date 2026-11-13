@@ -1,0 +1,5 @@
+# Isolated offline experiment only; does not change production dependencies.
+supervision==0.26.1
+opencv-python==4.13.0.92
+numpy==2.4.6
+

@@ -1,0 +1,25 @@
+{
+  "source_video_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2",
+  "seed": {
+    "tap_index": 3,
+    "status": "CANDIDATE_SEED",
+    "track_id": "0:7",
+    "proof_eligible": false,
+    "reason": "UNIQUE_VISIBLE_DETECTION",
+    "media_ms": 15849
+  },
+  "component": {
+    "track_id": "0:7",
+    "start_ms": 15599,
+    "end_ms": 16549,
+    "observed_frames": 58,
+    "proof_eligible": false,
+    "status": "OBSERVED_CANDIDATE_COMPONENT",
+    "identity_verified": false
+  },
+  "preceding_gap_ms": [
+    15033,
+    15599
+  ],
+  "note": "The gap precedes the original tap; do not propagate tap identity backwards across it."
+}

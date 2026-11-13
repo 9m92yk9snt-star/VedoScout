@@ -1,0 +1,232 @@
+{
+  "scope": "LOCAL_PROPOSALS_ONLY_NOT_PLAYER_IDENTITY_OR_REPORT_PARITY",
+  "source_video_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2",
+  "model_sha256": "013a98f3bc0264a3d793ef29ccbd178ceb0bbb86bc12ff3510273ce85b1c4526",
+  "engine": "opencv",
+  "window_ms": [
+    15000,
+    18000
+  ],
+  "frames": 180,
+  "llm_calls": 0,
+  "cpu_affinity_count": 1,
+  "opencv_threads": 1,
+  "versions": {
+    "supervision": "0.26.1",
+    "numpy": "2.4.6",
+    "opencv-python": "4.13.0.92"
+  },
+  "seconds": 34.835255622999966,
+  "stage_seconds": {
+    "decode": 1.9750427839999247,
+    "detection": 32.46348485300098,
+    "tracking": 0.24726107500021044
+  },
+  "frames_with_tracks": 180,
+  "distinct_track_ids": 20,
+  "identity_switches": "NOT_MEASURED_REQUIRES_LABELLED_TARGET",
+  "tap_candidates": [
+    {
+      "tap_index": 0,
+      "status": "UNRESOLVED",
+      "track_id": null,
+      "proof_eligible": false,
+      "reason": "NO_NEARBY_SOURCE_FRAME"
+    },
+    {
+      "tap_index": 1,
+      "status": "UNRESOLVED",
+      "track_id": null,
+      "proof_eligible": false,
+      "reason": "NO_NEARBY_SOURCE_FRAME"
+    },
+    {
+      "tap_index": 2,
+      "status": "UNRESOLVED",
+      "track_id": null,
+      "proof_eligible": false,
+      "reason": "NO_NEARBY_SOURCE_FRAME"
+    },
+    {
+      "tap_index": 3,
+      "status": "CANDIDATE_SEED",
+      "track_id": "0:7",
+      "proof_eligible": false,
+      "reason": "UNIQUE_VISIBLE_DETECTION",
+      "media_ms": 15849
+    },
+    {
+      "tap_index": 4,
+      "status": "UNRESOLVED",
+      "track_id": null,
+      "proof_eligible": false,
+      "reason": "NO_NEARBY_SOURCE_FRAME"
+    },
+    {
+      "tap_index": 5,
+      "status": "UNRESOLVED",
+      "track_id": null,
+      "proof_eligible": false,
+      "reason": "NO_NEARBY_SOURCE_FRAME"
+    },
+    {
+      "tap_index": 6,
+      "status": "UNRESOLVED",
+      "track_id": null,
+      "proof_eligible": false,
+      "reason": "NO_NEARBY_SOURCE_FRAME"
+    },
+    {
+      "tap_index": 7,
+      "status": "UNRESOLVED",
+      "track_id": null,
+      "proof_eligible": false,
+      "reason": "NO_NEARBY_SOURCE_FRAME"
+    },
+    {
+      "tap_index": 8,
+      "status": "UNRESOLVED",
+      "track_id": null,
+      "proof_eligible": false,
+      "reason": "NO_NEARBY_SOURCE_FRAME"
+    },
+    {
+      "tap_index": 9,
+      "status": "UNRESOLVED",
+      "track_id": null,
+      "proof_eligible": false,
+      "reason": "NO_NEARBY_SOURCE_FRAME"
+    }
+  ],
+  "target_track_summary": {
+    "id": "0:7",
+    "observed_frames": 146,
+    "first_ms": 15016,
+    "last_ms": 17999,
+    "largest_gap_ms": 566,
+    "identity_verified": false
+  },
+  "tap_frame": {
+    "media_ms": 15849,
+    "width": 1080,
+    "height": 1920,
+    "scene": 0,
+    "barrier": false,
+    "person_detections": 6,
+    "detection_boxes": [
+      [
+        0.2942962646484375,
+        1344.7630004882812,
+        536.7228240966797,
+        1918.5650024414062
+      ],
+      [
+        338.25525283813477,
+        855.1153564453125,
+        503.3543357849121,
+        1109.7570190429688
+      ],
+      [
+        141.02107429504395,
+        863.5706634521484,
+        227.90142631530762,
+        1000.2679595947266
+      ],
+      [
+        462.6219177246094,
+        832.6769256591797,
+        596.8734741210938,
+        1102.3340606689453
+      ],
+      [
+        521.7816467285156,
+        920.6567230224609,
+        647.0527954101562,
+        1109.3834381103516
+      ],
+      [
+        464.47869873046875,
+        765.3133163452148,
+        558.9679870605469,
+        890.5821304321289
+      ]
+    ],
+    "detection_scores": [
+      0.9551917910575867,
+      0.8575388789176941,
+      0.688922107219696,
+      0.5505759716033936,
+      0.4676229655742645,
+      0.37928566336631775
+    ],
+    "tracks": [
+      {
+        "id": "0:1",
+        "box": [
+          0.2942962646484375,
+          1344.7630004882812,
+          536.7228240966797,
+          1918.5650024414062
+        ],
+        "confidence": 0.9551917910575867,
+        "proof_eligible": false
+      },
+      {
+        "id": "0:7",
+        "box": [
+          338.25525283813477,
+          855.1153564453125,
+          503.3543357849121,
+          1109.7570190429688
+        ],
+        "confidence": 0.8575388789176941,
+        "proof_eligible": false
+      },
+      {
+        "id": "0:13",
+        "box": [
+          141.02107429504395,
+          863.5706634521484,
+          227.90142631530762,
+          1000.2679595947266
+        ],
+        "confidence": 0.688922107219696,
+        "proof_eligible": false
+      },
+      {
+        "id": "0:5",
+        "box": [
+          462.6219177246094,
+          832.6769256591797,
+          596.8734741210938,
+          1102.3340606689453
+        ],
+        "confidence": 0.5505759716033936,
+        "proof_eligible": false
+      },
+      {
+        "id": "0:2",
+        "box": [
+          521.7816467285156,
+          920.6567230224609,
+          647.0527954101562,
+          1109.3834381103516
+        ],
+        "confidence": 0.4676229655742645,
+        "proof_eligible": false
+      },
+      {
+        "id": "0:3",
+        "box": [
+          464.47869873046875,
+          765.3133163452148,
+          558.9679870605469,
+          890.5821304321289
+        ],
+        "confidence": 0.37928566336631775,
+        "proof_eligible": false
+      }
+    ]
+  },
+  "note": "Only tap index 3 falls in this window; the other taps were not evaluated. Track persistence does not verify identity."
+}
