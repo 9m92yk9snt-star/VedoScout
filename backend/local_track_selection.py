@@ -83,3 +83,36 @@ def seed_component(rows, seed):
     return {'track_id': seed['track_id'], 'start_ms':group[0], 'end_ms':group[-1],
             'observed_frames':len(group), 'proof_eligible':False,
             'status':'OBSERVED_CANDIDATE_COMPONENT', 'identity_verified':False}
+
+
+def overlap_review_frames(rows, component):
+    """Review candidates only; overlap is not an identity-switch verdict.
+
+    A quarter of the smaller box is a diagnostic threshold, not a calibrated
+    identity confidence. No result of this function authorizes LLM suppression.
+    """
+    if not component:
+        return []
+    flagged = []
+    def area(b):
+        return max(0., b[2]-b[0])*max(0., b[3]-b[1])
+    for row in rows:
+        if not component['start_ms'] <= row['media_ms'] <= component['end_ms']:
+            continue
+        target = [t for t in row.get('tracks', []) if t.get('id') == component['track_id']]
+        if len(target) != 1:
+            continue
+        box = target[0]['box']
+        maximum = 0.
+        for other in row.get('detection_boxes', []):
+            if other == box:
+                continue
+            denominator = min(area(box), area(other))
+            if denominator <= 0:
+                continue
+            intersection = max(0.,min(box[2],other[2])-max(box[0],other[0])) * max(0.,min(box[3],other[3])-max(box[1],other[1]))
+            maximum = max(maximum, intersection/denominator)
+        if maximum >= .25:
+            flagged.append({'media_ms':row['media_ms'],'reason':'PERSON_BOX_OVERLAP',
+                            'overlap_fraction':maximum,'proof_eligible':False})
+    return flagged

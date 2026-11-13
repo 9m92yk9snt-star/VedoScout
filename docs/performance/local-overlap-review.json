@@ -1,0 +1,357 @@
+{
+  "component": {
+    "track_id": "0:7",
+    "start_ms": 15599,
+    "end_ms": 16549,
+    "observed_frames": 58,
+    "proof_eligible": false,
+    "status": "OBSERVED_CANDIDATE_COMPONENT",
+    "identity_verified": false
+  },
+  "review_frames": [
+    {
+      "media_ms": 15599,
+      "reason": "PERSON_BOX_OVERLAP",
+      "overlap_fraction": 0.5100530885704646,
+      "proof_eligible": false
+    },
+    {
+      "media_ms": 15616,
+      "reason": "PERSON_BOX_OVERLAP",
+      "overlap_fraction": 0.47076891291575107,
+      "proof_eligible": false
+    },
+    {
+      "media_ms": 15633,
+      "reason": "PERSON_BOX_OVERLAP",
+      "overlap_fraction": 0.41054837070570627,
+      "proof_eligible": false
+    },
+    {
+      "media_ms": 15649,
+      "reason": "PERSON_BOX_OVERLAP",
+      "overlap_fraction": 0.3250288030543852,
+      "proof_eligible": false
+    },
+    {
+      "media_ms": 15666,
+      "reason": "PERSON_BOX_OVERLAP",
+      "overlap_fraction": 0.3990244055419878,
+      "proof_eligible": false
+    },
+    {
+      "media_ms": 15683,
+      "reason": "PERSON_BOX_OVERLAP",
+      "overlap_fraction": 0.35462913449951594,
+      "proof_eligible": false
+    },
+    {
+      "media_ms": 15699,
+      "reason": "PERSON_BOX_OVERLAP",
+      "overlap_fraction": 0.28513656654054104,
+      "proof_eligible": false
+    },
+    {
+      "media_ms": 15716,
+      "reason": "PERSON_BOX_OVERLAP",
+      "overlap_fraction": 0.292763164611634,
+      "proof_eligible": false
+    },
+    {
+      "media_ms": 15733,
+      "reason": "PERSON_BOX_OVERLAP",
+      "overlap_fraction": 0.3189254057368833,
+      "proof_eligible": false
+    },
+    {
+      "media_ms": 15749,
+      "reason": "PERSON_BOX_OVERLAP",
+      "overlap_fraction": 0.2869757922413046,
+      "proof_eligible": false
+    },
+    {
+      "media_ms": 15766,
+      "reason": "PERSON_BOX_OVERLAP",
+      "overlap_fraction": 0.6895041540884769,
+      "proof_eligible": false
+    },
+    {
+      "media_ms": 15783,
+      "reason": "PERSON_BOX_OVERLAP",
+      "overlap_fraction": 0.719537683589905,
+      "proof_eligible": false
+    },
+    {
+      "media_ms": 15799,
+      "reason": "PERSON_BOX_OVERLAP",
+      "overlap_fraction": 0.3496817766444431,
+      "proof_eligible": false
+    },
+    {
+      "media_ms": 15816,
+      "reason": "PERSON_BOX_OVERLAP",
+      "overlap_fraction": 0.5618714507043311,
+      "proof_eligible": false
+    },
+    {
+      "media_ms": 15849,
+      "reason": "PERSON_BOX_OVERLAP",
+      "overlap_fraction": 0.2781571789129161,
+      "proof_eligible": false
+    },
+    {
+      "media_ms": 15866,
+      "reason": "PERSON_BOX_OVERLAP",
+      "overlap_fraction": 0.27400546636443956,
+      "proof_eligible": false
+    },
+    {
+      "media_ms": 15883,
+      "reason": "PERSON_BOX_OVERLAP",
+      "overlap_fraction": 0.3499214740590974,
+      "proof_eligible": false
+    },
+    {
+      "media_ms": 15899,
+      "reason": "PERSON_BOX_OVERLAP",
+      "overlap_fraction": 0.3111656842948978,
+      "proof_eligible": false
+    },
+    {
+      "media_ms": 15916,
+      "reason": "PERSON_BOX_OVERLAP",
+      "overlap_fraction": 0.31478582694523854,
+      "proof_eligible": false
+    },
+    {
+      "media_ms": 15933,
+      "reason": "PERSON_BOX_OVERLAP",
+      "overlap_fraction": 0.2748924065646511,
+      "proof_eligible": false
+    },
+    {
+      "media_ms": 15949,
+      "reason": "PERSON_BOX_OVERLAP",
+      "overlap_fraction": 0.2869845885279742,
+      "proof_eligible": false
+    },
+    {
+      "media_ms": 15966,
+      "reason": "PERSON_BOX_OVERLAP",
+      "overlap_fraction": 0.2825776739565321,
+      "proof_eligible": false
+    },
+    {
+      "media_ms": 15983,
+      "reason": "PERSON_BOX_OVERLAP",
+      "overlap_fraction": 0.2601906835592709,
+      "proof_eligible": false
+    },
+    {
+      "media_ms": 15999,
+      "reason": "PERSON_BOX_OVERLAP",
+      "overlap_fraction": 0.3180570194119149,
+      "proof_eligible": false
+    },
+    {
+      "media_ms": 16016,
+      "reason": "PERSON_BOX_OVERLAP",
+      "overlap_fraction": 0.3243727472735788,
+      "proof_eligible": false
+    },
+    {
+      "media_ms": 16033,
+      "reason": "PERSON_BOX_OVERLAP",
+      "overlap_fraction": 0.41759939312871314,
+      "proof_eligible": false
+    },
+    {
+      "media_ms": 16049,
+      "reason": "PERSON_BOX_OVERLAP",
+      "overlap_fraction": 0.4830843987707747,
+      "proof_eligible": false
+    },
+    {
+      "media_ms": 16066,
+      "reason": "PERSON_BOX_OVERLAP",
+      "overlap_fraction": 0.5006816089373575,
+      "proof_eligible": false
+    },
+    {
+      "media_ms": 16083,
+      "reason": "PERSON_BOX_OVERLAP",
+      "overlap_fraction": 0.6014369101277148,
+      "proof_eligible": false
+    },
+    {
+      "media_ms": 16099,
+      "reason": "PERSON_BOX_OVERLAP",
+      "overlap_fraction": 0.3688279629645055,
+      "proof_eligible": false
+    },
+    {
+      "media_ms": 16116,
+      "reason": "PERSON_BOX_OVERLAP",
+      "overlap_fraction": 0.6819602944130659,
+      "proof_eligible": false
+    },
+    {
+      "media_ms": 16133,
+      "reason": "PERSON_BOX_OVERLAP",
+      "overlap_fraction": 0.3513520160984965,
+      "proof_eligible": false
+    },
+    {
+      "media_ms": 16149,
+      "reason": "PERSON_BOX_OVERLAP",
+      "overlap_fraction": 0.38236942431499776,
+      "proof_eligible": false
+    },
+    {
+      "media_ms": 16166,
+      "reason": "PERSON_BOX_OVERLAP",
+      "overlap_fraction": 0.36274186489536575,
+      "proof_eligible": false
+    },
+    {
+      "media_ms": 16183,
+      "reason": "PERSON_BOX_OVERLAP",
+      "overlap_fraction": 0.3997783585417083,
+      "proof_eligible": false
+    },
+    {
+      "media_ms": 16199,
+      "reason": "PERSON_BOX_OVERLAP",
+      "overlap_fraction": 1.0,
+      "proof_eligible": false
+    },
+    {
+      "media_ms": 16216,
+      "reason": "PERSON_BOX_OVERLAP",
+      "overlap_fraction": 0.9853790348152596,
+      "proof_eligible": false
+    },
+    {
+      "media_ms": 16233,
+      "reason": "PERSON_BOX_OVERLAP",
+      "overlap_fraction": 0.6998656811799085,
+      "proof_eligible": false
+    },
+    {
+      "media_ms": 16249,
+      "reason": "PERSON_BOX_OVERLAP",
+      "overlap_fraction": 1.0,
+      "proof_eligible": false
+    },
+    {
+      "media_ms": 16266,
+      "reason": "PERSON_BOX_OVERLAP",
+      "overlap_fraction": 0.6588401220442144,
+      "proof_eligible": false
+    },
+    {
+      "media_ms": 16283,
+      "reason": "PERSON_BOX_OVERLAP",
+      "overlap_fraction": 0.6498822896869678,
+      "proof_eligible": false
+    },
+    {
+      "media_ms": 16299,
+      "reason": "PERSON_BOX_OVERLAP",
+      "overlap_fraction": 0.657579660950699,
+      "proof_eligible": false
+    },
+    {
+      "media_ms": 16316,
+      "reason": "PERSON_BOX_OVERLAP",
+      "overlap_fraction": 0.6441732955179883,
+      "proof_eligible": false
+    },
+    {
+      "media_ms": 16333,
+      "reason": "PERSON_BOX_OVERLAP",
+      "overlap_fraction": 0.6147940044428516,
+      "proof_eligible": false
+    },
+    {
+      "media_ms": 16349,
+      "reason": "PERSON_BOX_OVERLAP",
+      "overlap_fraction": 0.45789634885440406,
+      "proof_eligible": false
+    },
+    {
+      "media_ms": 16383,
+      "reason": "PERSON_BOX_OVERLAP",
+      "overlap_fraction": 0.28995519892767985,
+      "proof_eligible": false
+    },
+    {
+      "media_ms": 16399,
+      "reason": "PERSON_BOX_OVERLAP",
+      "overlap_fraction": 0.39531711794401103,
+      "proof_eligible": false
+    },
+    {
+      "media_ms": 16416,
+      "reason": "PERSON_BOX_OVERLAP",
+      "overlap_fraction": 0.5497915433280693,
+      "proof_eligible": false
+    },
+    {
+      "media_ms": 16433,
+      "reason": "PERSON_BOX_OVERLAP",
+      "overlap_fraction": 1.0,
+      "proof_eligible": false
+    },
+    {
+      "media_ms": 16449,
+      "reason": "PERSON_BOX_OVERLAP",
+      "overlap_fraction": 1.0,
+      "proof_eligible": false
+    },
+    {
+      "media_ms": 16466,
+      "reason": "PERSON_BOX_OVERLAP",
+      "overlap_fraction": 1.0,
+      "proof_eligible": false
+    },
+    {
+      "media_ms": 16483,
+      "reason": "PERSON_BOX_OVERLAP",
+      "overlap_fraction": 0.704254888629413,
+      "proof_eligible": false
+    },
+    {
+      "media_ms": 16499,
+      "reason": "PERSON_BOX_OVERLAP",
+      "overlap_fraction": 0.6414002639499444,
+      "proof_eligible": false
+    },
+    {
+      "media_ms": 16516,
+      "reason": "PERSON_BOX_OVERLAP",
+      "overlap_fraction": 0.5765462553249021,
+      "proof_eligible": false
+    },
+    {
+      "media_ms": 16533,
+      "reason": "PERSON_BOX_OVERLAP",
+      "overlap_fraction": 0.4737481581400462,
+      "proof_eligible": false
+    },
+    {
+      "media_ms": 16549,
+      "reason": "PERSON_BOX_OVERLAP",
+      "overlap_fraction": 0.662404382021563,
+      "proof_eligible": false
+    }
+  ],
+  "flagged_frames": 56,
+  "source_video_sha256": "fa56f933859508d037b1f0ecb929c8b14ee3d2a5886fe8be312dcdc24a8be5e2",
+  "visual_spot_checks_ms": [
+    16099,
+    16266,
+    16549
+  ],
+  "finding": "Sampled boxes remain on the white player but overlap the blue opponent; not all 58 frames visually reviewed. Box overlap is not evidence of an identity switch. No LLM suppression enabled."
+}
