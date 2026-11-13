@@ -116,3 +116,28 @@ def overlap_review_frames(rows, component):
             flagged.append({'media_ms':row['media_ms'],'reason':'PERSON_BOX_OVERLAP',
                             'overlap_fraction':maximum,'proof_eligible':False})
     return flagged
+
+
+def review_windows(flagged, *, start_ms, end_ms, context_ms=250, max_window_ms=2500):
+    """Group related review frames with context, without dropping any flags.
+
+    Planning only. All windows still require independent identity validation;
+    absence of a flag never authorizes skipping existing analysis.
+    """
+    if (not all(type(v) is int for v in (start_ms,end_ms,context_ms,max_window_ms))
+            or start_ms < 0 or end_ms < start_ms or context_ms < 0
+            or max_window_ms <= 2*context_ms):
+        raise ValueError('INVALID_REVIEW_WINDOW_CONFIG')
+    stamps = sorted(set(r['media_ms'] for r in flagged))
+    if any(type(t) is not int or not start_ms <= t <= end_ms for t in stamps):
+        raise ValueError('REVIEW_FRAME_OUTSIDE_SOURCE_WINDOW')
+    windows = []
+    for stamp in stamps:
+        lo,hi=max(start_ms,stamp-context_ms),min(end_ms,stamp+context_ms)
+        if windows and lo <= windows[-1]['end_ms'] and hi-windows[-1]['start_ms']<=max_window_ms:
+            windows[-1]['end_ms']=max(hi,windows[-1]['end_ms'])
+            windows[-1]['review_frames_ms'].append(stamp)
+        else:
+            windows.append({'start_ms':lo,'end_ms':hi,'review_frames_ms':[stamp],
+                            'status':'REVIEW_PLAN_ONLY','proof_eligible':False})
+    return windows

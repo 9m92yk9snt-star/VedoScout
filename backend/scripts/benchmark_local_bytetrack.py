@@ -124,12 +124,13 @@ def main():
              'identity_switches':'NOT_MEASURED_REQUIRES_LABELLED_TARGET',
              'rows':rows}
     if args.selection_json:
-        from local_track_selection import bind_taps, seed_component, overlap_review_frames
+        from local_track_selection import bind_taps, seed_component, overlap_review_frames, review_windows
         selection = json.loads(args.selection_json.read_text())
         summary['tap_candidates'] = bind_taps(rows, selection['taps'],
             source_sha=source_sha, expected_source_sha=selection['source_video_sha256'])
         summary['seed_components'] = [seed_component(rows, seed) for seed in summary['tap_candidates']]
         summary['overlap_review'] = [overlap_review_frames(rows, c) for c in summary['seed_components']]
+        summary['review_windows'] = [review_windows(flags, start_ms=args.start_ms, end_ms=args.end_ms) for flags in summary['overlap_review']]
     args.output.parent.mkdir(parents=True,exist_ok=True)
     args.output.write_text(json.dumps(summary,indent=2)+'\n')
     print(json.dumps({k:v for k,v in summary.items() if k!='rows'},indent=2))
