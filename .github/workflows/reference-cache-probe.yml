@@ -1,0 +1,28 @@
+name: One-off shared reference cache probe
+on:
+  pull_request:
+    types: [synchronize]
+permissions:
+  contents: read
+jobs:
+  cache_probe:
+    if: github.repository == '9m92yk9snt-star/VedoScout' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'codex/reference-cache-probe' && github.event.before == '88e90313ef611b95a2259ea09d371478b810e785' && github.run_attempt == 1
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+          sparse-checkout: |
+            backend/scripts/probe_reference_cache.py
+            testdata/sequence-pilot-orman400
+          sparse-checkout-cone-mode: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install opencv-python-headless==4.10.0.84 numpy==2.1.3
+      - name: Two bounded image requests using existing credential
+        env:
+          EMERGENT_LLM_KEY: ${{ secrets.EMERGENT_LLM_KEY }}
+        run: python backend/scripts/probe_reference_cache.py
